@@ -1,0 +1,299 @@
+{% extends 'RATools/RAToolsBase.html' %}
+{% load static %}
+{% block content %}
+<style>
+    .form-control{
+        border: 1px solid black;
+    }
+</style>
+<div class="page-header">
+    <div class="d-flex justify-content-space-around">
+        <div>
+    <h3 class="page-title">
+    <div class="d-flex">
+        <div>
+        <span class="page-title-icon bg-gradient-primary text-white me-2">
+            <i class="mdi mdi-home"></i>
+        </span>
+    </div>
+    <div>
+        <div>{{ main_folder }}</div>
+        <div>{{ page_heading }}</div>
+    </div>
+    </h3>
+</div>
+{% if view_sample %}
+<div style="margin-left:50px;">
+    <a class="btn btn-gradient-success" href="{{ sample_url }}">View Sample</a>
+</div>
+{% endif %}
+</div>
+
+    <nav aria-label="breadcrumb">
+        <ul class="breadcrumb">
+            <li class="breadcrumb-item  " aria-current="page">
+                <button class="btn" data-bs-toggle="modal" data-bs-target="#overViewModal">Overview <i class="mdi mdi-alert-circle-outline icon-sm text-primary align-middle"></i></button>
+
+                {% comment %} <span></span> Overview <i class="mdi mdi-alert-circle-outline icon-sm text-primary align-middle"></i> {% endcomment %}
+            </li>
+        </ul>
+    </nav>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+    {% if request.user.role == "company_user" and not controlled_reports %}
+        <button class="btn btn-gradient-info hoverReport btn-fw" data-bs-toggle="modal" data-bs-target="#addreportmodal">Add Checklist</button>
+    {% endif %}
+    </div>
+    <div class="col-md-6 text-end">
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Search..."
+            class="form-control"
+            style="width: auto; display: inline-block;  "
+        />
+    </div>
+</div>
+
+<br>
+
+<div class="container bg-light shadow rounded p-4">
+    <div class="row">
+        <div class="col-md-12">
+            <table id="customTable" class="table table-bordered    ">
+                <thead>
+                    <tr class=" headingRow" >
+                        {% for header in table_headers %}
+                            <th class="">{{ header }} </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in reports %}
+                        {% if controlled_reports %}
+                            <tr class="tablehover">
+                                <td>{{ report }}</td>
+                                <td><button class="btn btn-gradient-success" style="color: white; border-radius: 5px; padding: 10px 20px; border: none;">
+                                    <a href="{% url 'download_document' report %}" style="color: white; text-decoration: none; font-weight: bold;">
+                                      Download Document
+                                    </a>
+                                  </button></td>
+                            </tr>
+                        {% else %}
+                        <tr class="tablehover">
+                            <td>{{ forloop.counter }}</td>
+                            <td>{% if report.name_of_api %} {{ report.name_of_api }} {% else %} {{ report.product_name }} {% endif %} </td>
+
+                                {% if report.category %}
+                                  <td>  {{ report.category }}</td>
+                                {% endif %}
+
+
+                                {% if report.name_of_api_vendor %}
+                                <td>{{ report.name_of_api_vendor }}</td>
+                                {% endif %}
+
+                                {% if report.dmf_status %}
+                                    <td>{{ report.dmf_status }}</td>
+                                    <td>{{ report.dmf }}</td>
+                                    <td>{{ report.dmf_version }}</td>
+
+                                {% endif %}
+                            <td>
+                                {% if not report.statues %}
+                                    <strong>Your Status</strong><br><br> {{ request.user.first_name }} - Not Filled
+                                {% else%}
+                                    {% for key, value in report.statues.items %}
+                                        <strong>{{ key }}</strong><br><br>
+                                        {% for sub_key, sub_value in value.items %}
+                                            {% for m,n in sub_value.items %}
+                                            {{ m }} - {{ n }} <br><br>
+                                            {% endfor %}
+                                        {% endfor %}
+                                    {% endfor %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ edit_url }}/{{report.id}}/" onclick="prventReload(e)" class="btn btn-gradient-success btn-rounded btn-icon">
+                                    <p style="margin-top: 11px;"><i class="fa fa-pencil"></i></p>
+                                </a>
+                                 <a href="{{ delete_url }}/{{report.id}}" id="DeleteBtn" class="btn btn-gradient-danger btn-rounded btn-icon">
+                                    <p style="margin-top: 11px;"><i class="fa fa-trash"></i></p>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">No checklist available</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="col-md-12 text-start mt-3 text-end">
+            <button id="prevPage" class="badge badge-danger">Previous</button>
+            <span id="currentPage">1</span>
+            <button id="nextPage" class="badge badge-danger">Next</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" tabindex="-1" id="addreportmodal">
+    <div class="modal-dialog " style="top:10%" >
+      <div class="modal-content modalContent border border-dark">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Checklist</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <form method="post" action="{{ action }}">
+                {% csrf_token %}
+                {{ form }}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary">Save changes</button>
+        </form>
+        </div>
+      </div>
+    </div>
+</div>
+
+<div class="modal fade" id="overViewModal"  tabindex="-1"  aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content modalContent">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="staticBackdropLabel"> {{modal_title}}</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            {{ modal_body_content }}
+        </div>
+        <div class="modal-footer">
+          {% comment %} <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> {% endcomment %}
+
+        </div>
+      </div>
+    </div>
+</div>
+<style>
+    form div{
+        margin-top:7px;
+        display:flex;
+        justify-content: space-between;
+    }
+    form div label{
+        padding:13px;
+    }
+    td{
+        color:black !important;
+    }
+
+    ::placeholder {
+        color: rgb(0, 0, 0) !important;
+        opacity: 1 !important; /* Firefox */
+      }
+      ::-ms-input-placeholder { /* Edge 12-18 */
+        color: red !important;
+      }
+
+    #customTable{
+        --bs-table-bg: none;
+    }
+   .hoverReport:hover{
+
+    background: linear-gradient(to right, #65b9ff, #047edf 99%);
+
+   }
+    .headingRow{
+
+        background: linear-gradient(to right, #65b9ff, #047edf 99%);
+    }
+
+
+    .modalContent{
+        background-color: white !important;
+
+    }
+    .save{
+        background: linear-gradient(120deg,rgb(237, 191, 248) ,#dd21dd);
+        color: white;
+        border: none !important;
+    }
+    .overView{
+        border:none !important
+    }
+    .tablehover:hover{
+        background-color: #f8e0fc;
+    }
+</style>
+<script>
+    prventReload(e){
+        e.preventDefault()
+    }
+document.addEventListener("DOMContentLoaded", () => {
+    const rowsPerPage = 7;
+    let currentPage = 1;
+
+    const table = document.getElementById("customTable");
+    const rows = Array.from(table.getElementsByTagName("tbody")[0].rows);
+    const searchInput = document.getElementById("searchInput");
+
+    const updateTable = () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filteredRows = rows.filter((row) =>
+            Array.from(row.cells).some((cell) =>
+                cell.textContent.toLowerCase().includes(searchTerm)
+            )
+        );
+
+        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+        document.getElementById("currentPage").textContent = currentPage;
+
+        rows.forEach((row) => (row.style.display = "none"));
+
+        filteredRows
+            .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+            .forEach((row) => (row.style.display = ""));
+    };
+
+    document.getElementById("prevPage").addEventListener("click", () => {
+        if (currentPage > 1) {
+            currentPage--;
+            updateTable();
+        }
+    });
+
+    document.getElementById("nextPage").addEventListener("click", () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filteredRows = rows.filter((row) =>
+            Array.from(row.cells).some((cell) =>
+                cell.textContent.toLowerCase().includes(searchTerm)
+            )
+        );
+
+        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            updateTable();
+        }
+    });
+
+    searchInput.addEventListener("input", () => {
+        currentPage = 1;
+        updateTable();
+    });
+
+    updateTable();
+});
+
+$("#DeleteBtn").click(function(e) {
+    if(!confirm("Are you sure, you want Delete?")){
+      e.preventDefault()
+    }
+  });
+</script>
+{% endblock %}

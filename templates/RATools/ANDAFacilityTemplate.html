@@ -1,0 +1,141 @@
+{% extends 'RATools/RAToolsBase.html' %}
+{% load static %}
+{% block content %}
+<div class="card">
+  {% if show_flag %}
+  <div style="display: flex; justify-content: right; align-items: center; height: 10vh; margin-right: 20px;">
+    <button style="background-color: #007bff; color: white; border-radius: 5px; padding: 10px 20px; border: none;">
+      <a href="{% url 'download_document' 'ANDAFacilityTemplate' %}" style="color: white; text-decoration: none; font-weight: bold;">
+        Download Document
+      </a>
+    </button>
+  </div>
+  {% endif %}
+    <div class="card-body-main">
+        <div class="pdf-page">
+          <img
+          class="imgcontainer"
+          src="{% static 'img/ANDAFacilityTemplate.png' %}"
+          alt="Page 1 Image"
+        />
+        </div>
+    </div>
+    {% if page_flag %}
+          <div class="pdf-page pdf blurimg" >
+            <div>
+                <div class="form">
+                  <div class="login-header">
+                    <img src="{% static 'assets/icretegy/itechnical logo.png' %}" style="height: 89px;width: 110px;"alt="iCretegy Logo">
+                    <h3 style="margin-top:13px">LOGIN</h3>
+                    <p style="font-size: 15px;">You need to log in to access this content.</p>
+                  </div>
+                  <a href="../../adminmaster/login/"  style="text-decoration: none;">
+                    <button type="button">LOGIN</button>
+                  </a>
+                </div>
+              </div>
+          </div>
+        {% endif %}
+<div>
+
+<style>
+  .form {
+    position: relative;
+    z-index: 1;
+    background: #FFFFFF;
+    max-width: 360px;
+    margin: 0 auto 100px;
+    margin-top: 70px;
+    padding: 45px;
+    text-align: center;
+    box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+  }
+
+  .form button {
+    font-family: "Roboto", sans-serif;
+    text-transform: uppercase;
+    outline: 0;
+    background-color: #ef6603;
+    width: 100%;
+    border: 0;
+    padding: 15px;
+    color: #FFFFFF;
+    font-size: 14px;
+    -webkit-transition: all 0.3 ease;
+    transition: all 0.3 ease;
+    cursor: pointer;
+  }
+    .blurimg{
+      height: 100%;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-image: url('{% static "img/blur_img.png" %}');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 100%;
+    }
+
+    .pdf-page {
+        width: 230mm; /* A4 width */
+        min-height: 266mm; /* A4 height */
+        margin: 0 auto;
+        padding: 40px;
+        border: 1px solid #ddd;
+        box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        position: relative;
+        overflow: hidden;
+        page-break-after: always;
+
+      }
+
+
+      /* Fix watermark positioning */
+      .pdf {
+        position: relative;
+        isolation: isolate;
+      }
+
+      .pdf::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("{% static 'img/watermark.png' %}");
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 70%;
+        opacity: 0.06;
+        z-index: -1;
+        mix-blend-mode: multiply;
+      }
+
+      .pdf-page img {
+        width: 100%;
+        height: 100%;
+      }
+
+      .imgcontainer {
+        position: relative;
+        text-align: center;
+        color: white;
+        height: 100%;
+      }
+      .top-left {
+        position: absolute;
+        top: 183px;
+        left: 73px;
+        color:rgb(33,88,104);
+        font-size: 73px;
+        font-weight: bold;
+        right: 60px;
+      }
+
+      .content {
+        font-size: 14px;
+        line-height: 2.0;
+        text-align: justify;
+        padding: 20px;
+      }
+</style>
+{% endblock %}

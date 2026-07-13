@@ -1,0 +1,3199 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Top 20 Recurring Issues - Full Intelligence</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <!-- Required CSS for dashboard layout -->
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+      :root {
+        --page-bg: #edf1f6;
+        --card-bg: #ffffff;
+        --border: #dce3ef;
+        --text: #142844;
+        --muted: #5b6e89;
+        --navy: #0a2c58;
+        --navy-2: #123d74;
+        --light-navy: #e5edf9;
+        --critical: #cf3136;
+        --major: #da9a2c;
+        --green: #19a974;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--page-bg);
+        color: var(--text);
+        font-family: "Geist, Arial, sans-serif" ;
+      }
+
+      .page {
+        width: 100%;
+        margin: 0 auto;
+        padding: 24px 0 28px;
+      }
+
+      .hero {
+        border-radius: 10px;
+        padding: 26px 26px 15px;
+       background: linear-gradient(
+        135deg,
+        #02162d 0%,
+        #05284d 45%,
+        #0a3b66 100%
+    );
+        color: #ffffff;
+        box-shadow: 0 10px 24px rgba(5, 27, 55, 0.2);
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-family: Geist, Arial, sans-serif;
+        font-size: clamp(30px, 4.5vw, 32px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .hero h2 {
+        margin: 4px 0 0;
+        font-size: clamp(26px, 3.8vw, 32px);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: #f36a62;
+        font-family: Geist, Arial, sans-serif;
+        font-style: italic;
+
+      }
+
+      .hero p {
+        margin: 10px 0 0;
+
+        line-height: 1.58;
+
+        color: #aab1bd;
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+      }
+
+      .hero-stats {
+        margin-top: 20px;
+        border: 1px solid rgba(188, 210, 243, 0.25);
+        border-radius: 10px;
+        padding: 18px 20px;
+
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .hero-stat {
+        text-align: center;
+        position: relative;
+      }
+
+      .hero-stat + .hero-stat::before {
+        content: "";
+        position: absolute;
+        left: -4px;
+        top: -17px;
+        bottom: -19px;
+        width: 1px;
+        background: rgb(55 72 92);
+      }
+
+      .hero-stat-value {
+        display: block;
+        font-size: clamp(30px, 4vw, 30px);
+        line-height: 1;
+        font-weight: 800;
+      }
+
+      .hero-stat-label {
+        display: block;
+        margin-top: 3px;
+        font-size: 14px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #d6e4fa;
+      }
+
+      .layout {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .stack {
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      .card-title {
+        margin: 0;
+        padding: 12px 14px;
+        background: #f0f3f8;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #13325e;
+      }
+
+      .icon-badge {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: #113a6e;
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+
+      .card-body {
+        padding: 14px;
+      }
+
+      .card-body p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.58;
+        text-align: justify;
+        color: #324764;
+      }
+
+      .card-body p + p {
+        text-align:justify;
+        margin-top: 10px;
+      }
+
+
+
+      #exec-kpis {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .kpi-card {
+        background: #f4f6f8;
+        border-radius: 10px;
+        padding: 16px 20px;
+        min-width: 220px;
+      }
+
+      .kpi-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1f2d3d;
+      }
+
+      .kpi-subtitle {
+        font-size: 14px;
+        color: #6b7c93;
+        margin-top: 4px;
+      }
+
+      .kpi-meta {
+        font-size: 13px;
+        color: #9aa5b1;
+        margin-top: 6px;
+      }
+
+      /* Optional color accents */
+      .kpi-card.red { border-left: 4px solid #e74c3c; }
+      .kpi-card.yellow { border-left: 4px solid #f1c40f; }
+      .kpi-card.green { border-left: 4px solid #2ecc71; }
+      .kpi-card.blue { border-left: 4px solid #3498db; }
+      .pareto-list {
+        display: grid;
+        gap: 9px;
+      }
+
+      .pareto-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .pareto-label {
+        font-size: 12px;
+        color: #5d6d86;
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+
+      .pareto-track {
+        height: 14px;
+        border-radius: 999px;
+        background: #ecf1f8;
+        overflow: hidden;
+      }
+
+      .pareto-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #0b2f62, #1f538f);
+      }
+
+
+
+      .pareto-summary {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+
+        margin-bottom: 12px;
+      }
+
+      .pareto-box {
+
+        padding: 6px 8px;
+        position: relative;
+      }
+
+      .pareto-box:not(:last-child)::after {
+        content: "";
+        position: absolute;
+        right: 0;
+        top: 20%;
+        bottom: 20%;
+        width: 1px;
+        background: #d9e2ef;
+      }
+
+      /* TEXT */
+      .pareto-title {
+        font-size: 11px;
+        color: #7b8da6;
+      }
+
+
+      /* PROGRESS BAR */
+
+
+
+      .severity-list {
+        display: grid;
+        gap: 0;
+      }
+
+      .severity-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 0;
+        border-bottom: 1px solid #e5ebf4;
+      }
+
+      .severity-row:last-child {
+        padding-bottom: 0;
+        border-bottom: 0;
+      }
+
+      .sev-label {
+        font-size: clamp(16px, 1.6vw, 20px);
+        font-weight: 400;
+        color: #1a365f;
+      }
+
+      .sev-value {
+        font-size: clamp(17px, 1.8vw, 22px);
+        font-weight: 400;
+        color: #102c53;
+      }
+
+      .severity-card .card-title {
+        font-size: clamp(18px, 2.2vw, 18px);
+        padding-top: 12px;
+        padding-bottom: 12px;
+      }
+
+      .sev-red .sev-label,
+      .sev-red .sev-value {
+        color: var(--critical);
+      }
+
+      .sev-yellow .sev-label,
+      .sev-yellow .sev-value {
+        color: var(--major);
+      }
+
+      .obs-section .card-body {
+        padding: 10px 12px 12px;
+      }
+
+      /* Container */
+      .obs-list {
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Row */
+      /* LEFT BORDER LINE */
+      .obs-row {
+        position: relative;
+        border-bottom: 1px solid #e4ebf5;
+        background: #fff;
+        padding: 10px 14px 10px 18px; /* extra left space */
+      }
+
+      /* Vertical colored line */
+      .obs-row::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+        border-radius: 4px;
+      }
+
+      /* Severity colors */
+      .obs-row.critical::before {
+        background: #c62828; /* red */
+      }
+
+      /* Critical → Red */
+      .obs-row.critical .obs-count {
+        color: #c62828;
+      }
+
+      /* Major → Orange */
+      .obs-row.major .obs-count {
+        color: #e68900;
+      }
+      .obs-row.major::before {
+        background: #e68900; /* orange */
+      }
+
+      /* Remove default arrow */
+      .obs-row summary {
+        list-style: none;
+        cursor: pointer;
+      }
+      .obs-row summary::-webkit-details-marker {
+        display: none;
+      }
+
+
+
+      /* Left */
+      .obs-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .obs-rank {
+        font-weight: 700;
+        color: #6b7c93;
+        min-width: 28px;
+        white-space: nowrap;
+      }
+
+      .obs-title {
+        font-weight: 600;
+        color: #0f2d52;
+        font-size: 15px;
+      }
+
+      .obs-tags {
+        margin-top: 2px;
+      }
+
+      .badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+
+      .badge.critical {
+        background: #ffe5e7;
+        color: #c62828;
+      }
+
+      .badge.major {
+        background: #fff3e0;
+        color: #e68900;
+      }
+      .obs-header {
+        list-style: none;
+        cursor: pointer;
+      }
+      .obs-header::-webkit-details-marker {
+        display: none;
+      }
+
+      /* MAIN HEADER LAYOUT */
+      .obs-top {
+        display: grid;
+        grid-template-columns: auto 1fr auto auto;
+        align-items: center;
+        gap: 12px;
+      }
+
+      /* Right */
+      .obs-right {
+        text-align: right;
+      }
+
+      .obs-count {
+        font-weight: 700;
+        font-size: 16px;
+      }
+
+      .obs-percent {
+        font-size: 12px;
+        color: #6b7c93;
+      }
+
+      /* Arrow */
+      .obs-arrow {
+        font-size: 12px;
+        color: #7a8ca5;
+        transition: transform 0.2s ease;
+      }
+
+      .obs-row[open] .obs-arrow {
+        transform: rotate(180deg);
+      }
+
+      /* Progress Bar */
+      .obs-bar {
+        margin-top: 8px;
+        height: 3px;
+        background: #e6edf7;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      .obs-fill {
+        height: 100%;
+        border-radius: 10px;
+      }
+
+      .obs-fill.critical {
+        background: #c62828;
+      }
+
+      .obs-fill.major {
+        background: #e68900;
+      }
+
+      .obs-wrapper {
+        border-bottom: 1px solid #e4ebf5;
+        background: #fff;
+        padding: 10px 14px 12px 18px;
+        position: relative;
+      }
+
+      /* Left border stays */
+      .obs-wrapper::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 4px;
+      }
+
+      .obs-wrapper.critical::before {
+        background: #c62828;
+      }
+
+      .obs-wrapper.major::before {
+        background: #e68900;
+      }
+      /* Dropdown content (keep existing) */
+      .obs-content {
+        display: none;
+        padding-top: 10px;
+      }
+
+      .obs-row[open] .obs-content {
+        display: block;
+      }
+
+      .obs-kpi-row {
+        margin-top: 8px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .obs-kpi {
+        border: 1px solid #e3eaf5;
+        border-radius: 6px;
+        padding: 7px 8px;
+        background: #f8fafe;
+      }
+
+      .obs-kpi strong {
+        display: block;
+        font-size: 14px;
+        line-height: 1;
+        color: #102f59;
+      }
+
+      .obs-kpi span {
+        margin-top: 3px;
+        display: block;
+        font-size: 10px;
+        color: #647691;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+      }
+
+      .implication {
+        margin-top: 16px;
+        border-radius: 10px;
+        padding: 18px 20px 20px;
+       background: linear-gradient(135deg, #02162d 0%, #05284d 45%, #0a3b66 100%);
+        color: #ffffff;
+      }
+
+      .implication h3 {
+        margin: 0;
+        font-size: clamp(34px, 3.8vw, 46px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .implication p {
+        margin: 10px 0 0;
+        color: #deecff;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+
+      @media (max-width: 980px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-stats {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .hero-stat + .hero-stat::before {
+          display: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .obs-head {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .obs-title {
+          flex: 1 1 calc(100% - 40px);
+        }
+
+        .obs-arrow {
+          margin-left: auto;
+        }
+
+        .obs-kpi-row,
+        .exec-kpis {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* 483 Dashboard Navbar & Sidebar CSS */
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        text-align: left !important;
+      }
+
+      .navbar-menu-wrapper {
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+        flex-grow: 1;
+      }
+
+      .nav-header-link {
+        font-size: 14px !important;
+        font-weight: bold;
+        text-decoration: none;
+        border-radius: 5px;
+        color: black !important;
+      }
+
+      @media (max-width: 1490px) {
+        .nav-header-link {
+          font-size: 12px !important;
+        }
+      }
+
+ .nav-header-link-hover:hover {
+        color: #045c8d !important;
+      }
+
+      .active-header-link {
+        color:  rgba(255, 255, 255, 1) !important;
+        background: linear-gradient(to right, #045c8d , #1276a2) !important;
+      }
+
+      .navbar-brand-wrapper {
+        width: fit-content !important;
+      }
+
+      .dropdown-menu[data-bs-popper] {
+        top: 70%;
+      }
+
+      .dashboard-page-body {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        padding-top: 70px;
+        min-height: 100vh;
+      }
+
+        .dashboard-main-panel {
+      flex: 1 1 auto;
+    margin-left: 260px;
+      width: calc(100% - 260px);
+      padding-left: 10px;
+    transition: all 0.3s ease;
+      transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .main-panel {
+        margin-left: 80px;
+        width: calc(100% - 80px);
+    }
+
+      .dashboard-layout:not(.sidebar-collapsed) .dashboard-main-panel {
+        transition: margin-left 0.25s ease;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 96px;
+        min-width: 96px;
+        max-width: 96px;
+      }
+
+      .dashboard-layout.sidebar-collapsed .sidebar-submenu-list,
+      .dashboard-layout.sidebar-collapsed .dropdown-caret {
+        display: none !important;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+        width: 56px;
+        margin: 0 auto;
+        justify-content: center;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .submenu-link {
+        margin-left: 2.5rem !important;
+      }
+
+      .dashboard-layout.sidebar-collapsed .submenu-link {
+        padding-left: 0 !important;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+        display: none;
+      }
+
+      .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+        justify-content: center;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+        display: flex;
+        justify-content: center;
+      }
+
+      .content-wrapper {
+        background: none;
+        padding: 0 20px !important;
+      }
+      .card .card-body
+      {
+        padding: 10px!important;
+      }
+
+      @media (max-width: 991px) {
+        .dashboard-page-body {
+          flex-direction: column;
+          padding-top: 70px;
+        }
+
+        .dashboard-sidebar {
+          position: relative;
+          top: 0;
+          width: 100%;
+          min-width: 100%;
+          max-width: 100%;
+          height: auto;
+          border-radius: 0 0 16px 16px;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+          width: 100%;
+          min-width: 100%;
+          max-width: 100%;
+        }
+
+        .dashboard-main-panel {
+          width: 100% !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-scroller">
+      <!-- Navbar -->
+      {% include './navbar.html' %}
+      <!-- Dashboard Layout with Sidebar -->
+      <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+
+      {% include './sidebar.html' %}
+        <!-- Main Panel -->
+        <div class="main-panel dashboard-main-panel">
+          <div class="content-wrapper">
+            <div class="page">
+      <section class="hero">
+        <h1>Top 20 Recurring Issues</h1>
+        <h2 id="entity-title">API Manufacturer - India</h2>
+        <p id="hero-intro"></p>
+
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <span class="hero-stat-value" id="hero-total">497</span>
+            <span class="hero-stat-label">Total Observations</span>
+          </div>
+          <div class="hero-stat">
+            <span class="hero-stat-value" id="hero-critical">5</span>
+            <span class="hero-stat-label">Critical</span>
+          </div>
+          <div class="hero-stat">
+            <span class="hero-stat-value" id="hero-major">15</span>
+            <span class="hero-stat-label">Major</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="layout">
+        <div class="stack">
+          <article class="card">
+            <h3 class="card-title">
+              <span class="icon-badge">P</span> Preamble
+            </h3>
+            <div
+              class="card-body"
+              id="preamble-content"
+              style="text-align: justify !important"
+            ></div>
+          </article>
+
+          <article class="card">
+            <h3 class="card-title">
+              <span class="icon-badge">E</span> Executive Summary
+            </h3>
+            <div class="card-body" style="text-align: justify !important">
+              <p id="exec-summary"></p>
+              <div class="exec-kpis" id="exec-kpis"></div>
+            </div>
+          </article>
+
+          <article class="card obs-section">
+            <h3 class="card-title">
+              <span class="icon-badge" style="background-color: #c62828;">20</span> Top 20 Observations - Ranked by
+              Frequency
+            </h3>
+            <div class="card-body" style="padding: 0px !important;">
+              <div class="obs-list" id="observation-list"></div>
+            </div>
+          </article>
+        </div>
+
+        <div class="stack">
+          <article class="card">
+            <h3 class="card-title">
+              <span class="icon-badge">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <rect
+                    x="2"
+                    y="12"
+                    width="4"
+                    height="10"
+                    fill="currentColor"
+                  ></rect>
+                  <rect
+                    x="10"
+                    y="4"
+                    width="4"
+                    height="18"
+                    fill="currentColor"
+                  ></rect>
+                  <rect
+                    x="18"
+                    y="8"
+                    width="4"
+                    height="14"
+                    fill="currentColor"
+                  ></rect>
+                </svg>
+              </span>
+              Pareto Chart
+            </h3>
+            <div class="card-body">
+              <div class="pareto-list" id="pareto-list"></div>
+                <div class="pareto-summary" id="pareto-summary"></div>
+            </div>
+          </article>
+
+          <article class="card severity-card">
+            <h3 class="card-title">
+              <span class="icon-badge">S</span> Severity Breakdown
+            </h3>
+            <div class="card-body">
+              <div class="severity-list">
+                <div class="severity-row sev-red">
+                  <span class="sev-label">Critical issues</span>
+                  <span class="sev-value" id="sev-critical-issues"
+                    >5 issues</span
+                  >
+                </div>
+                <div class="severity-row sev-yellow">
+                  <span class="sev-label">Major issues</span>
+                  <span class="sev-value" id="sev-major-issues">15 issues</span>
+                </div>
+                <div class="severity-row">
+                  <span class="sev-label">Critical count</span>
+                  <span class="sev-value" id="sev-critical-count" style="color: var(--critical);">303</span>
+                </div>
+                <div class="severity-row">
+                  <span class="sev-label">Major count</span>
+                  <span class="sev-value" id="sev-major-count" style="color: #da9a2c !important;">194</span>
+                </div>
+                <div class="severity-row">
+                  <span class="sev-label">Grand total</span>
+                  <span class="sev-value" id="sev-grand-total" ">497</span>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="implication">
+        <h3>Overall Regulatory Implication</h3>
+        <p id="implication-text" style="text-align: justify;"></p>
+      </section>
+    </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+    <script>
+      function initSidebarToggle() {
+        const layout = document.getElementById('dashboardLayout');
+        const toggleButton = document.getElementById('sidebarToggle');
+        if (!layout || !toggleButton) return;
+
+        toggleButton.addEventListener('click', () => {
+          layout.classList.toggle('sidebar-collapsed');
+          toggleButton.setAttribute('aria-expanded',
+            layout.classList.contains('sidebar-collapsed') ? 'false' : 'true');
+
+          if (typeof updateSidebarSubmenus === 'function' && typeof countryKey !== 'undefined') {
+            updateSidebarSubmenus(countryKey, typeof manufacturerLabel !== 'undefined' ? manufacturerLabel : '');
+          }
+        });
+      }
+      document.addEventListener('DOMContentLoaded', initSidebarToggle);
+    </script>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const countryParam = (params.get("country") || "india")
+        .trim()
+        .toLowerCase();
+      const manufacturerParam = (params.get("manufacturer") || "").trim();
+      const manufacturerKeyParam = (params.get("manufacturer_key") || "")
+        .trim()
+        .toLowerCase();
+      const parsedProfileIndex = Number.parseInt(params.get("profile"), 10);
+      const profileIndex = Number.isNaN(parsedProfileIndex)
+        ? null
+        : parsedProfileIndex;
+      const countryKey = countryParam === "usa" ? "usa" : "india";
+      const countryLabel = countryKey === "usa" ? "USA" : "India";
+
+      const OBSERVATION_WEIGHTS = [
+        17, 13, 9, 7, 6, 5, 4, 4, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 1, 1,
+      ];
+
+      const COMMON_THEMES = [
+        "Laboratory Record Completeness",
+        "Deviation Investigation Quality",
+        "CAPA Effectiveness Verification",
+        "Change Control Governance",
+        "Environmental Monitoring Trends",
+        "Cleaning Validation Execution",
+        "Supplier Qualification Controls",
+        "Equipment Calibration Discipline",
+        "Process Validation Lifecycle",
+        "Data Integrity Oversight",
+        "Quality Unit Independence",
+        "Training Effectiveness Checks",
+        "Batch Record Review Accuracy",
+        "Microbiology Laboratory Governance",
+        "Cross-Contamination Prevention",
+        "Complaint Investigation Depth",
+        "Stability Program Execution",
+        "Material Status Segregation",
+        "Access Control Governance",
+        "Maintenance Program Adherence",
+        "Risk Management Documentation",
+        "Analytical Method Suitability",
+        "Line Clearance and Changeover",
+        "Documentation Timeliness",
+        "Root-Cause Verification",
+      ];
+
+      const detailProfiles = {
+        india: [
+          {
+            manufacturerKey: "api_manufacturers",
+            manufacturer: "API Manufacturers",
+            totalObservations: 497,
+            criticalSignal: 5,
+            majorSignal: 15,
+            criticalIssues: 5,
+            heroIntro:
+              "Consolidated risk-based evaluation of recurring GMP inspectional observations. Ranked by frequency to support inspection readiness, cGMP system prioritization, and focused remediation planning.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across API Manufacturer establishments in India, based exclusively on the currently provided source dataset of the Top 20 recurring issues. The purpose of this report is to translate the ranked recurring observations into a structured regulatory narrative that supports inspection readiness, quality system prioritization, and focused remediation planning. The analysis is intended to help management and quality stakeholders understand where inspection exposure is concentrated and what those recurring themes indicate from a broader compliance and product quality perspective.",
+              "The compiled data show a dominant concentration of findings in Out-Of-Specification (OOS) investigations and retesting practices, routine cleaning and sanitation execution, laboratory controls and method suitability, cleaning validation and verification, and deviation investigations. This pattern indicates that the most persistent risks remain clustered around scientific decision-making, contamination control, laboratory governance, and the robustness of quality event management systems.",
+              "Critical observations are also prominently concentrated in areas such as documentation and record integrity, warehouse and traceability controls, equipment cleaning and maintenance, supplier and raw material controls, process validation, and data integrity or computerized systems. These observations reflect recurring weaknesses that can directly influence batch disposition, product quality assurance, and confidence in the reliability of GMP controls.",
+              "Beyond the dominant systems, recurring Major observations in stability, Quality Unit oversight, training, packaging and labeling controls, and utility system monitoring indicate broader opportunities to strengthen lifecycle control, procedural discipline, and effectiveness of CAPA. Overall, the current India API profile reflects a need for targeted and sustained remediation in those systems most closely tied to scientific justification, contamination prevention, and completeness of GMP execution records.",
+            ],
+            executiveSummary:
+              "The ranking indicates that the most significant regulatory vulnerability is concentrated in OOS investigations and retesting practices, followed by routine cleaning and sanitation execution, laboratory controls and method suitability, cleaning validation and verification, and deviation investigations.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that API Manufacturer operations in India face significant and sustained GMP pressure in a relatively concentrated set of quality system elements. The recurrence of observations involving OOS investigations and retesting, cleaning and sanitation execution, laboratory controls, cleaning validation, deviations, documentation, and warehouse controls indicates that regulatory agencies may view these weaknesses not as isolated lapses but as evidence of broader gaps in scientific discipline, contamination control, quality oversight, and CAPA effectiveness. Unless these recurring themes are addressed through robust, system-level remediation, they may continue to generate repeat observations, elevate product quality risk, and adversely affect inspection outcomes, regulatory confidence, and overall compliance posture.",
+            observationTitles: [
+              "OOS Investigations & Retesting",
+              "Routine Cleaning/Sanitation Execution & Records",
+              "Laboratory Controls & Method Suitability",
+              "Deviation Investigations",
+              "Cleaning Validation & Verification",
+              "Chromatography Controls (HPLC/GC)",
+              "Materials Traceability/Issuance & Warehouse Controls",
+              "Supplier Qualification/COA & Incoming Controls",
+              "OOT/Trending & Monitoring",
+              "Batch/Master Records & Documentation",
+              "Quality Unit Oversight & Batch Release",
+              "SOP / Document Control & Periodic Review",
+              "Stability Program & Retest/Expiry",
+              "Laboratory Records & Raw Data Completeness",
+              "Cross-Contamination / Carryover Control",
+              "Microbiology Controls (Bioburden/Endotoxin/EM)",
+              "Manufacturing Process Controls & CPPs",
+              "Facilities/Utilities (HVAC/Water)",
+              "Training & Personnel Qualification",
+              "Labeling & Packaging Controls",
+            ],
+            observationCounts: [
+              115, 85, 43, 43, 37, 32, 30, 18, 14, 14, 12, 12, 8, 6, 6, 5, 5, 5,
+              4, 3,
+            ],
+
+           observationDescriptions: {
+            "OOS Investigations & Retesting": {
+              condition: "critical",
+              description:
+                "Inadequate investigation and scientific justification of OOS results, including inappropriate retesting/invalidation without assignable cause, weak root-cause determination, and insufficient impact assessment, undermining batch disposition decisions.",
+            },
+
+            "Routine Cleaning/Sanitation Execution & Records": {
+              condition: "major",
+              description:
+                "Routine cleaning/sanitation execution and documentation were inconsistent (incomplete records, residues/poor housekeeping, weak post-maintenance/changeover cleaning), increasing contamination and mix-up risk.",
+            },
+
+            "Laboratory Controls & Method Suitability": {
+              condition: "major",
+              description:
+                "Laboratory control deficiencies including analytical method suitability/verification gaps, weak sampling/system suitability rationale, and inadequate control of test execution, risking unreliable results.",
+            },
+
+            "Deviation Investigations": {
+              condition: "critical",
+              description:
+                "Deviation investigations were incomplete or ineffective (scope, root cause, impact assessment, documentation), allowing recurrence of failures and unresolved quality risk.",
+            },
+
+            "Cleaning Validation & Verification": {
+              condition: "critical",
+              description:
+                "Cleaning validation/verification program gaps (worst-case rationale, acceptance limits such as MACO/PDE, recovery studies, verification evidence) reducing assurance of residue removal and increasing carryover/cross-contamination risk.",
+            },
+
+            "Chromatography Controls (HPLC/GC)": {
+              condition: "major",
+              description:
+                "Weak chromatography controls (HPLC/GC sequences/injections, integration/data processing governance, system suitability discipline) risking inaccurate results and inappropriate dispositions.",
+            },
+
+            "Materials Traceability/Issuance & Warehouse Controls": {
+              condition: "major",
+              description:
+                "Warehouse/material status, traceability, location and issuance/dispensing controls were weak, increasing risk of wrong material use or mix-ups.",
+            },
+
+            "Supplier Qualification/COA & Incoming Controls": {
+              condition: "major",
+              description:
+                "Supplier qualification and incoming material controls were inadequate, including overreliance on COAs, insufficient identity/verification testing, and weak vendor oversight, increasing risk of unsuitable materials entering manufacturing.",
+            },
+
+            "OOT/Trending & Monitoring": {
+              condition: "major",
+              description:
+                "Inadequate trending and escalation of OOT conditions and shifts/drifts, with weak statistical monitoring and insufficient follow-up, limiting early detection of deteriorating process or laboratory control.",
+            },
+
+            "Batch/Master Records & Documentation": {
+              condition: "major",
+              description:
+                "Batch/master production and control record deficiencies (missing entries/signatures, instruction vs execution discrepancies, inadequate contemporaneous recording/review) impairing traceability and control of operations.",
+            },
+
+            "Quality Unit Oversight & Batch Release": {
+              condition: "major",
+              description:
+                "Quality unit oversight gaps (timely review or approval, batch disposition and release controls, enforcement of procedures) reduced sustained state of control.",
+            },
+
+            "SOP / Document Control & Periodic Review": {
+              condition: "major",
+              description:
+                "Weak SOP and document control and periodic review or record retention practices (obsolete or inadequate procedures, uncontrolled documents) undermined consistent GMP execution and traceability.",
+            },
+
+            "Stability Program & Retest/Expiry": {
+              condition: "major",
+              description:
+                "Stability program deficiencies (protocol robustness, stability-indicating strategy, sample storage and monitoring, retest or expiry justification) reduced assurance across the retest or expiry period.",
+            },
+
+            "Laboratory Records & Raw Data Completeness": {
+              condition: "major",
+              description:
+                "Laboratory raw data and documentation gaps (worksheets or logbooks, calculations, traceability, second-person review) reduced reliability of reported results and quality decisions.",
+            },
+
+            "Cross-Contamination / Carryover Control": {
+              condition: "critical",
+              description:
+                "Controls to prevent cross-contamination and carryover on shared or non-dedicated equipment were insufficient (segregation, changeover or line clearance, verification), increasing adulteration risk.",
+            },
+
+            "Microbiology Controls (Bioburden/Endotoxin/EM)": {
+              condition: "critical",
+              description:
+                "Microbiology testing control deficiencies (bioburden, endotoxin, and microbial methods, GPT, neutralization or recovery where applicable, sampling strategy, response to excursions) weakened contamination control.",
+            },
+
+            "Manufacturing Process Controls & CPPs": {
+              condition: "major",
+              description:
+                "Insufficient control of manufacturing and in-process parameters (CPP governance, monitoring/sampling, undocumented adjustments) increasing variability and risk of nonconforming output.",
+            },
+
+            "Facilities/Utilities (HVAC/Water)": {
+              condition: "major",
+              description:
+                "Facility and utility control weaknesses (HVAC, water and critical utilities monitoring, maintenance, excursion response) increased contamination risk and process variability.",
+            },
+
+            "Training & Personnel Qualification": {
+              condition: "major",
+              description:
+                "Gaps in GMP training and personnel qualification or competency controls for critical tasks increased execution and compliance risk.",
+            },
+
+            "Labeling & Packaging Controls": {
+              condition: "major",
+              description:
+                "Label issuance, storage and reconciliation controls and packaging line-clearance practices were weak, increasing mix-up and mislabeling risk.",
+            },
+            }
+          },
+          {
+            manufacturerKey: "rx_drug_manufacturer",
+            manufacturer: "Prescription (Rx) Drug Manufacturer",
+            totalObservations: 407,
+            criticalSignal: 8,
+            majorSignal: 16,
+            criticalIssues: 7,
+            heroIntro:
+              "This report summarizes recurring GMP inspectional observations for India FDA Prescription (Rx) Drug Manufacturer facilities and converts ranked findings into focused inspection-readiness intelligence.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across Prescription (Rx) Drug Manufacturer establishments in India. The analysis uses ranked observation trend data to highlight the most persistent and inspection-sensitive quality system weaknesses driving repeat regulatory concern across the reviewed population.",
+              "The compiled data show a dominant concentration of findings in chromatography control, OOS investigation and retesting practices, aseptic interventions, manufacturing process controls, analytical method validation, and deviation investigations. Together, these themes indicate that both laboratory governance and process-execution discipline remain major contributors to repeat inspection outcomes.",
+              "Critical observations are prominently concentrated in OOS handling, aseptic practices, deviation investigation effectiveness, environmental monitoring, CAPA follow-up, data integrity controls, cleaning validation, cross-contamination control, microbiology oversight, and access governance. These recurring patterns elevate risk to batch disposition robustness, contamination control, and data reliability.",
+              "Beyond the dominant systems, recurring Major observations in laboratory record completeness, routine cleaning execution, supplier qualification, maintenance and calibration, facilities and utilities, and Quality Unit oversight show that foundational GMP disciplines continue to require sustained remediation. Overall, the profile reflects a need for stronger science-based decision making, better documented control strategies, and tighter oversight of repeat failure mechanisms.",
+            ],
+            executiveSummary:
+               "The ranking indicates that the mostsignificant regulatory vulnerability is concentrated in chromatography governance, followed by OOS investigation discipline, aseptic technique and intervention control, manufacturing process monitoring, and analytical method suitability.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that Prescription (Rx) Drug Manufacturer operations in India face significant and sustained regulatory risk driven by recurring weaknesses in laboratory controls, investigation quality, aseptic and environmental discipline, process control governance, and electronic data management. Because the highest-ranked themes directly influence analytical reliability, contamination control, root-cause closure, and batch disposition robustness, continued recurrence of these observations may support heightened agency concern regarding the maturity and effectiveness of the firm's pharmaceutical quality system. Accordingly, remediation priorities should emphasize scientifically justified laboratory practices, stronger investigation and CAPA systems, better contamination-control execution, lifecycle validation discipline, and more effective independent Quality Unit oversight.",
+            observationTitles: [
+              "Laboratory Controls – Chromatography (HPLC/GC)",
+              "OOS Investigations & Retesting",
+              "Aseptic Practices & Interventions",
+              "Manufacturing Process Controls & In-Process Testing",
+              "Laboratory Controls – Method Validation/Verification",
+              "Deviation Investigations",
+              "OOT/OOT Trending & Monitoring",
+              "Environmental Monitoring Program",
+              "Laboratory Records & Raw Data Completeness",
+              "CAPA Effectiveness & Follow-up",
+              "Routine Cleaning/Sanitation Execution & Records",
+              "Data Integrity – Audit Trail Review & Electronic Records",
+              "Cleaning Validation & Verification (MACO/PDE/Recovery)",
+              "Materials/Supplier Qualification & Incoming Controls",
+              "Equipment Maintenance & Calibration",
+              "Cross-Contamination / Changeover / Line Clearance",
+              "Microbiology Controls – Bioburden/Endotoxin/Microbial Limits",
+              "Facilities/Utilities (HVAC/Water/Env)",
+              "Data Integrity – Access Control & Credentials",
+              "Quality Unit Oversight & Batch Release",
+            ],
+            observationCounts: [
+              440, 357, 355, 238, 169, 167, 149, 109, 104, 81, 77, 75, 63, 53,
+              43, 39, 35, 27, 21, 20,
+            ],
+            observationDescriptions: {
+              "Laboratory Controls – Chromatography (HPLC/GC)": {
+                condition: "major",
+                description:
+                  "Weak control of chromatography operations (HPLC/GC), including sequence/injection governance, integration and processing rules, system suitability discipline, and documentation, risking inaccurate results and inappropriate batch decisions.",
+              },
+
+              "OOS Investigations & Retesting": {
+                condition: "critical",
+                description:
+                  "Inadequate investigation and scientific justification of OOS results, including inappropriate retesting/invalidation without assignable cause and insufficient root-cause and impact assessment, undermining batch disposition.",
+              },
+
+              "Aseptic Practices & Interventions": {
+                condition: "critical",
+                description:
+                  "Deficiencies in aseptic technique and control of interventions/setup activities (first-air protection, intervention practices, aseptic behavior) increasing contamination risk during critical operations.",
+              },
+
+              "Manufacturing Process Controls & In-Process Testing": {
+                condition: "major",
+                description:
+                  "Manufacturing and in-process control weaknesses (CPP/parameter governance, monitoring/sampling, undocumented adjustments, incomplete records) increasing variability and risk of nonconforming product.",
+              },
+
+              "Laboratory Controls – Method Validation/Verification": {
+                condition: "major",
+                description:
+                  "Gaps in analytical method validation/verification and suitability for intended use, including incomplete performance characterization and inadequate lifecycle control, risking unreliable test outcomes.",
+              },
+
+              "Deviation Investigations": {
+                condition: "critical",
+                description:
+                  "Deviation investigations are incomplete or ineffective (scope, root cause, impact assessment, documentation), allowing recurrence of failures and unresolved quality risk.",
+              },
+
+              "OOT/OOT Trending & Monitoring": {
+                condition: "major",
+                description:
+                  "Insufficient trending/monitoring of OOT conditions and shifts/drifts in process or laboratory performance, with weak escalation and investigation of adverse trends.",
+              },
+
+              "Environmental Monitoring Program": {
+                condition: "critical",
+                description:
+                  "Environmental/personnel monitoring program weaknesses (locations, frequency, technique, limits, follow-up) reducing early detection and control of contamination trends.",
+              },
+
+              "Laboratory Records & Raw Data Completeness": {
+                condition: "major",
+                description:
+                  "Incomplete laboratory records/raw data (worksheets, calculations, traceability, second-person review) reducing reliability of reported results and quality decisions.",
+              },
+
+              "CAPA Effectiveness & Follow-up": {
+                condition: "critical",
+                description:
+                  "CAPA implementation and effectiveness verification weaknesses (delayed/insufficient actions, weak controls, inadequate effectiveness checks and trending) reducing assurance issues are permanently corrected.",
+              },
+
+              "Routine Cleaning/Sanitation Execution & Records": {
+                condition: "major",
+                description:
+                  "Inconsistent routine cleaning/sanitation execution and documentation (incomplete records, residues/poor housekeeping, weak post-maintenance/changeover cleaning) increasing contamination risk.",
+              },
+
+              "Data Integrity – Audit Trail Review & Electronic Records": {
+                condition: "critical",
+                description:
+                  "Audit trail review and electronic record governance deficiencies allowing undetected changes and compromising ALCOA+ compliance and data reliability.",
+              },
+
+              "Cleaning Validation & Verification (MACO/PDE/Recovery)": {
+                condition: "critical",
+                description:
+                  "Cleaning validation/verification gaps (worst-case rationale, MACO/PDE/limits, recovery studies, acceptance criteria and verification evidence) increasing residue/carryover and cross-contamination risk.",
+              },
+
+              "Materials/Supplier Qualification & Incoming Controls": {
+                condition: "major",
+                description:
+                  "Supplier qualification and incoming material controls are weak (COA reliance, identity testing, sampling/testing, oversight), increasing risk of unsuitable materials/components.",
+              },
+
+              "Equipment Maintenance & Calibration": {
+                condition: "major",
+                description:
+                  "Preventive maintenance and calibration controls are insufficient (overdue/incomplete PM/calibration, weak documentation), reducing assurance of equipment suitability and measurement reliability.",
+              },
+
+              "Cross-Contamination / Changeover / Line Clearance": {
+                condition: "critical",
+                description:
+                  "Insufficient segregation/changeover/line clearance controls for shared/non-dedicated equipment/materials increasing mix-up and cross-contamination/carryover risk.",
+              },
+
+              "Microbiology Controls – Bioburden/Endotoxin/Microbial Limits": {
+                condition: "critical",
+                description:
+                  "Microbiological control deficiencies (bioburden/endotoxin/microbial limits testing strategy, method controls and response to excursions) increasing contamination risk.",
+              },
+
+              "Facilities/Utilities (HVAC/Water/Env)": {
+                condition: "major",
+                description:
+                  "Facilities and utility system control weaknesses (HVAC, water/critical utilities monitoring, maintenance, excursion response) increasing contamination risk and process variability.",
+              },
+
+              "Data Integrity – Access Control & Credentials": {
+                condition: "critical",
+                description:
+                  "Access control weaknesses (shared credentials, excessive privileges, weak segregation of duties) enabling unauthorized actions and compromising data integrity.",
+              },
+
+              "Quality Unit Oversight & Batch Release": {
+                condition: "major",
+                description:
+                  "Quality Unit oversight gaps (timely review/approval, batch disposition/release controls, enforcement of procedures) reducing sustained state of control.",
+              }
+            }
+          },
+          {
+            manufacturerKey: "sterile_products",
+            manufacturer: "Sterile Manufacturers ",
+            totalObservations: 497,
+            criticalSignal: 12,
+            majorSignal: 12,
+            criticalIssues: 9,
+            heroIntro:
+              "This report provides a dedicated recurring-observation profile for India Sterile Product facilities, with emphasis on aseptic assurance, microbiology governance, and contamination prevention systems.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across Sterile establishments in India, based on the top 20 most frequently recurring observation themes captured in the uploaded source file. The analysis is intended to highlight systemic inspection trends, recurring control weaknesses, and the areas requiring sustained management attention from a compliance and patient protection perspective.",
+              "The compiled data show an overwhelming concentration of findings in contamination-control and microbiological assurance systems. Aseptic Practices & Interventions alone accounts for 748 occurrences (52.4%), while the first three themes collectively represent 1051 observations (73.6%) of the total recurring issue profile. This indicates that sterile manufacturing control, environmental surveillance, and laboratory failure handling remain the defining regulatory risk clusters within the inspected population.",
+              "Critical observations dominate the overall profile, contributing 1231 of 1428 total observations (86.2%). Beyond aseptic and environmental control weaknesses, recurring critical issues are also evident in OOS investigations, deviation investigations, cleaning validation, sterility assurance controls, microbiology testing strategy, audit trail governance, media fill adequacy, personnel monitoring, and CAPA effectiveness. Taken together, these trends point to persistent gaps in contamination prevention, investigation rigor, data reliability, and lifecycle validation of sterile operations.",
+              "Major observations, although lower in number, continue to reflect important weaknesses in routine cleaning documentation, Quality Unit oversight, qualification lifecycle controls, SOP governance, laboratory documentation, materials management, facilities and utilities oversight, and visual inspection systems. These observations remain significant because they weaken the operational discipline and procedural control needed to support a stable state of compliance in sterile manufacturing.",
+            ],
+            executiveSummary:
+              "The ranking indicates that the most significant regulatory vulnerability is concentrated in aseptic processing and microbiological control practices, followed by environmental monitoring execution, OOS investigation handling, and contamination-related investigation systems.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that Sterile operations in India face significant and sustained regulatory exposure in the areas most directly linked to sterility assurance, contamination prevention, and reliable quality decision-making. The dominant recurrence of Critical observations suggests that many establishments continue to struggle with maintaining a robust contamination-control strategy that integrates aseptic technique, environmental surveillance, sound laboratory investigation practice, validated cleaning and sterilization controls, and effective Quality Unit governance. From a regulatory perspective, the observed pattern supports heightened concern regarding product quality assurance, batch release reliability, and the overall effectiveness of pharmaceutical quality systems intended to prevent microbiological, particulate, and process-related hazards in sterile manufacturing.",
+            observationTitles: [
+              "Aseptic Practices & Interventions",
+              "Environmental Monitoring Program",
+              "OOS Investigations & Retesting",
+              "Deviation Investigations",
+              "Routine Cleaning/Sanitation Execution & Records",
+              "Quality Unit Oversight & Governance",
+              "Cleaning Validation & Verification",
+              "Process Validation / Qualification",
+              "Sterility Assurance / Sterilization Controls",
+              "Microbiology Testing Strategy (Bioburden/Endotoxin/Sterility)",
+              "SOP/Document Control & Record Retention",
+              "Laboratory Controls – Chromatography (HPLC/GC)",
+              "Laboratory Records & Raw Data Completeness",
+              "Materials Management & Supplier Controls",
+              "Facilities/Utilities Controls (HVAC/Water/Env)",
+              "Data Integrity – Audit Trail/E-records",
+              "Media Fill / Aseptic Process Simulation",
+              "Personnel Monitoring & Gowning",
+              "Visual Inspection Controls",
+              "CAPA Effectiveness & Follow-up",
+            ],
+            observationCounts: [
+              748, 195, 108, 64, 49, 37, 33, 24, 21, 21, 20, 17, 15, 15, 14, 14,
+              13, 8, 6, 6,
+            ],
+            observationDescriptions: {
+              "Aseptic Practices & Interventions": {
+                condition: "critical",
+                description:
+                  "Deficiencies in aseptic technique and control of interventions/setup activities (first-air protection, material/personnel flow, RABS/ISO 5 practices), increasing contamination risk during critical operations.",
+              },
+
+              "Environmental Monitoring Program": {
+                condition: "critical",
+                description:
+                  "Environmental monitoring program weaknesses (risk-based locations, frequency, technique, alert/action limits, and follow-up of excursions) reducing detection and control of microbial/particulate contamination trends.",
+              },
+
+              "OOS Investigations & Retesting": {
+                condition: "critical",
+                description:
+                  "Inadequate OOS handling and investigation, including inappropriate retesting/invalidation without assignable cause, weak root-cause determination and impact assessment, undermining batch disposition decisions.",
+              },
+
+              "Deviation Investigations": {
+                condition: "critical",
+                description:
+                  "Deviation investigations are incomplete/ineffective (scope, root cause, impact assessment, documentation), allowing recurrence and unresolved product quality risk.",
+              },
+
+              "Routine Cleaning/Sanitation Execution & Records": {
+                condition: "major",
+                description:
+                  "Routine cleaning/sanitation execution and documentation deficiencies (incomplete records, residues/poor housekeeping, weak post-maintenance/changeover cleaning) increasing contamination risk.",
+              },
+
+              "Quality Unit Oversight & Governance": {
+                condition: "major",
+                description:
+                  "Quality Unit governance and oversight gaps (timely review/approval, authority, enforcement of procedures) reducing sustained state of control and enabling repeat deficiencies.",
+              },
+
+              "Cleaning Validation & Verification": {
+                condition: "critical",
+                description:
+                  "Cleaning validation/verification gaps (worst-case rationale, MACO/PDE limits, recovery studies, acceptance criteria and verification evidence) increasing residue/carryover and cross-contamination risk.",
+              },
+
+              "Process Validation / Qualification": {
+                condition: "major",
+                description:
+                  "Validation/qualification lifecycle gaps (PPQ/IQ/OQ/PQ evidence, protocol/report completeness, revalidation triggers) reducing assurance of consistent routine performance.",
+              },
+
+              "Sterility Assurance / Sterilization Controls": {
+                condition: "critical",
+                description:
+                  "Sterilization/sterility assurance control weaknesses (sterile filtration/sterilizer controls, SIP/autoclave cycles, filter integrity testing, depyrogenation controls) increasing sterility failure risk.",
+              },
+
+              "Microbiology Testing Strategy (Bioburden/Endotoxin/Sterility)": {
+                condition: "critical",
+                description:
+                  "Microbiology testing strategy/control deficiencies (bioburden/endotoxin/sterility testing, sampling strategy, response to excursions) reducing assurance of microbiological quality.",
+              },
+
+              "SOP/Document Control & Record Retention": {
+                condition: "major",
+                description:
+                  "Weak SOP/document control and record retention (obsolete/inadequate procedures, insufficient periodic review, controlled records handling) undermining consistent GMP execution and traceability.",
+              },
+
+              "Laboratory Controls – Chromatography (HPLC/GC)": {
+                condition: "major",
+                description:
+                  "Weak control of chromatography operations (HPLC/GC sequences/injections, integration/data processing governance, system suitability discipline) risking inaccurate results and inappropriate dispositions.",
+              },
+
+              "Laboratory Records & Raw Data Completeness": {
+                condition: "major",
+                description:
+                  "Laboratory raw data and documentation gaps (worksheets/logbooks, calculations, traceability, second-person review) reducing reliability of reported results and quality decisions.",
+              },
+
+              "Materials Management & Supplier Controls": {
+                condition: "major",
+                description:
+                  "Supplier qualification and materials management weaknesses (incoming controls/COA verification, identity testing, traceability/status/issuance controls) increasing risk of unsuitable materials.",
+              },
+
+              "Facilities/Utilities Controls (HVAC/Water/Env)": {
+                condition: "major",
+                description:
+                  "Facility and utility control deficiencies (HVAC, water systems, pressure/temperature/humidity monitoring, maintenance, excursion response) increasing contamination risk and process variability.",
+              },
+
+              "Data Integrity – Audit Trail/E-records": {
+                condition: "critical",
+                description:
+                  "Audit trail review and electronic record governance deficiencies allowing undetected changes and compromising ALCOA+ compliance and data reliability.",
+              },
+
+              "Media Fill / Aseptic Process Simulation": {
+                condition: "critical",
+                description:
+                  "Aseptic process simulation (media fill) program gaps (non-representative simulation, interventions not simulated, incubation controls) reducing assurance of aseptic process capability.",
+              },
+
+              "Personnel Monitoring & Gowning": {
+                condition: "critical",
+                description:
+                  "Personnel monitoring and gowning/garbing practice deficiencies (technique/frequency/documentation) weakening contamination control in controlled areas.",
+              },
+
+              "Visual Inspection Controls": {
+                condition: "major",
+                description:
+                  "Visual inspection program weaknesses (inspection qualification, defect classification, acceptance limits, trending) increasing risk of defect escape and inadequate defect control.",
+              },
+
+              "CAPA Effectiveness & Follow-up": {
+                condition: "critical",
+                description:
+                  "CAPA implementation and effectiveness verification weaknesses (delayed/insufficient actions, poor implementation control, inadequate effectiveness checks and recurrence trending) reducing assurance issues are permanently corrected.",
+              }
+            }
+          },
+          {
+            manufacturerKey: "osd_manufacturers",
+            manufacturer: "OSD Manufacturers",
+            totalObservations: 497,
+            criticalSignal: 12,
+            majorSignal: 12,
+            criticalIssues: 8,
+            heroIntro:
+              "This report captures recurring GMP inspectional observations for India OSD manufacturers, with focus on validation lifecycle robustness and reproducibility of solid-oral operations.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across Oral Solid Products establishments in India. The analysis uses ranked observation trend data to identify the most frequent compliance deficiency themes, assess their severity and systemic significance, and support risk-based prioritization of corrective and preventive actions (CAPA) to strengthen inspection readiness and sustain compliance with current Good Manufacturing Practice (cGMP) requirements.",
+              "The compiled data show a dominant concentration of findings in OOS investigations & retesting, contamination/cross-contamination control, deviation investigations (non-OOS), chromatography/test execution controls (HPLC/GC), and routine cleaning/sanitation execution & records. These trends indicate recurring weaknesses in laboratory decision-making, contamination prevention, investigation discipline, analytical execution controls, and cleaning or documentation reliability across core quality systems.",
+              "Critical observations are prominently concentrated in OOS investigations & retesting, contamination/cross-contamination control, deviation investigations (non-OOS), CAPA effectiveness & follow-up, microbiological testing controls (bioburden/endotoxin/microbial limits), cleaning validation & verification. Together, these themes indicate sustained risk in product quality assurance, cross-contamination prevention, laboratory investigation rigor, CAPA sustainability, microbiological control, and cleaning validation throughout the oral solid manufacturing lifecycle.",
+              "Beyond the dominant systems, recurring Major observations in warehousing and dispensing, stability programs, CAPA effectiveness, packaging and labeling controls, complaint and trend review, and personnel qualification indicate broader governance gaps that can weaken lifecycle quality assurance. Overall, the combined Critical and Major profile reflects elevated regulatory and product quality risk and reinforces the need for sustained remediation aligned with strong Quality Unit oversight, reliable documentation practices, effective investigations, and robust validation and contamination control strategies.",
+            ],
+            executiveSummary:
+              "The ranking indicates that the most significant regulatory vulnerability is concentrated in OOS investigations and retesting practices, followed by contamination and cross-contamination control, deviation investigations, chromatography and test execution controls, and routine cleaning and sanitation execution.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that Oral Solid Products operations in India face significant and sustained regulatory risk driven by recurring weaknesses in OOS handling, contamination and cross-contamination control, deviation investigation rigor, analytical execution governance, cleaning assurance, document control, laboratory data completeness, supplier and material oversight, CAPA effectiveness, and process control discipline. The mix of Critical and Major observations indicates that both technical control systems and management-system execution require strengthening. This profile reinforces the need for scientifically justified investigations, robust contamination control, reliable laboratory and documentation practices, effective CAPA follow-through, and strong lifecycle oversight of materials, methods, facilities, and equipment as core cGMP expectations.",
+            observationTitles: [
+              "OOS Investigations & Retesting",
+              "Contamination/Cross-Contamination Control",
+              "Deviation Investigations (Non-OOS)",
+              "Chromatography/Test Execution Controls (HPLC/GC)",
+              "Routine Cleaning/Sanitation Execution & Records",
+              "SOP/Document Control & Record Retention",
+              "Laboratory Records & Raw Data Completeness",
+              "Supplier Qualification/COA & Incoming Controls",
+              "OOT/Trending & Monitoring",
+              "Materials Traceability/Issuance & Warehouse Controls",
+              "Manufacturing Process Controls & In-Process Testing",
+              "CAPA Effectiveness & Follow-up",
+              "Quality Unit Oversight & Batch Release",
+              "Batch/Master Records & Documentation Practices",
+              "Microbiological Testing Controls (Bioburden/Endotoxin/Microbial Limits)",
+              "Facilities/HVAC/Environmental Controls",
+              "Cleaning Validation & Verification",
+              "Labeling & Packaging Controls",
+              "Analytical Method Validation/Verification & Suitability",
+              "Equipment Maintenance & Calibration",
+            ],
+            observationCounts: [
+              293, 253, 245, 209, 164, 122, 98, 82, 78, 52, 52, 51, 49, 46, 42,
+              42, 41, 34, 33, 25,
+            ],
+            observationDescriptions: {
+              "OOS Investigations & Retesting": {
+                condition: "critical",
+                description:
+                  "Inadequate handling of OOS results, including inappropriate retesting/invalidation without assignable cause, weak investigation rationale, incomplete root cause determination, and insufficient impact assessment affecting batch disposition.",
+              },
+
+              "Contamination/Cross-Contamination Control": {
+                condition: "critical",
+                description:
+                  "Insufficient controls to prevent contamination/cross-contamination and mix-ups, including weak segregation/changeover practices and inadequate carryover/foreign matter controls, risking adulteration.",
+              },
+
+              "Deviation Investigations (Non-OOS)": {
+                condition: "critical",
+                description:
+                  "Inadequate deviation/nonconformance investigations, including incomplete scope, weak root-cause analysis, insufficient impact assessment, and poor documentation, allowing recurrence of failures.",
+              },
+
+              "Chromatography/Test Execution Controls (HPLC/GC)": {
+                condition: "major",
+                description:
+                  "Weak chromatography/test execution controls (sequences/injections, integration/data processing practices, system suitability governance) risking inaccurate results and inappropriate dispositions.",
+              },
+
+              "Routine Cleaning/Sanitation Execution & Records": {
+                condition: "major",
+                description:
+                  "Inconsistent routine cleaning/sanitation execution and documentation (incomplete records, residues/poor housekeeping, weak post-maintenance/changeover cleaning), increasing contamination and mix-up risk.",
+              },
+
+              "SOP/Document Control & Record Retention": {
+                condition: "major",
+                description:
+                  "Weak SOP/document control and record retention (obsolete/inadequate procedures, insufficient periodic review, uncontrolled documents) undermining consistent GMP execution and traceability.",
+              },
+
+              "Laboratory Records & Raw Data Completeness": {
+                condition: "major",
+                description:
+                  "Laboratory raw data and documentation gaps (worksheets/logbooks, calculations, traceability, second-person review) reducing reliability of reported results and release decisions.",
+              },
+
+              "Supplier Qualification/COA & Incoming Controls": {
+                condition: "major",
+                description:
+                  "Weak supplier qualification and incoming controls (COA reliance, identity testing, sampling/testing, oversight) increasing risk of unsuitable materials/components.",
+              },
+
+              "OOT/Trending & Monitoring": {
+                condition: "major",
+                description:
+                  "Weak OOT monitoring and trending, with insufficient escalation/investigation of shifts or drifts in process and laboratory performance, limiting early detection of deteriorating control.",
+              },
+
+              "Materials Traceability/Issuance & Warehouse Controls": {
+                condition: "major",
+                description:
+                  "Warehouse/material status, traceability, location accuracy and issuance/dispensing controls weak, increasing risk of wrong material use or mix-ups.",
+              },
+
+              "Manufacturing Process Controls & In-Process Testing": {
+                condition: "major",
+                description:
+                  "Manufacturing and in-process controls inadequate (CPP/parameter governance, monitoring/sampling, undocumented adjustments, incomplete documentation), increasing variability and risk of nonconforming product.",
+              },
+
+              "CAPA Effectiveness & Follow-up": {
+                condition: "critical",
+                description:
+                  "CAPA weaknesses including delayed/insufficient actions, poor implementation controls, inadequate effectiveness verification, and weak recurrence trending, reducing assurance issues are permanently corrected.",
+              },
+
+              "Quality Unit Oversight & Batch Release": {
+                condition: "major",
+                description:
+                  "Quality Unit oversight gaps (timely review/approval, batch disposition/release controls, enforcement of procedures) reducing sustained state of control.",
+              },
+
+              "Batch/Master Records & Documentation Practices": {
+                condition: "major",
+                description:
+                  "Batch/master record deficiencies (missing entries/signatures, instruction vs execution discrepancies, weak review) impairing traceability and control of manufacturing operations.",
+              },
+
+              "Microbiological Testing Controls (Bioburden/Endotoxin/Microbial Limits)": {
+                condition: "critical",
+                description:
+                  "Deficiencies in microbiological testing controls (bioburden/endotoxin/microbial limits), including sampling strategy and method controls, documentation, and response to excursions, increasing contamination risk.",
+              },
+
+              "Facilities/HVAC/Environmental Controls": {
+                condition: "major",
+                description:
+                  "Facilities and environmental controls inadequate (HVAC/environmental condition monitoring, maintenance, excursion response), increasing contamination risk and process variability.",
+              },
+
+              "Cleaning Validation & Verification": {
+                condition: "critical",
+                description:
+                  "Cleaning validation/verification program gaps (worst-case rationale, acceptance limits such as MACO/PDE, recovery studies, verification evidence) reducing assurance of residue removal and increasing carryover risk.",
+              },
+
+              "Labeling & Packaging Controls": {
+                condition: "major",
+                description:
+                  "Labeling/packaging controls weak (issuance/storage, reconciliation, line clearance), increasing risk of mix-ups or mislabeling.",
+              },
+
+              "Analytical Method Validation/Verification & Suitability": {
+                condition: "major",
+                description:
+                  "Analytical method validation/verification and suitability controls inadequate for intended use, including insufficient evidence and weak acceptance criteria rationale, risking unreliable results.",
+              },
+
+              "Equipment Maintenance & Calibration": {
+                condition: "major",
+                description:
+                  "Preventive maintenance and calibration controls insufficient (overdue/incomplete PM/calibration, weak documentation) reducing assurance of equipment suitability and measurement reliability.",
+              }
+            }
+          },
+        ],
+        usa: [
+          {
+            manufacturerKey: "api_manufacturers",
+            manufacturer: "API Manufacturers",
+            totalObservations: 374,
+            criticalSignal: 9,
+            majorSignal: 13,
+            criticalIssues: 7,
+            heroIntro:
+              "This report provides recurring-observation intelligence for USA API manufacturers, highlighting systems with sustained inspection exposure.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across API Manufacturer establishments in USA. The analysis uses ranked observation trend data to identify the most frequent compliance deficiency themes, assess their severity and systemic significance, and support risk-based prioritization of corrective and preventive actions (CAPA) to strengthen inspection readiness and sustain compliance with current Good Manufacturing Practice (cGMP) requirements.",
+              "The compiled data show a dominant concentration of findings in laboratory controls and analytical testing, deviation and incident investigations, documentation and record control, facility and pest control, supplier and raw material oversight, equipment qualification and maintenance, and Quality Unit procedure enforcement. These trends indicate recurring weaknesses in investigation discipline, documentation reliability, facility upkeep, material governance, and the effectiveness of broader Pharmaceutical Quality System execution.",
+              "Critical observations are also prominently concentrated in cleaning execution and equipment cleanliness, OOS and laboratory investigations, aseptic and environmental monitoring, process validation and process controls, data integrity and computerized systems, cleaning validation, and water and utility system oversight. Together, these themes indicate weaknesses in contamination prevention, laboratory assurance, validated-state maintenance, computerized controls, and scientific decision-making for quality-impacting events.",
+              "Beyond the dominant systems, recurring Major observations in warehousing and dispensing, stability programs, CAPA effectiveness, packaging and labeling controls, complaint and trend review, and personnel qualification indicate broader governance gaps that can weaken lifecycle quality assurance. Overall, the combined Critical and Major profile reflects elevated regulatory and product quality risk and reinforces the need for sustained remediation aligned with strong Quality Unit oversight, reliable documentation practices, effective investigations, and robust validation and contamination control strategies.",
+            ],
+            executiveSummary:
+              "The ranking indicates that the most significant regulatory vulnerability is concentrated in laboratory controls and investigations, followed by documentation practices, facility controls, supplier oversight, equipment reliability, Quality Unit execution, cleaning assurance, OOS handling, and material governance.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that API Manufacturer operations in USA face significant and sustained regulatory risk driven by recurring weaknesses in laboratory control systems, deviation and OOS investigation rigor, documentation governance, facility and material controls, equipment reliability, cleaning assurance, validation discipline, and Quality Unit oversight. The mix of Critical and Major observations indicates that both technical control systems and management-system execution require strengthening. This profile reinforces the need for timely investigations, scientifically sound laboratory and validation practices, reliable data and documentation controls, effective CAPA follow-through, and robust contamination prevention and material management strategies as core cGMP expectations.",
+            observationTitles: [
+              "Laboratory Controls / Analytical Testing",
+              "Deviation / Incident Investigations",
+              "Documentation / Record Control",
+              "Facility / Building / Pest Control",
+              "Supplier / Raw Material / Component Controls",
+              "Equipment Qualification / Calibration / Maintenance",
+              "Quality Unit Oversight / Procedure Compliance",
+              "Cleaning Execution / Equipment Cleanliness",
+              "OOS / Laboratory Investigations",
+              "Material Storage / Warehouse / Dispensing",
+              "Stability Program / Sample Storage",
+              "CAPA Effectiveness / Trending",
+              "Aseptic / Environmental Monitoring",
+              "Packaging / Labeling Controls",
+              "Process Validation / Process Controls",
+              "Data Integrity / Computerized Systems",
+              "Complaints / APR / PQR Review",
+              "Cleaning Validation / Verification",
+              "Training / Personnel Qualification",
+              "Water / Utility Systems",
+            ],
+            observationCounts: [
+              248, 180, 153, 134, 110, 106, 101, 84, 77, 73, 64, 60, 48, 48, 33,
+              29, 28, 21, 15, 9,
+            ],
+
+           observationDescriptions: {
+                "Laboratory Controls / Analytical Testing": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to establish and follow scientifically sound laboratory controls, including deficiencies in analytical testing, microbiological testing, specifications, sample handling, and execution or review of QC testing used to support batch disposition.",
+                },
+
+                "Deviation / Incident Investigations": {
+                  condition: "major",
+                  description:
+                    "The firm failed to thoroughly document, investigate, trend, and conclude manufacturing and laboratory deviations or atypical incidents, resulting in recurring events without robust root cause determination, product impact assessment, or timely closure.",
+                },
+
+                "Documentation / Record Control": {
+                  condition: "major",
+                  description:
+                    "The firm failed to maintain complete, contemporaneous, controlled, and reviewable GMP documentation and records, including missing entries, unofficial records, incomplete batch documentation, weak logbook control, and inadequate record review practices.",
+                },
+
+                "Facility / Building / Pest Control": {
+                  condition: "major",
+                  description:
+                    "The firm failed to adequately maintain buildings, rooms, and facility infrastructure, including housekeeping, structural upkeep, and pest prevention controls, creating risk that the environment could adversely affect API quality and contamination control.",
+                },
+
+                "Supplier / Raw Material / Component Controls": {
+                  condition: "major",
+                  description:
+                    "The firm failed to adequately qualify suppliers and control incoming raw materials, components, containers, closures, and related acceptance activities, including deficiencies in identity testing, COA reliance, vendor oversight, and material approval decisions.",
+                },
+
+                "Equipment Qualification / Calibration / Maintenance": {
+                  condition: "major",
+                  description:
+                    "The firm failed to adequately qualify, calibrate, verify, and maintain critical manufacturing, laboratory, and support equipment, reducing assurance that equipment and instruments remain suitable, accurate, and reliable for intended GMP use.",
+                },
+
+                "Quality Unit Oversight / Procedure Compliance": {
+                  condition: "major",
+                  description:
+                    "The firm failed to ensure the Quality Unit and responsible functions effectively enforced written procedures, review requirements, approvals, and GMP oversight responsibilities needed for consistent quality system execution.",
+                },
+
+                "Cleaning Execution / Equipment Cleanliness": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to consistently clean and maintain equipment, utensils, hoses, ducts, and product-contact parts, with residue, visible contamination, inadequate cleaning execution, or poor post-cleaning controls creating recurring risk of carryover and cross-contamination.",
+                },
+
+                "OOS / Laboratory Investigations": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to adequately investigate out-of-specification, out-of-trend, invalidated, and related laboratory failures, including weak root cause analysis, unsupported retesting, and inadequate assessment of potentially affected batches, methods, and quality systems.",
+                },
+
+                "Material Storage / Warehouse / Dispensing": {
+                  condition: "major",
+                  description:
+                    "The firm failed to adequately control storage, warehousing, dispensing, issuance, and material status practices, increasing the risk of mix-ups, traceability gaps, unsuitable storage conditions, and use of incorrect or unreleased material.",
+                },
+
+                "Stability Program / Sample Storage": {
+                  condition: "major",
+                  description:
+                    "The firm failed to establish or maintain an adequate stability program and associated sample storage controls, including weaknesses in stability design, reserve or retain sample handling, expiry support, and assurance that products remain supported throughout shelf life.",
+                },
+
+                "CAPA Effectiveness / Trending": {
+                  condition: "major",
+                  description:
+                    "The firm failed to establish effective CAPA implementation, recurrence monitoring, and effectiveness verification, allowing repeated deficiencies to continue without demonstrating sustainable remediation or meaningful quality trend review.",
+                },
+
+                "Aseptic / Environmental Monitoring": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to maintain adequate aseptic processing and environmental monitoring controls, including weaknesses in sterile practices, personnel monitoring, disinfection, media fills, and microbiological oversight needed to assure contamination control.",
+                },
+
+                "Packaging / Labeling Controls": {
+                  condition: "major",
+                  description:
+                    "The firm failed to maintain adequate packaging and labeling controls, including deficiencies in label issuance, reconciliation, line clearance, packaging record execution, and controls needed to prevent mix-ups and misidentification.",
+                },
+
+                "Process Validation / Process Controls": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to validate and control manufacturing processes and critical process parameters, including inadequate process validation, revalidation, hold-time support, and evidence that routine operations consistently produce product meeting established quality attributes.",
+                },
+
+                "Data Integrity / Computerized Systems": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to ensure data integrity and adequate control of computerized systems, including weaknesses in audit trails, user access, passwords, electronic records, backup controls, and assurance that GMP data are complete, accurate, attributable, and secure throughout the data lifecycle.",
+                },
+
+                "Complaints / APR / PQR Review": {
+                  condition: "major",
+                  description:
+                    "The firm failed to adequately review complaint history, annual product quality review requirements, and related quality trend information, limiting the ability to detect recurring product quality issues and take timely system-level action.",
+                },
+
+                "Cleaning Validation / Verification": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to establish adequate cleaning validation and cleaning verification programs, including deficiencies in worst-case rationale, residue limits, swab recovery, hold-time evaluation, and documented evidence that cleaning procedures are effective and reproducible.",
+                },
+
+                "Training / Personnel Qualification": {
+                  condition: "major",
+                  description:
+                    "The firm failed to ensure personnel were adequately trained and qualified for assigned GMP activities, including operation-specific tasks, laboratory practices, and other activities directly affecting product quality.",
+                },
+
+                "Water / Utility Systems": {
+                  condition: "critical",
+                  description:
+                    "The firm failed to adequately monitor, validate, and control critical utility systems, including water and related support systems, reducing assurance that utilities remain suitable for intended manufacturing, cleaning, and laboratory use.",
+                }
+              }
+
+
+          },
+          {
+            manufacturerKey: "rx_drug_manufacturer",
+            manufacturer: "Prescription (Rx) Drug Manufacturer",
+            totalObservations: 392,
+            criticalSignal: 10,
+            majorSignal: 19,
+            criticalIssues: 7,
+            heroIntro:
+              "This report translates recurring inspectional findings for USA Rx drug manufacturers into a management-ready regulatory risk narrative.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across Prescription (Rx) Drug Manufacturer establishments operating in USA. The analysis is derived from the top 20 recurring observation themes captured in the currently provided source file and is intended to highlight the most persistent compliance weaknesses affecting product quality assurance, contamination control, laboratory reliability, and pharmaceutical quality system execution.",
+              "The compiled data show a pronounced concentration of findings in aseptic and environmental monitoring controls, supplier and incoming material oversight, OOS and laboratory investigation discipline, and deviation management. These leading themes account for 62.5% of all cited occurrences within the top 20 list, indicating that a limited number of critical GMP systems continue to drive the majority of recurring regulatory concern.",
+              "Critical deficiencies are repeatedly observed in aseptic processing control, laboratory controls, cleaning execution, data integrity governance, process validation, cleaning validation, and utility oversight. Major but still significant weaknesses are also seen in stability programs, equipment maintenance, documentation, material storage, complaint and quality review systems, CAPA effectiveness, and quality unit oversight, reflecting broader lifecycle control gaps across manufacturing and support operations.",
+              "Overall, the trend profile indicates sustained inspection risk arising from inadequate contamination control, insufficient scientific investigation, weak supplier and material assurance, and uneven execution of core quality system controls. The ranking therefore supports a focused remediation strategy centered on the highest-concentration systems while also strengthening linked procedural, analytical, and oversight mechanisms needed for durable compliance.",
+            ],
+            executiveSummary:
+              "The ranking indicates that the most significant regulatory vulnerability is concentrated in aseptic processing and environmental monitoring systems, followed by supplier and raw material controls, OOS and laboratory investigations, deviation handling, stability oversight, and equipment lifecycle control.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that Prescription (Rx) Drug Manufacturer establishments in USA face substantial and sustained regulatory risk driven primarily by failures in contamination control, supplier and raw material governance, laboratory investigation quality, deviation management, and supporting validation or maintenance systems. The concentration of Critical observations across aseptic operations, laboratory controls, cleaning and data integrity-related systems indicates that firms remain vulnerable to regulatory action where scientific controls, documentation discipline, and quality oversight are not consistently executed. Meaningful risk reduction will require not only remediation of individual observations, but also stronger integration of investigation quality, preventive maintenance, supplier qualification, process verification, and quality unit governance across the full product lifecycle.",
+            observationTitles: [
+              "Aseptic / Environmental Monitoring",
+              "Supplier / Raw Material / Component Controls",
+              "OOS / Laboratory Investigations",
+              "Deviation / Incident Investigations",
+              "Stability Program / Sample Storage",
+              "Equipment Qualification / Calibration / Maintenance",
+              "Laboratory Controls / Analytical Testing",
+              "Cleaning Execution / Equipment Cleanliness",
+              "Data Integrity / Computerized Systems",
+              "Documentation / Record Control",
+              "Process Validation / Process Controls",
+              "Cleaning Validation / Verification",
+              "Complaints / APR / PQR Review",
+              "Material Storage / Warehouse / Dispensing",
+              "CAPA Effectiveness / Trending",
+              "Facility / Building / Pest Control",
+              "Quality Unit Oversight / Procedure Compliance",
+              "Packaging / Labeling Controls",
+              "Training / Personnel Qualification",
+              "Water / Utility Systems",
+            ],
+            observationCounts: [
+              1582, 960, 697, 581, 419, 417, 369, 289, 220, 210, 188, 177, 142,
+              133, 122, 94, 75, 52, 44, 6,
+            ],
+
+           observationDescriptions: {
+              "Aseptic / Environmental Monitoring": {
+                condition: "critical",
+                description:
+                  "The firm failed to maintain adequate aseptic processing, sterile operation, and environmental monitoring controls, including weaknesses in cleanroom practices, disinfection, personnel monitoring, media fills, and microbiological oversight needed to assure contamination control.",
+              },
+
+              "Supplier / Raw Material / Component Controls": {
+                condition: "major",
+                description:
+                  "The firm failed to adequately qualify suppliers and control incoming raw materials, components, containers, closures, and related acceptance activities, including deficiencies in identity testing, COA reliance, vendor oversight, and material approval decisions.",
+              },
+
+              "OOS / Laboratory Investigations": {
+                condition: "critical",
+                description:
+                  "The firm failed to adequately investigate out-of-specification, out-of-trend, invalidated, and related laboratory failures, including weak root cause analysis, unsupported retesting, and inadequate assessment of potentially affected batches, methods, and quality systems.",
+              },
+
+              "Deviation / Incident Investigations": {
+                condition: "major",
+                description:
+                  "The firm failed to thoroughly document, investigate, trend, and conclude manufacturing and laboratory deviations or atypical incidents, resulting in recurring events without robust root cause determination, product impact assessment, or timely closure.",
+              },
+
+              "Stability Program / Sample Storage": {
+                condition: "major",
+                description:
+                  "The firm failed to establish or maintain an adequate stability program and associated sample storage controls, including weaknesses in stability design, reserve or retain sample handling, expiry support, and assurance that products remain supported throughout shelf life.",
+              },
+
+              "Equipment Qualification / Calibration / Maintenance": {
+                condition: "major",
+                description:
+                  "The firm failed to adequately qualify, calibrate, verify, and maintain critical manufacturing, laboratory, and support equipment, reducing assurance that equipment and instruments remain suitable, accurate, and reliable for intended GMP use.",
+              },
+
+              "Laboratory Controls / Analytical Testing": {
+                condition: "critical",
+                description:
+                  "The firm failed to establish and follow scientifically sound laboratory controls, including deficiencies in analytical testing, microbiological testing, specifications, sample handling, and execution or review of QC testing used to support batch disposition.",
+              },
+
+              "Cleaning Execution / Equipment Cleanliness": {
+                condition: "critical",
+                description:
+                  "The firm failed to consistently clean and maintain equipment, utensils, hoses, ducts, and product-contact parts, with residue, visible contamination, inadequate cleaning execution, or poor post-cleaning controls creating recurring risk of carryover and cross-contamination.",
+              },
+
+              "Data Integrity / Computerized Systems": {
+                condition: "critical",
+                description:
+                  "The firm failed to ensure data integrity and adequate control of computerized systems, including weaknesses in audit trails, user access, passwords, electronic records, backup controls, and assurance that GMP data are complete, accurate, attributable, and secure throughout the data lifecycle.",
+              },
+
+              "Documentation / Record Control": {
+                condition: "major",
+                description:
+                  "The firm failed to maintain complete, contemporaneous, controlled, and reviewable GMP documentation and records, including missing entries, unofficial records, incomplete batch documentation, weak logbook control, and inadequate record review practices.",
+              },
+
+              "Process Validation / Process Controls": {
+                condition: "critical",
+                description:
+                  "The firm failed to validate and control manufacturing processes and critical process parameters, including inadequate process validation, revalidation, hold-time support, and evidence that routine operations consistently produce product meeting established quality attributes.",
+              },
+
+              "Cleaning Validation / Verification": {
+                condition: "critical",
+                description:
+                  "The firm failed to establish adequate cleaning validation and cleaning verification programs, including deficiencies in worst-case rationale, residue limits, swab recovery, hold-time evaluation, and documented evidence that cleaning procedures are effective and reproducible.",
+              },
+
+              "Complaints / APR / PQR Review": {
+                condition: "major",
+                description:
+                  "The firm failed to adequately review complaint history, annual product quality review requirements, and related quality trend information, limiting the ability to detect recurring product quality issues and take timely system-level action.",
+              },
+
+              "Material Storage / Warehouse / Dispensing": {
+                condition: "major",
+                description:
+                  "The firm failed to adequately control storage, warehousing, dispensing, issuance, and material status practices, increasing the risk of mix-ups, traceability gaps, unsuitable storage conditions, and use of incorrect or unreleased material.",
+              },
+
+              "CAPA Effectiveness / Trending": {
+                condition: "major",
+                description:
+                  "The firm failed to establish effective CAPA implementation, recurrence monitoring, and effectiveness verification, allowing repeated deficiencies to continue without demonstrating sustainable remediation or meaningful quality trend review.",
+              },
+
+              "Facility / Building / Pest Control": {
+                condition: "major",
+                description:
+                  "The firm failed to adequately maintain buildings, rooms, and facility infrastructure, including housekeeping, structural upkeep, and pest prevention controls, creating risk that the environment could adversely affect product quality and contamination control.",
+              },
+
+              "Quality Unit Oversight / Procedure Compliance": {
+                condition: "major",
+                description:
+                  "The firm failed to ensure the Quality Unit and responsible functions effectively enforced written procedures, review requirements, approvals, and GMP oversight responsibilities needed for consistent quality system execution.",
+              },
+
+              "Packaging / Labeling Controls": {
+                condition: "major",
+                description:
+                  "The firm failed to maintain adequate packaging and labeling controls, including deficiencies in label issuance, reconciliation, line clearance, packaging record execution, and controls needed to prevent mix-ups and misidentification.",
+              },
+
+              "Training / Personnel Qualification": {
+                condition: "major",
+                description:
+                  "The firm failed to ensure personnel were adequately trained and qualified for assigned GMP activities, including operation-specific tasks, laboratory practices, and other activities directly affecting product quality.",
+              },
+
+              "Water / Utility Systems": {
+                condition: "critical",
+                description:
+                  "The firm failed to adequately monitor, validate, and control critical utility systems, including water and related support systems, reducing assurance that utilities remain suitable for intended manufacturing, cleaning, and laboratory use.",
+              }
+            }
+
+          },
+
+          {
+            manufacturerKey: "sterile_products",
+            manufacturer: "Sterile Manufacturers ",
+            totalObservations: 421,
+            criticalSignal: 11,
+            majorSignal: 11,
+            criticalIssues: 8,
+            heroIntro:
+              "This report outlines recurring GMP inspectional risk for USA sterile-product facilities, emphasizing aseptic process assurance and contamination-control reliability.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across sterile manufacturing establishments in the United States. The analysis uses ranked observation trend data to identify the most frequent compliance deficiency themes, assess their severity and systemic significance, and support risk-based prioritization of corrective and preventive actions (CAPA) to strengthen inspection readiness and sustain compliance with current Good Manufacturing Practice (cGMP) requirements.",
+              "The compiled data show an overwhelming concentration of Critical findings in aseptic processing and environmental monitoring controls, followed by recurring weaknesses in equipment cleanliness and cleaning execution. This pattern indicates that contamination control, sterile operation discipline, personnel and environmental oversight, disinfection execution, and post-cleaning assurance remain the most consequential quality risks across the reviewed sterile establishments.",
+              "Additional recurring Critical findings in cleaning validation and verification, data integrity and computerized system governance, water and utility systems, laboratory controls, and OOS investigation discipline further indicate persistent gaps in validation rigor, microbiological assurance, electronic record control, and scientifically sound decision making. Together, these trends point to weaknesses in both the prevention of contamination events and the robustness of the systems used to detect, investigate, and remediate them.",
+              "Beyond the dominant Critical systems, recurring Major deficiencies indicate broader Pharmaceutical Quality System execution gaps in complaint and APR/PQR review, documentation and record control, supplier and component oversight, facility maintenance, deviation management, equipment lifecycle control, stability support, warehousing, training, packaging controls, and Quality Unit enforcement of written procedures. Overall, the combined Critical and Major profile reflects elevated regulatory and product quality risk for sterile operations and reinforces the need for sustained remediation aligned with Quality Unit governance, reliable documentation, effective validation, and strong contamination prevention controls.",
+            ],
+            executiveSummary:
+              "The ranking indicates that the most significant regulatory vulnerability is concentrated in aseptic processing and environmental monitoring systems, followed by cleaning execution, cleaning validation, documentation control, data integrity, utility oversight, laboratory governance, and investigation rigor.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that sterile manufacturers in the United States face significant and sustained regulatory risk, driven primarily by failures in aseptic/environmental monitoring, cleaning execution, cleaning validation, documentation control, data integrity governance, utility oversight, laboratory control, and investigation rigor. The predominance of Critical observations—especially the overwhelming concentration in contamination control-related systems—confirms that these deficiencies are systemic rather than isolated. This risk profile places sterile manufacturers at elevated likelihood of regulatory action and reinforces the need for strong Quality Unit oversight, scientifically sound investigations, effective validation and cleaning programs, robust sterility assurance, and reliable data integrity practices as non-negotiable cGMP requirements.",
+            observationTitles: [
+              "Aseptic / Environmental Monitoring",
+              "Cleaning Execution / Equipment Cleanliness",
+              "Complaints / APR / PQR Review",
+              "Cleaning Validation / Verification",
+              "Documentation / Record Control",
+              "Data Integrity / Computerized Systems",
+              "Supplier / Raw Material / Component Controls",
+              "Water / Utility Systems",
+              "Laboratory Controls / Analytical Testing",
+              "OOS / Laboratory Investigations",
+              "Facility / Building / Pest Control",
+              "Deviation / Incident Investigations",
+              "Equipment Qualification / Calibration / Maintenance",
+              "Stability Program / Sample Storage",
+              "CAPA Effectiveness / Trending",
+              "Material Storage / Warehouse / Dispensing",
+              "Training / Personnel Qualification",
+              "Packaging / Labeling Controls",
+              "Process Validation / Process Controls",
+              "Quality Unit Oversight / Procedure Compliance",
+            ],
+            observationCounts: [
+              1772, 574, 102, 96, 87, 59, 59, 39, 31, 29, 23, 14, 8, 7, 6, 5, 3,
+              2, 2, 1,
+            ],
+
+            observationDescriptions: {
+              "Aseptic / Environmental Monitoring": {
+                condition: "critical",
+                description:
+                  "The most frequently cited observation reflects deficiencies in aseptic processing, cleanroom discipline, environmental and personnel monitoring, disinfection practices, media fill design, smoke study support, and microbiological oversight needed to maintain robust sterility assurance.",
+              },
+
+              "Cleaning Execution / Equipment Cleanliness": {
+                condition: "critical",
+                description:
+                  "Recurring observations cited failures to consistently clean and maintain equipment, utensils, hoses, ducts, and product-contact parts, including visible residue, inadequate post-cleaning protection, and weak execution controls that increase the risk of carryover and cross-contamination.",
+              },
+
+              "Complaints / APR / PQR Review": {
+                condition: "major",
+                description:
+                  "Firms failed to adequately review complaint history, field alerts, annual product reviews, and related quality trend information, limiting the ability to identify recurring product quality signals, detect adverse trends, and take timely system-level action.",
+              },
+
+              "Cleaning Validation / Verification": {
+                condition: "critical",
+                description:
+                  "Deficiencies were repeatedly observed in cleaning validation and verification programs, including inadequate disinfectant efficacy studies, contact time support, residue limits, swab recovery, clean hold time evaluation, and documented evidence that cleaning procedures remain effective and reproducible.",
+              },
+
+              "Documentation / Record Control": {
+                condition: "major",
+                description:
+                  "Recurring observations cited incomplete, non-contemporaneous, weakly controlled, or inadequately reviewed GMP documentation, reducing traceability and limiting assurance that manufacturing, laboratory, and quality activities were accurately performed and assessed.",
+              },
+
+              "Data Integrity / Computerized Systems": {
+                condition: "critical",
+                description:
+                  "Observations identified inadequate controls over computerized systems and electronic GMP data, including weaknesses in audit trail review, access management, administrator rights, password practices, electronic record retention, and assurance that data remain complete, accurate, attributable, and secure throughout the lifecycle.",
+              },
+
+              "Supplier / Raw Material / Component Controls": {
+                condition: "major",
+                description:
+                  "Supplier qualification and incoming material control systems were deficient, including weaknesses in vendor oversight, identity testing, component approval, COA reliance, and acceptance decisions for raw materials, containers, closures, and related components used in sterile operations.",
+              },
+
+              "Water / Utility Systems": {
+                condition: "critical",
+                description:
+                  "Firms failed to maintain adequate storage, segregation, status labeling, dispensing, handling, or identification controls for materials, intermediates, APIs, or finished goods, increasing the risk of mix-up, deterioration, misuse, or contamination.",
+              },
+
+              "Laboratory Controls / Analytical Testing": {
+                condition: "critical",
+                description:
+                  "Laboratory control systems were deficient, including weaknesses in analytical and microbiological testing, sterility or endotoxin testing, specifications, sample handling, and QC execution or review used to support reliable batch disposition decisions.",
+              },
+
+              "OOS / Laboratory Investigations": {
+                condition: "critical",
+                description:
+                  "Recurring Critical observations reflected inadequate investigation of out-of-specification, out-of-trend, invalidated, and related laboratory failures, including weak root cause analysis, unsupported retesting, and insufficient assessment of potentially affected batches, methods, and systems.",
+              },
+
+              "Facility / Building / Pest Control": {
+                condition: "major",
+                description:
+                  "Deficiencies were identified in the upkeep of buildings, rooms, air handling areas, and facility infrastructure, including housekeeping, structural maintenance, and environmental condition controls that may adversely affect contamination control and product quality.",
+              },
+
+              "Deviation / Incident Investigations": {
+                condition: "major",
+                description:
+                  "Firms failed to thoroughly document, investigate, trend, and conclude manufacturing and laboratory deviations or atypical incidents, resulting in recurring events without robust root cause determination, product impact assessment, or timely closure.",
+              },
+
+              "Equipment Qualification / Calibration / Maintenance": {
+                condition: "major",
+                description:
+                  "Inadequate qualification, calibration, verification, or maintenance of manufacturing, laboratory, and support equipment reduced assurance that equipment and instruments remain suitable, accurate, and reliable for intended GMP use.",
+              },
+
+              "Stability Program / Sample Storage": {
+                condition: "major",
+                description:
+                  "Stability program weaknesses included inadequate sample storage controls, chamber qualification, reserve or retain sample handling, expiry support, and overall assurance that products remain supported throughout their labeled shelf life.",
+              },
+
+              "CAPA Effectiveness / Trending": {
+                condition: "major",
+                description:
+                  "Corrective and preventive action systems were ineffective due to weak recurrence monitoring, limited effectiveness verification, poor trend review, and insufficient evidence that implemented actions achieved sustainable remediation.",
+              },
+
+              "Material Storage / Warehouse / Dispensing": {
+                condition: "major",
+                description:
+                  "Observations cited weaknesses in storage, warehousing, dispensing, issuance, and material status controls, increasing the risk of mix-ups, traceability gaps, unsuitable storage conditions, and use of incorrect or unreleased material.",
+              },
+
+              "Training / Personnel Qualification": {
+                condition: "major",
+                description:
+                  "Firms failed to ensure personnel were adequately trained and qualified for assigned GMP activities, including aseptic practices, laboratory operations, and other tasks directly affecting product quality and contamination control.",
+              },
+
+              "Packaging / Labeling Controls": {
+                condition: "major",
+                description:
+                  "Packaging and labeling systems were deficient, including weaknesses in label issuance, reconciliation, line clearance, and packaging controls needed to prevent mix-ups, misidentification, and labeling errors.",
+              },
+
+              "Process Validation / Process Controls": {
+                condition: "critical",
+                description:
+                  "Deficiencies were observed in process validation and routine process control, including inadequate theoretical yield control, limited process validation support, and insufficient evidence that operations consistently produce product meeting established quality attributes.",
+              },
+
+              "Quality Unit Oversight / Procedure Compliance": {
+                condition: "major",
+                description:
+                  "The Quality Unit and responsible functions did not consistently enforce written procedures, review expectations, approvals, and GMP oversight responsibilities needed to ensure disciplined and repeatable quality system execution.",
+              },
+            },
+
+
+          },
+          {
+            manufacturerKey: "osd_manufacturers",
+            manufacturer: "OSD Manufacturers",
+            totalObservations: 375,
+            criticalSignal: 7,
+            majorSignal: 9,
+            criticalIssues: 6,
+            heroIntro:
+              "This report provides a recurring-observation intelligence profile for USA OSD manufacturers, focused on reproducibility, analytical assurance, and material-control governance.",
+            preambleParagraphs: [
+              "This document presents a consolidated, risk-based evaluation of recurring GMP inspectional observations identified across oral solid products establishments represented in the provided source dataset. The analysis uses ranked observation trend data to identify the most frequent compliance deficiency themes, assess their severity and systemic significance, and support risk-based prioritization of corrective and preventive actions (CAPA) required to strengthen inspection readiness and sustain compliance with current Good Manufacturing Practice (cGMP) requirements.",
+              "The compiled data show a dominant concentration of findings in supplier and incoming material controls, OOS and laboratory investigation discipline, data integrity and computerized system governance, deviation investigation effectiveness, and GMP documentation control. Recurring observations in these systems indicate weak material qualification decisions, incomplete investigations, insufficient assurance over electronic records, poor event documentation and closure practices, and inadequate confidence that quality-impacting issues are fully understood, justified, and effectively remediated.",
+              "Critical deficiencies are also repeatedly observed in cleaning execution, laboratory controls, aseptic and environmental monitoring, cleaning validation, process validation, and water and utility systems. Together, these trends indicate persistent weaknesses in contamination control, scientific justification, test reliability, validated-state assurance, and lifecycle control of quality-impacting systems across core GMP operations supporting oral solid products manufacturing.",
+              "Beyond the dominant Critical systems, recurring Major deficiencies indicate broader Pharmaceutical Quality System execution gaps in CAPA effectiveness, equipment maintenance and calibration, stability program management, complaint and product quality review, warehousing and dispensing controls, packaging and labeling practices, Quality Unit oversight, and personnel qualification. Overall, the combined Critical and Major profile reflects elevated regulatory and product quality risk and reinforces the need for sustained remediation aligned with robust supplier governance, reliable investigations, effective documentation practices, strong data governance, and disciplined Quality Unit oversight.",
+            ],
+            executiveSummary:
+              "The ranking indicates that the most significant regulatory vulnerability is concentrated in supplier and raw material controls, followed by laboratory investigation rigor, data integrity, deviation management, documentation control, and cleaning-related systems.",
+            implication:
+              "Collectively, the inspection trend data demonstrate that establishments represented in this oral solid products dataset face significant and sustained regulatory risk driven primarily by weaknesses in supplier qualification, laboratory investigation rigor, data integrity governance, deviation management, documentation discipline, cleaning controls, and scientific assurance over testing and validation systems. The repeated presence of Critical observations in OOS investigations, data integrity, cleaning execution, laboratory controls, aseptic and environmental monitoring, cleaning validation, process validation, and water and utility systems confirms that these deficiencies are systemic rather than isolated. This risk profile places affected operations at elevated likelihood of regulatory action and reinforces the need for strong Quality Unit oversight, scientifically sound investigations, reliable supplier and material governance, effective validation and contamination control strategies, and disciplined documentation and data integrity practices as non-negotiable cGMP requirements.",
+            observationTitles: [
+              "Supplier / Raw Material / Component Controls",
+              "OOS / Laboratory Investigations",
+              "Data Integrity / Computerized Systems",
+              "Deviation / Incident Investigations",
+              "Documentation / Record Control",
+              "Cleaning Execution / Equipment Cleanliness",
+              "Laboratory Controls / Analytical Testing",
+              "CAPA Effectiveness / Trending",
+              "Aseptic / Environmental Monitoring",
+              "Equipment Qualification / Calibration / Maintenance",
+              "Cleaning Validation / Verification",
+              "Stability Program / Sample Storage",
+              "Complaints / APR / PQR Review",
+              "Process Validation / Process Controls",
+              "Material Storage / Warehouse / Dispensing",
+              "Facility / Building / Pest Control",
+              "Packaging / Labeling Controls",
+              "Quality Unit Oversight / Procedure Compliance",
+              "Training / Personnel Qualification",
+              "Water / Utility Systems",
+            ],
+            observationCounts: [
+              847, 741, 689, 572, 467, 358, 354, 312, 291, 288, 259, 166, 129,
+              116, 113, 80, 75, 68, 42, 13,
+            ],
+
+          observationDescriptions: {
+            "Supplier / Raw Material / Component Controls": {
+              condition: "major",
+              description:
+                "The firm failed to adequately qualify suppliers and control incoming raw materials, components, containers, closures, and related acceptance activities, including deficiencies in identity testing, COA reliance, vendor oversight, and material approval decisions.",
+            },
+
+            "OOS / Laboratory Investigations": {
+              condition: "critical",
+              description:
+                "The firm failed to adequately investigate out-of-specification, out-of-trend, invalidated, and related laboratory failures, including weak root cause analysis, unsupported retesting, and inadequate assessment of potentially affected batches, methods, and quality systems.",
+            },
+
+            "Data Integrity / Computerized Systems": {
+              condition: "critical",
+              description:
+                "The firm failed to ensure data integrity and adequate control of computerized systems, including weaknesses in audit trails, user access, passwords, electronic records, backup controls, and assurance that GMP data are complete, accurate, attributable, and secure throughout the data lifecycle.",
+            },
+
+            "Deviation / Incident Investigations": {
+              condition: "major",
+              description:
+                "The firm failed to thoroughly document, investigate, trend, and conclude manufacturing and laboratory deviations or atypical incidents, resulting in recurring events without robust root cause determination, product impact assessment, or timely closure.",
+            },
+
+            "Documentation / Record Control": {
+              condition: "major",
+              description:
+                "The firm failed to maintain complete, contemporaneous, controlled, and reviewable GMP documentation and records, including missing entries, unofficial records, incomplete batch documentation, weak logbook control, and inadequate record review practices.",
+            },
+
+            "Cleaning Execution / Equipment Cleanliness": {
+              condition: "critical",
+              description:
+                "The firm failed to consistently clean and maintain equipment, utensils, hoses, ducts, and product-contact parts, with residue, visible contamination, inadequate cleaning execution, or poor post-cleaning controls creating recurring risk of carryover and cross-contamination.",
+            },
+
+            "Laboratory Controls / Analytical Testing": {
+              condition: "critical",
+              description:
+                "The firm failed to establish and follow scientifically sound laboratory controls, including deficiencies in analytical testing, microbiological testing, specifications, sample handling, and execution or review of QC testing used to support batch disposition.",
+            },
+
+            "CAPA Effectiveness / Trending": {
+              condition: "major",
+              description:
+                "The firm failed to establish effective CAPA implementation, recurrence monitoring, and effectiveness verification, allowing repeated deficiencies to continue without demonstrating sustainable remediation or meaningful quality trend review.",
+            },
+
+            "Aseptic / Environmental Monitoring": {
+              condition: "critical",
+              description:
+                "The firm failed to maintain adequate aseptic processing, sterile operation, and environmental monitoring controls, including weaknesses in cleanroom practices, disinfection, personnel monitoring, media fills, and microbiological oversight needed to assure contamination control.",
+            },
+
+            "Equipment Qualification / Calibration / Maintenance": {
+              condition: "major",
+              description:
+                "The firm failed to adequately qualify, calibrate, verify, and maintain critical manufacturing, laboratory, and support equipment, reducing assurance that equipment and instruments remain suitable, accurate, and reliable for intended GMP use.",
+            },
+
+            "Cleaning Validation / Verification": {
+              condition: "critical",
+              description:
+                "The firm failed to establish adequate cleaning validation and cleaning verification programs, including deficiencies in worst-case rationale, residue limits, swab recovery, hold-time evaluation, and documented evidence that cleaning procedures are effective and reproducible.",
+            },
+
+            "Stability Program / Sample Storage": {
+              condition: "major",
+              description:
+                "The firm failed to establish or maintain an adequate stability program and associated sample storage controls, including weaknesses in stability design, reserve or retain sample handling, expiry support, and assurance that products remain supported throughout shelf life.",
+            },
+
+            "Complaints / APR / PQR Review": {
+              condition: "major",
+              description:
+                "The firm failed to adequately review complaint history, annual product quality review requirements, and related quality trend information, limiting the ability to detect recurring product quality issues and take timely system-level action.",
+            },
+
+            "Process Validation / Process Controls": {
+              condition: "critical",
+              description:
+                "The firm failed to validate and control manufacturing processes and critical process parameters, including inadequate process validation, revalidation, hold-time support, and evidence that routine operations consistently produce product meeting established quality attributes.",
+            },
+
+            "Material Storage / Warehouse / Dispensing": {
+              condition: "major",
+              description:
+                "The firm failed to adequately control storage, warehousing, dispensing, issuance, and material status practices, increasing the risk of mix-ups, traceability gaps, unsuitable storage conditions, and use of incorrect or unreleased material.",
+            },
+
+            "Facility / Building / Pest Control": {
+              condition: "major",
+              description:
+                "The firm failed to adequately maintain buildings, rooms, and facility infrastructure, including housekeeping, structural upkeep, and pest prevention controls, creating risk that the environment could adversely affect product quality and contamination control.",
+            },
+
+            "Packaging / Labeling Controls": {
+              condition: "major",
+              description:
+                "The firm failed to maintain adequate packaging and labeling controls, including deficiencies in label issuance, reconciliation, line clearance, packaging record execution, and controls needed to prevent mix-ups and misidentification.",
+            },
+
+            "Quality Unit Oversight / Procedure Compliance": {
+              condition: "major",
+              description:
+                "The firm failed to ensure the Quality Unit and responsible functions effectively enforced written procedures, review requirements, approvals, and GMP oversight responsibilities needed for consistent quality system execution.",
+            },
+
+            "Training / Personnel Qualification": {
+              condition: "major",
+              description:
+                "The firm failed to ensure personnel were adequately trained and qualified for assigned GMP activities, including operation-specific tasks, laboratory practices, and other activities directly affecting product quality.",
+            },
+
+            "Water / Utility Systems": {
+              condition: "critical",
+              description:
+                "The firm failed to adequately monitor, validate, and control critical utility systems, including water and related support systems, reducing assurance that utilities remain suitable for intended manufacturing, cleaning, and laboratory use.",
+            }
+          }
+
+          },
+        ],
+      };
+
+      function normalizeText(value) {
+        return String(value || "")
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim();
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function buildObservationDescription(
+        title,
+        manufacturerLabel,
+        count,
+        severity,
+      ) {
+        const text = String(title || "").toLowerCase();
+        const severityLabel = severity === "critical" ? "Critical" : "Major";
+        const prefix =
+          Number.isFinite(Number(count)) && Number(count) > 0
+            ? `${severityLabel} theme with ${Number(count)} recurring occurrences: `
+            : "";
+
+        if (text.includes("oos") || text.includes("out-of-specification")) {
+          return `${prefix}inadequate scientific investigation depth and weak assignable-cause logic can undermine batch disposition confidence in ${manufacturerLabel} inspections.`;
+        }
+        if (text.includes("cleaning") || text.includes("sanitation")) {
+          return `${prefix}cleaning and sanitation controls show execution and documentation gaps that increase contamination and mix-up risk exposure.`;
+        }
+        if (text.includes("laboratory") || text.includes("method")) {
+          return `${prefix}laboratory governance weaknesses affect method suitability, analytical reliability, and data-backed release decisions.`;
+        }
+        if (text.includes("data integrity") || text.includes("record")) {
+          return `${prefix}vulnerabilities in record credibility, auditability, and data-integrity controls weaken GMP decision confidence.`;
+        }
+        if (text.includes("deviation") || text.includes("capa")) {
+          return `${prefix}quality-event management remains weak in root-cause depth, corrective-action design, and effectiveness verification.`;
+        }
+        if (text.includes("validation")) {
+          return `${prefix}lifecycle validation controls are not consistently translated into routine execution and sustained state-of-control assurance.`;
+        }
+        if (text.includes("supplier") || text.includes("material")) {
+          return `${prefix}supplier governance and incoming-material assurance controls show recurring weaknesses with downstream batch-quality impact potential.`;
+        }
+        if (
+          text.includes("sterile") ||
+          text.includes("aseptic") ||
+          text.includes("microbiology")
+        ) {
+          return `${prefix}aseptic and microbiology control drift can elevate contamination risk and regulatory concern if not corrected at system level.`;
+        }
+        if (text.includes("quality unit")) {
+          return `${prefix}independent quality-unit oversight and escalation rigor are insufficient for sustained cross-functional governance.`;
+        }
+        if (text.includes("stability")) {
+          return `${prefix}stability evidence and lifecycle monitoring gaps reduce confidence in long-term quality commitments.`;
+        }
+
+        return `${prefix}${title} indicates recurring control-system weaknesses that require targeted CAPA and stronger management oversight to prevent repeat observations.`;
+      }
+
+      function buildDummyObservationDescription(title, manufacturerLabel) {
+        return `Dummy description for "${title}" in ${manufacturerLabel}. Replace this with validated regulatory narrative.`;
+      }
+
+      function normalizeCondition(value, fallback = "major") {
+        const condition = String(value || "")
+          .trim()
+          .toLowerCase();
+        if (condition === "critical") return "critical";
+        if (condition === "major") return "major";
+        return fallback === "critical" ? "critical" : "major";
+      }
+
+      function resolveObservationDescriptor(profile, title) {
+        const descriptionMap = profile.observationDescriptions || {};
+        if (Object.prototype.hasOwnProperty.call(descriptionMap, title)) {
+          return descriptionMap[title];
+        }
+
+        const normalizedKey = normalizeText(title);
+        if (
+          Object.prototype.hasOwnProperty.call(descriptionMap, normalizedKey)
+        ) {
+          return descriptionMap[normalizedKey];
+        }
+
+        return null;
+      }
+
+
+
+
+      function resolveObservationDescription(
+        profile,
+        title,
+        manufacturerLabel,
+        count,
+        severity,
+      ) {
+        const descriptor = resolveObservationDescriptor(profile, title);
+        if (typeof descriptor === "string" && descriptor.trim()) {
+          return descriptor;
+        }
+        if (
+          descriptor &&
+          typeof descriptor === "object" &&
+          typeof descriptor.description === "string" &&
+          descriptor.description.trim()
+        ) {
+          return descriptor.description;
+        }
+
+        return buildDummyObservationDescription(title, manufacturerLabel);
+      }
+
+      function resolveObservationCondition(profile, title, fallbackSeverity) {
+        const descriptor = resolveObservationDescriptor(profile, title);
+        if (descriptor && typeof descriptor === "object") {
+          return normalizeCondition(descriptor.condition, fallbackSeverity);
+        }
+        return normalizeCondition(fallbackSeverity, "major");
+      }
+
+      function toSentenceList(items) {
+        const values = items.filter(Boolean);
+        if (values.length === 0) return "";
+        if (values.length === 1) return values[0];
+        if (values.length === 2) return `${values[0]} and ${values[1]}`;
+        return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
+      }
+
+      function buildUniqueList(seedList, fallbackList, limit) {
+        const items = [];
+        [...seedList, ...fallbackList].forEach((item) => {
+          if (items.length >= limit) return;
+          if (!item || items.includes(item)) return;
+          items.push(item);
+        });
+        while (items.length < limit) {
+          items.push(`Recurring control theme ${items.length + 1}`);
+        }
+        return items;
+      }
+
+      function weightedCounts(total, weights) {
+        const safeTotal = Math.max(1, Number(total) || 1);
+        const weightSum = weights.reduce((sum, value) => sum + value, 0) || 1;
+        const counts = weights.map((weight) =>
+          Math.max(1, Math.round((safeTotal * weight) / weightSum)),
+        );
+
+        let diff = safeTotal - counts.reduce((sum, value) => sum + value, 0);
+        let pointer = 0;
+        while (diff !== 0 && pointer < 10000) {
+          const index = pointer % counts.length;
+          if (diff > 0) {
+            counts[index] += 1;
+            diff -= 1;
+          } else if (counts[index] > 1) {
+            counts[index] -= 1;
+            diff += 1;
+          }
+          pointer += 1;
+        }
+        return counts;
+      }
+
+      function resolveProfile(
+        country,
+        manufacturer,
+        indexFromQuery,
+        manufacturerKey,
+      ) {
+        const profiles = detailProfiles[country] || detailProfiles.india;
+
+        if (manufacturerKey) {
+          const foundByKey = profiles.find(
+            (profile) =>
+              String(profile.manufacturerKey || "").toLowerCase() ===
+              manufacturerKey,
+          );
+          if (foundByKey) return foundByKey;
+        }
+
+        if (
+          Number.isInteger(indexFromQuery) &&
+          indexFromQuery >= 0 &&
+          indexFromQuery < profiles.length
+        ) {
+          return profiles[indexFromQuery];
+        }
+
+        if (manufacturer) {
+          const lookup = normalizeText(manufacturer);
+          const found = profiles.find(
+            (profile) => normalizeText(profile.manufacturer) === lookup,
+          );
+          if (found) return found;
+        }
+
+        return profiles[0];
+      }
+
+      function buildObservationRows(profile, manufacturerLabel) {
+        if (
+          Array.isArray(profile.observations) &&
+          profile.observations.length
+        ) {
+          const sourceRows = profile.observations.map((row) => ({
+            title: row.title,
+            severity: normalizeCondition(row.severity, "major"),
+            count: Number(row.count) || 0,
+            narrative: row.narrative,
+            ofTotal: row.ofTotal,
+            cumulative: row.cumulative,
+          }));
+          const total = sourceRows.reduce((sum, row) => sum + row.count, 0);
+          let cumulative = 0;
+          return sourceRows.map((row) => {
+            cumulative += row.count;
+            const severity = resolveObservationCondition(
+              profile,
+              row.title,
+              row.severity,
+            );
+            return {
+              ...row,
+              severity,
+              ofTotal:
+                row.ofTotal !== undefined
+                  ? Number(row.ofTotal).toFixed(2)
+                  : ((row.count / Math.max(total, 1)) * 100).toFixed(2),
+              cumulative:
+                row.cumulative !== undefined
+                  ? Number(row.cumulative).toFixed(2)
+                  : ((cumulative / Math.max(total, 1)) * 100).toFixed(2),
+              narrative:
+                row.narrative ||
+                resolveObservationDescription(
+                  profile,
+                  row.title,
+                  manufacturerLabel,
+                  row.count,
+                  severity,
+                ),
+            };
+          });
+        }
+
+
+        const titles = buildUniqueList(
+          profile.observationTitles || profile.seedObservations || [],
+          COMMON_THEMES,
+          20,
+        );
+        const fixedCounts =
+          Array.isArray(profile.observationCounts) &&
+          profile.observationCounts.length >= titles.length
+            ? profile.observationCounts
+                .slice(0, titles.length)
+                .map((value) => Math.max(0, Number(value) || 0))
+            : null;
+        const counts =
+          fixedCounts ||
+          weightedCounts(profile.totalObservations, OBSERVATION_WEIGHTS);
+        const signalDenominator =
+          (Number(profile.criticalSignal) || 0) +
+          (Number(profile.majorSignal) || 0);
+        const defaultCriticalIssues = Math.max(
+          3,
+          Math.min(
+            10,
+            Math.round(
+              ((Number(profile.criticalSignal) || 0) /
+                Math.max(signalDenominator, 1)) *
+                20,
+            ),
+          ),
+        );
+        const criticalIssues = Number.isInteger(profile.criticalIssues)
+          ? Math.max(1, Math.min(19, profile.criticalIssues))
+          : defaultCriticalIssues;
+        const severityList =
+          Array.isArray(profile.observationSeverities) &&
+          profile.observationSeverities.length >= titles.length
+            ? profile.observationSeverities.map((value) =>
+                String(value || "").toLowerCase() === "critical"
+                  ? "critical"
+                  : "major",
+              )
+            : null;
+        const total = counts.reduce((sum, rowCount) => sum + rowCount, 0);
+        let cumulative = 0;
+
+        return titles.map((title, index) => {
+          const count = Number(counts[index]) || 0;
+          const computedSeverity = severityList
+            ? severityList[index]
+            : index < criticalIssues
+              ? "critical"
+              : "major";
+          const severity = resolveObservationCondition(
+            profile,
+            title,
+            computedSeverity,
+          );
+          cumulative += count;
+          return {
+            title,
+            severity,
+            count,
+            ofTotal: ((count / Math.max(total, 1)) * 100).toFixed(2),
+            cumulative: ((cumulative / Math.max(total, 1)) * 100).toFixed(2),
+            narrative: resolveObservationDescription(
+              profile,
+              title,
+              manufacturerLabel,
+              count,
+              severity,
+            ),
+          };
+        });
+      }
+
+      function buildExecutiveKpis(observations, grandTotal) {
+        const sumTop = (count) =>
+          observations
+            .slice(0, count)
+            .reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+
+        const percent = (value) =>
+          ((value / Math.max(grandTotal, 1)) * 100).toFixed(1) + "%";
+
+        return [
+          {
+            tone: "red",
+            value: percent(sumTop(5)),
+            subtitle: "Top 5 of 20 issues",
+            meta: `${sumTop(5)} of ${grandTotal} total observations`,
+          },
+          {
+            tone: "yellow",
+            value: percent(sumTop(10)),
+            subtitle: "Top 10 of 20 issues",
+            meta: `${sumTop(10)} of ${grandTotal} total observations`,
+          },
+          {
+            tone: "green",
+            value: percent(sumTop(15)),
+            subtitle: "Top 15 of 20 issues",
+            meta: `${sumTop(15)} of ${grandTotal} total observations`,
+          },
+          {
+            tone: "blue",
+            value: observations[0] ? observations[0].count : 0,
+            subtitle: "Highest recurring issue",
+            meta: observations[0]?.title || "",
+          },
+        ];
+      }
+
+      function injectFixedObservationData() {
+        Object.values(detailProfiles).forEach((countryProfiles) => {
+          countryProfiles.forEach((profile) => {
+            if (
+              !Array.isArray(profile.observationTitles) ||
+              !Array.isArray(profile.observationCounts)
+            ) {
+              return;
+            }
+
+            const titles = profile.observationTitles.slice(0, 20);
+            const counts = profile.observationCounts
+              .slice(0, titles.length)
+              .map((value) => Math.max(0, Number(value) || 0));
+            const total = counts.reduce((sum, value) => sum + value, 0);
+            const signalDenominator =
+              (Number(profile.criticalSignal) || 0) +
+              (Number(profile.majorSignal) || 0);
+            const defaultCriticalIssues = Math.max(
+              3,
+              Math.min(
+                10,
+                Math.round(
+                  ((Number(profile.criticalSignal) || 0) /
+                    Math.max(signalDenominator, 1)) *
+                    20,
+                ),
+              ),
+            );
+            const criticalIssues = Number.isInteger(profile.criticalIssues)
+              ? Math.max(1, Math.min(19, profile.criticalIssues))
+              : defaultCriticalIssues;
+            const severityList =
+              Array.isArray(profile.observationSeverities) &&
+              profile.observationSeverities.length >= titles.length
+                ? profile.observationSeverities.map((value) =>
+                    String(value || "").toLowerCase() === "critical"
+                      ? "critical"
+                      : "major",
+                  )
+                : null;
+
+            const descriptionObject = {
+              ...(profile.observationDescriptions || {}),
+            };
+            let cumulative = 0;
+            profile.observations = titles.map((title, index) => {
+              const count = counts[index] || 0;
+              const computedSeverity = severityList
+                ? severityList[index]
+                : index < criticalIssues
+                  ? "critical"
+                  : "major";
+              const severity = resolveObservationCondition(
+                profile,
+                title,
+                computedSeverity,
+              );
+              const narrative = resolveObservationDescription(
+                profile,
+                title,
+                profile.manufacturer,
+                count,
+                severity,
+              );
+              cumulative += count;
+              const descriptor = {
+                description: narrative,
+                condition: severity,
+              };
+              descriptionObject[title] = descriptor;
+              descriptionObject[normalizeText(title)] = descriptor;
+              return {
+                title,
+                severity,
+                count,
+                ofTotal: ((count / Math.max(total, 1)) * 100).toFixed(2),
+                cumulative: ((cumulative / Math.max(total, 1)) * 100).toFixed(
+                  2,
+                ),
+                narrative,
+              };
+            });
+            profile.observationDescriptions = descriptionObject;
+
+            const criticalRows = profile.observations.filter(
+              (row) => row.severity === "critical",
+            );
+            const majorRows = profile.observations.filter(
+              (row) => row.severity !== "critical",
+            );
+            profile.totals = {
+              totalObservations: total,
+              criticalIssues: criticalRows.length,
+              majorIssues: majorRows.length,
+              criticalCount: criticalRows.reduce(
+                (sum, row) => sum + (Number(row.count) || 0),
+                0,
+              ),
+              majorCount: majorRows.reduce(
+                (sum, row) => sum + (Number(row.count) || 0),
+                0,
+              ),
+            };
+            profile.paretoData = profile.observations
+              .slice(0, 20)
+              .map((row) => ({
+                category: row.title,
+                value: row.count,
+              }));
+            profile.executiveKpis = buildExecutiveKpis(
+              profile.observations,
+              total,
+            );
+          });
+        });
+      }
+
+      function renderParetoSummary(observations) {
+      const total = observations.reduce(
+        (sum, row) => sum + (Number(row.count) || 0),
+        0
+      );
+
+      const sumTop = (n) =>
+        observations
+          .slice(0, n)
+          .reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+
+      const percent = (value) =>
+        ((value / Math.max(total, 1)) * 100);
+
+      const data = [
+        { label: "Top 5", value: percent(sumTop(5)) },
+        { label: "Top 10", value: percent(sumTop(10)) },
+        { label: "Top 15", value: percent(sumTop(15)) },
+        { label: "All 20", value: percent(sumTop(20)) },
+      ];
+
+      const container = document.getElementById("pareto-summary");
+
+      container.innerHTML = data
+        .map(
+          (item) => `
+            <div class="pareto-box">
+
+              <div class="pareto-title">${item.label}</div>
+              <div class="pareto-value">${item.value.toFixed(1)}%</div>
+
+              <!-- PROGRESS BAR -->
+              <div class="pareto-bar">
+                <div class="pareto-fill"
+                    style="width: ${item.value}%"></div>
+              </div>
+
+            </div>
+          `
+        )
+        .join("");
+    }
+
+      function buildReport(profile, manufacturerLabel, countryText) {
+        const observations = buildObservationRows(profile, manufacturerLabel);
+        const criticalRows = observations.filter(
+          (row) => row.severity === "critical",
+        );
+        const majorRows = observations.filter(
+          (row) => row.severity !== "critical",
+        );
+        const totalObservations = observations.reduce(
+          (sum, row) => sum + (Number(row.count) || 0),
+          0,
+        );
+        const criticalCount = criticalRows.reduce(
+          (sum, row) => sum + (Number(row.count) || 0),
+          0,
+        );
+        const majorCount = majorRows.reduce(
+          (sum, row) => sum + (Number(row.count) || 0),
+          0,
+        );
+
+        const topFiveThemes = observations.slice(0, 5).map((row) => row.title);
+        const topThreeThemes = observations.slice(0, 3).map((row) => row.title);
+        const topEightCount = observations
+          .slice(0, 8)
+          .reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+
+        const defaultPreambleParagraphs = [
+          `This document presents a consolidated, risk-based evaluation of recurring GMP inspection observations for ${manufacturerLabel} facilities in ${countryText}. The analysis ranks findings that repeatedly appear across inspections and highlights repeat regulatory pressure points.`,
+          `The concentration of observations around ${toSentenceList(topThreeThemes).toLowerCase()} suggests persistent system-level drift rather than isolated process exceptions. Prioritization should therefore focus on structural CAPA effectiveness and cross-functional quality governance.`,
+          `Critical observations are prominently concentrated in ${toSentenceList(criticalRows.slice(0, 6).map((row) => row.title.toLowerCase()))}. These patterns elevate risk to batch disposition robustness, contamination control, and data reliability.`,
+          `Recurring Major observations in ${toSentenceList(majorRows.slice(0, 6).map((row) => row.title.toLowerCase()))} indicate continued need for stronger execution controls, better documentation discipline, and sustained management follow-up.`,
+        ];
+
+        const preambleParagraphs =
+          Array.isArray(profile.preambleParagraphs) &&
+          profile.preambleParagraphs.length
+            ? profile.preambleParagraphs
+            : defaultPreambleParagraphs;
+        const heroIntro =
+          profile.heroIntro ||
+          `An exhaustive analysis of recurring GMP inspection observations for ${manufacturerLabel} in ${countryText} highlights persistent quality-system control weaknesses. The intelligence below is aligned to the selected country and manufacturer profile.`;
+        const executiveSummary =
+          profile.executiveSummary ||
+          `The current risk profile is anchored by ${toSentenceList(topFiveThemes.slice(0, 4))}. Together, these categories account for ${((topEightCount / Math.max(totalObservations, 1)) * 100).toFixed(1)}% of all recurring findings, indicating recurring breakdowns in root-cause rigor and execution consistency.`;
+        const implication =
+          profile.implication ||
+          `Collectively, the recurring inspection profile for ${manufacturerLabel} in ${countryText} indicates persistent weakness across investigation systems, contamination-control execution, and process governance. Repetition of these themes can elevate regulatory concern around overall pharmaceutical quality-system maturity and supports immediate, risk-ranked CAPA prioritization.`;
+
+        const totals = profile.totals || {
+          totalObservations,
+          criticalIssues: criticalRows.length,
+          majorIssues: majorRows.length,
+          criticalCount,
+          majorCount,
+        };
+
+        return {
+          heroIntro,
+          preambleParagraphs,
+          executiveSummary,
+          implication,
+          totals,
+          executiveKpis:
+            Array.isArray(profile.executiveKpis) && profile.executiveKpis.length
+              ? profile.executiveKpis
+              : buildExecutiveKpis(observations, totalObservations),
+          paretoData:
+            Array.isArray(profile.paretoData) && profile.paretoData.length
+              ? profile.paretoData
+              : observations.slice(0, 20).map((row) => ({
+                  category: row.title,
+                  value: row.count,
+                })),
+          observations,
+        };
+      }
+
+      function setParagraphs(containerId, paragraphs) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = (paragraphs || [])
+          .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+          .join("");
+      }
+
+      function setTotals(totals) {
+        document.getElementById("hero-total").textContent =
+          totals.totalObservations;
+        document.getElementById("hero-critical").textContent =
+          totals.criticalIssues;
+        document.getElementById("hero-major").textContent = totals.majorIssues;
+        document.getElementById("sev-critical-issues").textContent =
+          `${totals.criticalIssues} issues`;
+        document.getElementById("sev-major-issues").textContent =
+          `${totals.majorIssues} issues`;
+        document.getElementById("sev-critical-count").textContent =
+          totals.criticalCount;
+        document.getElementById("sev-major-count").textContent =
+          totals.majorCount;
+        document.getElementById("sev-grand-total").textContent =
+          totals.totalObservations;
+      }
+
+      function updateSidebarSubmenus(activeCountry, activeManufacturer) {
+        const layout = document.getElementById('dashboardLayout');
+        const isCollapsed = layout && layout.classList.contains('sidebar-collapsed');
+
+        // Hide all submenus first
+        document.querySelectorAll('.sidebar-submenu-list').forEach(el => el.style.display = 'none');
+
+        const countryData = detailProfiles[activeCountry];
+        if (!countryData) return;
+
+        const submenuId = activeCountry === 'india' ? 'indiaSubmenu' : 'usaSubmenu';
+        const submenuEl = document.getElementById(submenuId);
+
+        if (submenuEl && !isCollapsed) {
+          submenuEl.innerHTML = countryData
+            .map((profile, index) => {
+              const detailUrl = `?country=${encodeURIComponent(activeCountry)}&manufacturer=${encodeURIComponent(profile.manufacturer || "")}&manufacturer_key=${encodeURIComponent(profile.manufacturerKey || "")}&profile=${encodeURIComponent(index)}`;
+              const isCurrent = (profile.manufacturer === activeManufacturer);
+              return `<li style="margin: 12px 0;"><a href="${detailUrl}" style="color: ${isCurrent ? '#102d3f' : '#25729D'}; text-decoration: none; font-size: 13px; font-weight: 700; display: block;">${profile.manufacturer}</a></li>`;
+            })
+            .join("");
+          submenuEl.style.display = 'block';
+        }
+
+        // Update active state on parent items
+        document.querySelectorAll('.dashboard-sidebar-item').forEach(item => {
+          const linkText = item.querySelector('.dashboard-sidebar-label')?.textContent || "";
+          if (linkText.includes('India') || linkText.includes('USA')) {
+            const isMatch = (activeCountry === 'india' && linkText.includes('India')) ||
+                            (activeCountry === 'usa' && linkText.includes('USA'));
+            item.classList.toggle('is-active', isMatch);
+          }
+        });
+      }
+
+      function renderExecutiveKpis(kpis) {
+        const kpiContainer = document.getElementById("exec-kpis");
+
+        kpiContainer.innerHTML = (kpis || [])
+          .map(
+            (kpi) => `
+              <div class="kpi-card ${kpi.tone}">
+                <div class="kpi-value">${escapeHtml(kpi.value)}</div>
+                <div class="kpi-subtitle">${escapeHtml(kpi.subtitle)}</div>
+                <div class="kpi-meta">${escapeHtml(kpi.meta)}</div>
+              </div>
+            `
+          )
+          .join("");
+      }
+
+      function renderPareto(paretoData) {
+        const list = document.getElementById("pareto-list");
+        const maxValue = Math.max(...paretoData.map((item) => item.value), 1);
+
+        list.innerHTML = paretoData
+          .map((item) => {
+            const width = Math.max(
+            2,
+              Math.round((item.value / maxValue) * 100),
+            );
+            return `
+              <div class="pareto-item">
+                <div>
+                  <div class="pareto-label">${escapeHtml(item.category)}</div>
+                  <div class="pareto-track">
+                    <div class="pareto-fill" style="width:${width}%"></div>
+                  </div>
+                </div>
+                <span class="pareto-value">${escapeHtml(item.value)}</span>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function renderObservations(data) {
+        const container = document.getElementById("observation-list");
+
+        container.innerHTML = data
+          .map((row, index) => {
+            const percent = Number(row.ofTotal || 0);
+            const cumulative = Number(row.cumulative || 0);
+            const severityLabel = row.severity.slice(0, 1).toUpperCase() + row.severity.slice(1);
+
+            return `
+              <details class="obs-row ${row.severity}">
+
+                <!-- HEADER + BAR (ALWAYS FIXED) -->
+                <summary class="obs-header">
+
+                  <div class="obs-top">
+                    <div class="obs-left">
+                      <span class="obs-rank">${index + 1}</span>
+
+                      <div>
+                        <div class="obs-title">${escapeHtml(row.title)}</div>
+                        <div class="obs-tags">
+                          <span class="badge ${row.severity}">
+                            ${severityLabel}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="obs-right">
+                      <div class="obs-count">${row.count}</div>
+                      <div class="obs-percent">
+                        ${percent.toFixed(1)}% · cum ${cumulative.toFixed(1)}%
+                      </div>
+                    </div>
+
+                    <div class="obs-arrow">▼</div>
+                  </div>
+
+                  <!-- ✅ BAR INSIDE SUMMARY -->
+                  <div class="obs-bar">
+                    <div class="obs-fill ${row.severity}"
+                        style="width: ${percent}%"></div>
+                  </div>
+
+                </summary>
+
+                <!-- DROPDOWN CONTENT -->
+                <div class="obs-content">
+                  <p>${escapeHtml(row.narrative)}</p>
+
+                  <div class="obs-kpi-row">
+                    <div class="obs-kpi">
+                      <strong>${row.count}</strong>
+                      <span>Occurrences</span>
+                    </div>
+                    <div class="obs-kpi">
+                      <strong>${percent.toFixed(1)}%</strong>
+                      <span>of total</span>
+                    </div>
+                    <div class="obs-kpi">
+                      <strong>${cumulative.toFixed(1)}%</strong>
+                      <span>cumulative</span>
+                    </div>
+                  </div>
+                </div>
+
+              </details>
+            `;
+          })
+          .join("");
+      }
+
+      document.addEventListener("click", function (e) {
+        const clicked = e.target.closest("summary");
+        if (!clicked) return;
+
+        const currentDetails = clicked.parentElement;
+
+        document.querySelectorAll(".obs-row").forEach((item) => {
+          if (item !== currentDetails) {
+            item.removeAttribute("open");
+          }
+        });
+      });
+      injectFixedObservationData();
+
+      const selectedProfile = resolveProfile(
+        countryKey,
+        manufacturerParam,
+        profileIndex,
+        manufacturerKeyParam,
+      );
+      const manufacturerLabel =
+        selectedProfile.manufacturer || manufacturerParam || "Manufacturer";
+      const report = buildReport(
+        selectedProfile,
+        manufacturerLabel,
+        countryLabel,
+      );
+
+      document.getElementById("entity-title").textContent =
+        `${manufacturerLabel} - ${countryLabel}`;
+      document.getElementById("hero-intro").textContent = report.heroIntro;
+      setParagraphs("preamble-content", report.preambleParagraphs);
+      document.getElementById("exec-summary").textContent =
+        report.executiveSummary;
+      document.getElementById("implication-text").textContent =
+        report.implication;
+
+      setTotals(report.totals);
+      renderExecutiveKpis(report.executiveKpis);
+      renderPareto(report.paretoData);
+      renderParetoSummary(report.observations);
+      renderObservations(report.observations, report.totals.totalObservations);
+
+      updateSidebarSubmenus(countryKey, manufacturerLabel);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1611 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Request Demo | RA-AI Tools</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
+
+  <!-- Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;700&display=swap"
+    rel="stylesheet" />
+
+  <!-- Three JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+  <style>
+    :root {
+      --blue: #26acf5;
+      --blue-dark: #02283d;
+      --blue-mid: #0272ae;
+      --blue-lite: #35b1f6;
+      --orange: #fe9409;
+      --orange2: #ff6700;
+      --white: #ffffff;
+      --off: #f4f8fc;
+      --text: #1a2a3a;
+      --muted: #5a7a94;
+      --ff-d: "Syne", sans-serif;
+      --ff-b: "DM Sans", sans-serif;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--ff-b);
+      color: var(--text);
+      background: #fff;
+      overflow-x: hidden;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* FOOTER */
+    footer {
+      background: var(--blue-dark);
+      padding: 60px 0 0;
+      font-family: var(--ff-b);
+    }
+
+    .fi {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 20px;
+      margin: 0 40px;
+      padding: 50px 40px;
+    }
+
+    .flogo {
+      height: 44px;
+      margin-bottom: 16px;
+      filter: brightness(0) invert(1);
+      object-fit: contain;
+    }
+
+    .ftagline {
+      font-family: var(--ff-d);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.45);
+      font-weight: 600;
+      letter-spacing: 1px;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+    }
+
+    .fbdesc {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+      line-height: 1.78;
+      text-align: justify;
+    }
+
+    .fct {
+      font-family: var(--ff-d);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 20px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid rgba(254, 148, 9, 0.5);
+      display: inline-block;
+    }
+
+    .fsl {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      text-decoration: none;
+      margin-bottom: 10px;
+    }
+
+    .fsl span {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .fl {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 14px;
+
+    }
+
+    .fl li {
+      margin-bottom: 7px;
+    }
+
+    .fl a {
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.54);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.2s, padding-left 0.2s;
+    }
+
+    .fl a:hover {
+      color: var(--blue-lite);
+      padding-left: 4px;
+    }
+
+    .fp {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .fp-img-wrap {
+      width: 100px;
+      height: 78px;
+      min-width: 78px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 3px solid #35b1f6;
+      background: #fff;
+      box-shadow: 0 0 25px rgba(53, 177, 246, 0.35);
+    }
+
+    .fp-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+      image-rendering: auto;
+      filter: contrast(1.04) saturate(1.05);
+    }
+
+    .fp-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.1;
+      margin-bottom: 4px;
+      font-family: var(--ff-d);
+    }
+
+    .fp-role {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    .fat {
+      font-size: 14px;
+      font-weight: 800;
+      color: #35b1f6;
+      letter-spacing: 1.5px;
+      margin-top: 24px;
+      margin-bottom: 14px;
+      font-family: "cursive";
+    }
+
+    .far {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 14px;
+      line-height: 1.7;
+      font-weight: 500;
+      font-family: var(--ff-b);
+    }
+
+    .far i {
+      color: #35b1f6;
+      font-size: 13px;
+      margin-top: 5px;
+      min-width: 14px;
+    }
+
+    .far a {
+      color: rgba(255, 255, 255, 0.82);
+      text-decoration: none;
+      transition: 0.3s ease;
+    }
+
+    .far a:hover {
+      color: #35b1f6;
+    }
+
+    footer p {
+      font-size: 14px !important;
+      line-height: 1.8 !important;
+      color: rgba(255, 255, 255, 0.68) !important;
+    }
+
+    .socs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-bottom: 22px;
+    }
+
+    .soc {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.2s;
+      overflow: hidden;
+    }
+
+    .soc:hover {
+      background: var(--blue-lite);
+      transform: translateY(-3px);
+    }
+
+    .soc img {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+    }
+
+    .fdemo {
+      display: inline-block;
+      background: var(--blue-lite);
+      color: #fff;
+      padding: 11px 26px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .fdemo:hover {
+      color: #fff;
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(53, 177, 246, 0.45);
+    }
+
+    .fdiv {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.07);
+      margin: 0 40px;
+    }
+
+    .fcopy {
+      background: rgba(255, 255, 255, 0.04);
+      margin: 0 40px;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      padding: 18px 40px;
+      text-align: center;
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.38);
+    }
+
+    .fcopy a {
+      color: rgba(255, 255, 255, 0.62);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .fpad {
+      height: 40px;
+      background: var(--blue-dark);
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-20px);
+      }
+
+      100% {
+        transform: translateY(0px);
+      }
+    }
+
+    @keyframes bdot {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.25;
+      }
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(53, 177, 246, 0.35) !important;
+    }
+
+    /* ===== Demo request: 2-step wizard ===== */
+    .dd-step-dots {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .dd-dot {
+      height: 4px;
+      width: 8px;
+      border-radius: 99px;
+      background: #e2e8f0;
+      transition: width .25s ease, background-color .25s ease;
+    }
+
+    .dd-dot.active {
+      width: 28px;
+      background: var(--blue);
+    }
+
+    .dd-dot.done {
+      background: var(--blue);
+      opacity: .55;
+    }
+
+    .dd-step.dd-fade-in {
+      animation: ddFadeIn .3s ease both;
+    }
+
+    @keyframes ddFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .dd-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 0;
+      margin-bottom: 16px;
+    }
+
+    .dd-back-btn:hover {
+      color: var(--blue-mid);
+    }
+
+    .dd-cal-host {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .dd-cal-avatar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      width: 40px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #26acf5, #0272ae);
+      color: #fff;
+      font-size: 15px;
+    }
+
+    .dd-cal-host-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a2a3a;
+      margin: 0;
+    }
+
+    .dd-cal-host-meta {
+      font-size: 12.5px;
+      color: #5a7a94;
+      margin: 0;
+    }
+
+    .dd-cal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .dd-cal-month-label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a2a3a;
+    }
+
+    .dd-muted {
+      color: #5a7a94;
+      font-weight: 500;
+    }
+
+    .dd-cal-nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    .dd-cal-nav button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      width: 28px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: #5a7a94;
+      font-size: 12px;
+    }
+
+    .dd-cal-nav button:hover:not(:disabled) {
+      background: #f4f8fc;
+      color: var(--blue-mid);
+    }
+
+    .dd-cal-nav button:disabled {
+      opacity: .3;
+      cursor: default;
+    }
+
+    .dd-cal-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      margin-bottom: 4px;
+    }
+
+    .dd-cal-weekdays span {
+      text-align: center;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .05em;
+      color: #5a7a94;
+    }
+
+    .dd-cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      margin-bottom: 10px;
+    }
+
+    .dd-cal-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 0;
+    }
+
+    .dd-cal-day {
+      height: 34px;
+      width: 34px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #1a2a3a;
+    }
+
+    .dd-cal-day.today {
+      background: rgba(38, 172, 245, .14);
+      font-weight: 800;
+    }
+
+    .dd-cal-day.selected {
+      background: linear-gradient(135deg, #26acf5, #0272ae);
+      color: #fff;
+    }
+
+    .dd-cal-day.disabled {
+      opacity: .3;
+      color: #5a7a94;
+      cursor: default;
+    }
+
+    .dd-cal-day.holiday {
+      opacity: .55;
+      color: #c2410c;
+      position: relative;
+    }
+
+    .dd-cal-day.holiday::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #f97316;
+    }
+
+    .dd-cal-day:not(.disabled):not(.selected):hover {
+      background: #f4f8fc;
+    }
+
+    .dd-holiday-legend {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #5a7a94;
+      margin: 0 0 6px;
+    }
+
+    .dd-legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f97316;
+      flex-shrink: 0;
+    }
+
+    .dd-slots-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 12px 0 8px;
+    }
+
+    .dd-slots-header p {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #1a2a3a;
+      margin: 0;
+    }
+
+    .dd-format-toggle {
+      display: flex;
+      border: 1px solid #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+      font-size: 11.5px;
+    }
+
+    .dd-format-toggle button {
+      padding: 3px 10px;
+      border: none;
+      background: transparent;
+      color: #5a7a94;
+      font-weight: 700;
+    }
+
+    .dd-format-toggle button.active {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .dd-tz-note {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #5a7a94;
+      background: #f4f8fc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 7px 10px;
+      margin-bottom: 12px;
+    }
+
+    .dd-tz-note i {
+      color: var(--blue);
+      font-size: 11px;
+    }
+
+    .dd-tz-note strong {
+      color: #1a2a3a;
+    }
+
+    .dd-slots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .dd-slot-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      padding: 8px 4px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #fff;
+      color: #1a2a3a;
+      transition: border-color .15s ease, background-color .15s ease;
+    }
+
+    .dd-slot-ist {
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .dd-slot-local {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #5a7a94;
+      line-height: 1.3;
+    }
+
+    .dd-slot-btn:hover:not(.booked) {
+      border-color: #26acf5;
+      background: #f4f8fc;
+    }
+
+    .dd-slot-btn.selected {
+      border-color: var(--blue);
+      background: rgba(38, 172, 245, .12);
+      color: var(--blue-mid);
+    }
+
+    .dd-slot-btn.selected .dd-slot-local {
+      color: var(--blue-mid);
+      opacity: .8;
+    }
+
+    .dd-slot-btn.booked {
+      background: #f8fafc;
+      border-style: dashed;
+      cursor: not-allowed;
+      opacity: .55;
+    }
+
+    .dd-slot-btn.booked .dd-slot-ist {
+      text-decoration: line-through;
+    }
+
+    .dd-slots-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      font-size: 12.5px;
+      color: #5a7a94;
+      padding: 14px 0;
+    }
+
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #d0e4ee;
+      border-radius: 99px;
+    }
+
+    .eyebrow {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: white;
+    }
+
+    .footer-platform {
+      text-align: left;
+    }
+
+    @media (max-width: 991px) {
+      .hero-title {
+        font-size: 42px !important;
+      }
+
+      .hero-desc {
+        margin-left: 0 !important;
+        text-align: left;
+      }
+
+      .fi {
+        margin: 0 16px;
+        padding: 30px 20px;
+      }
+
+      .fdiv,
+      .fcopy {
+        margin: 0 16px;
+      }
+
+      .hero-badge {
+        margin: 0 auto 22px;
+      }
+
+      .text-lg-start {
+        text-align: center !important;
+      }
+
+      .fl {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .fl a {
+        justify-content: center;
+      }
+    }
+
+    @media (min-width: 1700px) {
+      .fp-img-wrap {
+        height: 90px !important;
+      }
+
+      .hero-desc {
+        margin-left: 0 !important;
+      }
+    }
+
+    @media (min-width:1500px) {
+      .hero-desc {
+        margin-left: 0 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  {% include 'navbar.html' %}
+
+  <!-- HERO -->
+  <section id="hero"
+    style="min-height: 100vh; background: #012a48; padding-top: 100px; padding-bottom: 60px; display: flex; align-items: center; position: relative; overflow: hidden;">
+
+    <canvas id="bgCanvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;"></canvas>
+
+    <div class="container position-relative" style="z-index: 2;">
+      <div class="row align-items-center">
+
+        <!-- Left Content -->
+        <div class="col-lg-6 text-center text-lg-start mb-5 mb-lg-0 text-white">
+          {% comment %} <div class="hero-badge"
+            style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 100px; padding: 5px 16px; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.8); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 22px;">
+            <span class="hero-badge-dot"
+              style="width: 7px; height: 7px; background: #35b1f6; border-radius: 50%; animation: bdot 2s infinite;"></span>
+            AI POWERED REGULATORY PLATFORM
+          </div> {% endcomment %}
+          <h1 class="hero-title"
+            style="font-family: 'inter'; font-size: clamp(2rem, 3.8vw, 3.4rem); font-weight: 700; line-height: 1.15; color: #fff; margin-bottom: 16px;">
+
+            Intelligence That Powers<br />
+            <em style="font-style: normal; color: #35b1f6;">Better Regulatory Decisions.</em>
+          </h1>
+          <p class="hero-desc"
+            style="font-size: 0.97rem; line-height: 1.82; color: rgba(255, 255, 255, 0.65); max-width: 540px; margin-bottom: 36px; margin-left: auto; margin-right: auto;">
+            Discover how our AI-driven regulatory tools simplify compliance,
+            accelerate submissions, reduce deficiencies and transform your
+            workflow with intelligent automation
+          </p>
+          <div class="hero-image d-flex justify-content-center justify-content-lg-start">
+            <img src="{% static 'img/demorequest.jfif' %}" alt="Demo"
+              style="width: 100%; max-width: 480px; animation: float 5s ease-in-out infinite; filter: drop-shadow(0 30px 80px rgba(12,108,242,0.2)); border-radius: 15px;" />
+          </div>
+          <div class="contact-details-box mt-4 text-start"
+            style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 20px; max-width: 480px;">
+            <h5
+              style="font-family: var(--ff-d); font-size: 16px; color: #35b1f6; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">
+              Contact Information</h5>
+            <div style="font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.6;">
+              <p class="mb-2"><i class="fas fa-envelope me-2" style="color: #35b1f6;"></i>
+                <strong>Email: </strong>icretools@icretegy.com</p>
+              <p class="mb-2"><i class="fas fa-phone me-2" style="color: #35b1f6;"></i> <strong>Phone:</strong> <img src="{% static 'assets/icretegy/india_flag.svg' %}" alt="India flag" style="width: 20px; height: 15px; object-fit: cover; vertical-align: -1px; margin-right: 4px; border-radius: 2px;" /> +91 98982 89121</p>
+              <p class="mb-2"><i class="fas fa-phone me-2" style="color: #35b1f6;"></i> <strong>Phone:</strong> <img src="{% static 'assets/icretegy/Flag_of_the_United_States.webp' %}" alt="USA flag" style="width: 20px; height: 15px; object-fit: cover; vertical-align: -1px; margin-right: 4px; border-radius: 2px;" /> +1 201-916-2870</p>
+              <p class="mb-2"><i class="fas fa-globe me-2" style="color: #35b1f6;"></i> <strong>Website:</strong> <a
+                  href="https://ipharmaai.com/" target="_blank"
+                  style="color: inherit; text-decoration: none;">www.ipharmaai.com</a></p>
+              <p class="mb-0"><i class="fas fa-location-dot me-2" style="color: #35b1f6;"></i>
+                <strong>Location:</strong> A-1301, The Capital, Science City Road, Sola, Ahmedabad-380060, Gujarat,
+                India</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Form -->
+        <div class="col-lg-6">
+          <div class="form-wrapper"
+            style="background: #fff; border-radius: 28px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.15); border: 1px solid rgba(255,255,255,.1);">
+
+            <div class="form-top text-center" style="padding: 30px 30px 6px; background: #fff; color: #1a2a3a;">
+              <div class="dd-step-dots" id="ddStepDots">
+                <span class="dd-dot active" data-dot="1"></span>
+                <span class="dd-dot" data-dot="2"></span>
+              </div>
+              <h2 id="ddHeading"
+                style="font-family: 'inter', sans-serif; font-size: 32px; font-weight: 800; margin-bottom: 15px; letter-spacing: 2px;">
+                Connect with Experts</h2>
+              <p id="ddSubheading" style="font-size: 15px; color: #5a7a94; line-height: 1.6; margin: 0 auto;">
+                Fill in your details and our experts will connect with you for a live demonstration tailored to your
+                regulatory needs
+              </p>
+            </div>
+
+            <div class="demo-form" style="padding: 20px 40px 40px;">
+              <form method="post" id="ddForm" novalidate>
+                {% csrf_token %}
+
+                {% if error_message %}
+                <div class="alert alert-danger" style="font-size: 14px; padding: 10px; margin-bottom: 15px;">
+                  {{ error_message }}
+                </div>
+                {% endif %}
+
+                {% if success_message %}
+                <div class="alert alert-success" style="font-size: 14px; padding: 10px; margin-bottom: 15px;">
+                  {{ success_message }}
+                </div>
+                {% endif %}
+
+                <!-- STEP 1: details (unchanged fields) -->
+                <div class="dd-step" id="ddStep1">
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-group mb-3">
+                        <label class="form-label"
+                          style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Full Name
+                          *</label>
+                        <input type="text" class="form-control" name="fullName"
+                          value="{{ form_data.fullName|default:'' }}" placeholder="Enter your full name" required
+                          style="height: 48px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none;" />
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group mb-3">
+                        <label class="form-label"
+                          style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Email *</label>
+                        <input type="email" class="form-control" name="email" value="{{ form_data.email|default:'' }}"
+                          placeholder="Enter your email" required
+                          style="height: 48px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none;" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-group mb-3">
+                        <label class="form-label"
+                          style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Country *</label>
+                        <select class="form-select" name="country" id="ddCountryInput" required
+                          style="height: 48px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none;">
+                          <option value="">Select Country</option>
+                          <option value="india" {% if form_data.country == "india" %}selected{% endif %}>India</option>
+                          <option value="usa" {% if form_data.country == "usa" %}selected{% endif %}>USA</option>
+                          <option value="uk" {% if form_data.country == "uk" %}selected{% endif %}>UK</option>
+                          <option value="canada" {% if form_data.country == "canada" %}selected{% endif %}>Canada</option>
+                          <option value="germany" {% if form_data.country == "germany" %}selected{% endif %}>Germany</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group mb-3">
+                        <label class="form-label"
+                          style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Mobile Number
+                          *</label>
+                        <input type="tel" class="form-control" name="phone" value="{{ form_data.phone|default:'' }}"
+                          placeholder="Enter mobile number" required
+                          style="height: 48px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none;" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-group mb-3">
+                        <label class="form-label"
+                          style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Company Name
+                          *</label>
+                        <input type="text" class="form-control" name="companyName"
+                          value="{{ form_data.companyName|default:'' }}" placeholder="Enter company name" required
+                          style="height: 48px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none;" />
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group mb-3">
+                        <label class="form-label"
+                          style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Company Domain
+                          *</label>
+                        <input type="text" class="form-control" name="companyDomain"
+                          value="{{ form_data.companyDomain|default:'' }}" placeholder="Enter company domain" required
+                          style="height: 48px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none;" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-group mb-3">
+                    <label class="form-label"
+                      style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Service *</label>
+                    <select class="form-select" name="service" required
+                      style="height: 48px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none;">
+                      <option value="">Select Service</option>
+                      <option value="AuditIQ">Audit IQ</option>
+                      <option value="ANDACTDSmartTemplate">ANDA CTD SmartTemplate</option>
+                      <optgroup label="RegX">
+                        <option value="RegX">RegX</option>
+                        <option value="ANDAReviewChecklist">ANDA Review Checklist</option>
+                        <option value="WhitePaper(StrategicPaper)">White Paper (Strategic Paper)</option>
+                        <option value="ControlledCorrespondence">Controlled Correspondence</option>
+                        <option value="DMFChecklist">DMF Review Checklist</option>
+                        <option value="ValidationChecklist">Validation Checklist</option>
+                        <option value="ANDAFacilityTemplate">ANDA Facility Template</option>
+                        <option value="APIFacilityTemplate">API Facility Template</option>
+                        <option value="IIG_Proportionality_Clearance_Checklist">IIG Proportionality Clearance Checklist
+                        </option>
+                        <option value="Size_Shape_Score">Size, Shape & Score Comparison</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div class="form-group mb-4">
+                    <label class="form-label"
+                      style="font-size: 13px; font-weight: 700; color: #1a2a3a; margin-bottom: 6px;">Your Question
+                      *</label>
+                    <textarea class="form-control" name="question" placeholder="Tell us about your requirements..."
+                      required
+                      style="height: 90px; border-radius: 10px; font-size: 14px; border: 1px solid #e2e8f0; box-shadow: none; resize: none;">{{ form_data.question|default:'' }}</textarea>
+                  </div>
+
+                  <button type="button" id="ddNextBtn" class="submit-btn"
+                    style="width: 100%; height: 50px; border: none; border-radius: 10px; background: linear-gradient(135deg, #26acf5, #0272ae); color: #fff; font-size: 16px; font-weight: 700; transition: transform 0.2s, box-shadow 0.2s;">
+                    Next: Pick a Time <i class="fa-solid fa-arrow-right ms-2"></i>
+                  </button>
+                </div>
+
+                <!-- STEP 2: calendar -->
+                <div class="dd-step" id="ddStep2" style="display: none;">
+                  <button type="button" id="ddBackBtn" class="dd-back-btn">
+                    <i class="fa-solid fa-arrow-left"></i> Back
+                  </button>
+
+                  <div class="dd-cal-host">
+                    <div class="dd-cal-avatar"><i class="fa-solid fa-user-tie"></i></div>
+                    <div>
+                      <p class="dd-cal-host-name">iPharmaAI Team</p>
+                      <p class="dd-cal-host-meta">Live Product Demo &middot; 30 min &middot; Video Call</p>
+                    </div>
+                  </div>
+
+                  <p class="dd-tz-note" id="ddTzNote">
+                    <i class="fa-solid fa-globe"></i> Slot times shown in <strong>IST</strong> &amp; your local time
+                  </p>
+
+                  <div class="dd-cal-header">
+                    <span class="dd-cal-month-label"><span id="ddCalMonth"></span> <span id="ddCalYear"
+                        class="dd-muted"></span></span>
+                    <div class="dd-cal-nav">
+                      <button type="button" id="ddCalPrev" aria-label="Previous month"><i
+                          class="fa-solid fa-chevron-left"></i></button>
+                      <button type="button" id="ddCalNext" aria-label="Next month"><i
+                          class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                  </div>
+
+                  <div class="dd-cal-weekdays">
+                    <span>SUN</span><span>MON</span><span>TUE</span><span>WED</span><span>THU</span><span>FRI</span><span>SAT</span>
+                  </div>
+                  <div class="dd-cal-grid" id="ddCalGrid"></div>
+                  <p class="dd-holiday-legend"><span class="dd-legend-dot"></span> Holiday &mdash; no bookings available</p>
+
+                  <div id="ddSlotsArea" class="dd-slots-area" style="display: none;">
+                    <div class="dd-slots-header">
+                      <p id="ddSlotsDateLabel"></p>
+                      <div class="dd-format-toggle">
+                        <button type="button" data-fmt="12h" class="active">12h</button>
+                        <button type="button" data-fmt="24h">24h</button>
+                      </div>
+                    </div>
+                    <div class="dd-slots-grid custom-scroll" id="ddSlotsGrid"></div>
+                  </div>
+
+                  <input type="hidden" name="preferredDate" id="ddPreferredDate" />
+                  <input type="hidden" name="preferredTime" id="ddPreferredTime" />
+
+                  <button type="submit" id="ddConfirmBtn" class="submit-btn" style="display: none; width: 100%; height: 50px; border: none; border-radius: 10px; background: linear-gradient(135deg, #26acf5, #0272ae); color: #fff; font-size: 16px; font-weight: 700; margin-top: 14px; transition: transform 0.2s, box-shadow 0.2s;">
+                    <i class="fa-solid fa-check me-2"></i> <span id="ddConfirmLabel">Confirm booking</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="fi">
+      <div class="row g-4">
+        <div class="col-lg-4 text-center text-lg-start">
+          <img
+              src="{% static 'assets/icretegy/iPharmaAI_white.png' %}"
+              class="flogo"
+              alt="iPharmaAI"
+              style=" height: 90px;"
+            />
+          <p class="fbdesc text-left mx-auto mt-3" style="max-width: 800px;">
+            iPharmaAI Reserved by <a href="https://icretegy.com" target="_blank"
+              style="color: inherit; text-decoration: underline;">iCretegy Solutions</a>. <br> regulatory intelligence
+            platform built for FDA inspection readiness, ANDA workflows, audit intelligence, and modern pharma
+            compliance operations.
+          </p>
+          <div class="far justify-content-center justify-content-lg-start mt-3">
+            <i class="fas fa-envelope"></i><a href="mailto:icretools@icretegy.com">icretools@icretegy.com</a>
+          </div>
+          <div class="socs justify-content-center justify-content-lg-start mt-4">
+            <a href="https://www.linkedin.com/company/ipharmaai" class="soc"><img
+                src="{% static 'assets/icretegy/linkedin.png' %}" alt="LinkedIn" /></a>
+            <a href="https://wa.me/+919898289121" class="soc"><img src="{% static 'assets/icretegy/whatsapp.png' %}"
+                alt="WhatsApp" /></a>
+          </div>
+        </div>
+
+        <div class="col-lg-4 text-center footer-platform">
+          <span class="eyebrow mb-3" style="margin-right:90px;">Platform</span>
+          <ul class="fl text-start d-inline-block">
+            <li>
+              <a href="/aidatabase/form483/">
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Audit IQ
+              </a>
+            </li>
+            <li>
+              <a href="/ratools/modulehome/">
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> ANDA CTD
+                SmartTemplate
+              </a>
+            </li>
+            <li>
+              <a href="/ratools/">
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> RegX
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="col-lg-4 text-center text-lg-start">
+          <span class="eyebrow mb-3">Company</span>
+          <ul class="fl">
+            <li><a href="/about-alpesh/"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> About Us</a></li>
+            <li><a href="/ratools/requestdemo"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> Contact Us</a></li>
+            <li><a href="/privacy-policy/"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> Privacy Policy</a></li>
+            <li><a href="/termsofuse/"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> Terms of Use</a></li>
+            <li>
+              <a href="/ratools/requestdemo" style="">
+
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Schedule Consultation
+              </a>
+            </li>
+          </ul>
+          <div class="mt-4">
+            {% comment %} <a href="/about-alpesh/" class="fsl d-inline-flex align-items-center">
+              <i class="fas fa-user-tie me-2" style="color: #35b1f6; font-size: 16px;"></i><span>Founder: Alpesh
+                Patel</span>
+            </a> {% endcomment %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fdiv"></div>
+    <div class="fcopy">
+      © 2026 iPharmaAI.
+    </div>
+  </footer>
+
+  <!-- THREE JS BACKGROUND -->
+  <script>
+
+    const canvas = document.getElementById("bgCanvas");
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true
+    });
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    camera.position.z = 5;
+
+    const particlesGeometry = new THREE.BufferGeometry();
+
+    const particlesCount = 2500;
+
+    const posArray = new Float32Array(particlesCount * 3);
+
+    for (let i = 0; i < particlesCount * 3; i++) {
+      posArray[i] = (Math.random() - 0.5) * 12;
+    }
+
+    particlesGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(posArray, 3)
+    );
+
+    const particlesMaterial = new THREE.PointsMaterial({
+      size: 0.015,
+      color: "#35b1f6"
+    });
+
+    const particlesMesh = new THREE.Points(
+      particlesGeometry,
+      particlesMaterial
+    );
+
+    scene.add(particlesMesh);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      particlesMesh.rotation.y += 0.0008;
+      particlesMesh.rotation.x += 0.0003;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+
+      renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+      );
+
+      camera.aspect =
+        window.innerWidth / window.innerHeight;
+
+      camera.updateProjectionMatrix();
+
+    });
+
+  </script>
+
+  <!-- DEMO REQUEST: 2-STEP WIZARD (details -> calendar) -->
+  <script>
+    (function () {
+      'use strict';
+
+      var form = document.getElementById('ddForm');
+      if (!form) return;
+
+      var AVAILABILITY_URL = '/ratools/requestdemo/availability';
+      var IST_OFFSET_MIN = 5 * 60 + 30; // Asia/Kolkata, fixed, no DST
+      var IST_TZ = 'Asia/Kolkata';
+
+      var SLOT_CONFLICT = {{ slot_conflict|yesno:"true,false" }};
+      var PREV_DATE = "{{ form_data.preferredDate|default:'' }}";
+      var PREV_TIME = "{{ form_data.preferredTime|default:'' }}";
+
+      // Company holidays — no bookings offered on these dates. Injected
+      // from the server so it stays in sync with the backend's own check.
+      var HOLIDAYS = {{ holidays_json|default:"{}"|safe }};
+
+      // Selecting a country other than India shows a second, general time
+      // for that region alongside IST (not a precise per-user local time —
+      // each country maps to one representative zone).
+      var COUNTRY_TZ = {
+        india: 'Asia/Kolkata',
+        usa: 'America/New_York',
+        uk: 'Europe/London',
+        canada: 'America/Toronto',
+        germany: 'Europe/Berlin'
+      };
+      var COUNTRY_LABEL = {
+        india: 'IST',
+        usa: 'US (Eastern)',
+        uk: 'UK',
+        canada: 'Canada (Eastern)',
+        germany: 'Germany'
+      };
+
+      var step1 = document.getElementById('ddStep1');
+      var step2 = document.getElementById('ddStep2');
+      var dots = Array.prototype.slice.call(document.querySelectorAll('#ddStepDots .dd-dot'));
+      var heading = document.getElementById('ddHeading');
+      var subheading = document.getElementById('ddSubheading');
+
+      var nextBtn = document.getElementById('ddNextBtn');
+      var backBtn = document.getElementById('ddBackBtn');
+      var confirmBtn = document.getElementById('ddConfirmBtn');
+      var confirmLabel = document.getElementById('ddConfirmLabel');
+
+      var preferredDateInput = document.getElementById('ddPreferredDate');
+      var preferredTimeInput = document.getElementById('ddPreferredTime');
+      var questionField = form.querySelector('textarea[name="question"]');
+
+      var calGrid = document.getElementById('ddCalGrid');
+      var calMonthEl = document.getElementById('ddCalMonth');
+      var calYearEl = document.getElementById('ddCalYear');
+      var calPrev = document.getElementById('ddCalPrev');
+      var calNext = document.getElementById('ddCalNext');
+      var slotsArea = document.getElementById('ddSlotsArea');
+      var slotsGrid = document.getElementById('ddSlotsGrid');
+      var slotsDateLabel = document.getElementById('ddSlotsDateLabel');
+      var tzNote = document.getElementById('ddTzNote');
+
+      var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      var countryInput = document.getElementById('ddCountryInput');
+      var selectedCountry = '';
+      var countryTz = IST_TZ;
+      var sameAsIst = true;
+
+      // Re-reads the Country field from step 1 and updates which second
+      // timezone (if any) the calendar shows alongside IST.
+      function refreshCountryTz() {
+        selectedCountry = (countryInput.value || '').toLowerCase();
+        countryTz = COUNTRY_TZ[selectedCountry] || IST_TZ;
+        sameAsIst = countryTz === IST_TZ;
+      }
+
+      var cal = {
+        month: new Date(today.getFullYear(), today.getMonth(), 1),
+        selectedDate: null,
+        selectedTime: null,
+        is24h: false,
+        bookedSlots: [],
+        loadingAvailability: false,
+        holidayName: null,
+      };
+
+      function pad2(n) { return String(n).padStart(2, '0'); }
+
+      function toDateKey(d) {
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+      }
+
+      function formatClock(h, m, is24h) {
+        if (is24h) return pad2(h) + ':' + pad2(m);
+        var period = h >= 12 ? 'PM' : 'AM';
+        var h12 = (h % 12) || 12;
+        return h12 + ':' + pad2(m) + ' ' + period;
+      }
+
+      function to12h(time) {
+        var parts = time.split(':').map(Number);
+        return formatClock(parts[0], parts[1], false);
+      }
+
+      // Given a slot "HH:MM" (IST wall-clock) on the selected calendar day,
+      // return the equivalent wall-clock time in the selected country's zone.
+      function localTimeForSlot(slot) {
+        var parts = slot.split(':').map(Number);
+        var y = cal.selectedDate.getFullYear();
+        var mo = cal.selectedDate.getMonth();
+        var d = cal.selectedDate.getDate();
+        // Build the real UTC instant this IST wall-clock time represents,
+        // then let Intl render it back in the target country's zone —
+        // DST-aware, unlike a fixed offset.
+        var utcMs = Date.UTC(y, mo, d, parts[0], parts[1]) - IST_OFFSET_MIN * 60000;
+        var instant = new Date(utcMs);
+        try {
+          return new Intl.DateTimeFormat('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: !cal.is24h,
+            hourCycle: cal.is24h ? 'h23' : undefined,
+            timeZone: countryTz
+          }).format(instant);
+        } catch (e) {
+          return formatClock(instant.getUTCHours(), instant.getUTCMinutes(), cal.is24h);
+        }
+      }
+
+      // Short zone abbreviation (e.g. "EDT", "GMT+1") for the given instant
+      // in the selected country's zone — computed per-date so DST is correct.
+      function localZoneAbbr(instant) {
+        try {
+          var parts = new Intl.DateTimeFormat('en-US', { timeZone: countryTz, timeZoneName: 'short' }).formatToParts(instant || new Date());
+          var tz = parts.find(function (p) { return p.type === 'timeZoneName'; });
+          return tz ? tz.value : '';
+        } catch (e) {
+          return '';
+        }
+      }
+
+      function generateTimeSlots() {
+        var slots = [];
+        for (var h = 9; h <= 17; h++) {
+          slots.push(pad2(h) + ':00');
+          if (h < 17) slots.push(pad2(h) + ':30');
+        }
+        return slots;
+      }
+
+      function isHoliday(year, month, day) {
+        return Object.prototype.hasOwnProperty.call(HOLIDAYS, toDateKey(new Date(year, month, day)));
+      }
+
+      function isAvailableDay(year, month, day) {
+        var d = new Date(year, month, day);
+        var dow = d.getDay();
+        return d >= today && dow !== 0 && dow !== 6 && !isHoliday(year, month, day);
+      }
+
+      function goToStep(n) {
+        if (n === 1) {
+          step2.style.display = 'none';
+          step1.style.display = '';
+          step1.classList.add('dd-fade-in');
+          heading.textContent = 'Connect with Experts';
+          subheading.textContent = 'Fill in your details and our experts will connect with you for a live demonstration tailored to your regulatory needs';
+        } else {
+          step1.style.display = 'none';
+          step2.style.display = '';
+          step2.classList.add('dd-fade-in');
+          heading.textContent = 'Book your demo';
+          subheading.textContent = 'Pick a date and time that works best for you — our experts will confirm shortly after.';
+        }
+        dots.forEach(function (dot) {
+          var dotStep = Number(dot.getAttribute('data-dot'));
+          dot.classList.toggle('active', dotStep === n);
+          dot.classList.toggle('done', dotStep < n);
+        });
+      }
+
+      nextBtn.addEventListener('click', function () {
+        var step1Fields = Array.prototype.slice.call(step1.querySelectorAll('input, select, textarea'));
+        var allValid = step1Fields.every(function (el) { return el.checkValidity(); });
+        if (!allValid) {
+          form.reportValidity();
+          return;
+        }
+        refreshCountryTz();
+        goToStep(2);
+        renderCalendar();
+      });
+
+      backBtn.addEventListener('click', function () {
+        goToStep(1);
+      });
+
+      function renderCalendar() {
+        var year = cal.month.getFullYear();
+        var month = cal.month.getMonth();
+        var firstDay = new Date(year, month, 1).getDay();
+        var daysInMonth = new Date(year, month + 1, 0).getDate();
+        var canGoPrev = new Date(year, month - 1, 1) >= new Date(today.getFullYear(), today.getMonth(), 1);
+
+        calMonthEl.textContent = MONTHS[month];
+        calYearEl.textContent = year;
+        calPrev.disabled = !canGoPrev;
+
+        var zoneAbbr = sameAsIst ? '' : localZoneAbbr(cal.selectedDate || today);
+        var countryLabel = COUNTRY_LABEL[selectedCountry] || '';
+        tzNote.innerHTML = sameAsIst
+          ? '<i class="fa-solid fa-globe"></i> Slot times shown in <strong>IST</strong>'
+          : '<i class="fa-solid fa-globe"></i> Slot times shown in <strong>IST</strong> &amp; <strong>' + countryLabel + '</strong> time' + (zoneAbbr ? ' (' + zoneAbbr + ')' : '');
+
+        var cells = [];
+        for (var i = 0; i < firstDay; i++) cells.push(null);
+        for (var d = 1; d <= daysInMonth; d++) cells.push(d);
+        while (cells.length % 7 !== 0) cells.push(null);
+
+        var html = '';
+        cells.forEach(function (day) {
+          if (!day) { html += '<div class="dd-cal-cell"></div>'; return; }
+          var available = isAvailableDay(year, month, day);
+          var holiday = isHoliday(year, month, day);
+          var isToday = new Date(year, month, day).getTime() === today.getTime();
+          var isSelected = cal.selectedDate &&
+            cal.selectedDate.getFullYear() === year &&
+            cal.selectedDate.getMonth() === month &&
+            cal.selectedDate.getDate() === day;
+          var classes = ['dd-cal-day'];
+          if (isToday) classes.push('today');
+          if (isSelected) classes.push('selected');
+          if (!available) classes.push('disabled');
+          if (holiday) classes.push('holiday');
+          var holidayName = holiday ? HOLIDAYS[toDateKey(new Date(year, month, day))] : '';
+          var title = holidayName ? ' title="' + holidayName.replace(/"/g, '&quot;') + '"' : '';
+          html += '<div class="dd-cal-cell"><button type="button" class="' + classes.join(' ') + '" data-day="' + day + '" ' + (available ? '' : 'disabled') + title + '>' + day + '</button></div>';
+        });
+        calGrid.innerHTML = html;
+
+        Array.prototype.slice.call(calGrid.querySelectorAll('.dd-cal-day:not(.disabled)')).forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            selectDate(new Date(year, month, Number(btn.dataset.day)));
+          });
+        });
+
+        if (cal.selectedDate) {
+          slotsArea.style.display = '';
+          renderSlots();
+        } else {
+          slotsArea.style.display = 'none';
+        }
+      }
+
+      function selectDate(dateObj) {
+        cal.selectedDate = dateObj;
+        cal.selectedTime = null;
+        confirmBtn.style.display = 'none';
+        renderCalendar();
+        loadAvailability();
+      }
+
+      calPrev.addEventListener('click', function () {
+        cal.month = new Date(cal.month.getFullYear(), cal.month.getMonth() - 1, 1);
+        renderCalendar();
+      });
+      calNext.addEventListener('click', function () {
+        cal.month = new Date(cal.month.getFullYear(), cal.month.getMonth() + 1, 1);
+        renderCalendar();
+      });
+
+      Array.prototype.slice.call(document.querySelectorAll('.dd-format-toggle [data-fmt]')).forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          cal.is24h = btn.dataset.fmt === '24h';
+          document.querySelectorAll('.dd-format-toggle [data-fmt]').forEach(function (b) {
+            b.classList.toggle('active', b === btn);
+          });
+          renderSlots();
+        });
+      });
+
+      // Ask the server which slots on this day are already booked by
+      // someone else, so we can grey them out before the visitor even tries.
+      function loadAvailability() {
+        cal.loadingAvailability = true;
+        cal.bookedSlots = [];
+        cal.holidayName = null;
+        renderSlots();
+
+        var dateKey = toDateKey(cal.selectedDate);
+        fetch(AVAILABILITY_URL + '?date=' + encodeURIComponent(dateKey))
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            cal.bookedSlots = data.bookedSlots || [];
+            // Defensive — the calendar already disables holiday dates
+            // client-side, but honor the server's word if this is ever hit.
+            cal.holidayName = data.holiday ? (data.holidayName || 'Holiday') : null;
+          })
+          .catch(function () { /* fail open — server re-checks on submit anyway */ })
+          .finally(function () {
+            cal.loadingAvailability = false;
+            renderSlots();
+          });
+      }
+
+      function renderSlots() {
+        if (cal.holidayName) {
+          slotsDateLabel.textContent = cal.selectedDate ? cal.selectedDate.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+          slotsGrid.innerHTML = '<p class="dd-slots-empty">This date is a holiday (' + cal.holidayName + '). Please pick another date.</p>';
+          return;
+        }
+
+        var slots = generateTimeSlots();
+        slotsDateLabel.textContent = cal.loadingAvailability
+          ? 'Checking availability…'
+          : (cal.selectedDate ? cal.selectedDate.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' }) : '');
+
+        var html = '';
+        var allBooked = true;
+        slots.forEach(function (slot) {
+          var booked = cal.bookedSlots.indexOf(slot) !== -1;
+          if (!booked) allBooked = false;
+          var selected = cal.selectedTime === slot;
+          var classes = ['dd-slot-btn'];
+          if (selected) classes.push('selected');
+          if (booked) classes.push('booked');
+
+          var istLabel = cal.is24h ? slot : to12h(slot);
+          var localLabel = sameAsIst ? '' : localTimeForSlot(slot);
+
+          html += '<button type="button" class="' + classes.join(' ') + '" data-slot="' + slot + '" ' + (booked ? 'disabled aria-disabled="true"' : '') + '>';
+          html += '<span class="dd-slot-ist">' + istLabel + ' IST</span>';
+          if (localLabel) html += '<span class="dd-slot-local">' + localLabel + (booked ? ' &middot; booked' : '') + '</span>';
+          else if (booked) html += '<span class="dd-slot-local">booked</span>';
+          html += '</button>';
+        });
+
+        if (!cal.loadingAvailability && allBooked) {
+          html += '<p class="dd-slots-empty">All slots on this day are booked. Please pick another date.</p>';
+        }
+
+        slotsGrid.innerHTML = html;
+
+        Array.prototype.slice.call(slotsGrid.querySelectorAll('[data-slot]:not([disabled])')).forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            cal.selectedTime = btn.dataset.slot;
+            preferredDateInput.value = toDateKey(cal.selectedDate);
+            preferredTimeInput.value = cal.selectedTime;
+
+            var dateLabel = cal.selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+            var istLabel = to12h(cal.selectedTime);
+            var localLabel = sameAsIst ? '' : localTimeForSlot(cal.selectedTime);
+            var countryLabel = COUNTRY_LABEL[selectedCountry] || '';
+            if (questionField) {
+              var marker = /^Preferred slot:.*\n\n/;
+              var base = questionField.value.replace(marker, '');
+              var slotText = 'Preferred slot: ' + dateLabel + ' at ' + istLabel + ' IST' + (localLabel ? ' (' + localLabel + ' ' + countryLabel + ' time)' : '');
+              questionField.value = slotText + '\n\n' + base;
+            }
+
+            confirmLabel.textContent = 'Confirm booking — ' + istLabel + ' IST' + (localLabel ? ' (' + localLabel + ' ' + countryLabel + ')' : '');
+            confirmBtn.style.display = '';
+            renderSlots();
+          });
+        });
+      }
+
+      // If the server bounced the booking back because someone else grabbed
+      // the slot first, resume on step 2 with that day's fresh availability
+      // instead of dumping the visitor back to a blank step 1.
+      if (SLOT_CONFLICT && PREV_DATE) {
+        var dateParts = PREV_DATE.split('-').map(Number);
+        if (dateParts.length === 3) {
+          var resumeDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+          refreshCountryTz();
+          cal.month = new Date(resumeDate.getFullYear(), resumeDate.getMonth(), 1);
+          goToStep(2);
+          selectDate(resumeDate);
+        }
+      }
+    })();
+  </script>
+
+</body>
+
+</html>

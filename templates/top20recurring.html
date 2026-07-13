@@ -1,0 +1,1199 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Top 20 Recurring Inspection Issues</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&display=swap"
+    />
+    <!-- Required CSS for 483 dashboard -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+      :root {
+        --bg: #edf0f5;
+        --card-bg: #ffffff;
+        --border: #dfe5ee;
+        --title: #102343;
+        --accent: #2d74d7;
+        --text: #1d2b43;
+        --muted: #6f809b;
+        --chip-bg: #e5e9f0;
+        --tab-active: #10254e;
+        --tab-inactive: #dce3ef;
+        --total-bg: #e8f8ee;
+        --total-text: #24884c;
+        --critical-bg: #fde8e8;
+        --critical-text: #cf363c;
+        --major-bg: #fff0df;
+        --major-text: #d48822;
+        --bar-track: #e7ecf4;
+        --bar-fill: #1c3e74;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Geist, Arial, sans-serif" ;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 22px;
+        background: rgba(255, 255, 255, 0.96);
+        border-bottom: 1px solid rgba(16, 35, 67, 0.08);
+        backdrop-filter: blur(12px);
+      }
+
+
+
+      .topbar-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        text-decoration: none;
+        color: inherit;
+      }
+
+      .topbar-brand img {
+        width: 132px;
+        height: 31px;
+        object-fit: contain;
+      }
+
+      .topbar-copy {
+        display: grid;
+        gap: 2px;
+      }
+
+      .topbar-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #163766;
+      }
+
+      .topbar-subtitle {
+        font-size: 12px;
+        color: #70819a;
+      }
+
+      .topbar-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        text-decoration: none;
+        color: #0c6f9d;
+        background: #e8f7fc;
+        border: 1px solid #c7e8f4;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 300px minmax(0, 1fr);
+        min-height: calc(100vh - 74px);
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 74px;
+        align-self: start;
+        height: calc(100vh - 74px);
+        padding: 18px 14px;
+        background: #07101a;
+        color: #d4dded;
+        overflow-y: auto;
+      }
+
+      .sidebar-panel {
+        border-radius: 18px;
+        padding: 12px;
+        background: linear-gradient(
+          180deg,
+          rgba(18, 30, 46, 0.98),
+          rgba(5, 12, 20, 0.98)
+        );
+        border: 1px solid rgba(138, 168, 213, 0.12);
+      }
+
+      .sidebar-home {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 12px 14px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: #eff5ff;
+        background: rgba(18, 34, 57, 0.95);
+        border: 1px solid rgba(116, 150, 201, 0.16);
+        margin-bottom: 14px;
+      }
+
+      .sidebar-home.is-active {
+        box-shadow: 0 12px 24px rgba(7, 17, 30, 0.34);
+      }
+
+      .sidebar-home-icon,
+      .section-icon {
+        width: 18px;
+        height: 18px;
+        display: inline-grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 3px;
+        flex-shrink: 0;
+      }
+
+      .sidebar-home-icon span,
+      .section-icon span {
+        background: #7c8ea9;
+        border-radius: 2px;
+      }
+
+      .sidebar-home-copy strong {
+        display: block;
+        font-size: 14px;
+        line-height: 1.2;
+      }
+
+      .sidebar-home-copy small {
+        display: block;
+        margin-top: 3px;
+        color: #8090aa;
+        font-size: 11px;
+      }
+
+      .sidebar-sections {
+        display: grid;
+        gap: 8px;
+      }
+
+      .sidebar-section {
+        border-radius: 14px;
+        overflow: hidden;
+      }
+
+      .sidebar-section.is-open {
+        background: rgba(13, 24, 38, 0.9);
+      }
+
+      .sidebar-section-toggle {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 10px;
+        border: 0;
+        background: transparent;
+        color: #dbe5f4;
+        cursor: pointer;
+        text-align: left;
+        font: inherit;
+        font-weight: 700;
+      }
+
+      .sidebar-section-toggle:hover {
+        color: #ffffff;
+      }
+
+      .sidebar-section-label {
+        flex: 1;
+        font-size: 15px;
+      }
+
+      .sidebar-chevron {
+        width: 10px;
+        height: 10px;
+        border-right: 2px solid #7fa7c6;
+        border-bottom: 2px solid #7fa7c6;
+        transform: rotate(45deg);
+        transition: transform 0.2s ease;
+        margin-right: 4px;
+      }
+
+      .sidebar-section.is-open .sidebar-chevron {
+        transform: rotate(-135deg);
+      }
+
+      .sidebar-submenu {
+        display: none;
+        padding: 2px 0 10px 36px;
+      }
+
+      .sidebar-section.is-open .sidebar-submenu {
+        display: grid;
+        gap: 4px;
+      }
+
+      .sidebar-submenu a {
+        display: block;
+        padding: 10px 12px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: #8190a7;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .sidebar-submenu a:hover,
+      .sidebar-submenu a.is-active {
+        color: #ffffff;
+        background: rgba(38, 57, 84, 0.88);
+      }
+
+      /* .page-wrap {
+        width: min(1120px, 100%);
+        margin: 0;
+        padding: 22px 18px 26px;
+      } */
+
+      .page-wrap {
+        width: 100%;
+        margin: 0 auto;
+        padding: 20px 14px 26px;
+      }
+
+      .dashboard {
+        background: transparent;
+      }
+
+      .title {
+        margin: 0;
+        color: #fff;
+        font-size: clamp(28px, 4.2vw, 28px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        font-family: Geist, Arial, sans-serif;
+        text-transform: uppercase;
+      }
+
+      .title-accent {
+        color: var(--accent);
+      }
+
+      .main-heading {
+        font-family: "Playfair Display", serif;
+          background: linear-gradient(
+        135deg,
+        #02162d 0%,
+        #05284d 45%,
+        #0a3b66 100%
+    );
+        padding: 20px;
+        border-radius: 12px;
+      }
+      .subtitle {
+        font-family: Geist, Arial, sans-serif;
+        margin: 8px 0 4px;
+        color: #f36a62;
+        font-size: 28px;
+        font-style: italic;
+        font-weight: 600;
+      }
+
+      .description {
+        margin: 0;
+        color: #aab1bd;
+        font-size: 16px;
+        font-family: "Inter", sans-serif;
+      }
+
+      .stats-row {
+        margin-top: 20px;
+        display: flex;
+
+        border-radius: 18px;
+        overflow: hidden;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .stat-box {
+        flex: 1;
+        padding: 10px 20px;
+        text-align: center;
+        color: #fff;
+        border-right: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .stat-box:last-child {
+        border-right: none;
+      }
+
+      .stat-box h2 {
+        font-size: 32px;
+        font-weight: 700;
+        margin: 0;
+      }
+
+      .stat-box p {
+        font-size: 12px;
+        letter-spacing: 1px;
+        color: #fff;
+        margin-top: 5px;
+      }
+      .toggle-row {
+        margin-top: 15px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .country-btn {
+        border: 1px solid #b8c4d8;
+        border-radius: 7px;
+        padding: 6px 12px;
+        background: var(--tab-inactive);
+        color: #4f607c;
+        text-transform: uppercase;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .country-btn.active {
+        background: var(--tab-active);
+        border-color: var(--tab-active);
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(16, 37, 78, 0.24);
+      }
+
+      .country-flag {
+        position: relative;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid rgba(16, 35, 67, 0.2);
+        flex-shrink: 0;
+      }
+
+      .flag-india {
+        background: linear-gradient(
+          to bottom,
+          #ff9933 0%,
+          #ff9933 33.33%,
+          #ffffff 33.33%,
+          #ffffff 66.66%,
+          #138808 66.66%,
+          #138808 100%
+        );
+      }
+
+      .flag-india::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 4px;
+        height: 4px;
+        border: 1px solid #224fa5;
+        border-radius: 999px;
+        transform: translate(-50%, -50%);
+      }
+
+      .flag-usa {
+        background: repeating-linear-gradient(
+          to bottom,
+          #b22234 0,
+          #b22234 8%,
+          #ffffff 8%,
+          #ffffff 16%
+        );
+      }
+
+      .flag-usa::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 44%;
+        height: 55%;
+        background: #3c3b6e;
+        border-bottom-right-radius: 2px;
+      }
+
+      .profiles-title {
+        margin: 16px 0 5px;
+        font-size: clamp(24px, 3.8vw, 30px);
+        line-height: 1.1;
+        color: #102343;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .profiles-subtitle {
+        margin: 0;
+        color: #6d7f99;
+        font-size: 16px;
+      }
+
+      .cards-grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .profile-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        padding: 12px;
+        box-shadow: 0 2px 6px rgba(16, 35, 67, 0.06);
+      }
+
+      .card-title {
+        margin: 0;
+        color: #172d56;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .severity-row {
+        margin-top: 10px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .severity-box {
+        border-radius: 8px;
+        padding: 8px 7px;
+      }
+
+      .severity-box.total {
+        background: var(--total-bg);
+      }
+
+      .severity-box.critical {
+        background: var(--critical-bg);
+      }
+
+      .severity-box.major {
+        background: var(--major-bg);
+      }
+
+      .severity-value {
+        margin: 0;
+        font-size: 17px;
+        line-height: 1;
+        font-weight: 800;
+      }
+
+      .severity-box.total .severity-value,
+      .severity-box.total .severity-label {
+        color: var(--total-text);
+      }
+
+      .severity-box.critical .severity-value,
+      .severity-box.critical .severity-label {
+        color: var(--critical-text);
+      }
+
+      .severity-box.major .severity-value,
+      .severity-box.major .severity-label {
+        color: var(--major-text);
+      }
+
+      .severity-label {
+        margin-top: 3px;
+        display: block;
+        font-size: 8px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .issue-list {
+        margin-top: 11px;
+      }
+
+      .issue-row {
+        padding: 6px 0 7px;
+        border-bottom: 1px solid #edf1f7;
+      }
+
+      .issue-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+      }
+
+      .issue-row:last-child {
+        border-bottom: 0;
+      }
+
+      .issue-name {
+        color: #2a3f63;
+        font-size: 14px;
+        font-weight: 600;
+        flex: 1;
+      }
+
+      .issue-count {
+        color: #4f6180;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .issue-bar-track {
+        margin-top: 4px;
+        height: 4px;
+        width: 100%;
+        border-radius: 999px;
+        background: var(--bar-track);
+        overflow: hidden;
+      }
+
+      .issue-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--bar-fill), #5e88c8);
+      }
+
+      .card-link {
+        margin-top: 10px;
+        color: #2a65b7;
+        font-size: 10px;
+        font-weight: 700;
+        display: inline-flex;
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+        transition:
+          border-color 0.2s ease,
+          color 0.2s ease;
+      }
+
+      .card-link:hover {
+        color: #113f83;
+        border-color: currentColor;
+      }
+
+      /* 483 Dashboard Navbar & Sidebar CSS */
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        text-align: left !important;
+      }
+
+      .navbar-menu-wrapper {
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+        flex-grow: 1;
+      }
+
+      .nav-header-link {
+        font-size: 14px !important;
+        font-weight: bold;
+        text-decoration: none;
+        border-radius: 5px;
+        color: black !important;
+      }
+
+      @media (max-width: 1490px) {
+        .nav-header-link {
+          font-size: 12px !important;
+        }
+      }
+
+      .nav-header-link-hover:hover {
+        color: #045c8d !important;
+      }
+
+      .active-header-link {
+        color:  rgba(255, 255, 255, 1) !important;
+        background: linear-gradient(to right, #045c8d , #1276a2) !important;
+      }
+
+      .navbar-brand-wrapper {
+        width: fit-content !important;
+      }
+
+      .dropdown-menu[data-bs-popper] {
+        top: 70%;
+      }
+
+      .dashboard-page-body {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        padding-top: 70px;
+        min-height: 100vh;
+      }
+
+      .dashboard-main-panel {
+      flex: 1 1 auto;
+        margin-left: 260px;
+      width: calc(100% - 260px);
+      padding-left: 10px;
+      transition: all 0.3s ease;
+        transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .main-panel {
+        margin-left: 80px;
+        width: calc(100% - 80px);
+    }
+
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 96px;
+        min-width: 96px;
+        max-width: 96px;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+        display: none;
+      }
+
+      .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+        justify-content: center;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+        display: flex;
+        justify-content: center;
+      }
+
+      .dashboard-layout.sidebar-collapsed .sidebar-submenu-list,
+      .dashboard-layout.sidebar-collapsed .dropdown-caret {
+        display: none !important;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+        width: 56px;
+        margin: 0 auto;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .submenu-link {
+        margin-left: 2.5rem !important;
+      }
+
+      .dashboard-layout.sidebar-collapsed .submenu-link {
+        padding-left: 0 !important;
+      }
+
+      .content-wrapper {
+        background: none;
+        padding: 0% !important;
+      }
+
+      @media (max-width: 991px) {
+        .dashboard-page-body {
+          flex-direction: column;
+          padding-top: 70px;
+        }
+
+        .dashboard-sidebar {
+          position: relative;
+          top: 0;
+          width: 100%;
+          min-width: 100%;
+          max-width: 100%;
+          height: auto;
+          border-radius: 0 0 16px 16px;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+          width: 100%;
+          min-width: 100%;
+          max-width: 100%;
+        }
+
+        .dashboard-main-panel {
+          width: 100% !important;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .app-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: relative;
+          top: 0;
+          height: auto;
+        }
+
+        .page-wrap {
+          width: min(760px, 96vw);
+          margin: 0 auto;
+        }
+
+        .cards-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 660px) {
+        .topbar {
+          padding: 12px 14px;
+          flex-wrap: wrap;
+        }
+
+        .topbar-brand {
+          width: 100%;
+        }
+
+        .stats-row {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .stat-card {
+          padding: 8px;
+        }
+
+        .profiles-title {
+          font-size: clamp(24px, 9vw, 26px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-scroller">
+      <!-- Navbar from 483 dashboard -->
+      {% include './navbar.html' %}
+      <!-- Dashboard Layout with Sidebar -->
+      <div
+        class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout"
+        id="dashboardLayout"
+      >
+        <!-- 483 Dashboard Sidebar -->
+        {% include './sidebar.html' %}
+        <!-- Main Panel -->
+        <div class="main-panel dashboard-main-panel">
+          <div class="content-wrapper">
+            <div class="page-wrap">
+              <main class="dashboard">
+                <div class="main-heading">
+                  <h1 class="title">Top 20 Recurring Issues -</h1>
+                  <p class="subtitle">What Inspectors Find - Every Time</p>
+                  <p class="description">
+                    Ranked, risk-stratified GMP inspection observation data
+                    across API, FDF, OSD and Sterile manufacturer types for
+                    India and USA facilities. Built to sharpen inspection
+                    readiness.
+                  </p>
+
+                  <section class="stats-row">
+                    <div class="stat-box">
+                      <h2>2</h2>
+                      <p>LOCATIONS</p>
+                    </div>
+
+                    <div class="stat-box">
+                      <h2>4</h2>
+                      <p>MFR. TYPES</p>
+                    </div>
+
+                    <div class="stat-box">
+                      <h2>8</h2>
+                      <p>DATASETS</p>
+                    </div>
+                  </section>
+                </div>
+
+                <section class="toggle-row" aria-label="Country toggle">
+                  <button
+                    class="country-btn active"
+                    type="button"
+                    data-country="india"
+                  >
+                    <span
+                      class="country-flag flag-india"
+                      aria-hidden="true"
+                    ></span>
+                    IN (INDIA)
+                  </button>
+                  <button class="country-btn" type="button" data-country="usa">
+                    <span
+                      class="country-flag flag-usa"
+                      aria-hidden="true"
+                    ></span>
+                    USA (UNITED STATES)
+                  </button>
+                </section>
+
+                <h2 class="profiles-title" id="country-title">
+                  India - Manufacturer Profiles
+                </h2>
+                <p class="profiles-subtitle" id="country-subtitle">
+                  Select a manufacturer type to explore its Top 20 recurring GMP
+                  inspection observations, severity breakdown, Pareto Chart
+                  analysis, and inspection readiness intelligence.
+                </p>
+
+                <section class="cards-grid" id="profile-cards"></section>
+              </main>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Required Scripts -->
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+    <script>
+      function initSidebarToggle() {
+        const layout = document.getElementById("dashboardLayout");
+        const toggleButton = document.getElementById("sidebarToggle");
+        if (!layout || !toggleButton) return;
+
+        toggleButton.addEventListener("click", () => {
+          layout.classList.toggle("sidebar-collapsed");
+          toggleButton.setAttribute(
+            "aria-expanded",
+            layout.classList.contains("sidebar-collapsed") ? "false" : "true",
+          );
+
+          // Re-render submenus to respect the new collapsed state
+          const activeCountry =
+            document.querySelector(".country-btn.active")?.dataset.country ||
+            "india";
+          updateSidebarSubmenus(activeCountry);
+        });
+      }
+      document.addEventListener("DOMContentLoaded", initSidebarToggle);
+    </script>
+
+    <script>
+      const dashboardData = {
+        india: {
+          title: "India - Manufacturer Profiles",
+          subtitle:
+            "Select a manufacturer type to explore its Top 20 recurring GMP inspection observations, severity breakdown, Pareto Chart, and inspection readiness intelligence.",
+          summary: {
+            totalObservations: 1808,
+            critical: 44,
+            major: 64,
+          },
+          cards: [
+            {
+              manufacturerKey: "api_manufacturers",
+              manufacturer: "API Manufacturers",
+              totalObservations: 497,
+              critical: 5,
+              major: 15,
+              issues: [
+                { name: "OOS Investigations & Retesting", count: 115 },
+                {
+                  name: "Routine Cleaning/Sanitation Execution & Records",
+                  count: 85,
+                },
+                { name: "Laboratory Controls & Method Suitability", count: 43 },
+              ],
+            },
+            {
+              manufacturerKey: "rx_drug_manufacturer",
+              manufacturer: "Prescription (Rx) Drug Manufacturer",
+              totalObservations: 2622,
+              critical: 10,
+              major: 10,
+              issues: [
+                {
+                  name: "Laboratory Controls – Chromatography (HPLC/GC)",
+                  count: 440,
+                },
+                { name: "OOS Investigations & Retesting", count: 357 },
+                { name: "Aseptic Practices & Interventions", count: 355 },
+              ],
+            },
+            {
+              manufacturerKey: "sterile_products",
+              manufacturer: "Sterile Manufacturers ",
+              totalObservations: 1428,
+              critical: 11,
+              major: 9,
+              issues: [
+                { name: "Aseptic Practices & Interventions", count: 748 },
+                { name: "Environmental Monitoring Program", count: 195 },
+                { name: "OOS Investigations & Retesting", count: 108 },
+              ],
+            },
+            {
+              manufacturerKey: "osd_manufacturers",
+              manufacturer: "OSD Manufacturers",
+              totalObservations: 2011,
+              critical: 6,
+              major: 14,
+              issues: [
+                { name: "OOS Investigations & Retesting", count: 293 },
+                {
+                  name: "Contamination/Cross-Contamination Control",
+                  count: 253,
+                },
+                { name: "Deviation Investigations (Non-OOS)", count: 245 },
+              ],
+            },
+          ],
+        },
+        usa: {
+          title: "USA - Manufacturer Profiles",
+          subtitle:
+            "Select a manufacturer type to review Top 20 recurring GMP inspection observations from United States facilities, including severity and issue frequency.",
+          summary: {
+            totalObservations: 1562,
+            critical: 37,
+            major: 52,
+          },
+          cards: [
+            {
+              manufacturerKey: "api_manufacturers",
+              manufacturer: "API Manufacturers",
+              totalObservations: 1621,
+              critical: 8,
+              major: 12,
+              issues: [
+                {
+                  name: "Laboratory Controls / Analytical Testing",
+                  count: 248,
+                },
+                { name: "Deviation / Incident Investigations", count: 180 },
+                { name: "Documentation / Record Control", count: 153 },
+              ],
+            },
+            {
+              manufacturerKey: "rx_drug_manufacturer",
+              manufacturer: "Prescription (Rx) Drug Manufacturer",
+              totalObservations: 6777,
+              critical: 8,
+              major: 12,
+              issues: [
+                { name: "Aseptic / Environmental Monitoring", count: 1582 },
+                {
+                  name: "Supplier / Raw Material / Component Controls",
+                  count: 960,
+                },
+                { name: "OOS / Laboratory Investigations", count: 697 },
+              ],
+            },
+            {
+              manufacturerKey: "sterile_products",
+              manufacturer: "Sterile Manufacturers ",
+              totalObservations: 2919,
+              critical: 8,
+              major: 12,
+              issues: [
+                { name: "Aseptic / Environmental Monitoring", count: 1772 },
+                {
+                  name: "Cleaning Execution / Equipment Cleanliness",
+                  count: 574,
+                },
+                { name: "Complaints / APR / PQR Review", count: 102 },
+              ],
+            },
+            {
+              manufacturerKey: "osd_manufacturers",
+              manufacturer: "OSD Manufacturers",
+              totalObservations: 5980,
+              critical: 8,
+              major: 12,
+              issues: [
+                {
+                  name: "Supplier / Raw Material / Component Controls",
+                  count: 847,
+                },
+                { name: "OOS / Laboratory Investigations", count: 847 },
+                { name: "Data Integrity / Computerized Systems", count: 689 },
+              ],
+            },
+          ],
+        },
+      };
+
+      const cardsContainer = document.getElementById("profile-cards");
+      const countryTitle = document.getElementById("country-title");
+      const countrySubtitle = document.getElementById("country-subtitle");
+      const countrySidebar = document.getElementById("country-sidebar");
+      const countryButtons = document.querySelectorAll(".country-btn");
+      const detailPageBase = "{% url 'render_top20recurring_detail' %}";
+      const params = new URLSearchParams(window.location.search);
+
+      function createDetailUrl(country, card, profileIndex) {
+        return `${detailPageBase}?country=${encodeURIComponent(
+          country,
+        )}&manufacturer=${encodeURIComponent(card.manufacturer)}&manufacturer_key=${encodeURIComponent(card.manufacturerKey || "")}&profile=${encodeURIComponent(profileIndex)}`;
+      }
+
+      function updateSidebarSubmenus(activeCountry) {
+        const layout = document.getElementById("dashboardLayout");
+        const isCollapsed = layout.classList.contains("sidebar-collapsed");
+
+        // Hide all submenus first
+        document
+          .querySelectorAll(".sidebar-submenu-list")
+          .forEach((el) => (el.style.display = "none"));
+
+        const countryData = dashboardData[activeCountry];
+        const submenuId =
+          activeCountry === "india" ? "indiaSubmenu" : "usaSubmenu";
+        const submenuEl = document.getElementById(submenuId);
+
+        if (submenuEl && !isCollapsed) {
+          submenuEl.innerHTML = countryData.cards
+            .map((card, index) => {
+              const detailUrl = createDetailUrl(activeCountry, card, index);
+              return `<li style="margin: 12px 0;"><a href="${detailUrl}" style="color: #25729D; text-decoration: none; font-size: 13px; font-weight: 600; display: block;">${card.manufacturer}</a></li>`;
+            })
+            .join("");
+          submenuEl.style.display = "block";
+        }
+
+        // Update active state on parent items
+        document.querySelectorAll(".dashboard-sidebar-item").forEach((item) => {
+          const linkText =
+            item.querySelector(".dashboard-sidebar-label")?.textContent || "";
+          const isMatch =
+            (activeCountry === "india" && linkText.includes("India")) ||
+            (activeCountry === "usa" && linkText.includes("USA"));
+          item.classList.toggle("is-active", isMatch);
+        });
+      }
+
+      function createIssueRows(issues) {
+        const maxCount = Math.max(
+          ...issues.map((issue) => Number(issue.count) || 0),
+          1,
+        );
+
+        return issues
+          .map((issue) => {
+            const count = Number(issue.count) || 0;
+            const barWidth = Math.max(8, Math.round((count / maxCount) * 100));
+
+            return `
+              <div class="issue-row">
+                <div class="issue-top">
+                  <span class="issue-name">${issue.name}</span>
+                  <span class="issue-count">${count}</span>
+                </div>
+                <div class="issue-bar-track">
+                  <div class="issue-bar-fill" style="width: ${barWidth}%"></div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      function createCard(country, card, profileIndex) {
+        const detailUrl = createDetailUrl(country, card, profileIndex);
+
+        return `
+          <article class="profile-card">
+            <h3 class="card-title">${card.manufacturer}</h3>
+            <div class="severity-row">
+              <div class="severity-box total">
+                <p class="severity-value">${card.totalObservations}</p>
+                <span class="severity-label">Total Observations</span>
+              </div>
+              <div class="severity-box critical">
+                <p class="severity-value">${card.critical}</p>
+                <span class="severity-label">Critical</span>
+              </div>
+              <div class="severity-box major">
+                <p class="severity-value">${card.major}</p>
+                <span class="severity-label">Major</span>
+              </div>
+            </div>
+            <div class="issue-list">${createIssueRows(card.issues)}</div>
+            <a class="card-link" href="${detailUrl}">View Full Intelligence &gt;</a>
+          </article>
+        `;
+      }
+
+      function renderCountry(country) {
+        const countryData = dashboardData[country] || dashboardData.india;
+
+        countryTitle.textContent = countryData.title;
+        countrySubtitle.textContent = countryData.subtitle;
+
+        cardsContainer.innerHTML = countryData.cards
+          .map((card, index) => createCard(country, card, index))
+          .join("");
+
+        countryButtons.forEach((button) => {
+          button.classList.toggle("active", button.dataset.country === country);
+        });
+
+        updateSidebarSubmenus(country);
+
+        // Notify sidebar to update its India / USA active link
+        window.dispatchEvent(new CustomEvent('countryChanged', { detail: country }));
+      }
+
+      countryButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          renderCountry(button.dataset.country);
+        });
+      });
+
+      renderCountry(
+        (params.get("country") || "india").toLowerCase() === "usa"
+          ? "usa"
+          : "india",
+      );
+
+      // Remove the manual dropdown JS since we use Bootstrap collapse now
+    </script>
+  </body>
+</html>

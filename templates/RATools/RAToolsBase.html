@@ -1,0 +1,2244 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <title>iPharmaAI | Technical Tools</title>
+  <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+  <style>
+    :root {
+      --ink: #001f45;
+      --navy: #003865;
+      --blue: #045e8f;
+      --blue-2: #0878b5;
+      --cyan: #35b1f6;
+      --orange: #fe9409;
+      --line: #dce7f4;
+      --panel: #f4f8fe;
+      --soft: #eaf2fd;
+      --text: #314155;
+      --muted: #66768b;
+      --white: #ffffff;
+    }
+
+    html {
+      scroll-behavior: auto;
+    }
+
+
+    html.lenis,
+    html.lenis body {
+      height: auto;
+    }
+
+    .lenis.lenis-smooth {
+      scroll-behavior: auto !important;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      overflow-x: hidden;
+      background: #f0f7ff;
+      color: var(--text);
+      font-family: "DM Sans", sans-serif;
+    }
+
+    .dashboard-page-body {
+      display: flex;
+      flex-direction: row;
+      min-height: 100vh;
+      padding-top: 70px;
+    }
+
+    @media (max-width: 991px) {
+      .dashboard-page-body {
+        flex-direction: column;
+      }
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .tt-shell {
+      min-height: 100vh;
+      background: linear-gradient(180deg, #f0f7ff 0%, #f8fbff 54%, #eef5ff 100%);
+    }
+
+    #mainNav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      min-height: 68px;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+
+    #mainNav.scrolled {
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    #mainNav .nav-link {
+      font-weight: 600;
+      font-size: 13.5px !important;
+      color: var(--ink) !important;
+      transition: color 0.2s, background 0.2s, box-shadow 0.2s;
+      padding: 6px 11px !important;
+    }
+
+    #mainNav .nav-link:hover {
+      color: var(--cyan) !important;
+    }
+
+    #mainNav .nav-active {
+      background: rgba(1, 90, 139, 0.08) !important;
+      color: var(--ink) !important;
+      border-radius: 7px;
+    }
+
+
+    .nav-img {
+      width: 130px;
+      height: auto;
+    }
+
+    #mainNav .btn-demo {
+      background: var(--orange);
+      color: #fff !important;
+      border-radius: 8px;
+      padding: 8px 20px !important;
+      font-weight: 700 !important;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    #mainNav .btn-demo:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(254, 148, 9, 0.5);
+    }
+
+    #mainNav .btn-login {
+      background: transparent;
+      color: var(--cyan) !important;
+      border: 1px solid var(--cyan);
+      border-radius: 8px;
+      padding: 8px 20px !important;
+      font-weight: 700 !important;
+      transition: all 0.2s;
+    }
+
+    #mainNav .btn-login:hover {
+      background: var(--cyan);
+      color: #fff !important;
+    }
+
+    #mainNav .dropdown-menu .dropdown-item {
+      color: var(--text) !important;
+      font-size: 14px;
+    }
+
+    #mainNav .dropdown-menu .dropdown-item:hover {
+      background-color: #f4f8fc;
+    }
+
+    .tt-topbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 0 28px;
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid rgba(0, 56, 101, 0.12);
+      box-shadow: 0 12px 34px rgba(0, 31, 69, 0.08);
+      backdrop-filter: blur(18px);
+    }
+
+    .tt-brand {
+      width: 172px;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .tt-brand img {
+      width: 132px;
+      height: 31px;
+      object-fit: contain;
+    }
+
+    .tt-mainnav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .tt-mainnav a,
+    .tt-auth a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 9px 14px;
+      border-radius: 8px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: 0.22s ease;
+    }
+
+    .tt-mainnav a:hover {
+      color: var(--blue);
+      background: rgba(4, 94, 143, 0.08);
+    }
+
+    .tt-mainnav a.active {
+      color: var(--ink);
+      background: rgba(53, 177, 246, 0.14);
+      box-shadow: inset 0 -2px 0 var(--navy);
+    }
+
+    .tt-auth {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tt-auth .demo {
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), var(--navy));
+      box-shadow: 0 10px 24px rgba(4, 94, 143, 0.24);
+    }
+
+    .tt-profile {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .tt-profile img {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .tt-sidebar {
+      position: fixed;
+      top: 70px;
+      left: 0;
+      bottom: 0;
+      z-index: 900;
+      width: 255px;
+      padding: 20px 0;
+      overflow-y: auto;
+      background: linear-gradient(180deg, #f0f7ff 0%, #eef5ff 50%, #e6f0ff 100%);
+      border-right: 1px solid rgba(4, 94, 143, 0.12);
+      box-shadow: 4px 0 16px rgba(0, 31, 69, 0.06);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tt-sidebar.collapsed {
+      transform: translateX(-255px);
+    }
+
+    .tt-sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .tt-sidebar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .tt-sidebar::-webkit-scrollbar-thumb {
+      background: rgba(4, 94, 143, 0.2);
+      border-radius: 3px;
+    }
+
+    .tt-sidebar::-webkit-scrollbar-thumb:hover {
+      background: rgba(4, 94, 143, 0.4);
+    }
+
+    .tt-sidebar-title {
+      margin: 0 16px 24px;
+      padding: 12px 14px;
+      background: linear-gradient(135deg, rgba(4, 94, 143, 0.08), rgba(53, 177, 246, 0.06));
+      border-left: 3px solid var(--blue);
+      border-radius: 0 8px 8px 0;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .tt-sidebar-title span {
+      display: block;
+      margin-top: 6px;
+      color: var(--navy);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-weight: 700;
+      opacity: 0.8;
+    }
+
+    .tt-side-link {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 11px;
+      align-items: center;
+      margin: 0 10px;
+      padding: 11px 12px;
+      border-radius: 8px;
+      color: var(--ink);
+      font-size: 12.5px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tt-side-link::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(53, 177, 246, 0.1), rgba(4, 94, 143, 0.05));
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: -1;
+    }
+
+    .tt-side-link i {
+      color: var(--navy);
+      font-size: 18px;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .tt-side-link:hover {
+      background: rgba(255, 255, 255, 0.95);
+      color: var(--blue);
+      transform: translateX(4px);
+      box-shadow: 0 8px 24px rgba(0, 31, 69, 0.1);
+    }
+
+    .tt-side-link:hover i {
+      color: var(--blue);
+      transform: scale(1.15);
+    }
+
+    .tt-side-group {
+      margin-bottom: 2px;
+    }
+
+    .tt-side-group summary {
+      list-style: none;
+      cursor: pointer;
+    }
+
+    .tt-side-group summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .tt-side-group summary .tt-side-link {
+      position: relative;
+      padding-right: 32px;
+    }
+
+    .tt-side-group summary .tt-side-link::after {
+      content: "\F0140";
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--navy);
+      font-family: "Material Design Icons";
+      font-size: 18px;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .tt-side-group[open] summary .tt-side-link {
+      background: rgba(255, 255, 255, 0.95);
+      color: var(--blue);
+      box-shadow: 0 8px 24px rgba(0, 31, 69, 0.1);
+    }
+
+    .tt-side-group[open] summary .tt-side-link::after {
+      transform: translateY(-50%) rotate(180deg);
+      color: var(--blue);
+    }
+
+    .tt-submenu {
+      display: grid;
+      gap: 4px;
+      margin: 6px 10px 8px 35px;
+      padding-left: 12px;
+      border-left: 2px solid rgba(4, 94, 143, 0.2);
+      animation: slideDown 0.3s ease-out;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .tt-submenu a {
+      display: block;
+      padding: 9px 10px;
+      border-radius: 7px;
+      color: #24405d;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.3;
+      text-decoration: none;
+      transition: all 0.22s ease;
+      position: relative;
+      padding-left: 14px;
+    }
+
+    .tt-submenu a::before {
+      content: "●";
+      position: absolute;
+      left: 4px;
+      color: var(--cyan);
+      font-size: 6px;
+      opacity: 0;
+      transition: opacity 0.22s ease;
+    }
+
+    .tt-submenu a:hover {
+      color: var(--blue);
+      background: rgba(53, 177, 246, 0.12);
+      padding-left: 16px;
+      transform: translateX(2px);
+    }
+
+    .tt-submenu a:hover::before {
+      opacity: 1;
+    }
+
+    .tt-page {
+      margin-left: 255px;
+      padding-top: 70px;
+      transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tt-page.expanded {
+      margin-left: 0;
+    }
+
+    .dashboard-main-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100vh - 70px);
+      flex-grow: 1;
+    }
+
+    .tt-page>.card {
+      margin: 28px;
+      border: 0;
+      border-radius: 8px;
+      box-shadow: 0 18px 42px rgba(0, 31, 69, 0.1);
+    }
+
+    .tt-hero {
+      position: relative;
+      min-height: 500px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      background: linear-gradient(120deg, #023e5f, #045E8F);
+    }
+
+    #toolsScene {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 500px;
+      opacity: 0.72;
+    }
+
+    .tt-hero-inner {
+      position: relative;
+      z-index: 2;
+      width: 100%;
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 74px 34px 68px;
+      display: grid;
+      grid-template-columns: 1.08fr 0.92fr;
+      gap: 48px;
+      align-items: center;
+    }
+
+    @media (min-width: 1600px) {
+      .tt-hero-inner {
+        margin-left: 34px !important;
+        margin-right: auto !important;
+        max-width: 1600px !important;
+      }
+      .tt-hero
+      {
+        height: 500px;
+      }
+      .container {
+        max-width: 1600px !important;
+      }
+    }
+
+    .tt-hero-content {
+      min-width: 0;
+    }
+
+    .tt-hero-kicker {
+      display: block;
+      margin: 0 0 10px;
+      color: #35b1f6;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .tt-hero h2 {
+      margin: 0 0 20px;
+      color: #fff;
+      font-family: "Inter", sans-serif;
+
+      font-weight: 800;
+      line-height: 1.16;
+    }
+
+    .tt-hero h2 em {
+      color: #35b1f6;
+      font-style: normal;
+    }
+
+    .tt-hero-visual {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .tt-hero-visual img {
+      width: min(100%, 520px) !important;
+      max-height: 320px;
+      border-radius: 8px;
+      box-shadow: 0 24px 58px rgba(0, 0, 0, 0.28);
+      object-fit: cover;
+    }
+
+    .tt-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      padding: 7px 16px;
+      border: 1px solid rgba(4, 94, 143, 0.16);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+
+    .tt-hero h1 {
+      font-family: "Syne", sans-serif;
+      max-width: 760px;
+      margin: 0 0 14px;
+      color: #fff;
+      font-size: clamp(38px, 5vw, 58px);
+      font-weight: 800;
+      line-height: 1.03;
+      letter-spacing: 0;
+    }
+
+    .tt-hero p {
+      max-width: 620px;
+      margin: 0 0 30px;
+      color: #dbeafe;
+      font-size: 18px;
+      line-height: 1.55;
+    }
+
+    .tt-actions {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .tt-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 50px;
+      padding: 13px 26px;
+      border-radius: 8px;
+      border: 1px solid var(--navy);
+      color: var(--ink);
+      font-weight: 800;
+      text-decoration: none;
+      transition: 0.24s ease;
+    }
+
+    .tt-button.primary {
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), var(--navy));
+      box-shadow: 0 16px 34px rgba(4, 94, 143, 0.26);
+    }
+
+    .tt-hero .tt-button.primary {
+      border-color: #38bdf8;
+      background: #38bdf8;
+      color: #fff;
+      box-shadow: 0 16px 34px rgba(56, 189, 248, 0.28);
+    }
+
+    .tt-button:hover {
+      transform: translateY(-3px);
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .tt-button.primary:hover {
+      color: #fff;
+    }
+
+    .tt-section {
+      padding: 68px 34px;
+    }
+
+    .tt-section.soft {
+      background: #edf5ff;
+    }
+
+    .tt-wrap {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+    }
+
+    .tt-section-title {
+      margin: 0 auto 34px;
+      color: var(--ink);
+      font-size: clamp(24px, 3vw, 34px);
+      font-weight: 850;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .tt-section-title::after {
+      content: "";
+      display: block;
+      width: 86px;
+      height: 4px;
+      margin: 12px auto 0;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--navy), var(--cyan));
+    }
+
+    .tt-tool-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 26px;
+    }
+
+    .tt-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 250px;
+      padding: 28px;
+      border: 1px solid rgba(0, 56, 101, 0.08);
+      border-radius: 8px;
+      background: #fcfdfe;
+      box-shadow: 0 18px 42px rgba(0, 31, 69, 0.08);
+      transition: 0.25s ease;
+    }
+
+    .tt-card:hover {
+      transform: translateY(-7px);
+      box-shadow: 0 24px 54px rgba(0, 31, 69, 0.13);
+    }
+
+    .tt-icon {
+      width: 43px;
+      height: 43px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), var(--navy));
+      font-size: 22px;
+    }
+
+    .tt-card h3,
+    .tt-benefit h3 {
+      font-family: 'Inter', sans-serif;
+      margin: 0 0 13px;
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 850;
+    }
+
+    .tt-card p,
+    .tt-benefit p,
+    .tt-feature p {
+      margin: 0;
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.68;
+    }
+
+    .tt-launch {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: auto;
+      padding-top: 18px;
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 850;
+      text-decoration: none;
+    }
+
+    .tt-benefits {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 30px;
+    }
+
+    .tt-benefit {
+      min-height: 210px;
+      padding: 30px 28px;
+      border-radius: 8px;
+      background: #fcfdfe;
+      text-align: center;
+      box-shadow: 0 18px 38px rgba(0, 31, 69, 0.12);
+    }
+
+    .tt-benefit .tt-icon {
+      border-radius: 50%;
+      color: var(--navy);
+      background: #f0f6fc;
+    }
+
+    .tt-why {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 50px;
+      align-items: center;
+    }
+
+    .tt-why h2 {
+      margin: 0 0 16px;
+      color: var(--ink);
+      font-size: clamp(25px, 3vw, 34px);
+      font-weight: 850;
+    }
+
+    .tt-why>div>p {
+      max-width: 590px;
+      margin: 0 0 28px;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.72;
+    }
+
+    .tt-feature-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px 28px;
+    }
+
+    .tt-feature {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 12px;
+    }
+
+    .tt-feature i {
+      color: var(--navy);
+      font-size: 20px;
+    }
+
+    .tt-feature h3 {
+      margin: 0 0 4px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 850;
+    }
+
+    .tt-visual {
+      position: relative;
+      min-height: 372px;
+      overflow: hidden;
+      border: 5px solid #fff;
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 50% 46%, rgba(53, 177, 246, 0.32), transparent 26%),
+        radial-gradient(circle at 18% 20%, rgba(254, 148, 9, 0.16), transparent 24%),
+        linear-gradient(135deg, #001f45 0%, #003865 48%, #07172d 100%);
+      box-shadow: 0 26px 64px rgba(0, 31, 69, 0.24);
+    }
+
+    .tt-visual canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .tt-footer {
+      padding: 24px 34px;
+      background: #005477;
+      margin-top: auto;
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .tt-footer-grid {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.6fr repeat(3, 0.7fr);
+      gap: 42px;
+    }
+
+    .tt-footer h2,
+    .tt-footer h3 {
+      margin: 0 0 18px;
+      color: #fff;
+      font-weight: 850;
+    }
+
+    .tt-footer p,
+    .tt-footer a {
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 14px;
+      line-height: 1.75;
+      text-decoration: none;
+    }
+
+    .tt-footer a {
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .tt-social {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .tt-social a {
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .tt-copy {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      color: rgba(255, 255, 255, 0.58);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .reveal.in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1080px) {
+      .tt-sidebar {
+        display: none;
+      }
+
+      .tt-page,
+      .tt-footer {
+        margin-left: 0;
+      }
+
+      .tt-brand {
+        width: auto;
+      }
+
+      .tt-mainnav {
+        overflow-x: auto;
+      }
+
+      .tt-topbar {
+        gap: 14px;
+        padding: 0 16px;
+      }
+
+      .tt-tool-grid,
+      .tt-benefits,
+      .tt-why,
+      .tt-footer-grid {
+        grid-template-columns: 1fr;
+      }
+
+    }
+
+    @media (max-width: 720px) {
+      .tt-topbar {
+        height: auto;
+        min-height: 70px;
+        flex-wrap: wrap;
+        padding: 12px 14px;
+      }
+
+      .tt-auth {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .tt-page {
+        padding-top: 118px;
+      }
+
+      .tt-hero-inner {
+        width: 100%;
+        padding: 48px 15px;
+        grid-template-columns: 1fr;
+        gap: 28px;
+      }
+
+      .tt-hero p {
+        font-size: 17px;
+      }
+
+      .tt-section {
+        padding: 52px 18px;
+      }
+
+      .tt-feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+    }
+
+    @media (max-width: 768px) {
+
+      .tt-topbar {
+        padding: 10px;
+        height: auto;
+      }
+
+      .tt-mainnav {
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .tt-auth {
+        justify-content: center;
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      .tt-page {
+        padding-top: 130px;
+        margin-left: 0;
+      }
+
+      .tt-hero-inner {
+        width: 100%;
+        padding: 40px 18px;
+      }
+
+      .tt-hero h1 {
+        font-size: 2.2rem !important;
+      }
+
+      .tt-actions {
+        justify-content: center;
+      }
+
+      .tt-tool-grid,
+      .tt-benefits,
+      .tt-why {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .tt-footer-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+
+      .tt-section {
+        padding: 40px 15px;
+      }
+
+      .tt-why {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .tt-visual {
+        display: none;
+      }
+    }
+
+
+
+    .dashboard-sidebar {
+      width: 270px !important;
+
+      height: 90vh !important;
+
+      background: #ffffff !important;
+
+      border-right: 1px solid #e5e7eb !important;
+
+      position: fixed !important;
+
+      top: 60px !important;
+      left: 0 !important;
+
+      padding: 5px !important;
+
+      overflow-y: auto !important;
+
+      z-index: 998 !important;
+    }
+
+    /* INNER */
+
+    .dashboard-sidebar-inner {
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    /* TOGGLE BUTTON */
+
+    .sidebar-toggle-row {
+      display: flex !important;
+      justify-content: flex-end;
+
+      margin-bottom: 15px !important;
+    }
+
+    .sidebar-toggle-btn {
+      width: 46px !important;
+      height: 46px !important;
+
+      border-radius: 14px !important;
+
+      border: 2px solid #0b5cab !important;
+
+      background: white !important;
+
+      color: #0b5cab !important;
+
+      font-size: 20px !important;
+
+      transition: 0.3s ease !important;
+    }
+
+    .sidebar-toggle-btn:hover {
+      background: #eff6ff !important;
+    }
+
+    /* MENU */
+
+    .dashboard-sidebar-nav {
+      list-style: none !important;
+
+      padding: 0 !important;
+      margin: 0 !important;
+
+      display: flex !important;
+      flex-direction: column !important;
+
+      gap: 12px !important;
+    }
+
+    /* ITEM */
+
+    .dashboard-sidebar-link {
+      display: flex !important;
+      align-items: center !important;
+
+      gap: 4px !important;
+
+      padding: 4px 18px !important;
+
+      border-radius: 14px !important;
+
+      text-decoration: none !important;
+
+      color: #0b5cab !important;
+
+      font-size: 14px !important;
+      font-weight: 600 !important;
+
+      transition: all 0.3s ease !important;
+    }
+
+    /* ICON */
+
+    .dashboard-sidebar-icon {
+      font-size: 21px !important;
+    }
+
+    /* HOVER */
+
+    .dashboard-sidebar-link:hover {
+      background: #eff6ff !important;
+      color: #0b3b8c !important;
+    }
+
+    .dashboard-sidebar-link:hover i {
+      color: #0b3b8c !important;
+    }
+
+    /* ACTIVE */
+
+    .active-sidebar {
+      background: linear-gradient(135deg, #0b5cab, #3d8ec9) !important;
+
+      color: white !important;
+
+      box-shadow: 0 6px 16px rgba(11, 92, 171, 0.18) !important;
+    }
+
+    .active-sidebar i {
+      color: white !important;
+    }
+
+    /* SUB MENU */
+
+    .sub-sidebar-link {
+      margin-top: 8px !important;
+
+      margin-left: 12px !important;
+
+      font-size: 14px !important;
+
+      padding: 12px 16px !important;
+
+      border-radius: 12px !important;
+    }
+
+    /* SCROLLBAR */
+
+    .dashboard-sidebar::-webkit-scrollbar {
+      width: 6px !important;
+    }
+
+    .dashboard-sidebar::-webkit-scrollbar-thumb {
+      background: #d1d5db !important;
+
+      border-radius: 10px !important;
+    }
+
+    /* MOBILE */
+
+    @media(max-width:991px) {
+
+      .dashboard-sidebar {
+        width: 100% !important;
+
+        height: auto !important;
+
+        position: relative !important;
+
+        top: 0 !important;
+      }
+
+    }
+
+    /* COLLAPSED STATE FIXES */
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+      width: 96px !important;
+      overflow: visible !important;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+      margin-left: 96px !important;
+      width: calc(100% - 96px) !important;
+    }
+
+    .sidebar-collapsed .sidebar-toggle-row {
+      justify-content: center !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 0 !important;
+      width: 75% !important;
+      padding: 12px 0 !important;
+      margin: 0 !important;
+      height: 56px;
+
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link>div {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100% !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-icon {
+      margin: 0 !important;
+      width: 24px !important;
+      min-width: 24px !important;
+      text-align: center !important;
+      font-size: 22px !important;
+    }
+
+    .sidebar-collapsed .mdi-chevron-down {
+      display: none !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-label,
+    .sidebar-collapsed .dropdown-caret {
+      display: none !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-item {
+      display: block !important;
+      display: flex !important;
+      justify-content: center !important;
+    }
+
+    .sidebar-collapsed .collapse {
+      display: none !important;
+    }
+
+    /* TOOLTIPS FOR COLLAPSED STATE */
+    .sidebar-collapsed .dashboard-sidebar-item {
+      position: relative !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #106492;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      z-index: 1050;
+      pointer-events: none;
+      margin-left: 15px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]::before {
+      content: '';
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      border-width: 6px;
+      border-style: solid;
+      border-color: transparent #106492 transparent transparent;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      z-index: 1050;
+      pointer-events: none;
+      margin-left: 3px;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]:hover::after,
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]:hover::before {
+      opacity: 1;
+      visibility: visible;
+    }
+    .navbar-brand {
+      width:145px !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="tt-shell">
+    {% include 'navbar.html' %}
+
+    <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+      <nav class="dashboard-sidebar" id="sidebar">
+
+        <div class="dashboard-sidebar-inner">
+
+          <div class="sidebar-toggle-row">
+            <button type="button" class="sidebar-toggle-btn" id="sidebarToggle">
+
+              <i class="mdi mdi-dock-left"></i>
+
+            </button>
+          </div>
+
+          <ul class="dashboard-sidebar-nav">
+
+            <!-- ANDA REVIEW -->
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link d-flex justify-content-between align-items-center" data-tooltip="ANDA Review Checklist"
+                data-bs-toggle="collapse" href="#anda-review">
+
+                <div class="d-flex align-items-center">
+
+                  <i class="mdi mdi-checkbox-marked-outline dashboard-sidebar-icon"></i>
+
+                  <span class="dashboard-sidebar-label">
+                    ANDA Review Checklist
+                  </span>
+
+                </div>
+
+                <i class="mdi mdi-chevron-down"></i>
+
+              </a>
+
+              <div class="collapse" id="anda-review">
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_general_table">
+                  General ANDA
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_parenteral_dosage_table">
+                  Parenteral Dosage
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_solid_oral_dosage_table">
+                  Solid Oral Dosage
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link"
+                  href="/ratools/show_anda_semi_solid_topical_dosage_table">
+                  Semi Solid Topical Dosage
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_ophthalmic_dosage_table">
+                  Ophthalmic Dosage
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link"
+                  href="/ratools/show_anda_nasalspray_inhalation_table">
+                  Nasal Spray & Inhalation
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_mdi_and_dpi_table">
+                  MDI & DPI
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_transdermal_dosage_table">
+                  Transdermal
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_microsphere_table">
+                  Microsphere
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_anda_liposome_table">
+                  Liposome
+                </a>
+
+              </div>
+
+            </li>
+
+            <!-- WHITE PAPER -->
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link d-flex justify-content-between align-items-center" data-tooltip="White Paper (Strategic Paper)"
+                data-bs-toggle="collapse" href="#white-paper">
+
+                <div class="d-flex align-items-center">
+
+                  <i class="mdi mdi-file-document-outline dashboard-sidebar-icon"></i>
+
+                  <span class="dashboard-sidebar-label">
+                    White Paper (Strategic Paper)
+                  </span>
+
+                </div>
+
+                <i class="mdi mdi-chevron-down"></i>
+
+              </a>
+
+              <div class="collapse" id="white-paper">
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/general_white_paper_table">
+                  General White Paper
+                </a>
+
+              </div>
+
+            </li>
+
+            <!-- CONTROLLED CORRESPONDENCE -->
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link d-flex justify-content-between align-items-center" data-tooltip="Controlled Correspondence"
+                data-bs-toggle="collapse" href="#controlled-corresp">
+
+                <div class="d-flex align-items-center">
+
+                  <i class="mdi mdi-email-outline dashboard-sidebar-icon"></i>
+
+                  <span class="dashboard-sidebar-label">
+                    Controlled Correspondence
+                  </span>
+
+                </div>
+
+                <i class="mdi mdi-chevron-down"></i>
+
+              </a>
+
+              <div class="collapse" id="controlled-corresp">
+
+                <a class="dashboard-sidebar-link sub-sidebar-link"
+                  href="/ratools/show_controlled_correspondences_template">
+                  Template for Q1/Q2
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link"
+                  href="/ratools/show_controlled_correspondences_bestpractice">
+                  Best Practice
+                </a>
+
+              </div>
+
+            </li>
+
+            <!-- DMF -->
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link" href="/ratools/show_dmf_table" data-tooltip="DMF Review Checklist">
+
+                <i class="mdi mdi-clipboard-check-outline dashboard-sidebar-icon"></i>
+
+                <span class="dashboard-sidebar-label">
+                  DMF Review Checklist
+                </span>
+
+              </a>
+
+            </li>
+
+            <!-- VALIDATION -->
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link d-flex justify-content-between align-items-center" data-tooltip="Validation Checklist"
+                data-bs-toggle="collapse" href="#validation-checklist">
+
+                <div class="d-flex align-items-center">
+
+                  <i class="mdi mdi-cog-outline dashboard-sidebar-icon"></i>
+
+                  <span class="dashboard-sidebar-label">
+                    Validation Checklist
+                  </span>
+
+                </div>
+
+                <i class="mdi mdi-chevron-down"></i>
+
+              </a>
+
+              <div class="collapse" id="validation-checklist">
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_drug_product_validation_table">
+                  Drug Product Validation
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_api_validation_table">
+                  API Validation
+                </a>
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_api_verification_table">
+                  API Verification
+                </a>
+
+              </div>
+
+            </li>
+
+            <!-- ANDA FACILITY -->
+
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link" href="/ratools/show_anda_faciltiy" data-tooltip="ANDA Facility Template">
+
+                <i class="mdi mdi-office-building-outline dashboard-sidebar-icon"></i>
+
+                <span class="dashboard-sidebar-label">
+                  ANDA Facility Template
+                </span>
+
+              </a>
+
+            </li>
+
+            <!-- API FACILITY -->
+
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link" href="/ratools/show_api_faciltiy" data-tooltip="API Facility Template">
+
+                <i class="mdi mdi-factory dashboard-sidebar-icon"></i>
+
+                <span class="dashboard-sidebar-label">
+                  API Facility Template
+                </span>
+
+              </a>
+
+            </li>
+
+            <!-- IIG -->
+
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link d-flex justify-content-between align-items-center" data-tooltip="IIG Clearance Checklist"
+                data-bs-toggle="collapse" href="#iig-proportionality">
+
+                <div class="d-flex align-items-center">
+
+                  <i class="mdi mdi-flask-outline dashboard-sidebar-icon"></i>
+
+                  <span class="dashboard-sidebar-label">
+                    IIG Clearance Checklist
+                  </span>
+
+                </div>
+
+                <i class="mdi mdi-chevron-down"></i>
+
+              </a>
+
+              <div class="collapse" id="iig-proportionality">
+
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_tablet_table">Tablets &
+                  Capsules</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link"
+                  href="/ratools/show_iig_injection_table">Injection</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_liquidoral_table">Liquid
+                  Orals</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_topical_table">Topical</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_semisolid_table">Semi
+                  Solids</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_nasal_table">Nasals</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link"
+                  href="/ratools/show_iig_inhalation_table">Inhalation</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_mdi_table">MDI</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_dpi">DPI</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_microsphere">Microsphere</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link" href="/ratools/show_iig_liposome">Liposome</a>
+                <a class="dashboard-sidebar-link sub-sidebar-link"
+                  href="/ratools/show_iig_transdermal_table">Transdermal</a>
+
+              </div>
+
+            </li>
+
+            <!-- SSS -->
+
+            <li class="dashboard-sidebar-item">
+
+              <a class="dashboard-sidebar-link" href="/ratools/show_sss" data-tooltip="Size Shape & Score">
+
+                <i class="mdi mdi-ruler-square dashboard-sidebar-icon"></i>
+
+                <span class="dashboard-sidebar-label">
+                  Size Shape & Score
+                </span>
+
+              </a>
+
+            </li>
+
+          </ul>
+
+        </div>
+
+      </nav>
+
+      <div class="main-panel dashboard-main-panel"
+        style="margin-left:270px; transition: margin-left 0.3s ease, width 0.3s ease;">
+        <div class="content-wrapper"
+          style="padding: 0; background: transparent; display: flex; flex-direction: column; min-height: calc(100vh - 70px); flex-grow: 1;">
+          {% block content %}
+          <section class="tt-hero">
+            <canvas id="toolsScene" aria-hidden="true"></canvas>
+            <div class="tt-hero-inner reveal">
+              <div class="tt-hero-content">
+                <span class="tt-hero-kicker">REGULATORY INTELLIGENCE</span>
+                <h1>RegX</h1>
+                <h2>Build Dossiers That <em>Withstand Review.</em></h2>
+                <p>Strengthen regulatory submissions with reviewer-ready templates, technical workflows, and structured execution support.<br /> Enable teams to improve dossier quality, reduce rework, and manage regulatory documentation with greater consistency and confidence.</p>
+                <div class="tt-actions">
+                  <a class="tt-button primary" href="#tool-suite">Explore RegX Tools <i
+                      class="mdi mdi-arrow-down"></i></a>
+                  <!-- <a class="tt-button" href="{% static 'videos/iTechnicalTools - Final Video-v2.0.mp4' %}" target="_blank" rel="noopener">Watch Overview <i class="mdi mdi-play-circle-outline"></i></a> -->
+                </div>
+              </div>
+              <div class="tt-hero-visual relative flex justify-center" data-purpose="hero-image" aria-hidden="true">
+                <img src="{% static 'img/RegX GIF image.gif' %}" class="rounded-lg shadow-2xl w-4/5 mx-auto" alt="">
+              </div>
+            </div>
+          </section>
+
+          <section class="tt-section" id="tool-suite">
+            <div class="tt-wrap">
+              <h2 class="tt-section-title reveal">Explore Our Comprehensive Suite of Tools</h2>
+              <div class="tt-tool-grid">
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-checkbox-marked-outline"></i></span>
+                  <h3>ANDA Review Checklist</h3>
+                  <p>Ensure complete and accurate submissions across multiple dosage forms, reducing RTR or deficiency
+                    risks.</p>
+                  <a class="tt-launch" href="/ratools/show_anda_general_table">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-file-document-outline"></i></span>
+                  <h3>White Paper (Strategic Paper)</h3>
+                  <p>Foster strategic planning and inter-departmental collaboration for efficient submissions.</p>
+                  <a class="tt-launch" href="/ratools/general_white_paper_table">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-email-outline"></i></span>
+                  <h3>Controlled Correspondence Templates</h3>
+                  <p>Adhere to regulatory requirements with well-structured templates for common queries.</p>
+                  <a class="tt-launch" href="/ratools/show_controlled_correspondences_template">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-clipboard-check-outline"></i></span>
+                  <h3>DMF Review Checklist</h3>
+                  <p>Identify gaps early and ensure compliance for seamless drug master file submissions.</p>
+                  <a class="tt-launch" href="/ratools/show_dmf_table">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-cog-outline"></i></span>
+                  <h3>Validation Checklist (API & FP)</h3>
+                  <p>Ensure method validation meets FDA and ICH guidelines to enhance submission quality.</p>
+                  <a class="tt-launch" href="/ratools/show_drug_product_validation_table">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-office-building-outline"></i></span>
+                  <h3>ANDA Facility Template</h3>
+                  <p>Streamline facility inspection readiness by capturing all required data for FDA approval.</p>
+                  <a class="tt-launch" href="/ratools/show_anda_faciltiy">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-factory"></i></span>
+                  <h3>API Facility Template</h3>
+                  <p>Simplify data collection for API testing and manufacturing facilities.</p>
+                  <a class="tt-launch" href="/ratools/show_api_faciltiy">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-flask-outline"></i></span>
+                  <h3>IIG Evaluation Checklist</h3>
+                  <p>Evaluate inactive ingredient database compliance to prevent RTR concerns.</p>
+                  <a class="tt-launch" href="/ratools/show_iig_tablet_table">Launch Tool <i
+                      class="mdi mdi-arrow-right"></i></a>
+                </article>
+                <article class="tt-card reveal">
+                  <span class="tt-icon"><i class="mdi mdi-ruler-square"></i></span>
+                  <h3>Size, Shape & Score Checklist</h3>
+                  <p>Guarantee consistency in drug design for patient safety and regulatory acceptance.</p>
+                  <a class="tt-launch" href="/ratools/show_sss">Launch Tool <i class="mdi mdi-arrow-right"></i></a>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="tt-section soft">
+            <div class="tt-wrap">
+              <h2 class="tt-section-title reveal">Key Benefits of iTechnical Tools</h2>
+              <div class="tt-benefits">
+                <article class="tt-benefit reveal">
+                  <span class="tt-icon"><i class="mdi mdi-shield-check-outline"></i></span>
+                  <h3>Compliance Assurance</h3>
+                  <p>Aligned with FDA guidance to reduce deficiencies.</p>
+                </article>
+                <article class="tt-benefit reveal">
+                  <span class="tt-icon"><i class="mdi mdi-flash-outline"></i></span>
+                  <h3>Efficiency Gains</h3>
+                  <p>Streamlined processes from product inception to filing.</p>
+                </article>
+                <article class="tt-benefit reveal">
+                  <span class="tt-icon"><i class="mdi mdi-alert-outline"></i></span>
+                  <h3>Risk Mitigation</h3>
+                  <p>Early identification of potential gaps or errors.</p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="tt-section">
+            <div class="tt-wrap tt-why">
+              <div class="reveal">
+                <h2>Why Choose iTechnical Tools?</h2>
+                <p>Our platform integrates advanced technical intelligence with user-centric design, providing an
+                  unparalleled ecosystem for regulatory and technical excellence in pharmaceuticals.</p>
+                <div class="tt-feature-grid">
+                  <div class="tt-feature"><i class="mdi mdi-head-lightbulb-outline"></i>
+                    <div>
+                      <h3>Expert-Driven Insights</h3>
+                      <p>Tools built by regulatory experts with 3 decades of Experience.</p>
+                    </div>
+                  </div>
+                  <div class="tt-feature"><i class="mdi mdi-auto-fix"></i>
+                    <div>
+                      <h3>Efficiency Redefined</h3>
+                      <p>Save time & avoid Costly Errors using different innovative tools.</p>
+                    </div>
+                  </div>
+                  <div class="tt-feature"><i class="mdi mdi-source-branch"></i>
+                    <div>
+                      <h3>Comprehensive Coverage</h3>
+                      <p>Helps to achieve faster approval & avoid compliance risk.</p>
+                    </div>
+                  </div>
+                  <div class="tt-feature"><i class="mdi mdi-shield-lock-outline"></i>
+                    <div>
+                      <h3>Organizational Advantages</h3>
+                      <p>Helps to achieve faster approval & avoid compliance risk.</p>
+                    </div>
+                  </div>
+                  <div class="tt-feature"><i class="mdi mdi-chart-line"></i>
+                    <div>
+                      <h3>System Driven Approach</h3>
+                      <p>Allows user to follow step by step process with through review.</p>
+                    </div>
+                  </div>
+                  <div class="tt-feature"><i class="mdi mdi-account-group-outline"></i>
+                    <div>
+                      <h3>Real Time Updates</h3>
+                      <p>Submission meets the latest standards & current expectations of Authority.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="tt-visual reveal">
+                <canvas id="panelScene" aria-hidden="true"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <!-- CTA SECTION -->
+          <section class="tt-section reveal" style="padding: 30px 34px; text-align: center;">
+            <a href="/ratools/requestdemo" class="tt-button primary"
+              style="border-radius: 30px; padding: 14px 44px; font-weight: 700; font-size: 16px; border: none; box-shadow: 0 10px 25px rgba(4, 94, 143, 0.25);">Schedule
+              Consultation</a>
+          </section>
+          {% endblock %}
+
+          <footer class="tt-footer">
+            <div class="tt-copy">&copy; 2026 iPharmaAI.</div>
+          </footer>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+  <script src="{% static 'assets/js/off-canvas.js' %}"></script>
+  <script src="{% static 'assets/js/misc.js' %}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    document.querySelectorAll('#sidebarToggle').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const layout = document.getElementById('dashboardLayout');
+        const collapsed = layout.classList.toggle('sidebar-collapsed');
+        const icon = this.querySelector('i');
+        if (icon) icon.className = collapsed ? 'mdi mdi-dock-right' : 'mdi mdi-dock-left';
+      });
+    });
+
+    // Highlight active sidebar links on page load
+    document.addEventListener("DOMContentLoaded", function () {
+      const currentPath = window.location.pathname;
+      const sidebarLinks = document.querySelectorAll(".dashboard-sidebar .dashboard-sidebar-link");
+
+      // Function to map a report detail/edit path back to its list path
+      function getAssociatedListPath(path) {
+        if (path.includes("_report")) {
+          const reportMatch = path.match(/show_[a-zA-Z0-9_]+_report/);
+          if (reportMatch) {
+            const reportName = reportMatch[0];
+
+            // Special mappings
+            if (reportName === "show_general_white_paper_report") {
+              return "general_white_paper_table";
+            }
+            if (reportName === "show_controlled_correspondences_template_report") {
+              return "show_controlled_correspondences_template";
+            }
+            if (reportName === "show_controlled_correspondences_bestpractice_report") {
+              return "show_controlled_correspondences_bestpractice";
+            }
+            if (reportName === "show_anda_faciltiy_report") {
+              return "show_anda_faciltiy";
+            }
+            if (reportName === "show_api_faciltiy_report") {
+              return "show_api_faciltiy";
+            }
+            if (reportName === "show_sss_report") {
+              return "show_sss";
+            }
+            if (reportName === "show_iig_dpi_report") {
+              return "show_iig_dpi";
+            }
+            if (reportName === "show_iig_microsphere_report") {
+              return "show_iig_microsphere";
+            }
+            if (reportName === "show_iig_liposome_report") {
+              return "show_iig_liposome";
+            }
+
+            // Default: replace _report with _table
+            return reportName.replace("_report", "_table");
+          }
+        }
+        return null;
+      }
+
+      const associatedListPath = getAssociatedListPath(currentPath);
+
+      sidebarLinks.forEach(link => {
+        const href = link.getAttribute("href");
+        if (href && href !== "#" && !href.startsWith("#")) {
+          // Normalize paths by removing trailing slashes for comparison
+          const cleanPath = currentPath.replace(/\/$/, "");
+          const cleanHref = href.replace(/\/$/, "");
+
+          // Match if exact path matches, OR if we are on an associated report detail page that corresponds to this link
+          const isMatch = (cleanPath === cleanHref) ||
+            (associatedListPath && cleanHref.endsWith(associatedListPath));
+
+          if (isMatch) {
+            link.classList.add("active-sidebar");
+
+            // If it is a submenu link, make sure the collapse parent is open
+            const parentCollapse = link.closest(".collapse");
+            if (parentCollapse) {
+              parentCollapse.classList.add("show");
+
+              // Find the toggle link that controls this collapse
+              const toggleLink = document.querySelector(`.dashboard-sidebar a[href="#${parentCollapse.id}"]`);
+              if (toggleLink) {
+                toggleLink.classList.add("active-sidebar");
+                toggleLink.setAttribute("aria-expanded", "true");
+              }
+            }
+          }
+        }
+      });
+    });
+  </script>
+  <script>
+    (function () {
+      if (window.Lenis) {
+        const lenis = new Lenis({
+          duration: 2,
+          smoothWheel: true,
+          wheelMultiplier: 0.9,
+        });
+
+        function raf(time) {
+          lenis.raf(time);
+          requestAnimationFrame(raf);
+        }
+
+        requestAnimationFrame(raf);
+
+        lenis.on("scroll", ({ scroll }) => {
+          const nav = document.getElementById("mainNav");
+          if (nav) nav.classList.toggle("scrolled", scroll > 60);
+        });
+      }
+
+      const revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            entry.target.classList.add("in");
+            revealObserver.unobserve(entry.target);
+          });
+        },
+        { threshold: 0.16 },
+      );
+
+      document.querySelectorAll(".reveal").forEach((el, index) => {
+        el.style.transitionDelay = Math.min(index * 45, 260) + "ms";
+        revealObserver.observe(el);
+      });
+    })();
+
+    function initModuleHomeParticles(canvasId, heroSelector) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || !window.THREE) return;
+
+      const hero = document.querySelector(heroSelector);
+      if (window.innerWidth < 768) {
+        canvas.style.display = "none";
+        return;
+      }
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / 400, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+
+      function getHeroHeight() {
+        return 500;
+      }
+
+      renderer.setSize(window.innerWidth, getHeroHeight());
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const particlesGeometry = new THREE.BufferGeometry();
+      const count = 8000;
+      const positions = new Float32Array(count * 3);
+
+      for (let i = 0; i < count * 3; i++) {
+        positions[i] = (Math.random() - 0.5) * 10;
+      }
+
+      particlesGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+      const particlesMaterial = new THREE.PointsMaterial({
+        size: 0.015,
+        color: "#fdffff",
+        transparent: true,
+        opacity: 0.4,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+      scene.add(particles);
+      camera.position.z = 3;
+
+      let mouseX = 0;
+      let mouseY = 0;
+      window.addEventListener("mousemove", (e) => {
+        mouseX = (e.clientX / window.innerWidth) - 0.5;
+        mouseY = (e.clientY / window.innerHeight) - 0.5;
+      });
+
+      const animate = () => {
+        requestAnimationFrame(animate);
+        particles.rotation.y += 0.001;
+        particles.rotation.x += 0.0005;
+        particles.position.x += (mouseX * 0.5 - particles.position.x) * 0.05;
+        particles.position.y += (-mouseY * 0.5 - particles.position.y) * 0.05;
+        renderer.render(scene, camera);
+      };
+      animate();
+
+      window.addEventListener("resize", () => {
+        if (window.innerWidth < 768) {
+          canvas.style.display = "none";
+          return;
+        }
+
+        canvas.style.display = "block";
+        camera.aspect = window.innerWidth / getHeroHeight();
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, getHeroHeight());
+      });
+    }
+
+    function createParticleScene(canvasId, options) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || !window.THREE) return;
+
+      const host = canvas.parentElement;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+      camera.position.z = options.cameraZ || 70;
+
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+      const count = options.count || 1200;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const color = new THREE.Color();
+
+      for (let i = 0; i < count; i++) {
+        const t = i / count;
+        const angle = i * 0.22;
+        const radius = options.radius + Math.sin(i * 0.09) * options.wave;
+        positions[i * 3] = Math.cos(angle) * radius * Math.sin(t * Math.PI);
+        positions[i * 3 + 1] = (t - 0.5) * options.height + Math.sin(angle) * 8;
+        positions[i * 3 + 2] = Math.sin(angle) * radius;
+
+        color.setHSL(0.55 + t * 0.08, 0.84, 0.48 + Math.sin(i) * 0.08);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+      const material = new THREE.PointsMaterial({
+        size: options.size || 0.75,
+        vertexColors: true,
+        transparent: true,
+        opacity: options.opacity || 0.88,
+        depthWrite: false,
+      });
+
+      const points = new THREE.Points(geometry, material);
+      points.position.x = options.offsetX || 0;
+      scene.add(points);
+
+      function resize() {
+        const rect = host.getBoundingClientRect();
+        renderer.setSize(rect.width, rect.height, false);
+        camera.aspect = rect.width / Math.max(rect.height, 1);
+        camera.updateProjectionMatrix();
+      }
+
+      let active = true;
+      let frameId = null;
+      const start = performance.now();
+
+      function animate() {
+        if (!active) return;
+        frameId = requestAnimationFrame(animate);
+        const sec = (performance.now() - start) / 1000;
+        points.rotation.y = sec * (options.speed || 0.08);
+        points.rotation.x = Math.sin(sec * 0.35) * 0.18;
+        points.position.y = Math.sin(sec * 0.65) * 1.8;
+        renderer.render(scene, camera);
+      }
+
+      resize();
+      animate();
+
+      new IntersectionObserver(
+        (entries) => {
+          active = entries[0].isIntersecting;
+          if (active && !frameId) animate();
+          if (!active && frameId) {
+            cancelAnimationFrame(frameId);
+            frameId = null;
+          }
+        },
+        { threshold: 0.05 },
+      ).observe(host);
+
+      window.addEventListener("resize", resize);
+    }
+
+    function createAiCoreScene(canvasId) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas || !window.THREE) return;
+
+      const host = canvas.parentElement;
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000);
+      camera.position.z = 62;
+
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+      const group = new THREE.Group();
+      scene.add(group);
+
+      const coreGeometry = new THREE.IcosahedronGeometry(13, 2);
+      const coreMaterial = new THREE.MeshBasicMaterial({
+        color: 0x35b1f6,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.42,
+      });
+      const core = new THREE.Mesh(coreGeometry, coreMaterial);
+      group.add(core);
+
+      const ringMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.22,
+      });
+      const rings = [
+        new THREE.Mesh(new THREE.TorusGeometry(19, 0.08, 10, 140), ringMaterial),
+        new THREE.Mesh(new THREE.TorusGeometry(25, 0.06, 10, 140), ringMaterial.clone()),
+        new THREE.Mesh(new THREE.TorusGeometry(31, 0.045, 10, 140), ringMaterial.clone()),
+      ];
+      rings[0].rotation.x = Math.PI / 2.7;
+      rings[1].rotation.y = Math.PI / 2.4;
+      rings[2].rotation.x = Math.PI / 2;
+      rings[2].rotation.z = Math.PI / 5;
+      rings.forEach((ring) => group.add(ring));
+
+      const count = 1050;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const original = new Float32Array(count * 3);
+      const color = new THREE.Color();
+
+      for (let i = 0; i < count; i++) {
+        const u = Math.random();
+        const v = Math.random();
+        const theta = 2 * Math.PI * u;
+        const phi = Math.acos(2 * v - 1);
+        const radius = 13 + Math.random() * 23;
+        const x = radius * Math.sin(phi) * Math.cos(theta);
+        const y = radius * Math.sin(phi) * Math.sin(theta);
+        const z = radius * Math.cos(phi);
+
+        positions[i * 3] = original[i * 3] = x;
+        positions[i * 3 + 1] = original[i * 3 + 1] = y;
+        positions[i * 3 + 2] = original[i * 3 + 2] = z;
+
+        color.setHSL(0.54 + Math.random() * 0.08, 0.86, 0.52 + Math.random() * 0.22);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+
+      const particleGeometry = new THREE.BufferGeometry();
+      particleGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      particleGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+      const particleMaterial = new THREE.PointsMaterial({
+        size: 0.65,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false,
+      });
+      const particles = new THREE.Points(particleGeometry, particleMaterial);
+      group.add(particles);
+
+      const linePositions = [];
+      for (let i = 0; i < 160; i++) {
+        const a = Math.floor(Math.random() * count);
+        const b = Math.floor(Math.random() * count);
+        linePositions.push(
+          original[a * 3], original[a * 3 + 1], original[a * 3 + 2],
+          original[b * 3], original[b * 3 + 1], original[b * 3 + 2],
+        );
+      }
+
+      const lineGeometry = new THREE.BufferGeometry();
+      lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(linePositions, 3));
+      const lineMaterial = new THREE.LineBasicMaterial({
+        color: 0x9fe6ff,
+        transparent: true,
+        opacity: 0.12,
+      });
+      group.add(new THREE.LineSegments(lineGeometry, lineMaterial));
+
+      function resize() {
+        const rect = host.getBoundingClientRect();
+        renderer.setSize(rect.width, rect.height, false);
+        camera.aspect = rect.width / Math.max(rect.height, 1);
+        camera.updateProjectionMatrix();
+      }
+
+      const start = performance.now();
+      function animate() {
+        requestAnimationFrame(animate);
+        const sec = (performance.now() - start) / 1000;
+        const arr = particleGeometry.attributes.position.array;
+        for (let i = 0; i < count; i++) {
+          arr[i * 3] = original[i * 3] + Math.sin(sec * 1.3 + i * 0.03) * 0.55;
+          arr[i * 3 + 1] = original[i * 3 + 1] + Math.cos(sec * 1.1 + i * 0.04) * 0.55;
+          arr[i * 3 + 2] = original[i * 3 + 2] + Math.sin(sec * 1.2 + i * 0.05) * 0.55;
+        }
+        particleGeometry.attributes.position.needsUpdate = true;
+
+        group.rotation.y = sec * 0.14;
+        group.rotation.x = Math.sin(sec * 0.32) * 0.18;
+        core.rotation.y = -sec * 0.28;
+        rings[0].rotation.z = sec * 0.2;
+        rings[1].rotation.x = sec * 0.16;
+        rings[2].rotation.y = -sec * 0.18;
+        renderer.render(scene, camera);
+      }
+
+      resize();
+      animate();
+      window.addEventListener("resize", resize);
+    }
+
+    initModuleHomeParticles("toolsScene", ".tt-hero");
+
+    createAiCoreScene("panelScene");
+  </script>
+  {% include 'back_to_top.html' %}
+</body>
+
+</html>

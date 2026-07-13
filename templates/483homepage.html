@@ -1,0 +1,317 @@
+{% load static %}
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>483 Home – RA-AI Tools</title>
+
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+    <style>
+      /* ── Nav overrides ── */
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        text-align: left !important;
+      }
+      .navbar-menu-wrapper {
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+        flex-grow: 1;
+      }
+      .nav-header-link {
+        font-size: 14px !important;
+        font-weight: bold;
+        text-decoration: none;
+        border-radius: 5px;
+        color: black !important;
+      }
+      @media (max-width: 1490px) {
+        .nav-header-link { font-size: 12px !important; }
+      }
+
+      .nav-header-link-hover:hover { color: #045c8d !important; }
+      .active-header-link {
+        color: rgba(255,255,255,1) !important;
+        background: linear-gradient(to right, #045c8d, #3485b3) !important;
+      }
+      .dropdown-item:active { background-color: white; }
+      .dropdown-menu[data-bs-popper] { top: 70%; }
+
+      /* ── Dashboard layout ── */
+      .dashboard-page-body {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        padding-top: 60px;
+        min-height: 100vh;
+      }
+
+      .dashboard-sidebar {
+        position: sticky;
+        top: 70px;
+        left: 0;
+        z-index: 10;
+        width: 250px;
+        min-width: 250px;
+        max-width: 250px;
+        height: calc(100vh - 70px);
+        background: #ffffff;
+        border-right: 1px solid rgba(33, 150, 243, 0.35);
+        border-bottom-right-radius: 16px;
+        box-shadow: 0 8px 24px rgba(33, 150, 243, 0.08);
+        overflow: hidden;
+        transition: width 0.25s ease, min-width 0.25s ease, max-width 0.25s ease;
+        flex-shrink: 0;
+      }
+
+      .dashboard-sidebar-inner {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 14px 10px 16px;
+        overflow-y: auto;
+      }
+
+      .sidebar-toggle-row {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 18px;
+      }
+
+      .sidebar-toggle-btn {
+        width: 42px;
+        height: 42px;
+        border: 2px solid #25729D;
+        background: #ffffff;
+        color: #25729D;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .sidebar-toggle-btn:hover {
+        background: #25729D;
+        color: #ffffff;
+        box-shadow: 0 8px 18px rgba(37, 114, 157, 0.2);
+      }
+
+      .dashboard-sidebar-nav {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .dashboard-sidebar-item { margin: 0; }
+
+      .dashboard-sidebar-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        color: #25729D;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        min-height: 52px;
+        white-space: nowrap;
+      }
+      .dashboard-sidebar-link:hover {
+        background: rgba(37, 114, 157, 0.1);
+        color: #1a5374;
+      }
+      .dashboard-sidebar-item.is-active .dashboard-sidebar-link {
+        background: linear-gradient(90deg, #25729D, #3a8dbd);
+        color: #ffffff;
+        box-shadow: 0 10px 20px rgba(37, 114, 157, 0.18);
+      }
+      .dashboard-sidebar-item.is-active .dashboard-sidebar-link .dashboard-sidebar-icon {
+        color: #ffffff;
+      }
+
+      .dashboard-sidebar-icon {
+        width: 24px;
+        min-width: 20px !important;
+        text-align: center;
+        font-size: 22px;
+        color: #25729D;
+      }
+      .dashboard-sidebar-label { flex: 1; }
+
+      .dashboard-main-panel {
+        flex: 1 1 auto;
+        width: auto !important;
+        min-width: 0;
+        margin-left: 0 !important;
+        transition: margin-left 0.25s ease;
+      }
+
+      /* Collapsed sidebar */
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 96px;
+        min-width: 96px;
+        max-width: 96px;
+      }
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+      }
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label { display: none; }
+      .dashboard-layout.sidebar-collapsed .sidebar-toggle-row { justify-content: center; }
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+        display: flex;
+        justify-content: center;
+      }
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+        width: 56px;
+        margin: 0 auto;
+      }
+
+      /* ── Page content ── */
+      body {
+        background: linear-gradient(to right, #ffffff, rgb(228, 205, 244));
+      }
+      .main-panel {
+        width: 100%;
+        background: linear-gradient(to right, #ffffff, rgb(228, 205, 244)) !important;
+        border-radius: 16px;
+        box-shadow: 0 4px 30px rgba(0,0,0,0.1);
+      }
+      .content-wrapper { background: none; }
+      .footer { background: white; }
+
+      .homepage-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: calc(100vh - 112px);
+        padding: 40px 20px;
+      }
+
+      .homepage-title {
+        font-size: 52px;
+        font-family: 'Kaushan Script', cursive;
+        color: #044a70;
+        text-align: center;
+        margin-bottom: 48px;
+      }
+
+      .btn-grid {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 24px;
+      }
+
+      .btn-gen {
+        border-radius: 10px;
+        padding: 16px 48px;
+        font-size: 18px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      }
+      .btn-company {
+        background-color: rgba(233, 93, 0, 0.1);
+        color: #e95d00;
+        border: 1px solid #e95d00;
+      }
+      .btn-company:hover {
+        background-color: #e95d00;
+        color: white;
+      }
+      .btn-year {
+        background-color: rgba(8, 140, 177, 0.1);
+        color: #088cb1;
+        border: 1px solid #088cb1;
+      }
+      .btn-year:hover {
+        background-color: #088cb1;
+        color: white;
+      }
+      .btn-fda {
+        background-color: rgba(7, 76, 213, 0.1);
+        color: #074cd5;
+        border: 1px solid #074cd5;
+      }
+      .btn-fda:hover {
+        background-color: #074cd5;
+        color: white;
+      }
+      .btn-system {
+        background-color: rgba(131, 3, 200, 0.1);
+        color: #8303c8;
+        border: 1px solid #8303c8;
+      }
+      .btn-system:hover {
+        background-color: #8303c8;
+        color: white;
+      }
+    </style>
+
+    <link href="https://fonts.googleapis.com/css?family=Kaushan+Script" rel="stylesheet" />
+  </head>
+
+  <body>
+    <!-- ── Top Navbar ── -->
+      {% include './navbar.html' %}
+
+    <!-- ── Page body with sidebar ── -->
+    <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+
+      <!-- Sidebar -->
+      {% include './sidebar.html' %}
+
+      <!-- Main content -->
+      <div class="main-panel dashboard-main-panel">
+        <div class="content-wrapper">
+          <div class="homepage-content">
+            <h1 class="homepage-title"><em>What do you want to search with?</em></h1>
+            <div class="btn-grid">
+              <a href="/aidatabase/render_company_name/" class="btn-gen btn-company">Company Name</a>
+              <a href="/aidatabase/render_yearofinspection/" class="btn-gen btn-year">Year of Inspection</a>
+              <a href="/aidatabase/render_investigator/" class="btn-gen btn-fda">FDA Investigator</a>
+              <a href="/aidatabase/render_systempage/" class="btn-gen btn-system">System Name</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end dashboard-page-body -->
+
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <script src="{% static 'assets/js/off-canvas.js' %}"></script>
+    <script src="{% static 'assets/js/hoverable-collapse.js' %}"></script>
+    <script src="{% static 'assets/js/template.js' %}"></script>
+    <script>
+      // Sidebar toggle
+      const toggle = document.getElementById('sidebarToggle');
+      const layout = document.getElementById('dashboardLayout');
+      if (toggle && layout) {
+        toggle.addEventListener('click', () => {
+          const collapsed = layout.classList.toggle('sidebar-collapsed');
+          toggle.setAttribute('aria-expanded', String(!collapsed));
+        });
+      }
+    </script>
+  </body>
+</html>

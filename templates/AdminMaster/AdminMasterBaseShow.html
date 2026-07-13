@@ -1,0 +1,411 @@
+{% extends 'AdminMaster/AdminMasterBase.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load custom_filters %}
+{% block content %}
+<style>
+  .custom-grey-border-div {
+    border: 1px solid #dee2e6;  /* Grey border */
+    padding: 15px;
+    border-radius: 8px;         /* Rounded corners */
+  }
+
+  .custom-grey-border-div a {
+    transition: background-color 0.3s ease-in-out;
+  }
+
+  .custom-grey-border-div a:hover {
+    background-color: #6c757d;  /* Darker grey for hover */
+    color: white;
+  }
+  a {
+    text-decoration:none;
+    color: white;
+    padding:3px 8px;
+    border-radius: 3px;
+  }
+  .hoverReport:hover{
+    background: linear-gradient(to right,#fe7096 ,#ffbf96 ) !important;
+   }
+
+   .select2-container .select2-selection--single {
+    height: auto !important; /* Adjust height */
+}
+.report-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.report-checkbox {
+    flex: 1;
+}
+
+.report-level {
+    flex: 1;
+}
+.select2-search__field{
+  width: 5.75em !important;
+}
+</style>
+  <!-- Page Heading -->
+  <div class="row">
+    <div class="col-md-6">
+        <button class="btn btn-gradient-danger hoverReport btn-fw" data-bs-toggle="modal" data-bs-target="#addreportmodal">Add User</button>
+    </div>
+    <div class="col-md-6 text-end">
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Search..."
+            class="form-control"
+            style="width: auto; display: inline-block;"
+        />
+    </div>
+</div> <br>
+<div class="container bg-light shadow rounded p-4">
+  <div class="row">
+      <div class="col-md-12">
+          <table id="customTable" class="table table-hover">
+              <thead>
+                  <tr class="headingRow ">
+                      {% for header in table_headers %}
+                          <th>{{ header }}</th>
+                      {% endfor %}
+                  </tr>
+              </thead>
+              <tbody>
+                  {% for i in data %}
+                  <tr>
+                    <td>{{ i.first_name }}</td>
+                    <td>{{ i.last_name }}</td>
+                    <td>{{ i.role }}</td>
+                    <td>
+                      <a href="{{ edit_url }}/{{ i.pk }}" class="btn btn-gradient-success btn-rounded btn-icon">
+                        <p style="margin-top: 11px;"><i class="fa fa-pencil"></i></p>
+                      </a>
+                      <a href="javascript:void(0);" onclick="confirmDelete('{{ delete_url }}/{{ i.pk }}')" id="DeleteBtn" class="btn btn-gradient-danger btn-rounded btn-icon">
+                          <p style="margin-top: 11px;"><i class="fa fa-trash"></i></p>
+                      </a>
+                    </td>
+                  </tr>
+                  {% empty %}
+                      <tr>
+                          <td colspan="4" class="text-center">No Users available</td>
+                      </tr>
+                  {% endfor %}
+              </tbody>
+          </table>
+      </div>
+      <div class="col-md-12 text-start mt-3 text-end">
+          <button id="prevPage" class="badge badge-danger">Previous</button>
+          <span id="currentPage">1</span>
+          <button id="nextPage" class="badge badge-danger">Next</button>
+      </div>
+  </div>
+</div>
+
+<div class="modal fade" tabindex="-1" id="addreportmodal">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content modalContent">
+      <div class="modal-header">
+        <h5 class="modal-title">Add User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{{ add_url }}">
+      <div class="modal-body">
+            {% csrf_token %}
+            {% crispy form %}
+            <div id="company_user_section">
+              <div>
+                  <fieldset>
+                      <legend>Assign Reports and their levels:</legend>
+                      {% for report, report_field in form_2.assigned_report.field.choices %}
+                          {% if forloop.counter0 < form_2.assigned_report.field.choices|length|add:"-4" %}
+                              <div class="report-row">
+                                  <div class="report-checkbox">
+                                      <input type="checkbox" name="assigned_report" value="{{ report }}" id="id_assigned_report_{{ forloop.counter0 }}"
+                                          {% if report in form_2.assigned_report.value %}checked{% endif %}>
+                                      <label for="id_assigned_report_{{ forloop.counter0 }}">{{ report }}</label>
+
+                                  </div>
+                                  <div class="report-level">
+                                      {% comment %} <label for="id_level_report_{{ forloop.counter }}">Level:</label> {% endcomment %}
+                                      {{ form_2|getattr_custom:forloop.counter }}
+                                  </div>
+                              </div>
+                          {% else %}
+                          <div class="report-row">
+                          <div class="report-checkbox">
+                              <input type="checkbox" name="assigned_report" value="{{ report }}" id="id_assigned_report_{{ forloop.counter0 }}"
+                                  {% if report in form_2.assigned_report.value %}checked{% endif %}>
+                              <label for="id_assigned_report_{{ forloop.counter0 }}">{{ report }}</label>
+                          </div>
+                      </div>
+                          {% endif %}
+                      {% endfor %}
+                  </fieldset>
+              </div>
+              <div style="display:flex; justify-content:space-between;margin-top:5px;">
+                  <div>
+                  <label for="assigned_checker_level_1">Assign the Checker for level 1</label>
+                  {{ form_2.assigned_checker_level_1 }}
+                  </div>
+                  <div>
+                  <label for="assigned_checker_level_2">Assign the Checker for level 2</label>
+                  {{ form_2.assigned_checker_level_2 }}
+                  </div>
+                  <div>
+                      <label for="assigned_checker_level_3">Assign the Checker for level 3</label>
+                      {{ form_2.assigned_checker_level_3 }}
+                  </div>
+              </div>
+              <div style="display:flex; justify-content:space-between;margin-top:10px;">
+                  <div>
+                      <label for="assigned_checker_level_4">Assign the Checker for level 4</label>
+                      {{ form_2.assigned_checker_level_4 }}
+                  </div>
+                  <div>
+                      <label for="assigned_checker_level_5">Assign the Checker for level 5</label>
+                      {{ form_2.assigned_checker_level_5 }}
+                  </div>
+                  <div>
+                      <label for="assigned_checker_level_6">Assign the Checker for level 6</label>
+                      {{ form_2.assigned_checker_level_6 }}
+                  </div>
+              </div>
+              <div style="margin-top:10px;">
+                  <label for="assigned_checker_level_7">Assign the Checker for level 7</label>
+                  {{ form_2.assigned_checker_level_7 }}
+              </div>
+            </div>
+            <div id="company_checker_section">
+              <div>
+                <fieldset>
+                  <legend>Give Permission to view sample reports.</legend>
+                  {% for report, report_field in form_2.view_sample_reports.field.choices %}
+                    <div class="report-row">
+                        <div class="report-checkbox">
+                            <input type="checkbox" name="view_sample_reports" value="{{ report }}" id="id_view_sample_reports_{{ forloop.counter0 }}"
+                                {% if report in form_2.view_sample_reports.value %}checked{% endif %}>
+                            <label for="id_view_sample_reports_{{ forloop.counter0 }}">{{ report }}</label>
+                        </div>
+                    </div>
+                  {% endfor %}
+                </fieldset>
+              </div>
+            </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="submit" class="btn btn-gradient-success">Save</button>
+      </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% comment %} <script>
+  $('select').select2()
+</script> {% endcomment %}
+
+<script>
+    function confirmDelete(url) {
+        if (confirm("Are you sure you want to delete this record?")) {
+            window.location.href = url;
+        }
+    }
+
+    {% comment %} let table = new DataTable('#dataTable1', {ordering:false}); {% endcomment %}
+
+
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const rowsPerPage = 7;
+      let currentPage = 1;
+
+
+      const table = document.getElementById("customTable");
+      const rows = Array.from(table.getElementsByTagName("tbody")[0].rows);
+      const searchInput = document.getElementById("searchInput");
+
+      const updateTable = () => {
+          const searchTerm = searchInput.value.toLowerCase();
+          const filteredRows = rows.filter((row) =>
+              Array.from(row.cells).some((cell) =>
+                  cell.textContent.toLowerCase().includes(searchTerm)
+              )
+          );
+
+          const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+          document.getElementById("currentPage").textContent = currentPage;
+
+          rows.forEach((row) => (row.style.display = "none"));
+
+          filteredRows
+              .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+              .forEach((row) => (row.style.display = ""));
+      };
+
+      document.getElementById("prevPage").addEventListener("click", () => {
+          if (currentPage > 1) {
+              currentPage--;
+              updateTable();
+          }
+      });
+
+      document.getElementById("nextPage").addEventListener("click", () => {
+          const searchTerm = searchInput.value.toLowerCase();
+          const filteredRows = rows.filter((row) =>
+              Array.from(row.cells).some((cell) =>
+                  cell.textContent.toLowerCase().includes(searchTerm)
+              )
+          );
+
+          const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+          if (currentPage < totalPages) {
+              currentPage++;
+              updateTable();
+          }
+      });
+
+      searchInput.addEventListener("input", () => {
+          currentPage = 1;
+          updateTable();
+      });
+
+      updateTable();
+  });
+
+
+</script>
+{% comment %} <script>
+  document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll('.report-row').forEach(function(row) {
+          let checkbox = row.querySelector('input[type="checkbox"]');
+          let levelInput = row.querySelector('input[type="number"]');
+
+          // Show or hide level input based on checkbox state
+          function toggleLevelInput() {
+              if (checkbox.checked) {
+                  levelInput.style.display = 'block';
+              } else {
+                  levelInput.style.display = 'none';
+              }
+          }
+
+          // Initial toggle based on pre-checked state
+          toggleLevelInput();
+
+          // Add event listener for checkbox
+          checkbox.addEventListener('change', toggleLevelInput);
+      });
+  });
+</script> {% endcomment %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('.report-row').forEach(function (row) {
+        let checkbox = row.querySelector('input[type="checkbox"]');
+        let levelInput = row.querySelector('input[type="number"]');
+
+        // Only proceed if both checkbox and levelInput exist
+        if (checkbox && levelInput) {
+            // Show or hide level input based on checkbox state
+            function toggleLevelInput() {
+                levelInput.style.display = checkbox.checked ? 'block' : 'none';
+            }
+
+            // Initial toggle based on pre-checked state
+            toggleLevelInput();
+
+            // Add event listener for checkbox
+            checkbox.addEventListener('change', toggleLevelInput);
+        }
+    });
+  });
+</script>
+<script>
+  // Initialize Select2 for all select elements except the role selector
+    $('select').not('select[name="role"]').select2();
+
+    // Initialize Select2 for role selector with specific event handling
+    $('select[name="role"]').select2().on('select2:select', function(e) {
+        handleRoleChange(e.target.value);
+    });
+
+    // Get the company user section element
+    const companyUserSection = document.getElementById('company_user_section');
+    const companyCheckerSection = document.getElementById('company_checker_section');
+    // Hide the section initially
+    companyUserSection.style.display = 'none';
+    companyCheckerSection.style.display = 'none';
+
+    // Function to handle role change
+    function handleRoleChange(selectedRole) {
+      if (selectedRole === 'company_user') {
+          companyUserSection.style.display = 'block';
+          companyCheckerSection.style.display = 'none';
+      } else if (selectedRole === 'company_checker') {
+        companyCheckerSection.style.display = 'block';
+        companyUserSection.style.display = 'none';
+      } else {
+          companyUserSection.style.display = 'none';
+          companyCheckerSection.style.display = 'none';
+      }
+    }
+
+    // Call the function initially with the current value
+    handleRoleChange($('select[name="role"]').val());
+</script>
+
+
+<style>
+  td{
+    color:black !important;
+  }
+  ::placeholder {
+    color: rgb(0, 0, 0) !important;
+    opacity: 1 !important; /* Firefox */
+  }
+  ::-ms-input-placeholder { /* Edge 12-18 */
+    color: red !important;
+  }
+  .btn-warning {
+    color: #000;
+    background-image: linear-gradient(to right, #ffcc00, #ff9900);
+    border-color: #ffc107;
+    transition: background-image 0.3s ease-in-out;
+}
+#customTable{
+  --bs-table-bg: none;
+}
+.headingRow{
+
+  background: linear-gradient(to right, #65b9ff, #047edf 99%);
+}
+
+.btn-warning:hover {
+    background-image: linear-gradient(to right, #ff9900, #ffcc00);
+    color: #000;
+    border-color: #ffc107;
+}
+
+.btn-primary {
+  color: #fff;
+  background-image: linear-gradient(to right, #007bff, #0056b3);
+  transition: background-image 0.3s ease-in-out;
+}
+
+.btn-primary:hover {
+  background-image: linear-gradient(to right, #0056b3, #007bff);
+  color: #fff;
+}
+
+.dt-paging-button.current {
+  color: red !important; /* Change the color to your desired value */
+  background-image: linear-gradient(to right, #ffcc00, #ff9900) !important;
+}
+</style>
+{% endblock %}

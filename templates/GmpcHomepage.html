@@ -1,0 +1,1323 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Inspection Intelligence Platform · iPharmaAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+  <style>
+    :root {
+      --primary: #176996;
+      --primary-dark: #0F4D6E;
+      --primary-deep: #0A3850;
+      --tint-50: #F3F8FA;
+      --tint-100: #E7F0F5;
+      --tint-200: #D6E6ED;
+      --sky-tint: #BFE3F1;
+      --ink: #13232B;
+      --slate: #5E7A87;
+      --white: #FFFFFF;
+      --radius-sm: 6px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --maxw: 1300px;
+
+      /* Redesign specific colors */
+      --card-bg: #FFF5F5;
+      --tag-bg: #FEE2E2;
+      --tag-text: #991B1B;
+      --accent-orange: #E05638;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--white);
+      color: var(--ink);
+      font-family: 'IBM Plex Sans', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: 'Space Grotesk', sans-serif;
+      margin: 0;
+      color: var(--primary-deep);
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    .mono {
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    ::selection {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 3px;
+    }
+
+    /* ---------- buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 999px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      transition: transform .2s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 8px 24px -8px rgba(23, 105, 150, .55);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--primary-deep);
+      border-color: var(--tint-200);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--primary);
+      background: var(--tint-50);
+    }
+
+    .btn-outline-light {
+      background: transparent;
+      color: #fff;
+      border-color: rgba(255, 255, 255, .45);
+    }
+
+    .btn-outline-light:hover {
+      border-color: #fff;
+      background: rgba(255, 255, 255, .1);
+    }
+
+    .btn-light {
+      background: #fff;
+      color: var(--primary-deep);
+    }
+
+    .btn-light:hover {
+      background: var(--tint-50);
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+      flex: none;
+    }
+
+    /* ---------- reveal on scroll ---------- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity .7s ease, transform .7s ease;
+    }
+
+    .reveal.in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+
+      * {
+        animation: none !important;
+      }
+    }
+
+    /* ============ HERO ============ */
+    .hero {
+      position: relative;
+      padding: 88px 0 64px;
+      background: linear-gradient(155deg, var(--primary-deep) 0%, var(--primary) 78%);
+      overflow: hidden;
+      height: 100%;
+      max-height: 470px;
+
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255, 255, 255, .5) 1px, transparent 1.4px);
+      background-size: 26px 26px;
+      -webkit-mask-image: radial-gradient(ellipse 620px 420px at 78% 35%, #000 0%, transparent 72%);
+      mask-image: radial-gradient(ellipse 620px 420px at 78% 35%, #000 0%, transparent 72%);
+      opacity: .35;
+      pointer-events: none;
+    }
+    .hero-grid > div {
+      text-align: center;
+      max-width: 800px;
+    }
+
+    .hero-grid {
+      display: grid;
+
+      gap: 40px;
+      align-items: center;
+      position: relative;
+      justify-content: center;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: .78rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, .85);
+      font-weight: 500;
+      margin-bottom: 22px;
+    }
+    .eye
+    {
+        display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: .78rem;
+      letter-spacing: .14em;
+
+      color: rgba(255, 255, 255, .85);
+      font-weight: 500;
+      margin-bottom: 22px;
+    }
+    .eye::before {
+
+      width: 7px;
+      height: 7px;
+      background: #fff;
+      border-radius: 50%;
+      flex: none;
+    }
+
+    .eyebrow::before {
+
+      width: 7px;
+      height: 7px;
+      background: #fff;
+      border-radius: 50%;
+      flex: none;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.4rem, 4.6vw, 3.85rem);
+      line-height: 1.06;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: #fff;
+    }
+
+    .hero h1 .accent {
+      color: var(--sky-tint);
+    }
+
+    .hero-sub {
+      margin-top: 22px;
+      max-width: 560px;
+      margin-left: auto; margin-right: auto;
+      font-size: 1.08rem;
+      line-height: 1.65;
+      color: rgba(255, 255, 255, .82);
+    }
+
+    .hero-cta {
+      margin-top: 34px;
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* hero network art */
+    .hero-art {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1/1;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .hero-art svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .node-pulse {
+      animation: pulse 2.6s ease-in-out infinite;
+      transform-origin: center;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: .55;
+        r: 4;
+      }
+
+      50% {
+        opacity: 1;
+        r: 6;
+      }
+    }
+
+    .dash-line {
+      stroke-dasharray: 4 6;
+      animation: dash 30s linear infinite;
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -400;
+      }
+    }
+
+    /* ============ STAT BAND ============ */
+    .stat-band {
+      background: transparent;
+      padding: 0;
+      margin-top: -42px;
+      position: relative;
+      z-index: 5;
+    }
+
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      background: #fff;
+      border: 1px solid rgba(15, 77, 110, .14);
+      border-radius: var(--radius-md);
+      box-shadow: 0 24px 60px -34px rgba(10, 56, 80, .55);
+      overflow: hidden;
+    }
+
+    .stat-row[hidden] {
+      display: none;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 18px 10px;
+      position: relative;
+      background: linear-gradient(180deg, #fff 0%, var(--tint-50) 100%);
+    }
+
+    .stat+.stat::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: rgba(15, 77, 110, .14);
+    }
+
+    .stat-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: clamp(.86rem, 1.1vw, 1.15rem);
+      font-weight: 600;
+      color: var(--primary);
+      letter-spacing: -0.01em;
+      line-height: 1.2;
+      min-height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stat-label {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(15, 77, 110, .14);
+      font-size: clamp(.68rem, .86vw, .82rem);
+      color: var(--slate);
+      line-height: 1.3;
+      font-weight: 500;
+    }
+
+    .agency-stack {
+      display: inline-grid;
+      gap: 2px;
+      line-height: 1.15;
+    }
+
+    .agency-stack span {
+      display: block;
+    }
+
+    /* ============ SECTION HEADERS ============ */
+    .section {
+      padding: 96px 0;
+    }
+
+    .section-head {
+      max-width: 640px;
+      margin-bottom: 56px;
+    }
+
+    .kicker {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: .78rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--primary);
+      font-weight: 500;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .section-head h2 {
+      font-size: clamp(1.8rem, 3vw, 2.4rem);
+      line-height: 1.18;
+      font-weight: 600;
+    }
+
+    .section-head p {
+      margin-top: 16px;
+      color: var(--slate);
+      font-size: 1.04rem;
+      line-height: 1.6;
+    }
+
+    .bg-tint {
+      background: var(--tint-50);
+    }
+
+    /* ============ NEW REDESIGNED REGIONS (Dossiers) ============ */
+    .dossier-group {
+      margin-bottom: 64px;
+    }
+
+    .dossier-group:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Inline Header Track */
+    .region-track-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--tint-100);
+      padding-bottom: 12px;
+    }
+
+    .region-track-icon {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: transparent;
+      border: 3.5px solid var(--accent-orange);
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .region-track-title {
+      font-family: "'Segoe UI',system-ui,-apple-system,sans-serif”.";
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #3a6d85;
+    }
+
+    /* Redesigned Minimal Layout Card */
+    .dossier-card-v2 {
+      background: var(--card-bg);
+      border-radius: var(--radius-md);
+      padding: 0;
+      display: grid;
+      grid-template-columns: 116px minmax(0, 1fr) 180px;
+      gap: 0;
+      box-shadow: none;
+      border: 1px solid rgba(15, 77, 110, .18);
+      overflow: hidden;
+    }
+
+    .dossier-main-content {
+      display: contents;
+    }
+
+    .dossier-identity {
+      display: contents;
+    }
+
+    .dossier-region-short {
+      font-family: 'Space Grotesk', sans-serif;
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 22px 16px;
+      border-right: 1px solid rgba(15, 77, 110, .18);
+      border-bottom: 1px solid rgba(15, 77, 110, .18);
+      font-size: 1.55rem;
+      font-weight: 600;
+      color: var(--primary-deep);
+      line-height: 1;
+    }
+
+    .dossier-card-v2 h3 {
+      grid-column: 2;
+      grid-row: 1;
+      padding: 14px 16px 8px;
+      border-bottom: 1px solid rgba(15, 77, 110, .18);
+      font-size: 1.28rem;
+      font-weight: 700;
+      color: var(--primary-deep);
+      margin: 0;
+    }
+
+    .dossier-desc-v2 {
+      grid-column: 2;
+      grid-row: 2;
+      padding: 8px 16px 18px;
+      border-bottom: 1px solid rgba(15, 77, 110, .18);
+      color: var(--ink);
+      line-height: 1.38;
+      font-size: 1.05rem;
+      margin: 0;
+    }
+
+    .agency-tag-pill {
+      font-family: 'IBM Plex Sans', sans-serif;
+      grid-column: 3;
+      grid-row: 1 / span 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 18px 16px;
+      border-left: 1px solid rgba(15, 77, 110, .18);
+      border-bottom: 1px solid rgba(15, 77, 110, .18);
+      font-size: 1.08rem;
+      font-weight: 700;
+      letter-spacing: 0;
+      color: var(--primary-deep);
+      background: var(--card-bg);
+      border-radius: 0;
+      white-space: normal;
+      text-transform: none;
+      line-height: 1.2;
+    }
+
+    /* Features Grid Structure */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      margin-top: 24px;
+    }
+
+    .feature-grid.cols-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .feature-grid.cols-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .feature {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+
+      border: 1px solid rgba(51, 119, 156, 0.18);
+      border-radius: var(--radius-md, 12px);
+      padding: 24px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(15, 77, 110, 0.03);
+    }
+
+    .feature:hover {
+      border-color: var(--primary-deep, #0b5cab);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 30px rgba(15, 77, 110, 0.1);
+    }
+
+    .feature-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.04);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+    }
+
+    .feature-icon svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .feature h4 {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: .98rem;
+      font-weight: 600;
+      color: var(--primary-deep);
+      margin: 0;
+    }
+
+    .feature p {
+      font-size: .89rem;
+      line-height: 1.55;
+      color: var(--slate);
+    }
+
+    /* ============ CAPABILITIES ============ */
+    .cap-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .cap-card {
+      background: #fff;
+      border: 1px solid var(--tint-200);
+      border-radius: var(--radius-md);
+      padding: 30px 28px;
+      position: relative;
+      overflow: hidden;
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    }
+
+    .cap-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--primary);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform .3s ease;
+    }
+
+    .cap-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 22px 40px -28px rgba(15, 41, 56, .3);
+      border-color: var(--tint-200);
+    }
+
+    .cap-card:hover::before {
+      transform: scaleX(1);
+    }
+
+    .cap-card.wide {
+      grid-column: span 1;
+    }
+
+    .cap-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      background: var(--tint-100);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .cap-icon svg {
+      width: 21px;
+      height: 21px;
+    }
+
+    .cap-card h4 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.08rem;
+      font-weight: 600;
+      color: var(--primary-deep);
+      margin-bottom: 10px;
+    }
+
+    .cap-card p {
+      font-size: .92rem;
+      line-height: 1.6;
+      color: var(--slate);
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .gmpc-copy {
+      background: var(--primary-deep);
+      color: rgba(255, 255, 255, .75);
+      font-size: .875rem;
+      text-align: center;
+      padding: 12px 20px;
+    }
+
+    /* ============ FINAL CTA ============ */
+    .final-cta {
+      margin: 0 auto 96px;
+      max-width: var(--maxw);
+      padding: 0 32px;
+    }
+
+    .final-cta-inner {
+      background: linear-gradient(135deg, var(--primary-deep), var(--primary) 75%);
+      border-radius: var(--radius-lg);
+      padding: 64px 56px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .final-cta-inner::after {
+      content: "";
+      position: absolute;
+      width: 480px;
+      height: 480px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, .12);
+      top: -220px;
+      right: -160px;
+    }
+
+    .final-cta-inner h2 {
+      color: #fff;
+      font-size: clamp(1.7rem, 3vw, 2.3rem);
+      font-weight: 600;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .final-cta-inner p {
+      color: rgba(255, 255, 255, .82);
+      max-width: 560px;
+      margin: 18px auto 32px;
+      font-size: 1.02rem;
+      line-height: 1.6;
+    }
+
+    /* ============ RESPONSIVE ============ */
+    @media (max-width: 940px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-art {
+        max-width: 340px;
+        order: -1;
+      }
+
+      .dossier-card-v2 {
+        grid-template-columns: 92px minmax(0, 1fr) 150px;
+      }
+
+      .agency-tag-pill {
+        font-size: .96rem;
+      }
+
+      .feature-grid,
+      .feature-grid.cols-3,
+      .feature-grid.cols-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .cap-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .stat {
+        padding: 16px 8px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .wrap {
+        padding: 0 20px;
+      }
+
+      .section {
+        padding: 64px 0;
+      }
+
+      .feature-grid,
+      .feature-grid.cols-3,
+      .feature-grid.cols-2 {
+        grid-template-columns: 1fr;
+      }
+
+      .cap-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .dossier-card-v2 {
+        grid-template-columns: 1fr;
+      }
+
+      .dossier-region-short,
+      .dossier-card-v2 h3,
+      .dossier-desc-v2,
+      .agency-tag-pill {
+        grid-column: 1;
+        grid-row: auto;
+        border-left: 0;
+        border-right: 0;
+      }
+
+      .dossier-region-short {
+        justify-content: flex-start;
+      }
+
+      .final-cta-inner {
+        padding: 46px 26px;
+      }
+
+      .stat-band {
+        margin-top: -28px;
+      }
+
+      .stat {
+        padding: 14px 6px;
+      }
+    }
+        .navbar .collapse {
+    visibility: visible !important;
+    }
+      .navbar .nav-link {
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 8px;
+          flex-direction: row !important;
+      }
+
+      .navbar .nav-link img {
+          display: inline-block !important;
+          vertical-align: middle;
+      }
+
+      /* Sidebar layout adjustments */
+      .dashboard-page-body {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        padding-top: 60px;
+        min-height: 100vh;
+      }
+      .dashboard-main-panel {
+        flex: 1 1 auto;
+        margin-left: 270px;
+        width: calc(100% - 270px);
+        transition: margin-left 0.25s ease;
+      }
+      .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+          margin-left: 96px !important;
+          width: calc(100% - 96px) !important;
+      }
+      @media (max-width: 991px) {
+        .dashboard-page-body {
+          flex-direction: column;
+          padding-top: 60px;
+        }
+        .dashboard-main-panel {
+          margin-left: 0;
+          width: 100% !important;
+        }
+        .dashboard-sidebar {
+          display: none !important;
+        }
+      }
+  </style>
+</head>
+
+<body>
+  {% include 'navbar.html' %}
+  <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+    {% include 'sidebar.html' %}
+    <div class="main-panel dashboard-main-panel">
+      <section class="hero" style="padding: 64px 0;">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eye">iPharmaAI</span><span class="eyebrow"> · Global Regulatory Coverage</span>
+        <h1>Global Inspection<br>Intelligence <span class="accent">Platform</span></h1>
+        <p class="hero-sub">Track FDA 483 Observations, EMA &amp; MHRA compliance certificates, and non‑compliance
+          deficiency reports — all in one unified platform.</p>
+        <div class="hero-cta">
+          <a class="btn btn-light" href="/aidatabase/form483/">
+            Explore Coverage
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stat-band">
+    <div class="wrap">
+      <div class="stat-row">
+        <div class="stat">
+          <div class="stat-value">3</div>
+          <div class="stat-label">Regulatory Regions</div>
+        </div>
+        <div class="stat agency-stat">
+          <div class="stat-value agency-stack">
+            <span>FDA</span>
+            <span>EMA</span>
+            <span>MHRA</span>
+          </div>
+          <div class="stat-label">Agencies Covered</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ fda_483_observations_count }}</div>
+          <div class="stat-label">483 Observations</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ eudra_records_count }}</div>
+          <div class="stat-label">EUDRA Records</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ mhra_records_count }}</div>
+          <div class="stat-label">UK MHRA Records</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">AI-Powered</div>
+          <div class="stat-label">483 Observation Summaries</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">GMP &amp; Non-GMP Compliance</div>
+          <div class="stat-label">Tracked Certification Status</div>
+        </div>
+      </div>
+      <div class="stat-row" hidden>
+        <div class="stat">
+          <div class="stat-value">3</div>
+          <div class="stat-label">Regulatory Regions</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">FDA · EMA · MHRA</div>
+          <div class="stat-label">Agencies Covered</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ fda_483_observations_count }}</div>
+          <div class="stat-label">483 Observations</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ eudra_records_count }}</div>
+          <div class="stat-label">EUDRA Records</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">{{ mhra_records_count }}</div>
+          <div class="stat-label">UK MHRA Records</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">AI‑Powered</div>
+          <div class="stat-label">483 Observation Summaries</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">GMP &amp; Non‑GMP</div>
+          <div class="stat-label">Certificate Types Tracked</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="regions">
+    <div class="wrap">
+      {% comment %} <div class="section-head reveal">
+        <span class="kicker">Coverage by Jurisdiction</span>
+        <h2>Three regulatory regions, one case file each.</h2>
+        <p>Every jurisdiction is tracked as its own structured dossier — source agency, record type, and the specific
+          intelligence tools built around it.</p>
+      </div> {% endcomment %}
+
+      <div class="dossiers-container">
+
+        <div class="dossier-group reveal">
+          <div class="region-track-header">
+            <span class="region-track-icon"></span>
+            <span class="region-track-title">Region 01 — United States</span>
+          </div>
+
+          <div class="dossier-card-v2">
+            <div class="dossier-main-content">
+              <div class="dossier-identity">
+                <span class="dossier-region-short">US</span>
+                <h3>FDA 483 Observations Database</h3>
+              </div>
+              <p class="dossier-desc-v2">Inspection observation data from the U.S. Food & Drug Administration covering pharmaceutical manufacturing facilities nationwide.</p>
+            </div>
+
+            <div class="agency-tag-pill">
+              FDA
+            </div>
+          </div>
+
+          <div class="feature-grid">
+            <div class="feature">
+              <div class="feature-icon">
+               {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="10.5" cy="10.5" r="6.5" />
+                  <path d="M20 20l-4.8-4.8" />
+                  <path d="M8 8.5h5M8 12.5h3" />
+                </svg>  {% endcomment %}
+                <img src="{% static '/img/client_images/filter.png' %}" alt="Filter Icon" width="40" height="40">
+              </div>
+              <h4>Multi‑Filter Search</h4>
+              <p>Filter 483 observations by Organization, Company, FEI Number, Type of Establishment, System, Investigator, Year, Country and Keyword Search.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3l1.8 4.3L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.7L12 3z" />
+                  <path d="M19 15.5l.8 1.9L21.5 18l-1.7.7-.8 1.8-.8-1.8-1.7-.7 1.7-.6.8-1.9z" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/brain.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>AI‑Generated Summaries</h4>
+              <p>Every 483 observation is paired with an AI-generated plain-language summary so compliance teams can extract insights in seconds - not hours.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3h9l4 4v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                  <path d="M9 11h6M9 14.5h6M9 18h3" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/483_g.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>Full Observation Text</h4>
+              <p>Access the complete, unedited text of every FDA 483 observation exactly as issued during inspection.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19V5M4 19h16" />
+                  <path d="M7 16l4-5 3 3 5-7" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/trend.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>Trend &amp; Pattern Analysis</h4>
+              <p>Spot recurring patterns across Observations by cGMP System, Type of Establishment, and Geographic Location.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="dossier-group reveal">
+          <div class="region-track-header">
+            <span class="region-track-icon"></span>
+            <span class="region-track-title">Region 02 — European Union</span>
+          </div>
+
+          <div class="dossier-card-v2">
+            <div class="dossier-main-content">
+              <div class="dossier-identity">
+                <span class="dossier-region-short">EU</span>
+                <h3>EMA EudraGMDP Database</h3>
+              </div>
+              <p class="dossier-desc-v2">GMP and non-GMP compliance certificates alongside non-compliance deficiency reports from the European Medicines Agency and EU member state authorities.</p>
+            </div>
+
+            <div class="agency-tag-pill">
+              EMA . EU<br>Member States
+            </div>
+          </div>
+
+          <div class="feature-grid cols-3">
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="9" r="5.5" />
+                  <path d="M9 21l3-4 3 4M9.5 21l.5-3M14.5 21l-.5-3" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/gmp_1.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>GMP Compliance Certificates</h4>
+              <p>Certificates confirming an inspected manufacturing site meets EU GMP requirements, issued post‑inspection.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3h9l4 4v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                  <path d="M9.5 13l1.8 1.8L15 11" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/gmp_2.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>Non‑GMP Compliance Certificates</h4>
+              <p>Compliance certificates issued for facilities operating under Non‑GMP frameworks within the EMA network.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3h9l4 4v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                  <path d="M12 9v4M12 16h.01" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/gmp_3.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>Non‑Compliance Deficiency Reports</h4>
+              <p>Reports issued where inspected sites were found to be non-compliant with EMA standards, detailing specific deficiencies identified.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="dossier-group reveal">
+          <div class="region-track-header">
+            <span class="region-track-icon"></span>
+            <span class="region-track-title">Region 03 — United Kingdom</span>
+          </div>
+
+          <div class="dossier-card-v2">
+            <div class="dossier-main-content">
+              <div class="dossier-identity">
+                <span class="dossier-region-short">UK</span>
+                <h3>MHRA GMDP Database</h3>
+              </div>
+              <p class="dossier-desc-v2">Post-Brexit MHRA inspection outcomes including GMP and Non-GMP Compliance certificates and<br/> Non-Compliance Deficiency reports for UK-regulated sites.</p>
+            </div>
+
+            <div class="agency-tag-pill">
+              MHRA
+            </div>
+          </div>
+
+          <div class="feature-grid cols-2">
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="9" r="5.5" />
+                  <path d="M9 21l3-4 3 4M9.5 21l.5-3M14.5 21l-.5-3" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/gmp_1.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>GMP Compliance Certificates</h4>
+              <p>MHRA‑issued GMP compliance certificates for UK‑based and internationally inspected manufacturing sites.</p>
+            </div>
+            <div class="feature">
+              <div class="feature-icon">
+                {% comment %} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 3h9l4 4v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z" />
+                  <path d="M9.5 13l1.8 1.8L15 11" />
+                </svg> {% endcomment %}
+                <img src="{% static '/img/client_images/gmp_2.png' %}" alt="Filter Icon" width="50" height="50">
+
+              </div>
+              <h4>Non‑GMP Compliance Certificates</h4>
+              <p>Certificates issued by MHRA for sites operating outside standard GMP scope, under UK‑specific requirements.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section class="section bg-tint">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="kicker">Platform Capabilities</span>
+        <h2>Built for Regulatory Affairs & Compliance Teams</h2>
+        <p>iPharmaAI's Global Inspection Database doesn't just store data — it transforms it into regulatory intelligence. From pre-inspection prep to vendor qualification, every feature is designed for how real RA team’s work.</p>
+      </div>
+
+      <div class="cap-grid">
+        <div class="cap-card reveal">
+          <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3 12h18M12 3a13 13 0 010 18 13 13 0 010-18z" />
+            </svg></div>
+          <h4>Cross‑region filtering</h4>
+          <p>Search and compare inspection outcomes across the USA, EU, and UK from a single unified interface.</p>
+        </div>
+        <div class="cap-card reveal">
+          <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 4v11" />
+              <path d="M7.5 11.5L12 16l4.5-4.5" />
+              <path d="M5 19h14" />
+            </svg></div>
+          <h4>Document downloads</h4>
+          <p>Download original compliance certificates and deficiency reports directly from the platform.</p>
+        </div>
+        <div class="cap-card reveal">
+          <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12a8 8 0 0114-5.3M20 12a8 8 0 01-14 5.3" />
+              <path d="M18 4v4h-4M6 20v-4h4" />
+            </svg></div>
+          <h4>Regularly updated</h4>
+          <p>Database continuously refreshed with the latest inspection outcomes and certificate statuses as they are
+            published.</p>
+        </div>
+        <div class="cap-card reveal">
+          <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg></div>
+          <h4>Audit‑ready data</h4>
+          <p>Structured, traceable data designed to support internal compliance reviews and regulatory audit
+            preparation.</p>
+        </div>
+        <div class="cap-card reveal">
+          <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l1.8 4.3L18 9l-4.2 1.8L12 15l-1.8-4.2L6 9l4.2-1.7L12 3z" />
+              <path d="M19 15.5l.8 1.9L21.5 18l-1.7.7-.8 1.8-.8-1.8-1.7-.7 1.7-.6.8-1.9z" />
+            </svg></div>
+          <h4>AI‑powered insights</h4>
+          <p>Automated summaries and trend analysis help teams cut through large volumes of inspection data efficiently.
+          </p>
+        </div>
+        <div class="cap-card reveal">
+          <div class="cap-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 5h14v14H5z" opacity="0" />
+              <path d="M6 6h12M6 11h12M6 16h7" />
+              <path d="M5 6.2l.8.8L7 5.6M5 11.2l.8.8L7 10.6" />
+            </svg></div>
+          <h4>Vendor selection support</h4>
+          <p class="line-clamp-3" title="Assess a potential vendor's full regulatory track record - 483 observations, deficiency reports, and compliance certificate history — before qualification. Identify repeat findings, escalating non-compliance patterns, or recent regulatory actions across FDA, EMA, and MHRA to make informed, risk-based supplier decisions.">Assess a potential vendor's full regulatory track record - 483 observations, deficiency reports, and
+            compliance certificate history — before qualification. Identify repeat findings, escalating non-compliance
+            patterns, or recent regulatory actions across FDA, EMA, and MHRA to make informed, risk-based supplier decisions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- <div class="final-cta" id="request-demo">
+    <div class="final-cta-inner reveal">
+      <h2>Ready to explore global inspection data?</h2>
+      <p>Get a guided walkthrough of the Global Inspection Database and see how it can strengthen your compliance and
+        regulatory intelligence workflows.</p>
+      <a class="btn btn-light" href="#">
+        Request a Demo
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      </a>
+    </div>
+  </div> -->
+  <div class="gmpc-copy">&copy; 2026 iPharmaAI.</div>
+  </div>
+  </div>
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const els = document.querySelectorAll('.reveal');
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+      els.forEach(el => io.observe(el));
+    } else {
+      els.forEach(el => el.classList.add('in'));
+    }
+    /* safety net: never leave content permanently hidden */
+    setTimeout(() => { els.forEach(el => el.classList.add('in')); }, 1800);
+
+    function initSidebarToggle() {
+      const layout = document.getElementById("dashboardLayout");
+      const btn = document.getElementById("sidebarToggle");
+      if (!layout || !btn) return;
+
+      const storageKey = "systemsSidebarCollapsed";
+      const saved = localStorage.getItem(storageKey) === null ? false : localStorage.getItem(storageKey) === "true";
+
+      function applyState(collapsed) {
+        layout.classList.toggle("sidebar-collapsed", collapsed);
+        btn.setAttribute("aria-expanded", String(!collapsed));
+        btn.innerHTML = '<i class="mdi mdi-dock-left"></i>';
+      }
+
+      applyState(saved);
+      btn.addEventListener("click", () => {
+        const next = !layout.classList.contains("sidebar-collapsed");
+        localStorage.setItem(storageKey, String(next));
+        applyState(next);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initSidebarToggle();
+    });
+  </script>
+
+</body>
+
+</html>

@@ -1,0 +1,2292 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- Required meta tags -->
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>RA-AI Tools</title>
+  <!-- plugins:css -->
+  <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+  <!-- endinject -->
+  <!-- Plugin css for this page -->
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+  <!-- End plugin css for this page -->
+  <!-- Layout styles -->
+  <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+  <!-- End layout styles -->
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+  <style>
+    .country-btn {
+      display: inline-block;
+      padding: 8px 18px;
+      margin: 5px;
+      border-radius: 20px;
+      border: 1px solid #448ebd;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: #044a70;
+      background: #fff;
+      transition: 0.2s;
+    }
+
+    .country-btn:hover {
+      color: #fff;
+      background: linear-gradient(90deg, #0b5cab, #3d8ec9);
+      border-color: transparent;
+    }
+
+    .active-country {
+      background: linear-gradient(90deg, #0b5cab, #173f72);
+      color: #fff !important;
+      border-color: transparent;
+    }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #015a8b transparent;
+    }
+
+    .nav-link {
+
+
+      white-space: normal !important;
+      word-wrap: break-word !important;
+      /* Ensure long words break to the next line */
+      overflow-wrap: break-word !important;
+      /* Ensures compatibility with modern browsers */
+      text-align: left !important;
+      /* Optional: Adjust text alignment */
+    }
+
+    .main-panel {
+      width: 100%;
+      border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(2px);
+    }
+
+    .content-wrapper {
+      background: none;
+    }
+
+    .tt-footer {
+      padding: 24px 34px;
+      background: #005477;
+      margin-top: auto;
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .tt-copy {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      color: rgba(255, 255, 255, 0.58);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .nav-item-dr {
+      background: #90dad7;
+
+      padding: 0 !important;
+    }
+
+    .nav-item-dr-li {
+      padding: 0 1.25rem !important;
+    }
+
+    .hover-link {
+      color: rgb(0, 0, 0) !important;
+      font-weight: 600;
+
+      padding: 1.125rem 2.25rem !important;
+
+      i {
+        color: rgb(0, 0, 0) !important;
+      }
+    }
+
+    .hover-link:hover {
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+      i {
+        color: rgb(0, 0, 0) !important;
+      }
+    }
+
+
+    @media screen and (max-width:1366px) {
+
+
+      .nav-item.nav-settings {
+
+        margin-left: 0px !important;
+      }
+    }
+
+    .nav-link:before {
+      color: white !important;
+    }
+
+    .nav-item-list {
+      padding: 0.50rem 2.25rem !important;
+      color: rgb(0, 0, 0) !important;
+      font-weight: 600;
+      background: #90dad7;
+
+
+      .nav-link:before {
+        color: rgb(0, 0, 0) !important;
+      }
+
+
+      a {
+        background: none !important;
+      }
+    }
+
+
+
+    .active {
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+
+
+      .hover-link-list {
+
+        color: rgb(0, 0, 0) !important;
+      }
+
+      .menu-title {
+
+
+        color: rgb(0, 0, 0) !important;
+      }
+
+
+    }
+
+    td {
+      color: black !important;
+    }
+
+
+
+
+    .nav-item-list:hover {
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+
+      .nav-link:before {
+        color: white !important;
+
+      }
+
+      color: rgb(0, 0, 0) !important;
+
+      a {
+
+        color: rgb(0, 0, 0) !important;
+      }
+    }
+
+    .navbar-menu-wrapper {
+      padding-left: 0px !important;
+      padding-right: 0px !important;
+      flex-grow: 1;
+    }
+
+    .nav-header-link {
+      font-size: 14px !important;
+      font-weight: bold;
+      text-decoration: none;
+
+      border-radius: 5px;
+      color: black !important;
+
+    }
+
+    @media (max-width: 1490px) {
+      .nav-header-link {
+
+        font-size: 12px !important;
+      }
+    }
+
+
+    .nav-header-link-hover:hover {
+      color: #045c8d !important
+    }
+
+    @media (min-width: 992px) {
+      .sidebar-icon-only .sidebar {
+        width: 70px;
+      }
+    }
+
+    .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #0b5cab, #3d8ec9) !important;
+    }
+
+    .hover-link-list {
+
+      color: black !important;
+    }
+
+    ::placeholder {
+      color: rgb(0, 0, 0) !important;
+      opacity: 1 !important;
+      /* Firefox */
+    }
+
+    ::-ms-input-placeholder {
+      /* Edge 12-18 */
+      color: red !important;
+    }
+
+    #customTable {
+      --bs-table-bg: none;
+    }
+
+    .headingRow {
+
+      background: linear-gradient(to right, #65b9ff, #047edf 99%);
+    }
+
+    .count-container {
+      height: 895px;
+      overflow-y: scroll;
+
+    }
+
+    ::-webkit-scrollbar {
+      -webkit-appearance: none;
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      border-radius: 4px;
+      background-color: rgba(0, 0, 0, .5);
+      -webkit-box-shadow: 0 0 1px rgba(255, 255, 255, .5);
+    }
+
+    .hover-div {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      border-radius: 10px;
+
+      margin-bottom: 10px;
+
+      p {
+        margin-bottom: 0px !important;
+      }
+    }
+
+    .hover-div:hover {
+      background-color: lightgray;
+    }
+
+
+
+    /* Basic legend styling */
+    .rounded-legend {
+      padding: 20px 0;
+      margin-top: 20px;
+    }
+
+    .rounded-legend ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .rounded-legend ul li {
+      display: flex;
+      align-items: center;
+
+    }
+
+    /* Important: This is the crucial styling for the color spans */
+    .rounded-legend ul li span {
+      width: 12px;
+      height: 12px;
+      margin-right: 10px;
+      display: inline-block;
+      border-radius: 50%;
+    }
+
+    /* Specific styles for each chart's legend if needed */
+
+    /* Legend position classes */
+    .legend-bottom-left {
+      text-align: left;
+    }
+
+    .legend-vertical {
+      display: flex;
+      flex-direction: column;
+    }
+
+    h4 {
+      font-size: 22px !important;
+    }
+
+    .rectangle {
+      background-color: #fe9409;
+    }
+
+    .rectangle-container {
+      display: flex;
+      justify-content: center;
+
+      @media screen and (min-width: 468px) {
+        justify-content: end;
+      }
+    }
+
+    .reactangle-text {
+      font-family: "Poppins-Regular", Helvetica;
+      font-weight: 400;
+      color: #000000;
+      font-size: 24px;
+      letter-spacing: 0;
+      line-height: True;
+    }
+
+    .navbar-brand-wrapper {
+      width: fit-content !important;
+    }
+
+    .navbar-menu-wrapper {
+      width: fit-content !important;
+
+    }
+
+    .dropdown-item:active {
+      background-color: white
+    }
+
+    .dropdown-menu[data-bs-popper] {
+      top: 70%
+    }
+
+    .dashboard-page-body {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      padding-top: 60px;
+      min-height: 100vh;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    .dashboard-main-panel {
+      flex: 1 1 auto;
+      margin-left: 250px;
+      width: calc(100% - 250px);
+      transition: all 0.3s ease;
+      transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .main-panel {
+      margin-left: 80px;
+      width: calc(100% - 80px);
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+      width: 96px;
+      min-width: 96px;
+      max-width: 96px;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+      display: none;
+    }
+
+    .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+      justify-content: center;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      width: 46px;
+      margin: 0 auto;
+    }
+
+    .form483-dashboard {
+      background: #ffffffff;
+      border-radius: 18px;
+      padding: 24px;
+      margin-left: 10px;
+      min-height: calc(100vh - 112px);
+    }
+
+
+    .dashboard-kpi-row {
+      margin-bottom: 16px;
+    }
+
+    .custom-dashboard-table.kpi-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 0;
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 12px 30px rgba(15, 44, 84, 0.08);
+    }
+
+    .custom-dashboard-table.kpi-table th,
+    .custom-dashboard-table.kpi-table td {
+      padding: 12px;
+      text-align: center;
+      border: 1px solid #dce5f3;
+      vertical-align: middle;
+    }
+    .kpi-row-val td
+    {color:#173f72 !important;}
+
+    .custom-dashboard-table.kpi-table thead th {
+      background-color: #1a4373;
+      color: #ffffff;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .custom-dashboard-table.kpi-table thead th .kpi-header {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .custom-dashboard-table.kpi-table .kpi-icon {
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 50%;
+      color: #ffffff;
+      font-size: 18px;
+    }
+
+    .kpi-row-val td {
+      font-size: 30px;
+      font-weight: 800;
+      color: #0f3f75;
+      background-color: #f8fafc;
+    }
+
+    .kpi-row-sub th {
+      background-color: #f8fafc;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: none;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .kpi-row-sub th span {
+      display: block;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+    }
+
+    .summary-card {
+      background: #ffffff;
+      border: 1px solid rgba(17, 87, 146, 0.12);
+      border-radius: 20px;
+      padding: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      height: 100%;
+      box-shadow: 0 10px 35px rgba(18, 62, 109, 0.08);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .summary-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 45px rgba(18, 62, 109, 0.1);
+    }
+
+    .summary-icon {
+      width: 62px;
+      height: 62px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #0b5cab 0%, #173f72 100%);
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      flex-shrink: 0;
+      box-shadow: 0 12px 30px rgba(11, 92, 171, 0.18);
+    }
+
+    .summary-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .summary-content h6 {
+      margin: 0 0 12px;
+      color: #1f3f6e;
+      font-size: 14px !important;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase !important;
+    }
+
+    .summary-value {
+      font-size: 34px !important;
+      line-height: 1.05;
+      font-weight: 800;
+      color: #0b3d6d;
+      margin: 0;
+    }
+
+    .summary-meta {
+      margin-top: 6px;
+      color: #5d7b9f;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .dashboard-panel {
+      background: #ffffff;
+      border: 1px solid #dce5f3;
+      border-radius: 14px;
+      box-shadow: 0 4px 18px rgba(18, 62, 109, 0.06);
+      height: 100%;
+    }
+
+    .dashboard-panel .card-body {
+      padding: 18px;
+    }
+
+    .panel-title {
+      color: #173f72;
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      text-transform: none !important;
+    }
+
+    .system-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .system-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border: 1px solid #e5ebf5;
+      border-radius: 10px;
+      font-size: 14px;
+      background: #f8fbff;
+      gap: 12px;
+    }
+
+    .system-item-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #20456f;
+      font-weight: 700;
+      min-width: 0;
+    }
+
+    .system-item-label span:last-child {
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .system-item-count {
+      min-width: 62px;
+      text-align: center;
+      border-radius: 999px;
+      background: #ecf3ff;
+      color: #184071;
+      font-weight: 800;
+      padding: 4px 10px;
+      font-size: 13px;
+    }
+
+    .system-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .chart-layout {
+      align-items: center;
+    }
+
+    .chart-canvas-wrap {
+      height: 320px;
+      position: relative;
+    }
+
+    .chart-legend-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .chart-legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: #20456f;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .chart-legend-left {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .chart-legend-left span:last-child {
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .chart-legend-value {
+      color: #1b4d89;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .investigator-card-body {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .investigator-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      max-height: 750px;
+      padding-right: 4px;
+    }
+
+    .investigator-entry {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .investigator-rank {
+      color: #2d4f7a;
+      font-weight: 800;
+      font-size: 15px;
+      text-align: center;
+    }
+
+    .investigator-content {
+      min-width: 0;
+    }
+
+    .investigator-name {
+      color: #163f71;
+      font-weight: 700;
+      font-size: 14px;
+      text-transform: capitalize;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .investigator-progress {
+      width: 100%;
+      height: 4px;
+      border-radius: 999px;
+      background: #dce7f7;
+      overflow: hidden;
+    }
+
+    .investigator-progress-fill {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: 999px;
+      background: #173f72;
+      transition: width 0.3s ease;
+    }
+
+    .investigator-count {
+      color: #1a4b85;
+      font-weight: 800;
+      font-size: 16px;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .investigator-empty {
+      color: #607ea3;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+
+    .trends-panel .card-body {
+      height: 560px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .trends-panel .chart-canvas-wrap {
+      height: 100%;
+    }
+
+    @media (max-width: 1400px) {
+      .chart-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .chart-canvas-wrap {
+        height: 270px;
+      }
+    }
+
+    @media (max-width: 767px) {
+      .form483-dashboard {
+        padding: 14px;
+        margin-left: 10px;
+      }
+
+      .summary-value {
+        font-size: 32px;
+      }
+
+      .dashboard-toolbar-chip {
+        min-width: 100%;
+      }
+
+      .dashboard-toolbar-search {
+        min-width: 100%;
+      }
+    }
+
+    @media (max-width: 991px) {
+      .dashboard-page-body {
+        flex-direction: column;
+        padding-top: 60px;
+      }
+
+      .dashboard-sidebar {
+        position: relative;
+        top: 0;
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 0 0 16px 16px;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+      }
+
+      .dashboard-main-panel {
+        width: 100% !important;
+      }
+    }
+    body .dashboard-sidebar
+    {
+      height:100vh !important;
+
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container-scroller">
+
+    <!-- partial:partials/_navbar.html -->
+    {% include './navbar.html' %}
+
+
+    <!-- partial -->
+    <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+      {% include './sidebar.html' %}
+      <!-- partial -->
+      <div class="main-panel dashboard-main-panel">
+        <div class="content-wrapper form483-dashboard">
+          <div class="page-header">
+            <h3 class="page-title">
+              {% comment %} <span class="page-title-icon active-header-link text-white me-2">
+                <i class="mdi mdi-home"></i>
+              </span> {% endcomment %}
+              US - USFDA · 483 Observations Dashboard
+              <a href="/aidatabase/render_yearofinspection/" class=" ms-4 btn active-header-link">Click Here to
+                Search</a>
+            </h3>
+
+          </div>
+
+          <!-- Country Tabs -->
+          <div style="margin-bottom: 25px; text-align: center">
+            <a href="/aidatabase/form483/"
+              class="country-btn {% if selected_active_excel_name == 'usa' %}active-country{% endif %}">
+              USA
+            </a>
+            {% for excel_option in available_excel_names %}
+            <a href="/aidatabase/gmpc_dashboard/?active_excel_name={{ excel_option.value }}"
+              class="country-btn {% if excel_option.value == selected_active_excel_name %}active-country{% endif %}">
+              {{ excel_option.label }}
+            </a>
+            {% endfor %}
+
+          </div>
+
+          <div class="row dashboard-kpi-row g-3">
+            {% if selected_active_excel_name == 'usa' %}
+            <div class="col-12">
+              <div class="table-responsive">
+                <table class="custom-dashboard-table kpi-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 25%;">
+                        <span class="kpi-header"><span class="kpi-icon"><i class="mdi mdi-office-building-outline"></i></span>Total Companies<br>Inspected</span>
+                      </th>
+                      <th style="width: 25%;">
+                        <span class="kpi-header"><span class="kpi-icon"><i class="mdi mdi-file-document-outline"></i></span>Total Observations</span>
+                      </th>
+                      <th style="width: 25%;">
+                        <span class="kpi-header"><span class="kpi-icon"><i class="mdi mdi-account-group-outline"></i></span>Total Investigators</span>
+                      </th>
+                      <th style="width: 25%;">
+                        <span class="kpi-header"><span class="kpi-icon"><i class="mdi mdi-shield-outline"></i></span>cGMP Inspection<br>Systems</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr class="kpi-row-val">
+                      <td>{{ Total_Companies }}</td>
+                      <td style="color:rgb(27 207 180) !important">{{ Total_observations }}</td>
+                      <td>{{ Total_Investigators }}</td>
+                      <td id="inspectionSystemsCount" style="color:rgb(254 124 150) !important">0</td>
+                    </tr>
+
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {% else %}
+            <div class="col-xl-3 col-md-6">
+              <div class="summary-card">
+                <div class="summary-icon"><i class="mdi mdi-office-building-outline"></i></div>
+                <div class="summary-content">
+                  <h6 class="panel-title">Total Companies Inspected</h6>
+                  <p class="summary-value">{{ Total_Companies }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+              <div class="summary-card">
+                <div class="summary-icon"><i class="mdi mdi-file-document-outline"></i></div>
+                <div class="summary-content">
+                  <h6 class="panel-title">Total Observations Recorded</h6>
+                  <p class="summary-value">{{ Total_observations }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+              <div class="summary-card">
+                <div class="summary-icon"><i class="mdi mdi-account-group-outline"></i></div>
+                <div class="summary-content">
+                  <h6 class="panel-title">Total Investigators</h6>
+                  <p class="summary-value">{{ Total_Investigators }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-xl-3 col-md-6">
+              <div class="summary-card">
+                <div class="summary-icon">
+                  <i class="mdi mdi-shield-outline"></i>
+                </div>
+                <div class="summary-content">
+                  <h6 class="panel-title">cGMP Inspection Systems</h6>
+                  <p class="summary-value" id="inspectionSystemsCount">0</p>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="row g-3">
+            <div class="col-xl-9">
+              <div class="row g-3">
+                <div class="col-lg-5">
+                  <div class="dashboard-panel card">
+                    <div class="card-body">
+                      <h5 class="panel-title">cGMP Inspection Systems</h5>
+                      <div class="system-list" id="inspectionSystemsList"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-lg-7">
+                  <div class="dashboard-panel card">
+                    <div class="card-body diff">
+                      <h5 class="panel-title">Top Observations by cGMP Systems</h5>
+                      <div class="chart-layout">
+                        <div class="chart-canvas-wrap">
+                          <canvas id="barChartCMCSection"></canvas>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-lg-5">
+                  <div class="dashboard-panel card">
+                    <div class="card-body">
+                      <h5 class="panel-title">Type of Establishments</h5>
+                      <div class="system-list" id="establishmentTypeList"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-lg-7">
+                  <div class="dashboard-panel card">
+                    <div class="card-body diff">
+                      <h6 class="panel-title">Observations by Type of Establishments</h6>
+                      <div class="chart-layout">
+                        <div class="chart-canvas-wrap">
+                          <canvas id="barChartSections"></canvas>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-xl-3">
+              <div class="dashboard-panel card">
+                <div class="card-body investigator-card-body">
+                  <h6 class="panel-title">Top 10 Investigators (Most 483s)</h6>
+                  <div class="investigator-list">
+                    {% for inv in top_investigators %}
+                    <div class="investigator-entry" data-count="{{ inv.count|default_if_none:0 }}">
+                      <div class="investigator-rank">{{ forloop.counter }}</div>
+                      <div class="investigator-content">
+                        <div class="investigator-name">{{ inv.name }}</div>
+                        <div class="investigator-progress">
+                          <span class="investigator-progress-fill"></span>
+                        </div>
+                      </div>
+                      <div class="investigator-count">{{ inv.count }}</div>
+                    </div>
+                    {% empty %}
+                    <div class="investigator-empty">No investigator data available.</div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row mt-3">
+            <div class="col-12">
+              <div class="dashboard-panel card trends-panel">
+                <div class="card-body">
+                  <h6 class="panel-title mb-0">Trends Over Time</h6>
+                  <div id="visit-sale-chart-legend" class="rounded-legend legend-horizontal legend-top-right"></div>
+                  <div class="chart-canvas-wrap">
+                    <canvas id="visit-sale-chart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ALL Your Content Here -->
+        <!-- content-wrapper ends -->
+        <!-- partial:partials/_footer.html -->
+        {% comment %} <footer class="tt-footer">
+          <div class="tt-copy">&copy; 2026 iPharmaAI.</div>
+        </footer> {% endcomment %}
+        <!-- partial -->
+      </div>
+      <!-- main-panel ends -->
+    </div>
+    <!-- page-body-wrapper ends -->
+  </div>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+  {{ system_sequence|json_script:"form483-system-sequence" }}
+  {{ chart1labels|json_script:"form483-chart1labels" }}
+  {{ chart1data|json_script:"form483-chart1data" }}
+  {{ system_data|json_script:"form483-system-data" }}
+  {{ establishment_labels|json_script:"form483-establishment-labels" }}
+  {{ establishment_data|json_script:"form483-establishment-data" }}
+
+  <script>
+    function readJsonScript(id, fallbackValue) {
+      const el = document.getElementById(id);
+      if (!el) return fallbackValue;
+      try {
+        return JSON.parse(el.textContent);
+      } catch (e) {
+        console.error(`Invalid JSON in ${id}`, e);
+        return fallbackValue;
+      }
+    }
+
+    const systemSequence = readJsonScript('form483-system-sequence', []);
+    const chart1Labels = readJsonScript('form483-chart1labels', []);
+    const chart1Data = readJsonScript('form483-chart1data', {});
+    const systemData = readJsonScript('form483-system-data', []);
+    const establishmentLabels = readJsonScript('form483-establishment-labels', []);
+    const establishmentData = readJsonScript('form483-establishment-data', []);
+    const dashboardPalette = ['rgba(255, 99, 132, 0.8)',
+      'rgba(54, 162, 235, 0.8)',
+      '#DB7907',
+      'rgba(153, 102, 255, 0.8)',
+      '#10b981',
+      'rgba(239, 83, 80, 1)',]
+
+    // Enhanced chart creation function with better styling and responsiveness
+    function createChartPieOGs() {
+      const ctx = document.getElementById('barChartCMCSection');
+
+      const labels = systemSequence;
+      const data = systemData;
+      // Common chart options
+      const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+          legend: {
+            display: false,
+            // Show legends
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: 12,
+            titleFont: {
+              size: 14
+            },
+            bodyFont: {
+              size: 13
+            }
+          },
+          datalabels: {
+            color: '#000',
+            anchor: 'end',
+            align: 'start',
+            font: {
+              size: 14,
+              weight: 'bold'
+            }
+          }
+        }
+      };
+
+      // Color palette for pie chart
+      const colors = [
+        'rgba(255, 99, 132, 0.8)', //Quality
+        'rgba(54, 162, 235, 0.8)', //Laboratory
+        '#DB7907', //Material
+        'rgba(153, 102, 255, 0.8)', //Packaging
+        '#10b981', //Production
+        'rgba(239, 83, 80, 1)', //Facility
+        // 'rgba(156, 39, 176, 1)',
+        // 'rgba(75, 192, 192, 0.8)'
+      ];
+
+
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Observations',
+            data: data,
+            backgroundColor: colors,
+            borderColor: colors.map(color => color.replace('0.8', '1')),
+            borderWidth: 1,
+            hoverOffset: 4
+          }]
+        },
+        options: commonOptions
+      });
+    }
+
+
+    function createChartPieOGss() {
+      const ctx = document.getElementById('barChartSections');
+
+      const labels = establishmentLabels;
+      const data = establishmentData;
+
+      // Common chart options
+      const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '60%',
+        plugins: {
+          legend: {
+            display: false  // Show legends
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: 12,
+            titleFont: {
+              size: 14
+            },
+            bodyFont: {
+              size: 13
+            }
+          },
+          datalabels: {
+            color: '#000',
+            anchor: 'end',
+            align: 'start',
+            font: {
+              size: 14,
+              weight: 'bold'
+            }
+          }
+        }
+      };
+
+      // Color palette for pie chart
+      const colors = [
+        'rgba(12, 82, 34, 0.6)',   // Deep Orange
+        'rgba(175, 211, 81, 0.6)',   // Indigo
+        //'rgba(22, 33, 99, 0.6)',   // Pink
+        'rgba(255, 93, 7, 0.6)',   // Amber
+        // Teal (Replacing Cyan)
+      ];
+
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Observations',
+            data: data,
+            backgroundColor: colors,
+            borderColor: colors.map(color => color.replace('0.8', '1')),
+            borderWidth: 1,
+            hoverOffset: 4
+          }]
+        },
+        options: commonOptions
+      });
+    }
+
+    function formatCount(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return '0';
+      return numeric.toLocaleString('en-US');
+    }
+
+    function buildLegendRows(labels, values, targetId, palette) {
+      const legendEl = document.getElementById(targetId);
+      if (!legendEl) return;
+      const total = values.reduce((sum, val) => sum + (Number(val) || 0), 0);
+      legendEl.innerHTML = labels.map((label, index) => {
+        const value = Number(values[index]) || 0;
+        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+        const color = palette[index % palette.length];
+        return `
+          <li class="chart-legend-item">
+            <span class="chart-legend-left">
+              <span class="system-dot" style="background:${color};"></span>
+              <span>${label}</span>
+            </span>
+            <span class="chart-legend-value">${percentage}%</span>
+          </li>
+        `;
+      }).join('');
+    }
+
+    function renderInspectionSystemsPanel() {
+      const systemsCountEl = document.getElementById('inspectionSystemsCount');
+      if (systemsCountEl) {
+        systemsCountEl.textContent = formatCount(systemSequence.length);
+      }
+
+      const listEl = document.getElementById('inspectionSystemsList');
+      if (listEl) {
+        listEl.innerHTML = systemSequence.map((system, index) => {
+          const count = Number(systemData[index]) || 0;
+          return `
+            <div class="system-item">
+              <div class="system-item-label">
+                <span class="system-dot" style="background:${dashboardPalette[index % dashboardPalette.length]};"></span>
+                <span>${system}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      buildLegendRows(systemSequence, systemData, 'topObservationLegend', dashboardPalette);
+    }
+
+    function renderEstablishmentPanel() {
+      const listPalette = ['rgba(12, 82, 34, 0.6)',
+        'rgba(175, 211, 81, 0.6)',
+        //'rgba(22, 33, 99, 0.6)',
+        'rgba(255, 93, 7, 0.6)',
+        // Teal (Replacing Cyan)];
+      ]
+      const listEl = document.getElementById('establishmentTypeList');
+      if (listEl) {
+        listEl.innerHTML = establishmentLabels.map((label, index) => {
+          const count = Number(establishmentData[index]) || 0;
+          if (count == 0) {
+            return;
+          }
+          return `
+            <div class="system-item">
+              <div class="system-item-label">
+                <span class="system-dot" style="background:${listPalette[index % listPalette.length]};"></span>
+                <span>${label}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      buildLegendRows(establishmentLabels, establishmentData, 'establishmentLegend', listPalette);
+    }
+
+    function renderInvestigatorBars() {
+      const rows = Array.from(document.querySelectorAll('.investigator-entry'));
+      if (!rows.length) return;
+      const counts = rows.map(row => Number(row.getAttribute('data-count')) || 0);
+      const maxCount = Math.max(...counts, 1);
+      rows.forEach((row, index) => {
+        const fill = row.querySelector('.investigator-progress-fill');
+        if (!fill) return;
+        const width = Math.max((counts[index] / maxCount) * 100, counts[index] > 0 ? 4 : 0);
+        fill.style.width = `${width}%`;
+      });
+    }
+
+    function initSidebarToggle() {
+
+      const layout = document.getElementById("dashboardLayout");
+      function toggleSidebar() {
+        layout.classList.toggle("sidebar-collapsed");
+      }
+      const toggleButton = document.getElementById('sidebarToggle');
+      if (!layout || !toggleButton) return;
+
+      const storageKey = 'dashboard483SidebarCollapsed';
+      const savedState = localStorage.getItem(storageKey);
+      const isCollapsed = savedState === 'true';
+
+      function applyState(collapsed) {
+        layout.classList.toggle('sidebar-collapsed', collapsed);
+        toggleButton.setAttribute('aria-expanded', String(!collapsed));
+        toggleButton.querySelector('i').className = 'mdi mdi-dock-left';
+      }
+
+      applyState(isCollapsed);
+
+      toggleButton.addEventListener('click', () => {
+        const nextState = !layout.classList.contains('sidebar-collapsed');
+        localStorage.setItem(storageKey, String(nextState));
+        applyState(nextState);
+      });
+    }
+
+    function createChartBarOGs() {
+      const ctx = document.getElementById('visit-sale-chart');
+
+      // Years for X-axis
+      const labels = chart1Labels;
+
+      const data = chart1Data;
+
+      // Colors for bars
+      const colors = [
+        '#ff829d',
+        '#5eb5ef',
+        '#DB7907',
+        '#ad85ff',
+        '#00B579',
+        '#ef5350',
+
+      ];
+
+      // Create datasets for each establishment type
+      const datasets = systemSequence.map((system, index) => ({
+        label: system,
+        data: data[system] || Array(labels.length).fill(0),
+        backgroundColor: colors[index % colors.length],
+        borderColor: colors[index % colors.length].replace('0.8', '1'),
+        borderWidth: 1,
+        hoverOffset: 4
+      }));
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              labels: {
+                font: {
+                  size: 14, // Increase font size of system labels
+
+                }
+                , color: "black"
+              },
+
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              padding: 12,
+              titleFont: { size: 14 },
+              bodyFont: { size: 13 }
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+
+              ticks: {
+                color: "black",
+                font: {
+                  // Increase X-axis label size
+
+                }
+              }
+
+
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 20, color: "black" }
+            }
+          }
+        }
+      });
+    }
+
+    // Enhanced data fetching function with error handling and loading states
+    function fetchDataAndCreateChart(url, chartId, chartType) {
+      // Add loading state
+      const canvas = document.getElementById(chartId);
+      const container = canvas.parentElement;
+      container.style.position = 'relative';
+
+      const loadingDiv = document.createElement('div');
+      loadingDiv.innerHTML = 'Loading...';
+      loadingDiv.style.position = 'absolute';
+      loadingDiv.style.top = '50%';
+      loadingDiv.style.left = '50%';
+      loadingDiv.style.transform = 'translate(-50%, -50%)';
+      container.appendChild(loadingDiv);
+
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          container.removeChild(loadingDiv);
+          createChart(chartId, chartType, data.labels, data.counts);
+        })
+        .catch(error => {
+          console.error('Error fetching chart data:', error);
+          loadingDiv.innerHTML = 'Error loading data';
+          loadingDiv.style.color = 'red';
+        });
+    }
+
+
+
+    function createBarChart(chartId, chartType) {
+      // Add loading state
+      const canvas = document.getElementById(chartId);
+      const container = canvas.parentElement;
+      container.style.position = 'relative';
+
+      const loadingDiv = document.createElement('div');
+      loadingDiv.innerHTML = 'Loading...';
+      loadingDiv.style.position = 'absolute';
+      loadingDiv.style.top = '50%';
+      loadingDiv.style.left = '50%';
+      loadingDiv.style.transform = 'translate(-50%, -50%)';
+      container.appendChild(loadingDiv);
+
+      fetch(url)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          container.removeChild(loadingDiv);
+          createChart(chartId, chartType, data.labels, data.counts);
+        })
+        .catch(error => {
+          console.error('Error fetching chart data:', error);
+          loadingDiv.innerHTML = 'Error loading data';
+          loadingDiv.style.color = 'red';
+        });
+    }
+
+    // Add CSS for better chart container styling
+    const style = document.createElement('style');
+    style.textContent = `
+        .diff {
+          height: 350px;
+          position: relative;
+        }
+
+        canvas {
+          height: 90% !important;
+        }
+      `;
+    document.head.appendChild(style);
+
+    // Initialize all charts
+    document.addEventListener('DOMContentLoaded', function () {
+      initSidebarToggle();
+      renderInspectionSystemsPanel();
+      renderEstablishmentPanel();
+      renderInvestigatorBars();
+      //  fetchDataAndCreateChart('../../aidatabase/bar-chart-cmc-section/', 'barChartCMCSection', 'pie');
+      if (document.getElementById('barChartCMCSection')) createChartPieOGs();
+      if (document.getElementById('visit-sale-chart')) createChartBarOGs();
+      if (document.getElementById('barChartSections')) createChartPieOGss();
+      // fetchDataAndCreateChart('../../aidatabase/bar-chart-category-vs-deficiency/', 'barChartCategoryVsDeficiency', 'bar');
+      //createBarChart('barChartCMCSection','pie')
+    });
+  </script>
+  <!-- <script>
+    (function ($) {
+        if ($("#visit-sale-chart").length) {
+          const ctx = document.getElementById('visit-sale-chart');
+
+          // Create gradient colors
+          const createGradient = (context, color1, color2) => {
+            const gradient = context.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            return gradient;
+          };
+
+          const graphGradient1 = ctx.getContext("2d");
+          const graphGradient2 = ctx.getContext("2d");
+          const graphGradient3 = ctx.getContext("2d");
+
+          const gradientStrokeViolet = createGradient(graphGradient1,
+            'rgba(154, 85, 255, 1)', 'rgba(154, 85, 255, 1)');
+          const gradientStrokeBlue = createGradient(graphGradient2,
+            'rgb(125, 172, 239)', 'rgb(125, 172, 239)',);
+          const gradientStrokeRed = createGradient(graphGradient3,
+            'rgba(254, 112, 150, 1)', 'rgba(254, 112, 150, 1)');
+
+          // Create the chart
+          const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: [], // To be populated from backend
+              datasets: [
+                {
+                  label: 'Dosage Type',
+                  data: [],
+                  backgroundColor: gradientStrokeViolet,
+                  borderColor: gradientStrokeViolet,
+                  borderWidth: 1
+                },
+                {
+                  label: 'Deficiency Types',
+                  data: [],
+                  backgroundColor: gradientStrokeBlue,
+                  borderColor: gradientStrokeBlue,
+                  borderWidth: 1
+                },
+                {
+                  label: 'Deficiency Categories',
+                  data: [],
+                  backgroundColor: gradientStrokeRed,
+                  borderColor: gradientStrokeRed,
+                  borderWidth: 1
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                title: {
+                  display: true,
+                  text: 'ANDA Deficiency Database',
+                  font: {
+                    size: 20 // Increase the font size for the title
+                },
+                },
+                tooltip: {
+                  mode: 'index',
+                  intersect: false
+                },
+                legend: {
+                  position: 'top',
+                  labels: {
+                    font: {
+                        size: 14 // Increase the font size for the legend labels
+                    }
+                },
+
+                }
+              },
+              scales: {
+                x: {
+                  stacked: false,
+                  title: {
+                    display: true,
+                    text: ''
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Count'
+                  }
+                  }
+                }
+              }
+            });
+
+          // Fetch data and update chart
+          fetch('../../aidatabase/get_anda_chart_data/')
+            .then(response => response.json())
+            .then(data => {
+              chart.data.labels = data.labels;
+              chart.data.datasets[0].data = data.dosageCounts;
+              chart.data.datasets[1].data = data.deficiencyCounts;
+              chart.data.datasets[2].data = data.categoryCounts;
+              chart.update();
+            })
+            .catch(error => {
+              console.error('Error fetching data:', error);
+            });
+        }
+      })(jQuery);
+    </script> -->
+
+  <script>
+    if ($("#traffic-chart").length) {
+      const ctx = document.getElementById('traffic-chart');
+
+      // Create multiple gradient contexts
+      const gradientContexts = Array(11).fill().map(() =>
+        document.getElementById("traffic-chart").getContext('2d')
+      );
+
+      // Create an array of gradients with different colors
+      const gradients = [
+        // Original three gradients
+        (() => {
+          const grad = gradientContexts[0].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(54, 215, 232, 1)');
+          grad.addColorStop(1, 'rgba(177, 148, 250, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[1].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(6, 185, 157, 1)');
+          grad.addColorStop(1, 'rgba(132, 217, 210, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[2].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 191, 150, 1)');
+          grad.addColorStop(1, 'rgba(255, 191, 150, 1)');
+          return grad;
+        })(),
+        // Additional gradients for remaining categories
+        (() => {
+          const grad = gradientContexts[3].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 159, 64, 1)');
+          grad.addColorStop(1, 'rgba(255, 120, 64, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[4].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(153, 102, 255, 1)');
+          grad.addColorStop(1, 'rgba(126, 87, 194, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[5].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(75, 192, 192, 1)');
+          grad.addColorStop(1, 'rgba(38, 166, 154, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[6].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 99, 132, 1)');
+          grad.addColorStop(1, 'rgba(239, 83, 80, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[7].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(156, 39, 176, 1)');
+          grad.addColorStop(1, 'rgba(123, 31, 162, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[8].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(3, 169, 244, 1)');
+          grad.addColorStop(1, 'rgba(2, 136, 209, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[9].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 193, 7, 1)');
+          grad.addColorStop(1, 'rgba(251, 140, 0, 1)');
+          return grad;
+        })(),
+        (() => {
+          const grad = gradientContexts[10].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, '#10b981');
+          grad.addColorStop(1, 'rgba(56, 142, 60, 1)');
+          return grad;
+        })()
+      ];
+
+      const legendColors = [
+        'rgba(54, 215, 232, 1)',
+        'rgba(6, 185, 157, 1)',
+        'rgba(255, 191, 150, 1)',
+        'rgba(255, 159, 64, 1)',
+        'rgba(153, 102, 255, 1)',
+        'rgba(75, 192, 192, 1)',
+        'rgba(255, 99, 132, 1)',
+        'rgba(156, 39, 176, 1)',
+        'rgba(3, 169, 244, 1)',
+        'rgba(255, 193, 7, 1)',
+        '#10b981'
+      ];
+
+      const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            backgroundColor: gradients,
+            hoverBackgroundColor: gradients,
+            borderColor: gradients,
+            legendColor: legendColors
+          }]
+        },
+        options: {
+          cutout: 50,
+          animationEasing: "easeOutBounce",
+          animateRotate: true,
+          animateScale: false,
+          responsive: true,
+          maintainAspectRatio: true,
+          showScale: true,
+          legend: false,
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const value = context.raw;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${context.label}: ${value} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        },
+        plugins: [{
+          afterDatasetUpdate: function (chart, args, options) {
+            const chartId = chart.canvas.id;
+            const legendId = `${chartId}-legend`;
+            const legendElement = document.getElementById(legendId);
+
+            // Clear existing legend
+            if (legendElement) {
+              legendElement.innerHTML = '';
+            }
+
+            const ul = document.createElement('ul');
+            for (let i = 0; i < chart.data.datasets[0].data.length; i++) {
+              const value = chart.data.datasets[0].data[i];
+              const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+              const percentage = Math.round((value / total) * 100);
+
+              ul.innerHTML += `
+                                <li>
+                                    <span style="background-color: ${chart.data.datasets[0].legendColor[i]}"></span>
+                                    ${chart.data.labels[i]} (${percentage}%)
+                                </li>
+                            `;
+            }
+            legendElement.appendChild(ul);
+          }
+        }]
+      });
+
+      // Fetch and update data
+      fetch('../../aidatabase/anda_deficicency_count_pie/')
+        .then(response => response.json())
+        .then(data => {
+          chart.data.labels = data.labels;
+          chart.data.datasets[0].data = data.counts;
+          chart.update();
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+        });
+    }
+  </script>
+  <script>
+    if ($("#category-chart").length) {
+      const ctx = document.getElementById('category-chart');
+
+      // Create multiple gradient contexts
+      const gradientContexts = Array(11).fill().map(() =>
+        document.getElementById("category-chart").getContext('2d')
+      );
+
+      // Create an array of gradients with different colors
+      const gradients = [
+        // Blues & Purples
+        (() => {
+          const grad = gradientContexts[0].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(54, 215, 232, 1)');
+          grad.addColorStop(1, 'rgba(177, 148, 250, 1)');
+          return grad;
+        })(),
+        // Teals
+        (() => {
+          const grad = gradientContexts[1].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(6, 185, 157, 1)');
+          grad.addColorStop(1, 'rgba(132, 217, 210, 1)');
+          return grad;
+        })(),
+        // Coral & Pink
+        (() => {
+          const grad = gradientContexts[2].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 191, 150, 1)');
+          grad.addColorStop(1, 'rgba(255, 191, 150, 1)');
+
+          return grad;
+        })(),
+        // Orange
+        (() => {
+          const grad = gradientContexts[3].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 159, 64, 1)');
+          grad.addColorStop(1, 'rgba(255, 120, 64, 1)');
+          return grad;
+        })(),
+        // Deep Purple
+        (() => {
+          const grad = gradientContexts[4].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(153, 102, 255, 1)');
+          grad.addColorStop(1, 'rgba(126, 87, 194, 1)');
+          return grad;
+        })(),
+        // Cyan
+        (() => {
+          const grad = gradientContexts[5].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(75, 192, 192, 1)');
+          grad.addColorStop(1, 'rgba(38, 166, 154, 1)');
+          return grad;
+        })(),
+        // Red & Pink
+        (() => {
+          const grad = gradientContexts[6].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 99, 132, 1)');
+          grad.addColorStop(1, 'rgba(239, 83, 80, 1)');
+          return grad;
+        })(),
+        // Deep Purple
+        (() => {
+          const grad = gradientContexts[7].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(156, 39, 176, 1)');
+          grad.addColorStop(1, 'rgba(123, 31, 162, 1)');
+          return grad;
+        })(),
+        // Light Blue
+        (() => {
+          const grad = gradientContexts[8].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(3, 169, 244, 1)');
+          grad.addColorStop(1, 'rgba(2, 136, 209, 1)');
+          return grad;
+        })(),
+        // Amber
+        (() => {
+          const grad = gradientContexts[9].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 193, 7, 1)');
+          grad.addColorStop(1, 'rgba(251, 140, 0, 1)');
+          return grad;
+        })(),
+        // Green
+        (() => {
+          const grad = gradientContexts[10].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, '#10b981');
+          grad.addColorStop(1, 'rgba(56, 142, 60, 1)');
+          return grad;
+        })(),
+        // Additional gradients
+        // Rose Pink
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(255, 64, 129, 1)');
+        //     grad.addColorStop(1, 'rgba(236, 64, 122, 1)');
+        //     return grad;
+        // })(),
+        // Indigo
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(101, 31, 255, 1)');
+        //     grad.addColorStop(1, 'rgba(58, 58, 230, 1)');
+        //     return grad;
+        // })(),
+        // Brown
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(141, 110, 99, 1)');
+        //     grad.addColorStop(1, 'rgba(109, 76, 65, 1)');
+        //     return grad;
+        // })(),
+        // Blue Grey
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(96, 125, 139, 1)');
+        //     grad.addColorStop(1, 'rgba(69, 90, 100, 1)');
+        //     return grad;
+        // })()
+      ];
+
+      const legendColors = [
+        'rgba(54, 215, 232, 1)',   // Blue
+        'rgba(6, 185, 157, 1)',    // Teal
+        'rgba(255, 191, 150, 1)',  // Coral
+        'rgba(255, 159, 64, 1)',   // Orange
+        'rgba(153, 102, 255, 1)',  // Purple
+        'rgba(75, 192, 192, 1)',   // Cyan
+        'rgba(255, 99, 132, 1)',   // Red
+        'rgba(156, 39, 176, 1)',   // Deep Purple
+        'rgba(3, 169, 244, 1)',    // Light Blue
+        'rgba(255, 193, 7, 1)',    // Amber
+        '#10b981',    // Green
+        //'rgba(255, 64, 129, 1)',   // Rose Pink
+        //'rgba(101, 31, 255, 1)',   // Indigo
+        //'rgba(141, 110, 99, 1)',   // Brown
+        //'rgba(96, 125, 139, 1)'    // Blue Grey
+      ];
+
+      const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            backgroundColor: gradients,
+            hoverBackgroundColor: gradients,
+            borderColor: gradients,
+            legendColor: legendColors
+          }]
+        },
+        options: {
+          cutout: 50,
+          animationEasing: "easeOutBounce",
+          animateRotate: true,
+          animateScale: false,
+          responsive: true,
+          maintainAspectRatio: true,
+          showScale: true,
+          legend: false,
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const value = context.raw;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${context.label}: ${value} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        },
+        plugins: [{
+          afterDatasetUpdate: function (chart, args, options) {
+            const chartId = chart.canvas.id;
+            const legendId = `${chartId}-legend`;
+            const legendElement = document.getElementById(legendId);
+
+            // Clear existing legend
+            if (legendElement) {
+              legendElement.innerHTML = '';
+            }
+
+            const ul = document.createElement('ul');
+            for (let i = 0; i < chart.data.datasets[0].data.length; i++) {
+              const value = chart.data.datasets[0].data[i];
+              const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+              const percentage = Math.round((value / total) * 100);
+
+              ul.innerHTML += `
+                                <li>
+                                    <span style="background-color: ${chart.data.datasets[0].legendColor[i]}"></span>
+                                    ${chart.data.labels[i]} (${percentage}%)
+                                </li>
+                            `;
+            }
+            legendElement.appendChild(ul);
+          }
+        }]
+      });
+
+      // Fetch and update data
+      fetch('../../aidatabase/anda_category_deficicency_count_pie/')
+        .then(response => response.json())
+        .then(data => {
+          chart.data.labels = data.labels;
+          chart.data.datasets[0].data = data.counts;
+          chart.update();
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+        });
+    }
+  </script>
+  <script>
+    if ($("#dosage-chart").length) {
+      const ctx = document.getElementById('dosage-chart');
+
+      // Create multiple gradient contexts
+      const gradientContexts = Array(11).fill().map(() =>
+        document.getElementById("dosage-chart").getContext('2d')
+      );
+
+      // Create an array of gradients with different colors
+      const gradients = [
+        // Blues & Purples
+        (() => {
+          const grad = gradientContexts[0].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(54, 215, 232, 1)');
+          grad.addColorStop(1, 'rgba(177, 148, 250, 1)');
+          return grad;
+        })(),
+        // Teals
+        (() => {
+          const grad = gradientContexts[1].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(6, 185, 157, 1)');
+          grad.addColorStop(1, 'rgba(132, 217, 210, 1)');
+          return grad;
+        })(),
+        // Coral & Pink
+        (() => {
+          const grad = gradientContexts[2].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 191, 150, 1)');
+          grad.addColorStop(1, 'rgba(255, 191, 150, 1)');
+
+          return grad;
+        })(),
+        // Orange
+        (() => {
+          const grad = gradientContexts[3].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 159, 64, 1)');
+          grad.addColorStop(1, 'rgba(255, 120, 64, 1)');
+          return grad;
+        })(),
+        // Deep Purple
+        (() => {
+          const grad = gradientContexts[4].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(153, 102, 255, 1)');
+          grad.addColorStop(1, 'rgba(126, 87, 194, 1)');
+          return grad;
+        })(),
+        // Cyan
+        (() => {
+          const grad = gradientContexts[5].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(75, 192, 192, 1)');
+          grad.addColorStop(1, 'rgba(38, 166, 154, 1)');
+          return grad;
+        })(),
+        // Red & Pink
+        (() => {
+          const grad = gradientContexts[6].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 99, 132, 1)');
+          grad.addColorStop(1, 'rgba(239, 83, 80, 1)');
+          return grad;
+        })(),
+        // Deep Purple
+        (() => {
+          const grad = gradientContexts[7].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(156, 39, 176, 1)');
+          grad.addColorStop(1, 'rgba(123, 31, 162, 1)');
+          return grad;
+        })(),
+        // Light Blue
+        (() => {
+          const grad = gradientContexts[8].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(3, 169, 244, 1)');
+          grad.addColorStop(1, 'rgba(2, 136, 209, 1)');
+          return grad;
+        })(),
+        // Amber
+        (() => {
+          const grad = gradientContexts[9].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, 'rgba(255, 193, 7, 1)');
+          grad.addColorStop(1, 'rgba(251, 140, 0, 1)');
+          return grad;
+        })(),
+        // Green
+        (() => {
+          const grad = gradientContexts[10].createLinearGradient(0, 0, 0, 181);
+          grad.addColorStop(0, '#10b981');
+          grad.addColorStop(1, 'rgba(56, 142, 60, 1)');
+          return grad;
+        })(),
+        // Additional gradients
+        // Rose Pink
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(255, 64, 129, 1)');
+        //     grad.addColorStop(1, 'rgba(236, 64, 122, 1)');
+        //     return grad;
+        // })(),
+        // Indigo
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(101, 31, 255, 1)');
+        //     grad.addColorStop(1, 'rgba(58, 58, 230, 1)');
+        //     return grad;
+        // })(),
+        // Brown
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(141, 110, 99, 1)');
+        //     grad.addColorStop(1, 'rgba(109, 76, 65, 1)');
+        //     return grad;
+        // })(),
+        // Blue Grey
+        // (() => {
+        //     const grad = gradientContext.createLinearGradient(0, 0, 0, 181);
+        //     grad.addColorStop(0, 'rgba(96, 125, 139, 1)');
+        //     grad.addColorStop(1, 'rgba(69, 90, 100, 1)');
+        //     return grad;
+        // })()
+      ];
+
+      const legendColors = [
+        'rgba(54, 215, 232, 1)',   // Blue
+        'rgba(6, 185, 157, 1)',    // Teal
+        'rgba(255, 191, 150, 1)',  // Coral
+        'rgba(255, 159, 64, 1)',   // Orange
+        'rgba(153, 102, 255, 1)',  // Purple
+        'rgba(75, 192, 192, 1)',   // Cyan
+        'rgba(255, 99, 132, 1)',   // Red
+        'rgba(156, 39, 176, 1)',   // Deep Purple
+        'rgba(3, 169, 244, 1)',    // Light Blue
+        'rgba(255, 193, 7, 1)',    // Amber
+        '#10b981',    // Green
+        //'rgba(255, 64, 129, 1)',   // Rose Pink
+        //'rgba(101, 31, 255, 1)',   // Indigo
+        //'rgba(141, 110, 99, 1)',   // Brown
+        //'rgba(96, 125, 139, 1)'    // Blue Grey
+      ];
+
+      const chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            backgroundColor: gradients,
+            hoverBackgroundColor: gradients,
+            borderColor: gradients,
+            legendColor: legendColors
+          }]
+        },
+        options: {
+          cutout: 50,
+          animationEasing: "easeOutBounce",
+          animateRotate: true,
+          animateScale: false,
+          responsive: true,
+          maintainAspectRatio: true,
+          showScale: true,
+          legend: false,
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const value = context.raw;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = Math.round((value / total) * 100);
+                  return `${context.label}: ${value} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        },
+        plugins: [{
+          afterDatasetUpdate: function (chart, args, options) {
+            const chartId = chart.canvas.id;
+            const legendId = `${chartId}-legend`;
+            const legendElement = document.getElementById(legendId);
+
+            // Clear existing legend
+            if (legendElement) {
+              legendElement.innerHTML = '';
+            }
+
+            const ul = document.createElement('ul');
+            for (let i = 0; i < chart.data.datasets[0].data.length; i++) {
+              const value = chart.data.datasets[0].data[i];
+              const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+              const percentage = Math.round((value / total) * 100);
+
+              ul.innerHTML += `
+                                <li>
+                                    <span style="background-color: ${chart.data.datasets[0].legendColor[i]}"></span>
+                                    ${chart.data.labels[i]} (${percentage}%)
+                                </li>
+                            `;
+            }
+            legendElement.appendChild(ul);
+          }
+        }]
+      });
+
+      // Fetch and update data
+      fetch('../../aidatabase/anda_dosage_count_pie/')
+        .then(response => response.json())
+        .then(data => {
+          chart.data.labels = data.labels;
+          chart.data.datasets[0].data = data.counts;
+          chart.update();
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+        });
+    }
+  </script>
+  <!-- container-scroller -->
+  <!-- plugins:js -->
+  <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+  <!-- endinject -->
+  <!-- Plugin js for this page -->
+  <!-- <script src="{% static 'assets/vendors/chart.js/chart.umd.js' %}"></script> -->
+  <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+  <!-- End plugin js for this page -->
+  <!-- inject:js -->
+  <!-- <script src="{% static 'assets/js/off-canvas.js' %}"></script> -->
+  <script src="{% static 'assets/js/misc.js' %}"></script>
+  <script src="{% static 'assets/js/settings.js' %}"></script>
+  <script src="{% static 'assets/js/todolist.js' %}"></script>
+  <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+  <!-- endinject -->
+  <!-- Custom js for this page -->
+  <!-- <script src="{% static 'assets/js/dashboard.js' %}"></script> -->
+  <!-- End custom js for this page -->
+
+</body>
+
+</html>

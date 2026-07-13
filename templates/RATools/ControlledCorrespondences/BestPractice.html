@@ -1,0 +1,598 @@
+{% extends 'RATools/RAToolsBase.html' %} {% load static %} {% block content %}
+<div class="card">
+  <div class="card-body">
+    <div class="pdf-page">
+      <img
+        class="imgcontainer"
+        src="{% static 'img/Controlled Correspondences Best Practices.png' %}"
+        alt="Page 1 Image"
+      />
+    </div>
+    <div class="pdf-page pdf">
+      <div class="bordered-container">
+        <div class="header">
+          <!-- Placeholder for the logo image -->
+          <div
+            style="
+              border-right: 1px solid black;
+              width: 22%;
+              display: flex;
+              justify-content: center;
+            "
+          >
+            <img src="{% static 'img/iCretegy.png' %}" alt="Company Logo" />
+          </div>
+
+          <!-- Centered content for title and table -->
+          <div rowspan="6" class="header-content">
+            <h4
+              style="
+                font-weight: bold;
+                font-family: 'Times New Roman';
+                font-size: 18px;
+              "
+            >
+              Controlled Correspondence Best Practices
+            </h4>
+          </div>
+        </div>
+      </div>
+      <hr style="opacity: 100%" />
+      <div
+        style="
+          width: 100%;
+          height: 800px;
+          border: 4px solid #000;
+          box-sizing: border-box;
+          margin-top: 40px;
+        "
+      >
+        <div
+          style="
+            height: 787px;
+            border: 2px solid #000;
+            box-sizing: border-box;
+            margin: 2px;
+            padding: 0px 10px;
+          "
+        >
+          <div class="content">
+            <div class="title">
+              IMPORTANCE OF
+              <span style="color: green"
+                >CONTROLLED CORRESPONDENCE BEST PRACTICES</span
+              >
+            </div>
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Controlled
+              Correspondence (CC) is a formal communication channel between
+              industry stakeholders and the FDA. It allows manufacturers to seek
+              clarity on regulatory, scientific, and administrative matters
+              related to drug development, submission, approval and post
+              approval.
+            </p>
+            <br />
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Timely and accurate responses
+              to Controlled Correspondence from the FDA can provide crucial
+              advice on issues such as the Q1/Q2, MDD, BET, Stability
+              orientation, acceptability of proposed methodologies and many
+              more. Leveraging this communication effectively can significantly
+              enhance the efficiency of the approval process, mitigate risks,
+              and ensure that submissions align with FDA expectations.
+            </p>
+            <br />
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;iTechnicalTools provides a
+              specialized Controlled Correspondence template, designed to help
+              companies draft clear, precise, and compliant queries to the FDA.
+              Our template streamlines the process, ensuring that your
+              submissions are aligned with FDA expectations, reducing the risk
+              of delays, and enhancing the overall efficiency of your regulatory
+              communications.
+            </p>
+            <br />
+          </div>
+        </div>
+      </div>
+    </div>
+    {% if page_flag %}
+          <div class="pdf-page pdf blurimg" >
+            <div>
+                <div class="form">
+                  <div class="login-header">
+                    <img src="{% static 'assets/icretegy/itechnical logo.png' %}" style="height: 89px;width: 110px;"alt="iCretegy Logo">
+                    <h3 style="margin-top:13px">LOGIN</h3>
+                    <p style="font-size: 15px;">You need to log in to access this content.</p>
+                  </div>
+                  <a href="../../adminmaster/login/"  style="text-decoration: none;">
+                    <button type="button">LOGIN</button>
+                  </a>
+                </div>
+              </div>
+          </div>
+    {% endif %}
+
+    {% if show_flag %}
+    <div class="pdf-page pdf">
+      <div class="bordered-container">
+        <div class="header">
+          <!-- Placeholder for the logo image -->
+          <div
+            style="
+              border-right: 1px solid black;
+              width: 22%;
+              display: flex;
+              justify-content: center;
+            "
+          >
+            <img src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="Company Logo" />
+          </div>
+
+          <!-- Centered content for title and table -->
+          <div rowspan="6" class="header-content">
+            <h4
+              style="
+                font-weight: bold;
+                font-family: 'Times New Roman';
+                font-size: 18px;
+              "
+            >
+              Controlled Correspondence Best Practices
+            </h4>
+          </div>
+        </div>
+      </div>
+      <hr style="opacity: 100%" />
+      <div
+        style="
+          width: 100%;
+          border: 1px solid #000;
+          box-sizing: border-box;
+          margin-top: 40px;
+          padding: 20px;
+        "
+      >
+        <div class="title">CONTROL CORRESPONDENCE TOPICS</div>
+        <div style="padding-left: 20px">
+          <p style="margin-bottom: 10px">
+            Control Correspondence can be filled for below topics and many more:
+          </p>
+          <ol style="line-height: 1.6">
+            <li>Q1/Q2</li>
+            <li>Inactive ingredient (IIG Evaluation)</li>
+            <li>Stability Bracketing</li>
+            <li>Stability Orientation (Inverted/Upright/Horizontal)</li>
+            <li>Retention sample for BE study</li>
+            <li>BET limit</li>
+            <li>MDD</li>
+            <li>Batch Size</li>
+            <li>Request for RLD designation</li>
+            <li>Question related to Reference Standard Selection</li>
+            <li>Requests evaluations of alternative BE approaches</li>
+            <li>
+              Question related to User Interface of a Drug Device Combination
+              Product
+            </li>
+            <li>
+              Requests a Covered Product Authorization to obtain sufficient
+              quantities
+            </li>
+            <li>
+              Question related to Labeling differences and submission
+              requirements when packaging configuration differs from the RLD's
+            </li>
+            <li>Container Closure Change</li>
+            <li>In-use stability testing</li>
+            <li>Dissolution</li>
+            <li>Packaging of Exhibit batches</li>
+            <li>Scoring and Split Tablet Testing</li>
+            <li>Size and Shape of Tablet/Capsule</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <div class="pdf-page pdf">
+      <div class="bordered-container">
+        <div class="header">
+          <!-- Placeholder for the logo image -->
+          <div
+            style="
+              border-right: 1px solid black;
+              width: 22%;
+              display: flex;
+              justify-content: center;
+            "
+          >
+            <img src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="Company Logo" />
+          </div>
+
+          <!-- Centered content for title and table -->
+          <div rowspan="6" class="header-content">
+            <h4
+              style="
+                font-weight: bold;
+                font-family: 'Times New Roman';
+                font-size: 18px;
+              "
+            >
+              Controlled Correspondence Best Practices
+            </h4>
+          </div>
+        </div>
+      </div>
+      <hr style="opacity: 100%" />
+      <p style="color: #31849B;font-weight: bold;text-decoration: underline;font-size: 20px;margin-bottom: 0%;">Following are the key points to consider during the controlled correspondence finalization and submission:</p>
+      <div class="table-responsive table-content">
+
+          {% for category, subcategories in grouped_data.items %}
+          <table style="min-width:100% ">
+          <!-- Category Row -->
+          <thead>
+            <tr class="category-row">
+              <th
+                colspan="12"
+                class="text-center"
+                style="
+                  background-color: #e36c0a;
+                  color: white;
+                  padding: 8px;
+                  text-align: center;
+                  font-size: 17px;
+                  font-weight: bold;
+                  border: 2px dashed black;
+                "
+              >
+                {{ category }}
+              </th>
+            </tr>
+          </thead>
+
+          <!-- Subcategory and Content Rows -->
+          <tbody>
+            {% for subcategory, questions in subcategories.items %}
+            <!-- Subcategory Row -->
+            <tr class="subcategory-row">
+              {% if 'None' not in subcategory %}
+              <td
+                colspan="12"
+                class="text-center font-weight-bold"
+                style="
+                  background-color: #215868;
+                  color: white;
+                  padding: 8px;
+                  text-align: center;
+                  font-size: 17px;
+                  font-weight: bold;
+                  border: 2px dashed black;
+                "
+              >
+                {{ subcategory }}
+              </td>
+              {% endif %}
+            </tr>
+
+            <!-- Content Rows -->
+            {% for question in questions %}
+            <tr class="content-row" style="border: 1px solid black">
+              <td
+                class="pl-4"
+                colspan="4"
+                style="border-right: 1px solid black;width:10%;text-align: center;"
+              >
+                {{ question.numbered_key }}
+              </td>
+              <td colspan="5" class="tdChange">{{ question.question|safe }}</td>
+            </tr>
+            {% endfor %} {% endfor %}
+          </tbody>
+        </table><br>
+          {% endfor %}
+
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+<style>
+  .form {
+    position: relative;
+    z-index: 1;
+    background: #FFFFFF;
+    max-width: 360px;
+    margin: 0 auto 100px;
+    margin-top: 70px;
+    padding: 45px;
+    text-align: center;
+    box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+  }
+
+  .form button {
+    font-family: "Roboto", sans-serif;
+    text-transform: uppercase;
+    outline: 0;
+    background-color: #ef6603;
+    width: 100%;
+    border: 0;
+    padding: 15px;
+    color: #FFFFFF;
+    font-size: 14px;
+    -webkit-transition: all 0.3 ease;
+    transition: all 0.3 ease;
+    cursor: pointer;
+  }
+    .blurimg{
+      height: 100%;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-image: url('{% static "img/blur_img.png" %}');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 100%;
+    }
+  .tdChange{
+    ul,ol{
+      margin-bottom: 0rem !important;
+      line-height:1.15 !important;
+      li{
+        line-height: 1.15 !important;
+        text-indent: 0px;
+        padding-left: 8px;
+      }
+    }
+
+  }
+   .card {
+     font-family: 'Times New Roman' !important;
+   }
+   td p {
+     text-align: justify !important;
+     margin: 4px;
+     line-height:1.15;
+   }
+   td{
+     img{
+         width: 360px !important;
+         height: auto !important;
+         border-radius: 0% !important;
+         background-color: white !important;
+       }
+  }
+     .pdf-page {
+       width: 210mm;          /* A4 width */
+       min-height: 266mm;         /* A4 height */
+       margin: 0 auto;
+       padding: 40px;
+       border: 1px solid #ddd;
+       box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+       overflow: hidden;      /* Hides overflow and ensures content spills to the next page */
+       page-break-after: always;
+       position: relative;
+     }
+     .pdf::before {
+       content: '';
+       position: absolute;
+       top: 0;
+       left: 0;
+       width: 100%;
+       height: 100%;
+       background-image: url("{% static 'img/watermark.png' %}");
+       background-repeat: no-repeat;
+       background-position: center;
+       background-size: 70%;
+       opacity: 0.06;
+     }
+     .pdf-page img {
+       width: 100%;
+       height: 100%;
+     }
+     .imgcontainer {
+       position: relative;
+       text-align: center;
+       color: white;
+     }
+     .top-left {
+       top: 267px;
+       left: 135px;
+       color: rgb(33, 88, 104);
+       font-size: 59px;
+       position: absolute;
+       font-weight: bold;
+       width:60%;
+     }
+     .content {
+         font-size: 14px;
+         line-height: 2.0;
+         text-align: justify;
+         padding: 20px;
+     }
+     .title {
+       font-weight: bold;
+       font-size: 18px;
+       text-align: center;
+       margin-top: 20px;
+       margin-bottom: 30px;
+       text-decoration: underline;
+     }
+     p{
+       margin-bottom:30px;
+       line-height: 2;
+     }
+
+     /* Table styling to handle page breaks */
+     .table, .table tbody, .table tr, .table td, .table th {
+         page-break-inside: avoid;
+         page-break-after: auto;
+     }
+
+
+     .bordered-container {
+         width: 100%;
+         border: 1px solid #000;
+         box-sizing: border-box;
+         margin-bottom: 15px; /* add space to prevent overlap */
+     }
+
+     /* Header adjustments */
+     .header {
+         display: flex;
+         align-items: center;
+         justify-content: space-between;
+     }
+
+     .header img {
+         width: 100px;
+         height: auto;
+     }
+
+     .header-content {
+         flex: 1;
+         text-align: center;
+         margin-left: 10px;
+         margin-top: 3px;
+     }
+
+     .header-table {
+         width: 100%;
+         margin-top: 10px;
+         border-collapse: collapse;
+     }
+
+     .header-table td {
+         padding: 5px 10px;
+         border: 1px solid #000;
+         text-align: center;
+     }
+
+     h4 {
+         margin: 0;
+         font-size: 16px;
+     }
+
+     @media print {
+         /* Ensures each page break for dynamic content */
+         .pdf-page {
+             page-break-after: always;
+         }
+       }
+
+
+       .btn-warning {
+         color: #000;
+         background-image: linear-gradient(to right, #ffcc00, #ff9900);
+         border-color: #ffc107;
+         transition: background-image 0.3s ease-in-out;
+       }
+
+     .btn-warning:hover {
+         background-image: linear-gradient(to right, #ff9900, #ffcc00);
+         color: #000;
+         border-color: #ffc107;
+     }
+     .radio-cell {
+       display: flex;
+       justify-content: space-between;
+     }
+
+     .radio-container {
+       display: inline-block;
+       position: relative;
+       cursor: pointer;
+       user-select: none;
+       padding-left: 35px;
+
+     }
+
+     .radio-container input {
+       position: absolute;
+       opacity: 0;
+       cursor: pointer;
+     }
+
+     .custom-radio {
+       position: relative;
+       padding-left: 35px;
+       margin-bottom: 12px;
+       cursor: pointer;
+       user-select: none;
+       font-size: 14px; /* Reduced font size */
+     }
+
+     .custom-radio:before {
+       content: "";
+       position: absolute;
+       left: 0;
+       top: 0;
+       width: 20px;
+       height: 20px;
+       border: 2px solid #ddd;
+       border-radius: 4px;
+       background-color: #f1f1f1;
+     }
+
+     .radio-container input:checked ~ .custom-radio:before {
+       background-color: #4caf50;
+       border-color: #4caf50;
+     }
+
+     .radio-container input:checked ~ .custom-radio:after {
+       display: block;
+     }
+
+     .radio-container .custom-radio:after {
+       content: "";
+       position: absolute;
+       display: none;
+       top: 4px;
+       left: 9px;
+       width: 6px;
+       height: 12px;
+       border: solid white;
+       border-width: 0 3px 3px 0;
+       transform: rotate(45deg);
+     }
+
+     /* Custom row colors */
+     .table-success {
+       background-color: rgba(76, 175, 80, 0.3); /* Transparent green */
+     }
+
+     .table-danger {
+       background-color: rgba(244, 67, 54, 0.3); /* Transparent red */
+     }
+
+     .table-warning {
+       background-color: rgba(255, 235, 59, 0.3); /* Transparent yellow */
+     }
+
+     tr:hover{
+       background-image: linear-gradient(to right, #ffcc00, #ff9900);  !important;
+     }
+
+     #submit-complete-button {
+       color: #000;
+         background-image: linear-gradient(101deg, #b241ff, #fe86ff);
+         border-color: #ffc107;
+         transition: background-image 0.3s ease-in-out;
+     }
+
+     #submit-complete-button:hover {
+       background-image: linear-gradient(101deg, #fe86ff, #b241ff);
+       color: #000;
+       border-color: #ffc107;
+     }
+
+     .btn-danger {
+       background-image: linear-gradient(101deg, #8b0000 , #fc5c7d); /* Gradient background */
+       color: white; /* Text color */
+     }
+
+     /* Gradient effect on hover */
+     .btn-danger:hover {
+       background-image: linear-gradient(101deg, #fc5c7d, #8b0000 );
+       color: white; /* Ensure text remains white */
+     }
+</style>
+{% endblock %}

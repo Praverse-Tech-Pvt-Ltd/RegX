@@ -1,0 +1,567 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy Policy | iPharmaAI</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+    <style>
+      :root {
+        --blue: #26acf5;
+        --blue-dark: #02283d;
+        --blue-mid: #0272ae;
+        --blue-lite: #35b1f6;
+        --orange: #fe9409;
+        --orange2: #ff6700;
+        --white: #ffffff;
+        --off: #f4f8fc;
+        --text: #1a2a3a;
+        --muted: #5a7a94;
+        --ff-d: "inter", sans-serif;
+        --ff-b: "DM Sans", sans-serif;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--ff-b);
+        color: var(--text);
+        background: var(--off);
+        overflow-x: hidden;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      /* Offset for anchor links to account for fixed navbar */
+      .terms-content h3 {
+        scroll-margin-top: 100px;
+      }
+      .page-header {
+        background: linear-gradient(135deg, var(--blue-dark) 0%, #011a2f 100%);
+        padding: 140px 0 60px;
+        text-align: center;
+        color: #fff;
+      }
+      .page-title {
+        font-family: var(--ff-d);
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .content-section {
+        padding: 60px 0 100px;
+      }
+      .terms-card {
+        background: #fff;
+        border-radius: 20px;
+        padding: 50px;
+        box-shadow: 0 15px 40px rgba(1, 90, 139, 0.05);
+        border: 1px solid rgba(1, 90, 139, 0.08);
+      }
+      .terms-meta {
+        color: var(--muted);
+        font-size: 15px;
+        margin-bottom: 40px;
+        line-height: 1.8;
+        padding-bottom: 20px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+      }
+      .terms-content h3 {
+        font-family: var(--ff-d);
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--blue-dark);
+        margin-top: 35px;
+        margin-bottom: 15px;
+      }
+      .terms-content h4 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--blue-mid);
+        margin-top: 25px;
+        margin-bottom: 12px;
+      }
+      .terms-content p, .terms-content ul {
+        font-size: 0.95rem;
+        line-height: 1.8;
+        color: #324764;
+        margin-bottom: 15px;
+      }
+      .terms-content ul {
+        padding-left: 20px;
+      }
+      .terms-content li {
+        margin-bottom: 8px;
+      }
+
+      /* Sidebar Navigation */
+      .sticky-sidebar {
+        position: sticky;
+        top: 100px;
+      }
+      .nav-toc {
+        list-style: none;
+        padding: 0;
+      }
+      .nav-toc li a {
+        display: block;
+        padding: 10px 15px;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        border-left: 2px solid transparent;
+        transition: 0.3s;
+      }
+      .nav-toc li a:hover, .nav-toc li a.active {
+        color: var(--blue-lite);
+        border-left-color: var(--blue-lite);
+        background: rgba(53, 177, 246, 0.05);
+      }
+
+      /* Footer Styles */
+      footer {
+        background: radial-gradient(circle at top left, #015a8b 0%, #01263f 45%, #010f1d 100%);
+        padding: 60px 0 0;
+        font-family: var(--ff-b);
+      }
+      .fi {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 20px;
+        margin: 0 40px;
+        padding: 50px 40px;
+      }
+      .flogo {
+        height: 60px;
+        filter: brightness(0) invert(1);
+        object-fit: contain;
+      }
+      .fbdesc {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.6);
+        line-height: 1.78;
+        text-align: justify;
+      }
+      .fct {
+        font-family: var(--ff-d);
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 24px;
+        padding-bottom: 8px;
+        display: inline-block;
+      }
+      .fl {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 14px;
+      }
+      .fl li { margin-bottom: 14px; }
+      .fl a {
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: color 0.2s, padding-left 0.2s;
+      }
+      .fl a:hover { color: var(--blue-lite); padding-left: 4px; }
+      .eyebrow {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: white;
+      }
+      .far {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 14px;
+        line-height: 1.7;
+        font-weight: 500;
+      }
+      .far i { color: #35b1f6; font-size: 13px; margin-top: 5px; min-width: 14px; }
+      .far a { color: rgba(255, 255, 255, 0.82); text-decoration: none; transition: 0.3s ease; }
+      .far a:hover { color: #35b1f6; }
+      .socs { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 22px; }
+      .soc {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s, transform 0.2s;
+        overflow: hidden;
+      }
+      .soc:hover { background: var(--blue-lite); transform: translateY(-3px); }
+      .soc img { width: 20px; height: 20px; object-fit: contain; }
+      .fdiv { height: 1px; background: rgba(255, 255, 255, 0.07); margin: 0 40px; }
+      .fcopy {
+        background: rgba(255, 255, 255, 0.04);
+        margin: 0 40px;
+        border-bottom-left-radius: 20px;
+        border-bottom-right-radius: 20px;
+        padding: 18px 40px;
+        text-align: center;
+        font-size: 12.5px;
+        color: rgba(255, 255, 255, 0.38);
+      }
+      .fcopy a { color: rgba(255, 255, 255, 0.62); text-decoration: underline; text-underline-offset: 3px; }
+
+      @media (max-width: 991px) {
+        .fi { margin: 0 16px; padding: 30px 20px; }
+        .fdiv, .fcopy { margin: 0 16px; }
+        .terms-card { padding: 30px 20px; }
+        .fl { display: flex; flex-direction: column; align-items: center; }
+        .fl a { justify-content: center; }
+      }
+    </style>
+  </head>
+  <body>
+    {% include 'navbar.html' %}
+
+    <section class="page-header">
+      <div class="container">
+        <h1 class="page-title">Privacy Policy</h1>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-3 d-none d-lg-block">
+            <div class="sticky-sidebar">
+              <h5 class="mb-3" style="font-family: var(--ff-d); font-weight: 700;">Contents</h5>
+              <ul class="nav-toc">
+                <li><a href="#intro">1. Introduction</a></li>
+                <li><a href="#collection">2. Information We Collect</a></li>
+                <li><a href="#not-collect">3. Information We Do Not Collect</a></li>
+                <li><a href="#how-use">4. How We Use Information</a></li>
+                <li><a href="#client-data">5. Use of Client Data</a></li>
+                <li><a href="#disclosure">6. Disclosure of Information</a></li>
+                <li><a href="#security">7. Data Security</a></li>
+                <li><a href="#access-control">8. Password Reset & Access</a></li>
+                <li><a href="#cookies">9. Cookies</a></li>
+                <li><a href="#retention">10. Data Retention</a></li>
+                <li><a href="#rights">11. Client and User Rights</a></li>
+                <li><a href="#regional">12. Regional Privacy Notice</a></li>
+                <li><a href="#confidentiality">13. Confidentiality</a></li>
+                <li><a href="#marketing">14. Marketing</a></li>
+                <li><a href="#international">15. International Users</a></li>
+                <li><a href="#updates">16. Updates</a></li>
+                <li><a href="#contact">17. Contact Us</a></li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-lg-9">
+            <div class="terms-card">
+              <div class="terms-meta">
+                <strong>Effective Date:</strong> 03.06.2026<br>
+                <strong>Website / Platform:</strong> iPharmaAI<br>
+                <strong>Contact Email:</strong> <a href="mailto:icretools@icretegy.com" style="color: var(--blue-lite);">icretools@icretegy.com</a>
+              </div>
+
+              <div class="terms-content">
+                <h3 id="intro">1. Introduction</h3>
+                <p> iPharmaAI respects the privacy and confidentiality of our clients, users, and website visitors. This Privacy Policy explains how we collect, use, disclose, protect, and manage information when users access our website, SaaS-based application platform, and related services. </p>
+                <p> iPharmaAI is designed to help pharmaceutical and regulatory teams simplify regulatory operations, strengthen FDA inspection readiness, accelerate ANDA workflows, and proactively manage compliance risk using AI-driven inspection intelligence, audit analytics, regulatory checklists, and CTD documentation support. </p>
+                <p> By using our website or SaaS platform, you acknowledge that you have read and understood this Privacy Policy. </p>
+                <h3 id="collection">2. Information We Collect</h3>
+                <p>We may collect the following types of information:</p>
+                <h4>A. Account and User Information</h4>
+                <p>When a client or authorized user accesses the iPharmaAI platform, we may collect:</p>
+                <ul>
+                  <li>Name</li>
+                  <li>Company name</li>
+                  <li>Business email address</li>
+                  <li>Phone number, if provided</li>
+                  <li>Job title or department, if provided</li>
+                  <li>Login credentials or system access details</li>
+                  <li>User role and access permission information</li>
+                </ul>
+                <p> iPharmaAI uses a controlled single sign-in access model. User access may be browser-specific and/or system-specific for security purposes. Users cannot reset passwords directly through the platform. Password reset or access-related requests must be submitted to iPharmaAI by email. </p>
+                <h4>B. Platform Usage Information</h4>
+                <p>We may collect information about how users access and use the platform, including:</p>
+                <ul>
+                  <li>Login activity</li>
+                  <li>Login token</li>
+                  <li>IP address</li>
+                </ul>
+                <p> This information helps us maintain platform security, improve performance, and support authorized client usage. </p>
+                <h4>C. Client-Provided Information</h4>
+                <p> Clients may provide business, regulatory, quality, technical, or operational information when using the platform or requesting support. </p>
+                <ul>
+                  <li>Regulatory questions</li>
+                  <li>Audit or inspection readiness needs</li>
+                  <li>ANDA or CTD documentation-related inputs</li>
+                  <li>Checklist usage preferences</li>
+                  <li>Support requests</li>
+                  <li>Feedback or product improvement suggestions</li>
+                </ul>
+                <p> Clients are responsible for ensuring that any information they provide to iPharmaAI is accurate and appropriate for use within the platform. </p>
+                <h4>D. Website and Communication Information</h4>
+                <p> When visitors contact us through the website, email, demo request, or inquiry form, we may collect: </p>
+                <ul>
+                  <li>Name</li>
+                  <li>Business email address</li>
+                  <li>Company name</li>
+                  <li>Phone number</li>
+                  <li>Message content</li>
+                  <li>Service interest or inquiry details</li>
+                </ul>
+                <p> We may also collect limited technical information through cookies or similar technologies to improve website functionality and user experience. </p>
+                <h3 id="not-collect">3. Information We Do Not Intend to Collect</h3>
+                <p> iPharmaAI is not designed to collect patient-level health information, protected health information, medical records, personal clinical data, or sensitive personal information unless specifically agreed in writing under a separate contract. </p>
+                <p> Users should not upload or submit confidential patient data, personal health information, or highly sensitive information unless iPharmaAI has expressly agreed to receive and process such information under appropriate legal and contractual safeguards. </p>
+                <h3 id="how-use">4. How We Use Information</h3>
+                <p>We use collected information for the following purposes:</p>
+                <ul>
+                  <li>Provide authorized access to the iPharmaAI SaaS platform</li>
+                  <li>Manage user accounts and login permissions</li>
+                  <li>Support single sign-in and browser/system-specific access controls</li>
+                  <li>Provide AuditIQ, RegX, ANDA CTD SmartTemplate and related services</li>
+                  <li>Allow users to access, search, review, and download permitted content</li>
+                  <li>Respond to inquiries, support requests, and password/access reset requests</li>
+                  <li>Improve platform functionality, security, and user experience</li>
+                  <li>Monitor authorized use and prevent unauthorized access</li>
+                  <li>Provide product updates, service communications, and administrative notices</li>
+                  <li>Maintain internal records, audit trails, and compliance documentation</li>
+                  <li>Comply with legal, regulatory, contractual, or security obligations</li>
+                </ul>
+                <p>We do not sell client data or personal information.</p>
+                <h3 id="client-data">5. Use of Client Data</h3>
+                <p> Client data is treated as confidential business information. iPharmaAI uses client data only for legitimate business, service, support, security, and contractual purposes. </p>
+                <p> We do not use client confidential information for unrelated marketing, resale, or disclosure to third parties except as described in this Privacy Policy or as agreed in writing with the client. </p>
+                <p> Where AI-enabled tools or analytics are used within the platform, client-provided data is handled in accordance with applicable access controls, security safeguards, and contractual obligations. </p>
+                <p> iPharmaAI does not intentionally use client confidential information to train public AI models unless expressly agreed in writing. </p>
+                <h3 id="disclosure">6. Disclosure of Information</h3>
+                <h4>A. Authorized Service Providers</h4>
+                <p> We may share limited information with trusted service providers who support our website, hosting, software operations, security, analytics, email, or technical support. </p>
+                <h4 id="legal">B. Legal or Regulatory Requirements</h4>
+                <p> We may disclose information when required by law, regulation, court order, subpoena, government request, or other legal process. </p>
+                <h4 id="protection">C. Security and Protection</h4>
+                <p> We may disclose information if necessary to protect the security, rights, property, or safety of iPharmaAI, iCretegy, our clients, users, or others. </p>
+                <h4 id="consent">D. With Client Consent</h4>
+                <p> We may share information when the client or user provides consent or instructs us to do so. </p>
+
+                <h3 id="security">7. Data Security</h3>
+                <p>iPharmaAI takes data security seriously and uses reasonable administrative, technical, and organizational safeguards to protect information from unauthorized access, loss, misuse, alteration, or disclosure. Our security practices may include:</p>
+                <ul>
+                  <li>Controlled user access</li>
+                  <li>Single sign-in access model</li>
+                  <li>Browser and/or system-specific access restrictions</li>
+                  <li>Password reset handled through direct email request</li>
+                  <li>Role-based access control, where applicable</li>
+                  <li>Secure hosting and access monitoring</li>
+                  <li>Technical logs for security and troubleshooting</li>
+                  <li>Data backup and recovery practices</li>
+                  <li>Confidentiality controls for internal access</li>
+                  <li>Use of secure communication methods where appropriate</li>
+                </ul>
+                <p>Although we take reasonable steps to protect information, no website, SaaS platform, database, or internet transmission can be guaranteed to be completely secure. Users are responsible for protecting their login credentials and immediately notifying iPharmaAI of any suspected unauthorized access.</p>
+
+                <h3 id="access-control">8. Password Reset and Access Control</h3>
+                <p>For security purposes, users cannot reset their passwords directly through the platform. If a user forgets a password, changes a device, changes a browser, or experiences access issues, the user must contact iPharmaAI by email at: <a href="mailto:icretools@icretegy.com" style="color: var(--blue-lite);">icretools@icretegy.com</a></p>
+                <p>iPharmaAI may verify the user’s identity, company authorization, browser, device, or account status before restoring access.</p>
+
+                <h3 id="cookies">9. Cookies and Similar Technologies</h3>
+                <p>Our website may use cookies or similar technologies to improve website performance, remember user preferences, analyse traffic, and support secure access. Users may adjust browser settings to disable cookies; however, some website or platform features may not function properly if cookies are disabled.</p>
+
+                <h3 id="retention">10. Data Retention</h3>
+                <p>We retain information for as long as reasonably necessary to provide services, maintain user accounts, support contractual obligations, comply with legal or regulatory requirements, resolve disputes, and enforce agreements. When information is no longer required, we may delete, archive, anonymize, or securely retain it in accordance with our internal policies and applicable requirements.</p>
+
+                <h3 id="rights">11. Client and User Rights</h3>
+                <p>Depending on applicable law and location, users or clients may have the right to:</p>
+                <ul>
+                  <li>Request access to personal information</li>
+                  <li>Request correction of inaccurate information</li>
+                  <li>Request deletion of certain information</li>
+                  <li>Object to or restrict certain processing activities</li>
+                  <li>Request information about how data is used or disclosed</li>
+                  <li>Withdraw consent where processing is based on consent</li>
+                  <li>Opt out of marketing communications</li>
+                </ul>
+                <p>To submit a privacy-related request, please contact: <a href="mailto:icretools@icretegy.com" style="color: var(--blue-lite);">icretools@icretegy.com</a>. We may need to verify the identity and authority of the requester before processing any request.</p>
+
+                <h3 id="regional">12. Regional Privacy Notice</h3>
+                <p>iPharmaAI serves business users and clients in multiple regions. Privacy rights and legal requirements may vary depending on the user’s location and applicable law. Where required by applicable privacy laws, users may have certain rights regarding their personal information, including the right to request access, correction, deletion, restriction, or information about how their data is collected, used, stored, or disclosed.</p>
+                <p>iPharmaAI handles personal information and client data for lawful business purposes, including platform access, account management, client support, service delivery, security monitoring, product improvement, and contractual administration. iPharmaAI does not sell personal information. We also do not intentionally disclose client confidential information to third parties except as necessary to provide services, support platform operations, comply with legal obligations, protect security, or as otherwise agreed with the client.</p>
+                <p>Because iPharmaAI may serve users in different locations, information may be accessed, stored, or processed in regions other than the user’s location. Where required, iPharmaAI uses reasonable safeguards designed to protect information during such processing. Users may submit privacy-related questions, access requests, correction requests, deletion requests, grievance requests, or other data-related concerns by contacting: <a href="mailto:icretools@icretegy.com" style="color: var(--blue-lite);">icretools@icretegy.com</a>. iPharmaAI may verify the identity, authority, and company affiliation of the requester before processing any privacy or data-related request.</p>
+
+                <h3 id="confidentiality">13. Confidentiality of Regulatory and Business Information</h3>
+                <p>Because iPharmaAI supports pharmaceutical, regulatory, inspection readiness, and ANDA-related activities, users may interact with sensitive business or regulatory information. iPharmaAI maintains confidentiality practices designed to protect client information. Clients and users should ensure that only authorized personnel access the platform and should avoid submitting information that is not necessary for the intended service or support request.</p>
+
+                <h3 id="marketing">14. Marketing Communications</h3>
+                <p>We may use business contact information to send service updates, product information, demo follow-ups, regulatory tool updates, or marketing communications related to iPharmaAI services. Users may request to stop receiving marketing communications by contacting us at: <a href="mailto:icretools@icretegy.com" style="color: var(--blue-lite);">icretools@icretegy.com</a>. Administrative, security, or service-related communications may still be sent where necessary.</p>
+
+                <h3 id="international">15. International Access and Cross-Border Processing</h3>
+                <p>iPharmaAI primarily serves business users in India and the United States. However, users may access the platform from other locations, and certain service providers may store or process information in different jurisdictions.</p>
+                <p>Where permitted by applicable law, information may be accessed, transferred, stored, or processed outside the user’s country. iPharmaAI uses reasonable safeguards to protect such information in accordance with this Privacy Policy and applicable contractual obligations.</p>
+                <p>Users are responsible for ensuring that their use of the platform is permitted under the laws and policies applicable to their location and organization.</p>
+
+                <h3 id="updates">16. Updates to This Privacy Policy</h3>
+                <p>We may update this Privacy Policy from time to time to reflect changes in our services, legal requirements, security practices, or business operations. The updated version will be posted on our website with a revised effective date. Continued use of the website or platform after updates means the user acknowledges the updated Privacy Policy.</p>
+
+                <h3 id="contact">17. Contact Us</h3>
+                <p> For privacy questions, user rights requests, password reset requests, access support, or data-related concerns, please contact: </p>
+                <p> <strong>iPharmaAI / iCretegy</strong><br> Email: <a href="mailto:icretools@icretegy.com" style="color: var(--blue-lite);"> icretools@icretegy.com </a> </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="fi">
+        <div class="row g-4">
+          <div class="col-lg-4 text-center text-lg-start">
+          <img
+              src="{% static 'assets/icretegy/iPharmaAI_white.png' %}"
+              class="flogo"
+              alt="iPharmaAI"
+              style=" height: 90px;"
+            />
+            <p class="fbdesc text-left mx-auto mt-3" style="max-width: 800px;">
+              iPharmaAI  Reserved by <a href="https://icretegy.com" target="_blank" style="color: inherit; text-decoration: underline;">iCretegy Solutions</a>. <br>Regulatory intelligence platform built for FDA inspection readiness, ANDA workflows, audit intelligence, and modern pharma compliance operations.
+            </p>
+            <div class="far justify-content-center justify-content-lg-start mt-3">
+              <i class="fas fa-envelope"></i>
+              <a href="mailto:icretools@icretegy.com" style="
+                        font-family: 'Inter';
+                    ">icretools@icretegy.com</a>
+            </div>
+            <div class="socs justify-content-center justify-content-lg-start mt-4">
+              <a href="https://www.linkedin.com/company/ipharmaai" class="soc"
+                ><img src="{% static 'assets/icretegy/linkedin.png' %}" alt="LinkedIn"
+              /></a>
+              <a href="https://wa.me/+919898289121" class="soc"
+                ><img src="{% static 'assets/icretegy/whatsapp.png' %}" alt="WhatsApp"
+              /></a>
+            </div>
+          </div>
+
+          <div class="col-lg-4 text-center footer-platform">
+            <span class="eyebrow mb-3" style="margin-right:90px;">Platform</span>
+            <ul class="fl text-start d-inline-block">
+              <li>
+                <a href="/aidatabase/form483/">
+                  <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Audit IQ
+                </a>
+              </li>
+              <li>
+                <a href="/ratools/modulehome/">
+                  <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> ANDA CTD SmartTemplate
+                </a>
+              </li>
+              <li>
+                <a href="/ratools/">
+                  <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> RegX
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="col-lg-4 text-center text-lg-start">
+            <span class="eyebrow mb-3">Company</span>
+            <ul class="fl">
+                <li><a href="/about-alpesh/"><i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> About Us</a></li>
+                <li><a href="/ratools/requestdemo"><i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Contact Us</a></li>
+                <li><a href="/privacy-policy/"><i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Privacy Policy</a></li>
+                <li><a href="/termsofuse/"><i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Terms of Use</a></li>
+                <li>
+                  <a href="/ratools/requestdemo">
+                    <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Schedule Consultation
+                  </a>
+                </li>
+            </ul>
+            <div class="mt-4">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fdiv"></div>
+      <div class="fcopy">
+        © 2026 iPharmaAI.
+      </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const links = document.querySelectorAll('.nav-toc a');
+        const headings = Array.from(document.querySelectorAll('.terms-content h3'));
+
+        function getActiveHeading() {
+          const threshold = 120; // Offset to match the scroll-margin-top + safety gap
+          let activeHeading = null;
+
+          for (let i = 0; i < headings.length; i++) {
+            const heading = headings[i];
+            const rect = heading.getBoundingClientRect();
+            if (rect.top <= threshold) {
+              activeHeading = heading;
+            } else {
+              break;
+            }
+          }
+
+          if (!activeHeading && headings.length > 0) {
+            activeHeading = headings[0];
+          }
+
+          // If scrolled to the bottom, highlight the last section
+          if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 50) {
+            activeHeading = headings[headings.length - 1];
+          }
+
+          return activeHeading;
+        }
+
+        function updateActiveLink() {
+          const activeHeading = getActiveHeading();
+          if (!activeHeading) return;
+
+          const id = activeHeading.getAttribute('id');
+          links.forEach(link => {
+            if (link.getAttribute('href') === `#${id}`) {
+              link.classList.add('active');
+            } else {
+              link.classList.remove('active');
+            }
+          });
+        }
+
+        window.addEventListener('scroll', updateActiveLink);
+        // Initialize on load
+        updateActiveLink();
+      });
+    </script>
+  </body>
+</html>
