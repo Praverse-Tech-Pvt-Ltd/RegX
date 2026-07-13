@@ -24,12 +24,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-@p+gqd5klb7_e&nd7cpt)hhbbb1wbuua(^h82+7mc9oijp-15m"
+SECRET_KEY = config(
+    "SECRET_KEY",
+    default="django-insecure-@p+gqd5klb7_e&nd7cpt)hhbbb1wbuua(^h82+7mc9oijp-15m",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("DEBUG", cast=bool, default=True)
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="*",
+    cast=lambda v: [h.strip() for h in v.split(",") if h.strip()],
+)
 
 # Application definition
 
@@ -141,12 +148,12 @@ AUTH_USER_MODEL = 'AdminMaster.CustomUser'
 # EMAIL_HOST_USER = "ayushimistry03@gmail.com"
 # EMAIL_HOST_PASSWORD = "***REMOVED-SECRET***"
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.office365.com'
-EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
-EMAIL_PORT = 587
-EMAIL_HOST_USER = "icretools@icretegy.com"
-EMAIL_HOST_PASSWORD = "***REMOVED-SECRET***"
+EMAIL_HOST = config("EMAIL_HOST", default="smtp.office365.com")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool, default=True)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=bool, default=False)
+EMAIL_PORT = config("EMAIL_PORT", cast=int, default=587)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 CORS_ALLOW_ALL_ORIGINS = True
 
