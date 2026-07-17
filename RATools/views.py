@@ -14248,3 +14248,34 @@ def requestdemo_availability(request):
     return JsonResponse({
         "bookedSlots": sorted({t.strftime("%H:%M") for t in booked_times})
     })
+
+
+# Regulatory Technical Tools AI — audit trail URLs should be below this line
+@login_required(login_url='/adminmaster/login/')
+def show_regulatory_audit_trail(request):
+    """
+    Read-only, 21 CFR Part 11-style audit trail listing.
+
+    company_user sees only their own logged actions; company_checker (or
+    anyone holding a RegulatoryRole of reviewer/vp) sees every entry.
+    """
+    user = request.user
+    can_view_all = (
+        getattr(user, "role", None) == "company_checker"
+        or getattr(user, "internal_team", False)
+        or RegulatoryRole.objects.filter(user=user, role__in=["reviewer", "vp"]).exists()
+    )
+
+    entries = RegulatoryAuditTrail.objects.select_related("user", "content_type").all()
+    if not can_view_all:
+        entries = entries.filter(user=user)
+
+    context = {
+        "main_folder": "Regulatory Technical Tools",
+        "page_heading": "Audit Trail",
+        "table_headers": ["Sr. No.", "Action", "User", "Role at time", "Target", "Reason", "Timestamp"],
+        "entries": entries[:500],
+        "can_view_all": can_view_all,
+    }
+    return render(request, "RATools/AuditTrail/AuditTrailList.html", context)
+

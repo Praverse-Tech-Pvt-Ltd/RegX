@@ -664,4 +664,7 @@ urlpatterns = [
     path("view_sample_dmf",views.view_sample_dmf,name="view_sample_dmf"),
     path("view_sample_sss",views.view_sample_sss,name="view_sample_sss"),
     path("view_general_white_paper_sample",views.view_general_white_paper_sample,name="view_general_white_paper_sample"),
+
+    # Regulatory Technical Tools AI — audit trail URLs should be below this line
+    path("audit-trail/", views.show_regulatory_audit_trail, name="show_regulatory_audit_trail"),
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

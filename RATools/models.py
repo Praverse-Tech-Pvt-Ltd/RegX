@@ -1,4 +1,6 @@
 from django.db import models
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from ckeditor.fields import RichTextField
 from AdminMaster.models import *
 import datetime
@@ -804,3 +806,171 @@ class DemoRequest(models.Model):
 
     def __str__(self):
         return f"{self.full_name} - {self.service}"
+
+
+# ---------------------------------------------------------------------------
+# Regulatory Technical Tools AI — workflow/audit foundation.
+#
+# Scoped entirely to RATools (Regulatory Technical Tools), deliberately kept
+# separate from AIDatabase/483 workflow state and from AdminMaster.CustomUser
+# .role / AdminMaster.AssignChecker (which already mix both product domains
+# in one REPORT_CHOICES list — see REGULATORY_TECHNICAL_TOOLS_BASELINE_REPORT.md
+# section 6). Existing per-checklist doer/checker-level fields (e.g.
+# DMFChecklistUser.is_completed_by_doer / approved_by_checkers_level_N) are
+# untouched by this addition.
+#
+# Note: "VP" here means the Doer -> Reviewer -> VP approval-role chain from
+# the SOW, a personnel role. It is unrelated to the existing VPReportQuestions
+# / VPUserReports / VPUserAnswers models, which represent a "Verification
+# Protocol" report *type*, not a role. The two are different Django models
+# in different namespaces and do not collide in code, but the naming overlap
+# is worth remembering when reading the codebase.
+# ---------------------------------------------------------------------------
+
+
+class RegulatoryRole(models.Model):
+    """Doer / Reviewer / VP role assignment, scoped to Regulatory Technical Tools only."""
+
+    ROLE_CHOICES = [
+        ("doer", "Doer"),
+        ("reviewer", "Reviewer"),
+        ("vp", "VP"),
+    ]
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name="regulatory_roles"
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "role")
+
+    def __str__(self):
+        return f"{self.user.username} - {self.get_role_display()}"
+
+
+class RegulatoryReviewGate(models.Model):
+    """
+    Traceable review gate for a Regulatory Technical Tools artifact (a
+    calculator result, a gap-analysis report, a checklist submission, etc.).
+
+    Attached generically via content_type/object_id so it can be linked to
+    any existing or future RATools model without requiring a schema change
+    on that model.
+    """
+
+    STATUS_CHOICES = [
+        ("pending_review", "Pending Review"),
+        ("pending_vp", "Pending VP Approval"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    target = GenericForeignKey("content_type", "object_id")
+
+    doer = models.ForeignKey(
+        CustomUser, on_delete=models.PROTECT, related_name="regulatory_doer_gates"
+    )
+    reviewer = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="regulatory_reviewer_gates",
+    )
+    vp = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="regulatory_vp_gates",
+    )
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending_review")
+    reviewer_comment = models.TextField(blank=True)
+    vp_comment = models.TextField(blank=True)
+    rejection_reason = models.TextField(blank=True)
+
+    version = models.PositiveIntegerField(default=1)
+    version_locked = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+        ]
+
+    def __str__(self):
+        return f"ReviewGate({self.content_type}:{self.object_id}) - {self.status}"
+
+
+class RegulatoryAuditTrail(models.Model):
+    """
+    21 CFR Part 11-style audit trail for Regulatory Technical Tools actions.
+
+    Entries are immutable once written: save() rejects updates to an
+    existing row, and delete() is disabled. Attach to any object via the
+    generic content_type/object_id pair, or leave target blank for
+    account-level events (e.g. role_action).
+    """
+
+    ACTION_CHOICES = [
+        ("calculator_input", "Calculator Input"),
+        ("calculator_output", "Calculator Output"),
+        ("data_upload", "Data Upload"),
+        ("document_version_upload", "Document Version Upload"),
+        ("gap_analysis_generated", "Gap Analysis Generated"),
+        ("ai_response_generated", "AI Response Generated"),
+        ("review_action", "Review Action"),
+        ("approval", "Approval"),
+        ("rejection", "Rejection"),
+        ("export", "Export"),
+        ("role_action", "User Role Action"),
+        ("version_change", "Version Change"),
+    ]
+
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="regulatory_audit_events",
+    )
+    role_at_time = models.CharField(max_length=20, blank=True)
+    action_type = models.CharField(max_length=40, choices=ACTION_CHOICES)
+
+    content_type = models.ForeignKey(
+        ContentType, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    target = GenericForeignKey("content_type", "object_id")
+
+    previous_value = models.JSONField(null=True, blank=True)
+    new_value = models.JSONField(null=True, blank=True)
+    reason = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["action_type", "created_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError(
+                "RegulatoryAuditTrail entries are immutable and cannot be updated."
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("RegulatoryAuditTrail entries cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.get_action_type_display()} by {self.user} @ {self.created_at:%Y-%m-%d %H:%M}"
+

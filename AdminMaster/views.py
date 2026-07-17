@@ -69,7 +69,7 @@ def login(request):
         if user is not None:
             cookie_token = request.COOKIES.get("device_token")
 
-            if config("SERVER") != "PRODUCTION" or user.internal_team:
+            if config("SERVER", default="LOCAL") != "PRODUCTION" or user.internal_team:
                 auth.login(request, user)
                 response = redirect("/adminmaster/adminbase" if user.role == "admin" else "/ratools/")
                 return response
