@@ -974,3 +974,60 @@ class RegulatoryAuditTrail(models.Model):
     def __str__(self):
         return f"{self.get_action_type_display()} by {self.user} @ {self.created_at:%Y-%m-%d %H:%M}"
 
+
+class RegulatoryGapAnalysisReport(models.Model):
+    """
+    Automated gap analysis for an ANDA or DMF checklist submission.
+
+    Scoped to "no"-answered questions in the yes/no/not_applicable checklist
+    data (ANDAUserAnswers for ANDA; DMFCAAnswer for DMF). DMF's separate
+    DMFReviewAnswer model (drf/ra/ard booleans) is intentionally excluded --
+    its three-flag semantics aren't a documented compliance signal anywhere
+    in the codebase, so no gap logic is guessed for it here.
+
+    Re-generating for the same target creates a new, higher-versioned row
+    rather than overwriting -- existing reports are immutable once written,
+    matching the audit-trail's traceability model.
+    """
+
+    SOURCE_CHOICES = [("anda", "ANDA"), ("dmf", "DMF")]
+
+    source_type = models.CharField(max_length=10, choices=SOURCE_CHOICES)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    target = GenericForeignKey("content_type", "object_id")
+
+    total_questions = models.PositiveIntegerField()
+    answered_count = models.PositiveIntegerField()
+    gap_count = models.PositiveIntegerField()
+    score_percent = models.DecimalField(max_digits=5, decimal_places=2)
+    gap_details = models.JSONField(default=list)
+
+    generated_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="generated_gap_reports",
+    )
+    version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["source_type", "created_at"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError(
+                "RegulatoryGapAnalysisReport entries are immutable; generate a new version instead."
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("RegulatoryGapAnalysisReport entries cannot be deleted.")
+
+    def __str__(self):
+        return f"{self.get_source_type_display()} gap analysis v{self.version} - {self.gap_count}/{self.total_questions} gaps"

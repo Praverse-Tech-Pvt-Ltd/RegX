@@ -667,4 +667,12 @@ urlpatterns = [
 
     # Regulatory Technical Tools AI — audit trail URLs should be below this line
     path("audit-trail/", views.show_regulatory_audit_trail, name="show_regulatory_audit_trail"),
+
+    # Regulatory Technical Tools AI — ANDA/DMF gap analysis URLs should be below this line
+    path("gap-analysis/", views.show_gap_analysis_list, name="show_gap_analysis_list"),
+    path("gap-analysis/anda/<int:report_id>/generate/", views.generate_anda_gap_analysis_view, name="generate_anda_gap_analysis"),
+    path("gap-analysis/dmf/<int:checklist_id>/generate/", views.generate_dmf_gap_analysis_view, name="generate_dmf_gap_analysis"),
+    path("gap-analysis/<int:report_id>/", views.show_gap_analysis_detail, name="show_gap_analysis_detail"),
+    path("gap-analysis/<int:report_id>/export/", views.export_gap_analysis_csv, name="export_gap_analysis_csv"),
+    path("gap-analysis/review-gate/<int:gate_id>/action/", views.review_gate_action, name="review_gate_action"),
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

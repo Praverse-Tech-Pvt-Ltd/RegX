@@ -1,0 +1,84 @@
+{% extends 'RATools/RAToolsBase.html' %}
+{% load static %}
+{% block content %}
+<div class="page-header">
+    <div class="d-flex justify-content-space-around">
+        <div>
+    <h3 class="page-title">
+    <div class="d-flex">
+        <div>
+        <span class="page-title-icon bg-gradient-primary text-white me-2">
+            <i class="mdi mdi-file-search-outline"></i>
+        </span>
+    </div>
+    <div>
+        <div>{{ main_folder }}</div>
+        <div>{{ page_heading }}</div>
+    </div>
+    </h3>
+</div>
+</div>
+</div>
+
+<div class="container bg-light shadow rounded p-4">
+    <div class="row">
+        <div class="col-md-12">
+            {% if not can_review %}
+            <p class="text-muted">Showing your own submitted checklists only.</p>
+            {% endif %}
+            <table id="customTable" class="table table-bordered">
+                <thead>
+                    <tr class="headingRow">
+                        {% for header in table_headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rows %}
+                        <tr class="tablehover">
+                            <td>{{ row.source_label }}</td>
+                            <td>{{ row.name }}</td>
+                            <td>{{ row.checklist_type }}</td>
+                            {% if row.latest_report %}
+                                <td>{{ row.latest_report.score_percent }}%</td>
+                                <td>{{ row.latest_report.gap_count }} / {{ row.latest_report.total_questions }}</td>
+                                <td>v{{ row.latest_report.version }}</td>
+                                <td>
+                                    <a href="/ratools/gap-analysis/{{ row.latest_report.pk }}/" class="btn btn-gradient-info btn-rounded btn-icon" title="View Report">
+                                        <p style="margin-top: 11px;"><i class="fa fa-eye"></i></p>
+                                    </a>
+                                    <form method="post" action="{{ row.generate_url }}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-gradient-success btn-rounded btn-icon" title="Re-generate">
+                                            <i class="fa fa-refresh"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            {% else %}
+                                <td colspan="3" class="text-center text-muted">Not yet analyzed</td>
+                                <td>
+                                    <form method="post" action="{{ row.generate_url }}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-gradient-info">Generate Gap Analysis</button>
+                                    </form>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">No ANDA or DMF checklists found</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .headingRow { background: linear-gradient(to right, #65b9ff, #047edf 99%); }
+    .tablehover:hover { background-color: #f8e0fc; }
+    td { color: black !important; }
+</style>
+{% endblock %}

@@ -22,6 +22,10 @@ import pandas as pd
 from collections import Counter
 from .ics_builder import IcsInput, build_ics
 from .graph_email import send_graph_email, create_meeting_url, GraphNotConfigured
+from . import gap_analysis as gap_analysis_service
+from . import audit
+from django.contrib.contenttypes.models import ContentType
+import csv
 
 
 # from AdminMaster.models import *
@@ -14279,3 +14283,196 @@ def show_regulatory_audit_trail(request):
     }
     return render(request, "RATools/AuditTrail/AuditTrailList.html", context)
 
+
+# Regulatory Technical Tools AI — ANDA/DMF gap analysis URLs should be below this line
+def _can_review_gap_analysis(user):
+    return (
+        getattr(user, "role", None) == "company_checker"
+        or getattr(user, "internal_team", False)
+        or RegulatoryRole.objects.filter(user=user, role__in=["reviewer", "vp"]).exists()
+    )
+
+
+@login_required(login_url='/adminmaster/login/')
+def show_gap_analysis_list(request):
+    """
+    Cross-dosage-form, cross-checklist-type list of ANDA/DMF submissions with
+    their latest gap-analysis status (if any has been generated yet).
+
+    company_user sees only their own submissions. Reviewers/checkers see
+    every submission that the doer has marked complete -- this is a
+    simplified visibility rule for this cross-cutting view, not a
+    replacement for the existing per-dosage-form checker-level assignment
+    cascade used on the individual ANDA/DMF listing pages.
+    """
+    user = request.user
+    can_review = _can_review_gap_analysis(user)
+
+    if can_review:
+        anda_reports = ANDAUserReports.objects.filter(is_completed_by_doer=True)
+        dmf_checklists = DMFChecklistUser.objects.filter(is_completed_by_doer=True)
+    else:
+        anda_reports = ANDAUserReports.objects.filter(user=user)
+        dmf_checklists = DMFChecklistUser.objects.filter(user=user)
+
+    anda_ct = ContentType.objects.get_for_model(ANDAUserReports)
+    dmf_ct = ContentType.objects.get_for_model(DMFChecklistUser)
+
+    latest_by_target = {}
+    for report in RegulatoryGapAnalysisReport.objects.filter(
+        content_type__in=[anda_ct, dmf_ct]
+    ).order_by("object_id", "-version"):
+        key = (report.content_type_id, report.object_id)
+        if key not in latest_by_target:
+            latest_by_target[key] = report
+
+    rows = []
+    for anda_report in anda_reports.select_related("report_name"):
+        latest = latest_by_target.get((anda_ct.id, anda_report.pk))
+        rows.append({
+            "source_type": "anda",
+            "source_label": "ANDA",
+            "object_id": anda_report.pk,
+            "name": anda_report.product_name,
+            "checklist_type": anda_report.report_name.report_name,
+            "latest_report": latest,
+            "generate_url": f"/ratools/gap-analysis/anda/{anda_report.pk}/generate/",
+        })
+    for dmf_checklist in dmf_checklists:
+        latest = latest_by_target.get((dmf_ct.id, dmf_checklist.pk))
+        rows.append({
+            "source_type": "dmf",
+            "source_label": "DMF",
+            "object_id": dmf_checklist.pk,
+            "name": dmf_checklist.name_of_api,
+            "checklist_type": "DMF CA Checklist",
+            "latest_report": latest,
+            "generate_url": f"/ratools/gap-analysis/dmf/{dmf_checklist.pk}/generate/",
+        })
+
+    context = {
+        "main_folder": "Regulatory Technical Tools",
+        "page_heading": "ANDA / DMF Gap Analysis",
+        "table_headers": ["Type", "Product / API", "Checklist", "Latest Score", "Gaps", "Version", "Actions"],
+        "rows": rows,
+        "can_review": can_review,
+    }
+    return render(request, "RATools/GapAnalysis/GapAnalysisList.html", context)
+
+
+@login_required(login_url='/adminmaster/login/')
+@require_http_methods(["POST"])
+def generate_anda_gap_analysis_view(request, report_id):
+    anda_report = get_object_or_404(ANDAUserReports, pk=report_id)
+    if not _can_review_gap_analysis(request.user) and anda_report.user_id != request.user.id:
+        return HttpResponse("Forbidden", status=403)
+    report = gap_analysis_service.generate_anda_gap_analysis(anda_report, generated_by=request.user)
+    return redirect("show_gap_analysis_detail", report_id=report.pk)
+
+
+@login_required(login_url='/adminmaster/login/')
+@require_http_methods(["POST"])
+def generate_dmf_gap_analysis_view(request, checklist_id):
+    dmf_checklist = get_object_or_404(DMFChecklistUser, pk=checklist_id)
+    if not _can_review_gap_analysis(request.user) and dmf_checklist.user_id != request.user.id:
+        return HttpResponse("Forbidden", status=403)
+    report = gap_analysis_service.generate_dmf_gap_analysis(dmf_checklist, generated_by=request.user)
+    return redirect("show_gap_analysis_detail", report_id=report.pk)
+
+
+@login_required(login_url='/adminmaster/login/')
+def show_gap_analysis_detail(request, report_id):
+    report = get_object_or_404(RegulatoryGapAnalysisReport, pk=report_id)
+    can_review = _can_review_gap_analysis(request.user)
+
+    review_gate = RegulatoryReviewGate.objects.filter(
+        content_type=report.content_type, object_id=report.object_id
+    ).order_by("-created_at").first()
+
+    context = {
+        "main_folder": "Regulatory Technical Tools",
+        "page_heading": "Gap Analysis Detail",
+        "report": report,
+        "target_name": str(report.target) if report.target else "(deleted)",
+        "review_gate": review_gate,
+        "can_review": can_review,
+        "export_url": f"/ratools/gap-analysis/{report.pk}/export/",
+    }
+    return render(request, "RATools/GapAnalysis/GapAnalysisDetail.html", context)
+
+
+@login_required(login_url='/adminmaster/login/')
+@require_http_methods(["POST"])
+def review_gate_action(request, gate_id):
+    gate = get_object_or_404(RegulatoryReviewGate, pk=gate_id)
+    if not _can_review_gap_analysis(request.user):
+        return HttpResponse("Forbidden", status=403)
+
+    action = request.POST.get("action")
+    comment = request.POST.get("comment", "")
+    is_vp = RegulatoryRole.objects.filter(user=request.user, role="vp").exists()
+
+    if action == "approve":
+        if gate.status == "pending_review":
+            gate.reviewer = request.user
+            gate.reviewer_comment = comment
+            gate.status = "approved" if is_vp else "pending_vp"
+        elif gate.status == "pending_vp":
+            gate.vp = request.user
+            gate.vp_comment = comment
+            gate.status = "approved"
+        gate.save()
+        audit_action = "approval"
+    elif action == "reject":
+        gate.rejection_reason = comment
+        gate.status = "rejected"
+        gate.save()
+        audit_action = "rejection"
+    else:
+        return HttpResponse("Invalid action", status=400)
+
+    audit.log_event(
+        user=request.user,
+        action_type=audit_action,
+        target=gate,
+        reason=comment,
+        new_value={"status": gate.status},
+    )
+    return redirect("show_gap_analysis_detail", report_id=_report_id_for_gate(gate))
+
+
+def _report_id_for_gate(gate):
+    latest = RegulatoryGapAnalysisReport.objects.filter(
+        content_type=gate.content_type, object_id=gate.object_id
+    ).order_by("-version").first()
+    return latest.pk if latest else None
+
+
+@login_required(login_url='/adminmaster/login/')
+def export_gap_analysis_csv(request, report_id):
+    report = get_object_or_404(RegulatoryGapAnalysisReport, pk=report_id)
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="gap_analysis_{report.source_type}_{report.object_id}_v{report.version}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(["Source", report.get_source_type_display()])
+    writer.writerow(["Target", str(report.target) if report.target else "(deleted)"])
+    writer.writerow(["Version", report.version])
+    writer.writerow(["Generated By", report.generated_by.username if report.generated_by else "System"])
+    writer.writerow(["Generated At", report.created_at])
+    writer.writerow(["Total Questions", report.total_questions])
+    writer.writerow(["Answered", report.answered_count])
+    writer.writerow(["Gaps", report.gap_count])
+    writer.writerow(["Score %", report.score_percent])
+    writer.writerow([])
+    writer.writerow(["Module", "Chapter/Sub-category", "Category", "Question", "Answer"])
+    for gap in report.gap_details:
+        writer.writerow([
+            gap.get("module", ""),
+            gap.get("chapter", ""),
+            gap.get("category", ""),
+            gap.get("question", ""),
+            gap.get("answer", ""),
+        ])
+    return response
