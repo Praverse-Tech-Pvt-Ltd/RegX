@@ -15,7 +15,7 @@ media/
 tmp/
 
 # Legacy files in root
-manage.py
+/manage.py
 build.sh
 render.yaml
 REGULATORY_TECHNICAL_TOOLS_BASELINE_REPORT.md
