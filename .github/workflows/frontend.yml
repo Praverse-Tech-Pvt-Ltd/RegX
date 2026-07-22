@@ -62,7 +62,7 @@ jobs:
 
       - name: Guard — no auth token in localStorage
         run: |
-          if grep -r 'localStorage\.setItem.*["\'].*token' src/ --include="*.ts" --include="*.tsx"; then
+          if grep -r "localStorage\.setItem" src/ --include="*.ts" --include="*.tsx" | grep -i "token"; then
             echo "FAIL: Auth token stored in localStorage"
             exit 1
           fi
