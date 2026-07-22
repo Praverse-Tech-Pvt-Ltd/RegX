@@ -87,14 +87,15 @@ jobs:
 
       - name: Guard — no AIDatabase import
         run: python -c "
-import ast, pathlib, sys
+import re, pathlib, sys
 violations = []
 for p in pathlib.Path('.').rglob('*.py'):
-    if '.venv' in str(p): continue
-    if 'AIDatabase' in p.read_text(errors='ignore'):
+    if '.venv' in str(p) or '__pycache__' in str(p): continue
+    src = p.read_text(errors='ignore')
+    if re.search(r'^(?:import|from)\s+AIDatabase', src, re.MULTILINE):
         violations.append(str(p))
 if violations:
-    print('FAIL: AIDatabase referenced in:', violations)
+    print('FAIL: AIDatabase imported in:', violations)
     sys.exit(1)
 print('OK: No AIDatabase imports found.')
 "

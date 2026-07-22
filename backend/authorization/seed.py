@@ -37,6 +37,11 @@ def seed_roles_and_permissions(sender, **kwargs):
     if sender.name != "authorization":
         return
 
+    from django.db import connection
+    tables = connection.introspection.table_names()
+    if "authorization_permission" not in tables or "authorization_role" not in tables:
+        return  # Tables not created yet; will seed on the next post_migrate
+
     from .models import Permission, Role, RolePermission
 
     for codename, desc in BUILTIN_PERMISSIONS:

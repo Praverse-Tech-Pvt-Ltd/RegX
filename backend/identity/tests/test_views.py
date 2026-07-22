@@ -11,6 +11,7 @@ class TestRegisterView:
         resp = api_client.post(
             "/api/regx/v1/auth/register/",
             {"email": "newuser@example.com", "password": "NewPass1234!"},
+            format="json",
         )
         assert resp.status_code == status.HTTP_201_CREATED
         assert resp.data["email"] == "newuser@example.com"
@@ -23,6 +24,7 @@ class TestRegisterView:
         resp = api_client.post(
             "/api/regx/v1/auth/register/",
             {"email": user.email, "password": "AnotherPass1234!"},
+            format="json",
         )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -30,6 +32,7 @@ class TestRegisterView:
         resp = api_client.post(
             "/api/regx/v1/auth/register/",
             {"email": "weak@example.com", "password": "short"},
+            format="json",
         )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -40,6 +43,7 @@ class TestLoginView:
         resp = api_client.post(
             "/api/regx/v1/auth/login/",
             {"email": user.email, "password": "TestPass1234!"},
+            format="json",
         )
         assert resp.status_code == status.HTTP_200_OK
         assert resp.data["email"] == user.email
@@ -48,6 +52,7 @@ class TestLoginView:
         resp = api_client.post(
             "/api/regx/v1/auth/login/",
             {"email": user.email, "password": "WrongPass9999!"},
+            format="json",
         )
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 

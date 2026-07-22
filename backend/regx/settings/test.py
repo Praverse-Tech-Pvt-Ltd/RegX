@@ -1,5 +1,6 @@
 """Test settings."""
 
+from decouple import config  # noqa: F401 — re-exported for DATABASES block below
 from .base import *  # noqa: F401, F403
 
 DEBUG = False
@@ -10,11 +11,11 @@ CELERY_TASK_ALWAYS_EAGER = True
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "regx_test",
-        "USER": "regx",
-        "PASSWORD": "regx_dev_password",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": config("DB_NAME", default="regx_test"),
+        "USER": config("DB_USER", default="regx"),
+        "PASSWORD": config("DB_PASSWORD", default="gate_test_pass"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default="5432"),
     }
 }
 

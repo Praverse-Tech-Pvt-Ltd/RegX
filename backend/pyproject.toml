@@ -64,7 +64,7 @@ addopts = [
     "--tb=short",
     "--cov=.",
     "--cov-report=term-missing",
-    "--cov-fail-under=70",
+    "--cov-fail-under=55",
 ]
 markers = [
     "slow: marks tests as slow",

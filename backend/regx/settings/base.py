@@ -50,8 +50,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "csp.middleware.CSPMiddleware",
-    "tenancy.middleware.TenantContextMiddleware",
-    "audit.middleware.CorrelationIDMiddleware",
+    "tenancy.middleware.TenantMiddleware",
+    "audit.middleware.AuditMiddleware",
 ]
 
 ROOT_URLCONF = "regx.urls"
@@ -68,7 +68,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": config("DB_NAME", default="regx"),
         "USER": config("DB_USER", default="regx"),
-        "PASSWORD": config("DB_PASSWORD"),
+        "PASSWORD": config("DB_PASSWORD", default=""),
         "HOST": config("DB_HOST", default="localhost"),
         "PORT": config("DB_PORT", default="5432"),
         "CONN_MAX_AGE": 60,
