@@ -1,0 +1,80 @@
+# ============================================================
+# REGX — regx-main branch .gitignore
+# Legacy monolith files present on disk MUST NOT be committed.
+# ============================================================
+
+# Legacy monolith directories
+AIDatabase/
+AdminMaster/
+RAAI/
+RATools/
+templates/
+staticfiles/
+static/
+media/
+tmp/
+
+# Legacy files in root
+manage.py
+build.sh
+render.yaml
+REGULATORY_TECHNICAL_TOOLS_BASELINE_REPORT.md
+REGULATORY_TOOLS_CODEBASE_INSPECTION_REPORT.md
+
+# Legacy SQLite databases and backups
+*.sqlite3
+*.sqlite3.bak*
+db*.sqlite3
+db*.sqlite3.bak*
+
+# Legacy root-level requirements (REGX requirements live in backend/requirements/)
+requirements.txt
+
+# Claude Code project data
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets — never commit real .env
+.env
+.env.local
+.env.*.local
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.eslintcache
+
+# Playwright
+playwright-report/
+test-results/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Docker volumes
+.docker/

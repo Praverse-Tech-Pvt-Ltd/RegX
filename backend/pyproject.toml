@@ -1,0 +1,72 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = [".", "regx", "common", "identity", "tenancy", "authorization", "audit", "workflows"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "N",         # pep8-naming
+    "S",         # bandit security
+    "B",         # bugbear
+    "A",         # flake8-builtins
+    "C4",        # flake8-comprehensions
+    "UP",        # pyupgrade
+    "RUF",       # ruff-specific
+]
+ignore = [
+    "S101",  # assert in tests
+    "S106",  # hardcoded-password-func-arg (test fixtures)
+    "B008",  # do-not-perform-function-call-in-argument-defaults (DRF views)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/tests/*" = ["S", "N802"]
+"*/migrations/*" = ["N806", "E501"]
+
+[tool.ruff.lint.isort]
+known-django = ["django"]
+known-drf = ["rest_framework", "drf_spectacular"]
+section-order = ["future", "standard-library", "django", "drf", "third-party", "first-party", "local-folder"]
+
+[tool.importlinter]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows"]
+
+[[tool.importlinter.contracts]]
+name = "common-has-no-domain-imports"
+type = "forbidden"
+source_modules = ["common"]
+forbidden_modules = ["identity", "tenancy", "authorization", "audit", "workflows", "AIDatabase"]
+
+[[tool.importlinter.contracts]]
+name = "no-aidatabase-imports-anywhere"
+type = "forbidden"
+source_modules = [
+    "common", "identity", "tenancy", "authorization", "audit", "workflows", "regx"
+]
+forbidden_modules = ["AIDatabase"]
+
+[[tool.importlinter.contracts]]
+name = "identity-no-tenancy"
+type = "forbidden"
+source_modules = ["identity"]
+forbidden_modules = ["tenancy", "authorization", "AIDatabase"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "regx.settings.test"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--tb=short",
+    "--cov=.",
+    "--cov-report=term-missing",
+    "--cov-fail-under=70",
+]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks integration tests requiring live DB",
+]

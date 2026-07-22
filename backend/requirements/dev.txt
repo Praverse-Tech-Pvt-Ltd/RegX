@@ -1,0 +1,4 @@
+-r test.txt
+ruff==0.11.13
+import-linter==2.3
+detect-secrets==1.5.0
