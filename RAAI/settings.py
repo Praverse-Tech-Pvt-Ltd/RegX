@@ -65,6 +65,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -174,6 +175,15 @@ BOOKING_HOST_EMAIL = config("BOOKING_HOST_EMAIL", default="inquiry@icretegy.com"
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# CompressedStaticFilesStorage (not the Manifest variant) is used because
+# some vendored CSS (e.g. Material Design Icons) references .css.map files
+# that aren't actually shipped in static/; the Manifest variant fails
+# collectstatic outright on any such missing reference.
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 MEDIA_URL = "/media/"
@@ -209,5 +219,10 @@ CKEDITOR_CONFIGS = {
     }
 }
 
-CELERY_BROKER_URL = 'redis://127.0.0.1:6379/0'
-CELERY_RESULT_BACKEND = 'redis://127.0.0.1:6379/0'
+# CELERY_TASK_ALWAYS_EAGER runs tasks synchronously in-process, so no Redis
+# broker is required. Useful for free-tier hosting where a Redis add-on
+# isn't available; set to False (and provide CELERY_BROKER_URL) once a
+# broker is provisioned.
+CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", cast=bool, default=True)
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://127.0.0.1:6379/0")
