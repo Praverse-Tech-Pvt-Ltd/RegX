@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -181,7 +181,7 @@ function VersionRow({
   );
 }
 
-export default function DocumentDetailPage() {
+function DocumentDetailPageInner() {
   const { publicId } = useParams<{ publicId: string }>();
   const searchParams = useSearchParams();
   const tenantSlug = searchParams.get("tenant") ?? "";
@@ -390,5 +390,13 @@ export default function DocumentDetailPage() {
         ))}
       </section>
     </main>
+  );
+}
+
+export default function DocumentDetailPage() {
+  return (
+    <Suspense>
+      <DocumentDetailPageInner />
+    </Suspense>
   );
 }

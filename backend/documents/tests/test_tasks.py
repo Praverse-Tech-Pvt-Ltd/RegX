@@ -239,3 +239,91 @@ class TestProcessingTask:
         assert version.processing_status == ProcessingStatus.COMPLETE
         locators = DocumentLocator.objects.filter(version=version)
         assert locators.exists()
+
+    def test_xlsx_processing_creates_sheet_locators(
+        self, settings, tmp_path, tenant_a, user_a, valid_xlsx_bytes
+    ):
+        settings.DOCUMENT_STORAGE_BACKEND = "local"
+        settings.DOCUMENT_LOCAL_STORAGE_ROOT = str(tmp_path / "store")
+        settings.CELERY_TASK_ALWAYS_EAGER = True
+
+        import hashlib
+
+        from documents.storage import LocalStorage
+
+        storage = LocalStorage()
+        sha = hashlib.sha256(valid_xlsx_bytes).hexdigest()
+        key = storage.store(
+            tenant_id=tenant_a.pk,
+            file_obj=io.BytesIO(valid_xlsx_bytes),
+            expected_sha256=sha,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            original_filename="test.xlsx",
+        )
+        doc = Document.objects.create(
+            tenant=tenant_a, title="XLSX Proc", document_type=DocumentType.XLSX, created_by=user_a
+        )
+        version = DocumentVersion.objects.create(
+            document=doc,
+            version_number=1,
+            original_filename="test.xlsx",
+            normalized_filename="test.xlsx",
+            extension="xlsx",
+            declared_mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            size_bytes=len(valid_xlsx_bytes),
+            sha256_checksum=sha,
+            storage_key=key,
+            uploaded_by=user_a,
+            scan_status=ScanStatus.CLEAN,
+        )
+
+        process_document_version(version.pk, tenant_a.pk)
+        version.refresh_from_db()
+        assert version.processing_status == ProcessingStatus.COMPLETE
+        assert DocumentLocator.objects.filter(
+            version=version, locator_type=LocatorType.SHEET
+        ).exists()
+
+    def test_pptx_processing_creates_slide_locators(
+        self, settings, tmp_path, tenant_a, user_a, valid_pptx_bytes
+    ):
+        settings.DOCUMENT_STORAGE_BACKEND = "local"
+        settings.DOCUMENT_LOCAL_STORAGE_ROOT = str(tmp_path / "store")
+        settings.CELERY_TASK_ALWAYS_EAGER = True
+
+        import hashlib
+
+        from documents.storage import LocalStorage
+
+        storage = LocalStorage()
+        sha = hashlib.sha256(valid_pptx_bytes).hexdigest()
+        key = storage.store(
+            tenant_id=tenant_a.pk,
+            file_obj=io.BytesIO(valid_pptx_bytes),
+            expected_sha256=sha,
+            content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            original_filename="test.pptx",
+        )
+        doc = Document.objects.create(
+            tenant=tenant_a, title="PPTX Proc", document_type=DocumentType.PPTX, created_by=user_a
+        )
+        version = DocumentVersion.objects.create(
+            document=doc,
+            version_number=1,
+            original_filename="test.pptx",
+            normalized_filename="test.pptx",
+            extension="pptx",
+            declared_mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            size_bytes=len(valid_pptx_bytes),
+            sha256_checksum=sha,
+            storage_key=key,
+            uploaded_by=user_a,
+            scan_status=ScanStatus.CLEAN,
+        )
+
+        process_document_version(version.pk, tenant_a.pk)
+        version.refresh_from_db()
+        assert version.processing_status == ProcessingStatus.COMPLETE
+        assert DocumentLocator.objects.filter(
+            version=version, locator_type=LocatorType.SLIDE
+        ).exists()

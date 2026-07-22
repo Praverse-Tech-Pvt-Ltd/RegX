@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { documents, type Document, type DocumentType, ApiError } from "@/lib/api";
 import Link from "next/link";
@@ -51,7 +51,7 @@ function processingLabel(status: string) {
   return map[status] ?? status;
 }
 
-export default function DocumentsPage() {
+function DocumentsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantSlug = searchParams.get("tenant") ?? "";
@@ -344,5 +344,13 @@ export default function DocumentsPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense>
+      <DocumentsPageInner />
+    </Suspense>
   );
 }
