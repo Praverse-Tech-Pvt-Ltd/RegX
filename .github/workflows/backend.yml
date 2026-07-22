@@ -72,7 +72,11 @@ jobs:
           DJANGO_SETTINGS_MODULE: regx.settings.test
           DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
           MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
-          DATABASE_URL: postgres://regx:test_password@localhost:5432/regx_test
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
           REDIS_URL: redis://localhost:6379/0
         run: python manage.py migrate --noinput
 
@@ -81,7 +85,11 @@ jobs:
           DJANGO_SETTINGS_MODULE: regx.settings.test
           DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
           MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
-          DATABASE_URL: postgres://regx:test_password@localhost:5432/regx_test
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
           REDIS_URL: redis://localhost:6379/0
         run: pytest --tb=short -q
 
