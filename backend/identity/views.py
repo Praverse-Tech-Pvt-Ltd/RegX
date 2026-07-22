@@ -1,7 +1,8 @@
-"""Identity views: register, login, logout, MFA setup/verify/recovery."""
+"""Identity views: register, login, logout, csrf, MFA setup/verify/recovery."""
 
 import pyotp
 from django.contrib.auth import login, logout
+from django.middleware.csrf import get_token
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -20,6 +21,17 @@ from .serializers import (
 
 _MFA_LOCKOUT_THRESHOLD = 5
 _MFA_LOCKOUT_MINUTES = 15
+
+
+@extend_schema(
+    tags=["auth"],
+    responses={200: {"type": "object", "properties": {"csrfToken": {"type": "string"}}}},
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def csrf_view(request):
+    """Return a CSRF token. Frontend must call this before any state-mutating request."""
+    return Response({"csrfToken": get_token(request)})
 
 
 @extend_schema(tags=["auth"], request=RegisterSerializer, responses={201: UserPublicSerializer})

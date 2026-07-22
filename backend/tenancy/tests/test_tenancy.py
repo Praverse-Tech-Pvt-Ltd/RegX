@@ -59,3 +59,37 @@ class TestTenantAPIViews:
     def test_unauthenticated_rejected(self, api_client):
         resp = api_client.get("/api/regx/v1/tenants/")
         assert resp.status_code == 403
+
+
+@pytest.mark.django_db
+class TestTenantActiveView:
+    def test_set_active_tenant(self, auth_client, membership, tenant):
+        resp = auth_client.post(
+            "/api/regx/v1/tenants/active/",
+            {"tenant_id": str(tenant.public_id)},
+            format="json",
+        )
+        assert resp.status_code == 200
+        # TenantSerializer exposes public_id as "id" (UUID field, aliased)
+        assert resp.data["id"] == str(tenant.public_id)
+
+    def test_non_member_rejected(self, auth_client):
+        other = Tenant.objects.create(name="Other", slug="other")
+        resp = auth_client.post(
+            "/api/regx/v1/tenants/active/",
+            {"tenant_id": str(other.public_id)},
+            format="json",
+        )
+        assert resp.status_code == 403
+
+    def test_missing_tenant_id_rejected(self, auth_client):
+        resp = auth_client.post("/api/regx/v1/tenants/active/", {}, format="json")
+        assert resp.status_code == 400
+
+    def test_unauthenticated_rejected(self, api_client, tenant):
+        resp = api_client.post(
+            "/api/regx/v1/tenants/active/",
+            {"tenant_id": str(tenant.public_id)},
+            format="json",
+        )
+        assert resp.status_code == 403

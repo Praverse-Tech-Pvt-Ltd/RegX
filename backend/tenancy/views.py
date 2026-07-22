@@ -46,6 +46,31 @@ def tenant_detail_view(request, public_id):
 
 
 @extend_schema(tags=["tenants"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def tenant_active_view(request):
+    """Set the active tenant for the current session. Body: {tenant_id: uuid}."""
+    tenant_id = request.data.get("tenant_id")
+    if not tenant_id:
+        return Response({"detail": "tenant_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        tenant = Tenant.objects.get(public_id=tenant_id)
+    except (Tenant.DoesNotExist, Exception):
+        return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not TenantMembership.objects.filter(
+        tenant=tenant, user=request.user, is_active=True
+    ).exists():
+        return Response(
+            {"detail": "Not a member of this tenant."}, status=status.HTTP_403_FORBIDDEN
+        )
+
+    request.session["active_tenant_id"] = str(tenant.public_id)
+    return Response(TenantSerializer(tenant).data)
+
+
+@extend_schema(tags=["tenants"])
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def tenant_members_view(request, public_id):

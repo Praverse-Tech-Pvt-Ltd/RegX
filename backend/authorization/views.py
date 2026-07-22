@@ -1,11 +1,11 @@
-"""Authorization endpoints: list roles and permissions."""
+"""Authorization endpoints: list roles, permissions, and effective permissions."""
 
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Permission, Role
+from .models import MembershipRole, Permission, Role
 
 
 @extend_schema(tags=["authorization"])
@@ -21,4 +21,22 @@ def role_list_view(request):
 @permission_classes([IsAuthenticated])
 def permission_list_view(request):
     perms = Permission.objects.values("codename", "description")
+    return Response(list(perms))
+
+
+@extend_schema(tags=["authorization"])
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def effective_permissions_view(request):
+    """Return the set of permissions the current user has across all their tenant memberships."""
+    membership_roles = MembershipRole.objects.filter(membership__user=request.user).select_related(
+        "role"
+    )
+    roles = [mr.role for mr in membership_roles]
+    perms = (
+        Permission.objects.filter(role_permissions__role__in=roles)
+        .values("codename", "description")
+        .distinct()
+        .order_by("codename")
+    )
     return Response(list(perms))

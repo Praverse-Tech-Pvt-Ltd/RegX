@@ -66,3 +66,29 @@ class TestMeView:
     def test_unauthenticated_rejected(self, api_client):
         resp = api_client.get("/api/regx/v1/auth/me/")
         assert resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+class TestCsrfView:
+    def test_returns_csrf_token(self, api_client):
+        resp = api_client.get("/api/regx/v1/auth/csrf/")
+        assert resp.status_code == status.HTTP_200_OK
+        assert "csrfToken" in resp.data
+        assert isinstance(resp.data["csrfToken"], str)
+        assert len(resp.data["csrfToken"]) > 0
+
+    def test_unauthenticated_allowed(self, api_client):
+        # CSRF endpoint must be public — frontend calls it before login
+        resp = api_client.get("/api/regx/v1/auth/csrf/")
+        assert resp.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.django_db
+class TestMfaEnrolView:
+    def test_enrol_alias_works(self, auth_client):
+        # /mfa/enrol/ is an alias for /mfa/setup/
+        resp = auth_client.post("/api/regx/v1/mfa/enrol/")
+        assert resp.status_code == status.HTTP_200_OK
+        assert "totp_uri" in resp.data
+        assert "recovery_codes" in resp.data
+        assert len(resp.data["recovery_codes"]) == 10
