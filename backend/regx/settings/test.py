@@ -4,6 +4,7 @@ from decouple import config  # noqa: F401 — re-exported for DATABASES block be
 from .base import *  # noqa: F401, F403
 
 DEBUG = False
+ALLOWED_HOSTS = ["*"]  # test client uses 'testserver' host
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 CELERY_TASK_ALWAYS_EAGER = True
