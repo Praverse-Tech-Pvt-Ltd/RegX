@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "audit",
     "workflows",
     "common",
+    "documents",
 ]
 
 MIDDLEWARE = [
@@ -153,9 +154,29 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.MultiPartParser",
+        "rest_framework.parsers.FormParser",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 25,
     "EXCEPTION_HANDLER": "common.exceptions.regx_exception_handler",
 }
+
+# ---------------------------------------------------------------------------
+# Document platform
+# ---------------------------------------------------------------------------
+DOCUMENT_STORAGE_BACKEND = config("DOCUMENT_STORAGE_BACKEND", default="local")
+DOCUMENT_LOCAL_STORAGE_ROOT = config(
+    "DOCUMENT_LOCAL_STORAGE_ROOT",
+    default=str(BASE_DIR / "document_storage"),
+)
+DOCUMENT_MAX_UPLOAD_BYTES = config("DOCUMENT_MAX_UPLOAD_BYTES", cast=int, default=50 * 1024 * 1024)
+# Scanner: "stub" (dev default, marks all clean), "clamav" (requires running clamd)
+DOCUMENT_SCANNER_BACKEND = config("DOCUMENT_SCANNER_BACKEND", default="stub")
+DOCUMENT_CLAMAV_HOST = config("DOCUMENT_CLAMAV_HOST", default="127.0.0.1")
+DOCUMENT_CLAMAV_PORT = config("DOCUMENT_CLAMAV_PORT", cast=int, default=3310)
 
 # ---------------------------------------------------------------------------
 # OpenAPI

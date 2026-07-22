@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = [".", "regx", "common", "identity", "tenancy", "authorization", "audit", "workflows"]
+src = [".", "regx", "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents"]
 
 [tool.ruff.lint]
 select = [
@@ -25,15 +25,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"*/tests/*" = ["S", "N802"]
+"*/tests/*" = ["S", "N802", "N806", "E501"]
 "*/migrations/*" = ["N806", "E501", "RUF012", "I001"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "regx"]
-known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple"]
+known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "regx"]
+known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -46,7 +46,7 @@ forbidden_modules = ["identity", "tenancy", "authorization", "audit", "workflows
 name = "no-aidatabase-imports-anywhere"
 type = "forbidden"
 source_modules = [
-    "common", "identity", "tenancy", "authorization", "audit", "workflows"
+    "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents"
 ]
 forbidden_modules = ["AIDatabase"]
 
