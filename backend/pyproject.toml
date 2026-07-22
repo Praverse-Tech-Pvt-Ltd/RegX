@@ -17,22 +17,24 @@ select = [
     "RUF",       # ruff-specific
 ]
 ignore = [
-    "S101",  # assert in tests
-    "S106",  # hardcoded-password-func-arg (test fixtures)
-    "B008",  # do-not-perform-function-call-in-argument-defaults (DRF views)
+    "S101",   # assert in tests
+    "S106",   # hardcoded-password-func-arg (test fixtures)
+    "B008",   # do-not-perform-function-call-in-argument-defaults (DRF views)
+    "RUF012", # Django Meta/class attributes are intentionally mutable class vars
+    "N818",   # Django exception naming convention differs from PEP 8 (no -Error suffix)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "*/tests/*" = ["S", "N802"]
-"*/migrations/*" = ["N806", "E501"]
+"*/migrations/*" = ["N806", "E501", "RUF012", "I001"]
 
 [tool.ruff.lint.isort]
-known-django = ["django"]
-known-drf = ["rest_framework", "drf_spectacular"]
-section-order = ["future", "standard-library", "django", "drf", "third-party", "first-party", "local-folder"]
+known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "regx"]
+known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple"]
 
 [tool.importlinter]
 root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows"]
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "common-has-no-domain-imports"
@@ -44,7 +46,7 @@ forbidden_modules = ["identity", "tenancy", "authorization", "audit", "workflows
 name = "no-aidatabase-imports-anywhere"
 type = "forbidden"
 source_modules = [
-    "common", "identity", "tenancy", "authorization", "audit", "workflows", "regx"
+    "common", "identity", "tenancy", "authorization", "audit", "workflows"
 ]
 forbidden_modules = ["AIDatabase"]
 

@@ -6,6 +6,7 @@ tenant_admin, platform_support) are seeded at startup.
 """
 
 from django.db import models
+
 from common.models import TimeStampedModel
 
 

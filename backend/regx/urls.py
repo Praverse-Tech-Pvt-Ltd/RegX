@@ -1,6 +1,6 @@
 """REGX root URL configuration."""
 
-from django.urls import path, include
+from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [

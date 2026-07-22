@@ -1,6 +1,7 @@
 """Shared abstract base models for REGX."""
 
 import uuid
+
 from django.db import models
 
 

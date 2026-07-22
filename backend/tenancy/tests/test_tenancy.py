@@ -1,9 +1,11 @@
 """Tests for tenancy domain."""
 
 import pytest
-from tenancy.models import Tenant, TenantMembership
-from tenancy.context import set_current_tenant, current_tenant, clear_current_tenant
+from django.db import IntegrityError
+
 from common.exceptions import TenantScopeMissing
+from tenancy.context import clear_current_tenant, current_tenant, set_current_tenant
+from tenancy.models import Tenant, TenantMembership
 
 
 @pytest.mark.django_db
@@ -15,7 +17,7 @@ class TestTenantModel:
 
     def test_slug_uniqueness(self):
         Tenant.objects.create(name="Alpha", slug="alpha")
-        with pytest.raises(Exception):
+        with pytest.raises(IntegrityError):
             Tenant.objects.create(name="Alpha 2", slug="alpha")
 
 

@@ -23,7 +23,14 @@ class AuditMiddleware:
         return response
 
 
-def log_event(event_type: str, resource_type: str = "", resource_id: str = "", payload: dict = None, user=None, tenant=None):
+def log_event(
+    event_type: str,
+    resource_type: str = "",
+    resource_id: str = "",
+    payload: dict | None = None,
+    user=None,
+    tenant=None,
+):
     """Convenience helper to create an immutable AuditEvent."""
     from .models import AuditEvent
 

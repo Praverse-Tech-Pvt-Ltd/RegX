@@ -5,50 +5,71 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('authorization', '0001_initial'),
-        ('tenancy', '0001_initial'),
+        ("authorization", "0001_initial"),
+        ("tenancy", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='membershiprole',
-            name='membership',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='membership_roles', to='tenancy.tenantmembership'),
+            model_name="membershiprole",
+            name="membership",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="membership_roles",
+                to="tenancy.tenantmembership",
+            ),
         ),
         migrations.AddField(
-            model_name='role',
-            name='tenant',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='roles', to='tenancy.tenant'),
+            model_name="role",
+            name="tenant",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="roles",
+                to="tenancy.tenant",
+            ),
         ),
         migrations.AddField(
-            model_name='membershiprole',
-            name='role',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='membership_roles', to='authorization.role'),
+            model_name="membershiprole",
+            name="role",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="membership_roles",
+                to="authorization.role",
+            ),
         ),
         migrations.AddField(
-            model_name='rolepermission',
-            name='permission',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='role_permissions', to='authorization.permission'),
+            model_name="rolepermission",
+            name="permission",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="role_permissions",
+                to="authorization.permission",
+            ),
         ),
         migrations.AddField(
-            model_name='rolepermission',
-            name='role',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='role_permissions', to='authorization.role'),
+            model_name="rolepermission",
+            name="role",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="role_permissions",
+                to="authorization.role",
+            ),
         ),
         migrations.AlterUniqueTogether(
-            name='role',
-            unique_together={('tenant', 'name')},
+            name="role",
+            unique_together={("tenant", "name")},
         ),
         migrations.AlterUniqueTogether(
-            name='membershiprole',
-            unique_together={('membership', 'role')},
+            name="membershiprole",
+            unique_together={("membership", "role")},
         ),
         migrations.AlterUniqueTogether(
-            name='rolepermission',
-            unique_together={('role', 'permission')},
+            name="rolepermission",
+            unique_together={("role", "permission")},
         ),
     ]

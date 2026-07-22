@@ -5,6 +5,7 @@ these tests cover the Django ORM guard that prevents accidental mutation.
 """
 
 import pytest
+
 from audit.models import AuditEvent
 
 

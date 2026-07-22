@@ -11,6 +11,10 @@ export default defineConfig({
     baseURL: process.env["BASE_URL"] ?? "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // CSP with 'script-src self' blocks Next.js dev-mode eval and inline scripts,
+    // and 'connect-src self' blocks cross-origin API fetches during tests.
+    // bypassCSP lets React hydrate and page.route() intercept API calls correctly.
+    bypassCSP: true,
   },
   projects: [
     {

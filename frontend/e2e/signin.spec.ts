@@ -10,6 +10,24 @@ test.describe("Sign-in page", () => {
   });
 
   test("shows error on invalid credentials", async ({ page }) => {
+    // Route interception works correctly once bypassCSP is enabled in playwright.config.ts.
+    // Without bypassCSP, connect-src 'self' blocks cross-origin fetch to localhost:8000
+    // before Playwright can intercept it.
+    await page.route(/\/api\/regx\/v1\/auth\/csrf\//, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ csrfToken: "test-csrf" }),
+      })
+    );
+    await page.route(/\/api\/regx\/v1\/auth\/login\//, (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Invalid credentials." }),
+      })
+    );
+
     await page.goto("/signin");
     await page.getByLabel("Email").fill("nobody@example.com");
     await page.getByLabel("Password").fill("WrongPass1234!");

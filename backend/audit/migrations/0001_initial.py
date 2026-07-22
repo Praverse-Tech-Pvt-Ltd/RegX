@@ -25,7 +25,6 @@ DROP FUNCTION IF EXISTS audit_prevent_update_delete();
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = []

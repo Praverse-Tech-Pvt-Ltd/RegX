@@ -1,7 +1,8 @@
 """Test settings."""
 
-from decouple import config  # noqa: F401 — re-exported for DATABASES block below
-from .base import *  # noqa: F401, F403
+from decouple import config
+
+from .base import *  # noqa: F403
 
 DEBUG = False
 ALLOWED_HOSTS = ["*"]  # test client uses 'testserver' host

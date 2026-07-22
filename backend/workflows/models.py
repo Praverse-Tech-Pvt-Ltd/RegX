@@ -1,6 +1,7 @@
 """Workflows domain — scaffold only for foundation milestone."""
 
 from django.db import models
+
 from common.models import PublicIDModel, TimeStampedModel
 
 
@@ -20,7 +21,9 @@ class WorkflowItem(PublicIDModel, TimeStampedModel):
         "identity.User", on_delete=models.PROTECT, related_name="workflow_items"
     )
     title = models.CharField(max_length=255)
-    state = models.CharField(max_length=20, choices=State.choices, default=State.DRAFT, db_index=True)
+    state = models.CharField(
+        max_length=20, choices=State.choices, default=State.DRAFT, db_index=True
+    )
 
     class Meta:
         ordering = ["-created_at"]

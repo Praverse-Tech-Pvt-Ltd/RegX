@@ -4,21 +4,23 @@ REGX identity models.
 No AIDatabase, no legacy booking-demo imports, no SQLite dependency.
 """
 
+import base64
 import hashlib
 import secrets
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
-from django.db import models
+
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
-import base64
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.db import models
 
-from common.models import TimeStampedModel, PublicIDModel
+from common.models import PublicIDModel, TimeStampedModel
+
 from .managers import UserManager
-
 
 # ---------------------------------------------------------------------------
 # User
 # ---------------------------------------------------------------------------
+
 
 class User(AbstractBaseUser, PermissionsMixin, PublicIDModel, TimeStampedModel):
     """
@@ -50,6 +52,7 @@ class User(AbstractBaseUser, PermissionsMixin, PublicIDModel, TimeStampedModel):
 # MFA Device (TOTP)
 # ---------------------------------------------------------------------------
 
+
 def _fernet() -> Fernet:
     """Return a Fernet instance using the configured MFA encryption key."""
     raw = settings.MFA_ENCRYPTION_KEY
@@ -70,9 +73,7 @@ class MFADevice(TimeStampedModel):
     Never log or expose the plaintext secret.
     """
 
-    user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name="mfa_device"
-    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="mfa_device")
     # Encrypted TOTP secret (base32 string, Fernet-encrypted, stored as bytes)
     _encrypted_secret = models.BinaryField(db_column="encrypted_secret")
     is_verified = models.BooleanField(default=False)
@@ -106,6 +107,7 @@ class MFADevice(TimeStampedModel):
 # Recovery Codes
 # ---------------------------------------------------------------------------
 
+
 class RecoveryCode(TimeStampedModel):
     """
     Single-use MFA recovery code stored as a SHA-256 hash.
@@ -116,9 +118,7 @@ class RecoveryCode(TimeStampedModel):
     HASH_ALGORITHM = "sha256"
     CODE_BYTES = 10  # 80-bit entropy, displayed as hex
 
-    device = models.ForeignKey(
-        MFADevice, on_delete=models.CASCADE, related_name="recovery_codes"
-    )
+    device = models.ForeignKey(MFADevice, on_delete=models.CASCADE, related_name="recovery_codes")
     code_hash = models.CharField(max_length=64, db_index=True)
     used_at = models.DateTimeField(null=True, blank=True)
 

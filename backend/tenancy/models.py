@@ -6,6 +6,7 @@ No tenant FK is placed directly on the User model.
 """
 
 from django.db import models
+
 from common.models import PublicIDModel, TimeStampedModel
 
 
@@ -33,12 +34,8 @@ class Tenant(PublicIDModel, TimeStampedModel):
 class TenantMembership(TimeStampedModel):
     """Links a user to a tenant. Roles are granted via authorization.MembershipRole."""
 
-    tenant = models.ForeignKey(
-        Tenant, on_delete=models.CASCADE, related_name="memberships"
-    )
-    user = models.ForeignKey(
-        "identity.User", on_delete=models.CASCADE, related_name="memberships"
-    )
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey("identity.User", on_delete=models.CASCADE, related_name="memberships")
     is_active = models.BooleanField(default=True)
 
     class Meta:

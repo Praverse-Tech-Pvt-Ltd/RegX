@@ -1,10 +1,9 @@
 """Identity serializers. Internal PKs are never returned; only public_id."""
 
-import pyotp
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from .models import MFADevice, RecoveryCode, User
+from .models import User
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
@@ -54,10 +53,9 @@ class LoginSerializer(serializers.Serializer):
 
 class MFASetupSerializer(serializers.Serializer):
     """Returns provisioning URI; secret never leaves the server in plaintext."""
+
     totp_uri = serializers.CharField(read_only=True)
-    recovery_codes = serializers.ListField(
-        child=serializers.CharField(), read_only=True
-    )
+    recovery_codes = serializers.ListField(child=serializers.CharField(), read_only=True)
 
 
 class MFAVerifySerializer(serializers.Serializer):

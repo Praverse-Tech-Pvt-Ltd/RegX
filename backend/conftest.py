@@ -30,18 +30,21 @@ def superuser(db):
 @pytest.fixture
 def tenant(db):
     from tenancy.models import Tenant
+
     return Tenant.objects.create(name="Test Tenant", slug="test-tenant")
 
 
 @pytest.fixture
 def membership(db, user, tenant):
     from tenancy.models import TenantMembership
+
     return TenantMembership.objects.create(tenant=tenant, user=user)
 
 
 @pytest.fixture
 def api_client():
     from rest_framework.test import APIClient
+
     return APIClient()
 
 

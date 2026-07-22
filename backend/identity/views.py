@@ -3,17 +3,16 @@
 import pyotp
 from django.contrib.auth import login, logout
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
 
-from .models import MFADevice, RecoveryCode, User
+from .models import MFADevice, RecoveryCode
 from .serializers import (
     LoginSerializer,
     MFARecoverySerializer,
-    MFASetupSerializer,
     MFAVerifySerializer,
     RegisterSerializer,
     UserPublicSerializer,
@@ -63,6 +62,7 @@ def me_view(request):
 # MFA
 # ---------------------------------------------------------------------------
 
+
 @extend_schema(tags=["mfa"])
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -109,9 +109,7 @@ def mfa_verify_view(request):
     if not totp.verify(code, valid_window=1):
         device.failed_attempts += 1
         if device.failed_attempts >= _MFA_LOCKOUT_THRESHOLD:
-            device.locked_until = timezone.now() + timezone.timedelta(
-                minutes=_MFA_LOCKOUT_MINUTES
-            )
+            device.locked_until = timezone.now() + timezone.timedelta(minutes=_MFA_LOCKOUT_MINUTES)
         device.save(update_fields=["failed_attempts", "locked_until"])
         return Response({"detail": "Invalid OTP."}, status=400)
 
@@ -157,4 +155,5 @@ def _is_locked(device: MFADevice) -> bool:
 def _totp_counter() -> int:
     """Return the current 30-second TOTP window index (unix // 30)."""
     import time
+
     return int(time.time()) // 30

@@ -40,6 +40,7 @@ class TestUser:
         # pk is a plain integer; public_id is a UUID
         assert isinstance(user.pk, int)
         import uuid
+
         assert isinstance(user.public_id, uuid.UUID)
 
 

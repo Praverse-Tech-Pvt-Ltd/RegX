@@ -6,7 +6,6 @@ Idempotent: safe to call multiple times.
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
 
-
 SYSTEM_ROLES = [
     ("doer", "Initiates and submits workflow items."),
     ("reviewer", "Reviews and approves submitted items."),
@@ -38,6 +37,7 @@ def seed_roles_and_permissions(sender, **kwargs):
         return
 
     from django.db import connection
+
     tables = connection.introspection.table_names()
     if "authorization_permission" not in tables or "authorization_role" not in tables:
         return  # Tables not created yet; will seed on the next post_migrate

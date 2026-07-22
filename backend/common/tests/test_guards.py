@@ -4,7 +4,6 @@ These tests PROVE that prohibited patterns are absent or enforced.
 Each test documents WHAT it is checking and WHY it matters.
 """
 
-import ast
 import re
 from pathlib import Path
 
@@ -16,7 +15,8 @@ class TestNoAIDatabase:
 
     def _python_files(self):
         return [
-            p for p in BACKEND_ROOT.rglob("*.py")
+            p
+            for p in BACKEND_ROOT.rglob("*.py")
             if ".venv" not in str(p)
             and "__pycache__" not in str(p)
             # Exclude guard tests themselves — they contain "AIDatabase" as a string
@@ -53,8 +53,7 @@ class TestNoSQLiteInSettings:
             if "sqlite3" in source.lower():
                 violations.append(f.name)
         assert violations == [], (
-            f"SQLite found in settings: {violations}. "
-            "REGX requires PostgreSQL exclusively."
+            f"SQLite found in settings: {violations}. REGX requires PostgreSQL exclusively."
         )
 
 
@@ -67,8 +66,7 @@ class TestNoProductionUnsafeEval:
             return  # Not yet created; that's fine at foundation milestone
         source = prod_settings.read_text(encoding="utf-8", errors="ignore")
         assert "unsafe-eval" not in source, (
-            "production.py contains unsafe-eval in CSP. "
-            "This violates the REGX security baseline."
+            "production.py contains unsafe-eval in CSP. This violates the REGX security baseline."
         )
 
 
@@ -100,14 +98,21 @@ class TestNoLocalStorageAuthToken:
         frontend_root = BACKEND_ROOT.parent / "frontend"
         if not frontend_root.exists():
             return  # Frontend not yet scaffolded
+        local_storage_pattern = re.compile(
+            r'localStorage\.setItem\s*\(\s*["\'](?:token|auth|jwt)', re.IGNORECASE
+        )
         violations = []
         for p in frontend_root.rglob("*.ts"):
+            if "node_modules" in str(p):
+                continue
             source = p.read_text(encoding="utf-8", errors="ignore")
-            if re.search(r'localStorage\.setItem\s*\(\s*["\'](?:token|auth|jwt)', source, re.IGNORECASE):
+            if local_storage_pattern.search(source):
                 violations.append(str(p.relative_to(frontend_root)))
         for p in frontend_root.rglob("*.tsx"):
+            if "node_modules" in str(p):
+                continue
             source = p.read_text(encoding="utf-8", errors="ignore")
-            if re.search(r'localStorage\.setItem\s*\(\s*["\'](?:token|auth|jwt)', source, re.IGNORECASE):
+            if local_storage_pattern.search(source):
                 violations.append(str(p.relative_to(frontend_root)))
         assert violations == [], (
             f"Auth token stored in localStorage: {violations}. "
