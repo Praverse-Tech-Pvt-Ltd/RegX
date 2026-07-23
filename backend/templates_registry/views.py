@@ -461,49 +461,88 @@ class MigrationBatchResultsView(APIView):
     )
 )
 class MigrationBatchReviewView(APIView):
+    _VALID_RESOLUTIONS = ("same", "distinct", "superseded", "merge_approved")
+
     def get_permissions(self):
         return [CanReview()]
 
     def post(self, request, public_id):
+        from .audit_events import TemplateEvent, emit
+
         tenant = _get_tenant(request)
         batch = _get_batch_or_404(public_id, tenant)
         serializer = MigrationBatchReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        entries = serializer.validated_data.get("duplicate_resolutions", [])
+
+        # Every candidate must trace back to THIS batch's source package via
+        # either subject form -- a public_id belonging to another tenant, or
+        # to a different source package within the same tenant, never
+        # matches this queryset. Sharing the exact scoping used by the
+        # reconciliation report guarantees "reviewable" and "reportable" mean
+        # the same thing.
+        scoped_candidates = reconciliation.duplicate_candidates_for_source_package(
+            batch.source_package
+        )
 
         resolved = []
         with transaction.atomic():
-            for entry in serializer.validated_data.get("duplicate_resolutions", []):
+            # First pass: resolve and validate every entry before mutating
+            # anything. A single foreign-tenant, foreign-batch, or malformed
+            # entry rejects the whole request -- never a partial resolution,
+            # and never a response that discloses whether the foreign
+            # candidate exists.
+            to_apply = []
+            for entry in entries:
                 candidate_id = entry.get("public_id")
                 resolution = entry.get("resolution")
                 reason = entry.get("reason", "")
-                if not candidate_id or resolution not in (
-                    "same",
-                    "distinct",
-                    "superseded",
-                    "merge_approved",
-                ):
-                    continue
+                if not candidate_id or resolution not in self._VALID_RESOLUTIONS:
+                    raise ValidationError(
+                        "Each duplicate resolution requires a valid public_id and resolution."
+                    )
                 try:
-                    candidate = TemplateDuplicateCandidate.objects.get(public_id=candidate_id)
-                except TemplateDuplicateCandidate.DoesNotExist:
-                    continue
+                    candidate = scoped_candidates.get(public_id=candidate_id)
+                except TemplateDuplicateCandidate.DoesNotExist as exc:
+                    raise NotFound("Duplicate candidate not found.") from exc
+                # PostgreSQL rejects FOR UPDATE on the OR/outer-join query
+                # above (subject_source_record vs. subject_template_item are
+                # both nullable), so the row lock is taken separately via a
+                # simple by-pk query once scope has already been confirmed.
+                candidate = TemplateDuplicateCandidate.objects.select_for_update().get(
+                    pk=candidate.pk
+                )
+                to_apply.append((candidate, resolution, reason))
+
+            for candidate, resolution, reason in to_apply:
+                previous_resolution = candidate.resolution
                 candidate.resolution = resolution
                 candidate.reviewer = request.user
                 candidate.reason = reason
                 candidate.save(update_fields=["resolution", "reviewer", "reason", "updated_at"])
                 resolved.append(str(candidate.public_id))
 
-        from .audit_events import TemplateEvent, emit
+                # Audit event is written inside the same atomic block as the
+                # mutation it describes -- if any later entry in this
+                # request fails validation, the whole transaction (mutations
+                # and audit events alike) rolls back, so no misleading
+                # "resolved" event can ever survive a rejected request.
+                emit(
+                    event_type=TemplateEvent.DUPLICATE_CANDIDATE_RESOLVED,
+                    resource_type="template_duplicate_candidate",
+                    resource_id=str(candidate.public_id),
+                    tenant_id=getattr(tenant, "id", None),
+                    payload={
+                        "batch": str(batch.public_id),
+                        "source_package": str(batch.source_package.public_id),
+                        "previous_resolution": previous_resolution,
+                        "new_resolution": resolution,
+                        "reason": reason,
+                    },
+                    actor_id=request.user.id,
+                    actor_email=request.user.email,
+                )
 
-        emit(
-            event_type=TemplateEvent.DUPLICATE_CANDIDATE_RESOLVED,
-            resource_type="migration_batch",
-            resource_id=str(batch.public_id),
-            tenant_id=getattr(tenant, "id", None),
-            payload={"resolved": resolved},
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
         return Response({"resolved": resolved})
 
 
@@ -515,10 +554,25 @@ class MigrationBatchReconciliationCsvView(APIView):
         return [CanExportReconciliation()]
 
     def get(self, request, public_id):
+        from .audit_events import TemplateEvent, emit
+
         tenant = _get_tenant(request)
         batch = _get_batch_or_404(public_id, tenant)
         report = reconciliation.build_reconciliation_report(batch)
         csv_body = reconciliation.render_reconciliation_csv(report)
+        emit(
+            event_type=TemplateEvent.RECONCILIATION_EXPORTED,
+            resource_type="migration_batch",
+            resource_id=str(batch.public_id),
+            tenant_id=getattr(tenant, "id", None),
+            payload={
+                "source_package": str(batch.source_package.public_id),
+                "format": "csv",
+                "counts": report["counts"],
+            },
+            actor_id=request.user.id,
+            actor_email=request.user.email,
+        )
         response = HttpResponse(csv_body, content_type="text/csv")
         response["Content-Disposition"] = (
             f'attachment; filename="reconciliation-{batch.public_id}.csv"'
@@ -538,6 +592,22 @@ class MigrationBatchReconciliationJsonView(APIView):
         return [(CanReview | CanExportReconciliation)()]
 
     def get(self, request, public_id):
+        from .audit_events import TemplateEvent, emit
+
         tenant = _get_tenant(request)
         batch = _get_batch_or_404(public_id, tenant)
-        return Response(reconciliation.build_reconciliation_report(batch))
+        report = reconciliation.build_reconciliation_report(batch)
+        emit(
+            event_type=TemplateEvent.RECONCILIATION_EXPORTED,
+            resource_type="migration_batch",
+            resource_id=str(batch.public_id),
+            tenant_id=getattr(tenant, "id", None),
+            payload={
+                "source_package": str(batch.source_package.public_id),
+                "format": "json",
+                "counts": report["counts"],
+            },
+            actor_id=request.user.id,
+            actor_email=request.user.email,
+        )
+        return Response(report)

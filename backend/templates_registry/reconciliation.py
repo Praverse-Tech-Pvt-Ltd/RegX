@@ -7,6 +7,8 @@ explicitly out of scope for this milestone.
 import csv
 import io
 
+from django.db.models import Q
+
 from .models import (
     MigrationRecordResult,
     MigrationRecordResultType,
@@ -16,6 +18,42 @@ from .models import (
     TemplateSourceRecord,
 )
 from .serializers import NormalizationMappingSerializer, TemplateDuplicateCandidateSerializer
+
+# Any string whose effective first character (after skipping plain leading
+# spaces) is one of these is a formula/DDE trigger in Excel, Google Sheets,
+# and LibreOffice (CWE-1236). A leading apostrophe is the standard,
+# universally-supported "force text" escape: it makes the affected cell
+# display its original value verbatim while never being evaluated.
+_CSV_FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r", "\n")
+
+
+def _csv_safe_cell(value) -> str:
+    """Neutralize a single CSV cell value against spreadsheet formula
+    injection. This only affects the rendered export -- it never touches
+    the underlying database value (callers pass in already-fetched strings;
+    nothing here performs a .save())."""
+    text = "" if value is None else str(value)
+    effective_first_char = text.lstrip(" ")[:1]
+    if effective_first_char in _CSV_FORMULA_TRIGGER_CHARS:
+        return "'" + text
+    return text
+
+
+def duplicate_candidates_for_source_package(source_package):
+    """Every TemplateDuplicateCandidate whose "new" side traces back to this
+    source package, via either subject form (subject_source_record or
+    subject_template_item). Shared by the reconciliation report and the
+    duplicate-review endpoint so a candidate can only ever be reported on or
+    resolved within the scope of the source package it actually belongs to
+    -- never by public_id alone."""
+    return TemplateDuplicateCandidate.objects.filter(
+        Q(subject_source_record__source_package=source_package)
+        | Q(
+            subject_template_item__template_section__template_version__source_package=(
+                source_package
+            )
+        )
+    )
 
 
 def build_reconciliation_report(batch) -> dict:
@@ -33,16 +71,8 @@ def build_reconciliation_report(batch) -> dict:
     mapping_qs = NormalizationMapping.objects.filter(
         source_record__source_package=batch.source_package
     )
-    from django.db.models import Q
 
-    duplicate_qs = TemplateDuplicateCandidate.objects.filter(
-        Q(subject_source_record__source_package=batch.source_package)
-        | Q(
-            subject_template_item__template_section__template_version__source_package=(
-                batch.source_package
-            )
-        )
-    )
+    duplicate_qs = duplicate_candidates_for_source_package(batch.source_package)
 
     approvals = TemplateApproval.objects.filter(
         template_version__source_package=batch.source_package
@@ -118,10 +148,10 @@ def render_reconciliation_csv(report: dict) -> str:
     for row in report["records"]:
         writer.writerow(
             [
-                row["source_record_identifier"],
-                row["target_public_identifier"] or "",
-                row["result"],
-                row["reason_code"],
+                _csv_safe_cell(row["source_record_identifier"]),
+                _csv_safe_cell(row["target_public_identifier"] or ""),
+                _csv_safe_cell(row["result"]),
+                _csv_safe_cell(row["reason_code"]),
             ]
         )
     return buffer.getvalue()
