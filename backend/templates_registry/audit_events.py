@@ -21,6 +21,7 @@ class TemplateEvent:
     VERSION_ACTIVATED = "template.version.activated"
     VERSION_SUPERSEDED = "template.version.superseded"
     VERSION_RETIRED = "template.version.retired"
+    RECONCILIATION_EXPORTED = "template.reconciliation.exported"
 
 
 def emit(
