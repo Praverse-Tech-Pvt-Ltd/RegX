@@ -29,6 +29,18 @@ A candidate's `resolution` moves from `pending` to one of `same` / `distinct`
 the reviewer and reason recorded. Nothing in the pipeline transitions this
 field automatically.
 
+The review endpoint only resolves candidates that belong to the reviewed
+batch's source package — a candidate `public_id` from another tenant, or
+from a different source package in the same tenant, is not in scope and
+returns a generic `404`. A review request is atomic: a single
+foreign/invalid entry rejects the whole request before any candidate is
+mutated. Each successful resolution emits a `DUPLICATE_CANDIDATE_RESOLVED`
+audit event (candidate public ID, previous resolution, new resolution,
+reviewer, reason, batch public ID, source-package public ID) inside the
+same transaction as the mutation. See
+[TEMPLATE_RECONCILIATION_REPORT.md](TEMPLATE_RECONCILIATION_REPORT.md#audit-events)
+for the full audit-event definitions.
+
 ## Subject constraint
 
 A `TemplateDuplicateCandidate` always identifies exactly one "new" side —
