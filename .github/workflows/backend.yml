@@ -150,6 +150,75 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         run: pytest documents/tests/test_tasks.py -v --tb=short --no-cov
 
+      - name: Templates — model and lifecycle tests
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest templates_registry/tests/test_models.py templates_registry/tests/test_lifecycle.py -v --tb=short --no-cov
+
+      - name: Templates — permissions and API/tenant-isolation tests
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest templates_registry/tests/test_permissions.py templates_registry/tests/test_api.py -v --tb=short --no-cov
+
+      - name: Templates — source-package/import/normalization/duplicate tests
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest templates_registry/tests/test_importer.py -v --tb=short --no-cov
+
+      - name: Templates — planted-failure / governance-integrity tests
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest templates_registry/tests/test_planted_failures.py -v --tb=short --no-cov
+
+      - name: OpenAPI schema generates and validates
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        # --fail-on-warn is intentionally omitted: this codebase's APIView-based
+        # views (predating this milestone, matching documents/authorization/
+        # tenancy) produce known, non-blocking "unable to guess serializer"
+        # warnings that drf-spectacular gracefully falls back on.
+        run: python manage.py spectacular --validate --file /tmp/schema.yml
+
       - name: Guard — no AIDatabase import
         run: |
           python - <<'PYEOF'
@@ -165,4 +234,20 @@ jobs:
               print('FAIL: AIDatabase imported in:', violations)
               sys.exit(1)
           print('OK: No AIDatabase imports found.')
+          PYEOF
+
+      - name: Guard — no 483/warning-letter content in templates_registry fixtures or migrations
+        run: |
+          python - <<'PYEOF'
+          import re, pathlib, sys
+          pattern = re.compile(r'\bform\s*483\b|\b483\s*observation|\bwarning\s*letter\b', re.IGNORECASE)
+          violations = []
+          for p in pathlib.Path('templates_registry/migrations').glob('*.py'):
+              src = p.read_text(errors='ignore')
+              if pattern.search(src):
+                  violations.append(str(p))
+          if violations:
+              print('FAIL: 483/warning-letter content referenced in migrations:', violations)
+              sys.exit(1)
+          print('OK: No 483/warning-letter content baked into templates_registry migrations.')
           PYEOF
