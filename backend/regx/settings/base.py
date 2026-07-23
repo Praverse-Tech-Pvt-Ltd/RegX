@@ -5,6 +5,7 @@ Never import AIDatabase, legacy RAAI, or legacy AdminMaster here.
 
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 from decouple import Csv, config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -127,6 +128,13 @@ CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="http://localhost:
 CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:3000", cast=Csv())
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False  # Explicit; never wildcard
+
+# django-cors-headers' default allow-list does not include the tenant-scoping
+# header the frontend sends on every document API request; without this, a
+# real cross-origin browser blocks the preflight and every document request
+# fails, even though same-process test clients (which don't enforce CORS)
+# never catch it.
+CORS_ALLOW_HEADERS = [*default_headers, "x-tenant-slug"]
 
 # ---------------------------------------------------------------------------
 # Content Security Policy
