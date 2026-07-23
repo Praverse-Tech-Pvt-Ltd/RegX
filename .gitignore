@@ -3,16 +3,19 @@
 # Legacy monolith files present on disk MUST NOT be committed.
 # ============================================================
 
-# Legacy monolith directories
-AIDatabase/
-AdminMaster/
-RAAI/
-RATools/
-templates/
-staticfiles/
-static/
-media/
-tmp/
+# Legacy monolith directories (root-anchored: an unanchored pattern here
+# would also match same-named directories elsewhere in the tree, e.g.
+# frontend/src/app/templates/ -- a real Next.js route, not the legacy
+# Django template directory this was meant to exclude)
+/AIDatabase/
+/AdminMaster/
+/RAAI/
+/RATools/
+/templates/
+/staticfiles/
+/static/
+/media/
+/tmp/
 
 # Legacy files in root
 /manage.py

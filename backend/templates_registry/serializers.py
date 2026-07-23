@@ -42,11 +42,13 @@ class TemplateItemOptionRawSerializer(serializers.ModelSerializer):
 
 class TemplateItemSerializer(serializers.ModelSerializer):
     options = TemplateItemOptionSerializer(many=True, read_only=True)
+    template_section = serializers.UUIDField(source="template_section.public_id", read_only=True)
 
     class Meta:
         model = TemplateItem
         fields = [
             "public_id",
+            "template_section",
             "canonical_item_code",
             "normalized_text",
             "guidance_text",
@@ -62,11 +64,13 @@ class TemplateItemSerializer(serializers.ModelSerializer):
 
 class TemplateItemRawSerializer(serializers.ModelSerializer):
     options = TemplateItemOptionRawSerializer(many=True, read_only=True)
+    template_section = serializers.UUIDField(source="template_section.public_id", read_only=True)
 
     class Meta:
         model = TemplateItem
         fields = [
             "public_id",
+            "template_section",
             "canonical_item_code",
             "raw_text",
             "normalized_text",

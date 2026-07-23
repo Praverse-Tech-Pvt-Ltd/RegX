@@ -273,6 +273,296 @@ export const documents = {
     ),
 };
 
+// ---------------------------------------------------------------------------
+// Template registry / migration governance types
+// ---------------------------------------------------------------------------
+
+export type TemplateLifecycleStatus =
+  | "draft"
+  | "imported"
+  | "under_review"
+  | "returned"
+  | "approved"
+  | "active"
+  | "superseded"
+  | "retired"
+  | "rejected";
+
+export type MigrationBatchStatus =
+  | "registered"
+  | "extracting"
+  | "validating"
+  | "classifying"
+  | "normalizing"
+  | "duplicate_detection"
+  | "importing"
+  | "completed"
+  | "failed";
+
+export interface RegulatoryTemplate {
+  public_id: string;
+  canonical_code: string;
+  title: string;
+  category: string;
+  regulatory_pathway: string;
+  dosage_form_applicability: string;
+  description: string;
+  lifecycle_status: TemplateLifecycleStatus;
+  current_approved_version: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateVersion {
+  public_id: string;
+  template: string;
+  version_number: number;
+  status: TemplateLifecycleStatus;
+  effective_date: string | null;
+  superseded_date: string | null;
+  approved_at: string | null;
+}
+
+export interface TemplateSection {
+  public_id: string;
+  canonical_section_code: string;
+  normalized_title: string;
+  display_order: number;
+  parent_section: string | null;
+}
+
+export interface TemplateItemOption {
+  public_id: string;
+  code: string;
+  normalized_label: string;
+  order: number;
+}
+
+export interface TemplateItem {
+  public_id: string;
+  template_section: string;
+  canonical_item_code: string;
+  normalized_text: string;
+  guidance_text: string;
+  response_type: string;
+  required: boolean;
+  display_order: number;
+  options: TemplateItemOption[];
+}
+
+export interface TemplateSourcePackage {
+  public_id: string;
+  source_name: string;
+  source_type: string;
+  source_checksum: string;
+  source_version: string;
+  source_date: string | null;
+  approval_state: "pending" | "approved" | "rejected";
+  imported_by_email: string | null;
+  imported_at: string;
+}
+
+export interface MigrationBatch {
+  public_id: string;
+  source_package: string;
+  status: MigrationBatchStatus;
+  started_by_email: string | null;
+  started_at: string;
+  completed_at: string | null;
+  counts: Record<string, number>;
+  correlation_id: string;
+}
+
+export interface MigrationRecordResult {
+  public_id: string;
+  source_record_identifier: string;
+  target_public_identifier: string | null;
+  result: "imported" | "skipped" | "excluded" | "duplicate" | "failed" | "requires_review";
+  reason_code: string;
+  safe_detail: string;
+}
+
+export interface NormalizationMappingRow {
+  public_id: string;
+  source_record_identifier: string;
+  field_name: string;
+  raw_value: string;
+  normalized_value: string;
+  normalization_rule: string;
+  reviewer_email: string | null;
+  reason: string;
+  created_at: string;
+}
+
+export interface TemplateDuplicateCandidate {
+  public_id: string;
+  match_type: string;
+  similarity_evidence: Record<string, unknown>;
+  resolution: "pending" | "same" | "distinct" | "superseded" | "merge_approved";
+  reviewer_email: string | null;
+  reason: string;
+  suspected_match_item: string;
+  created_at: string;
+}
+
+export interface ReconciliationReport {
+  batch: { correlation_id: string; public_id: string; status: string };
+  source_package: { public_id: string; source_name: string; source_checksum: string };
+  counts: Record<string, number>;
+  records: MigrationRecordResult[];
+  unmatched_records: { source_record_identifier: string; migration_disposition: string }[];
+  normalization_mappings: NormalizationMappingRow[];
+  duplicate_candidates: TemplateDuplicateCandidate[];
+  approvals: {
+    template_version: string;
+    reviewer: string | null;
+    decision: string;
+    approval_sequence: number;
+    role_at_time: string;
+  }[];
+}
+
+export const templates = {
+  list: (tenantSlug: string, params?: { status?: string; page?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.page) qs.set("page", String(params.page));
+    const query = qs.toString() ? `?${qs}` : "";
+    return apiRequest<PaginatedResponse<RegulatoryTemplate>>(`/api/regx/v1/templates/${query}`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    });
+  },
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<RegulatoryTemplate>(`/api/regx/v1/templates/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  versions: (tenantSlug: string, publicId: string) =>
+    apiRequest<PaginatedResponse<TemplateVersion>>(`/api/regx/v1/templates/${publicId}/versions/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  sections: (tenantSlug: string, publicId: string, versionPublicId: string) =>
+    apiRequest<PaginatedResponse<TemplateSection>>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/sections/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  items: (tenantSlug: string, publicId: string, versionPublicId: string) =>
+    apiRequest<PaginatedResponse<TemplateItem>>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/items/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  submitReview: (tenantSlug: string, publicId: string, versionPublicId: string) =>
+    apiRequest<TemplateVersion>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/submit-review/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  approve: (tenantSlug: string, publicId: string, versionPublicId: string, comments?: string) =>
+    apiRequest<TemplateVersion>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/approve/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { comments: comments ?? "" } }
+    ),
+
+  returnForCorrection: (tenantSlug: string, publicId: string, versionPublicId: string, comments?: string) =>
+    apiRequest<TemplateVersion>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/return/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { comments: comments ?? "" } }
+    ),
+
+  reject: (tenantSlug: string, publicId: string, versionPublicId: string, comments?: string) =>
+    apiRequest<TemplateVersion>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/reject/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { comments: comments ?? "" } }
+    ),
+
+  activate: (tenantSlug: string, publicId: string, versionPublicId: string) =>
+    apiRequest<TemplateVersion>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/activate/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  supersede: (tenantSlug: string, publicId: string, versionPublicId: string, comments?: string) =>
+    apiRequest<TemplateVersion>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/supersede/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { comments: comments ?? "" } }
+    ),
+
+  retire: (tenantSlug: string, publicId: string, versionPublicId: string, comments?: string) =>
+    apiRequest<TemplateVersion>(
+      `/api/regx/v1/templates/${publicId}/versions/${versionPublicId}/retire/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { comments: comments ?? "" } }
+    ),
+};
+
+export const templateSources = {
+  list: (tenantSlug: string) =>
+    apiRequest<PaginatedResponse<TemplateSourcePackage>>("/api/regx/v1/template-sources/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  register: (
+    tenantSlug: string,
+    data: {
+      source_name: string;
+      source_type: string;
+      source_path_or_reference: string;
+      payload: Record<string, unknown>;
+      source_version?: string;
+    }
+  ) =>
+    apiRequest<TemplateSourcePackage>("/api/regx/v1/template-sources/", {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+};
+
+export const migrationBatches = {
+  list: (tenantSlug: string) =>
+    apiRequest<PaginatedResponse<MigrationBatch>>("/api/regx/v1/migration-batches/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<MigrationBatch>(`/api/regx/v1/migration-batches/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  create: (tenantSlug: string, sourcePackage: string, records: Record<string, unknown>[]) =>
+    apiRequest<MigrationBatch>("/api/regx/v1/migration-batches/", {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { source_package: sourcePackage, records },
+    }),
+
+  results: (tenantSlug: string, publicId: string) =>
+    apiRequest<PaginatedResponse<MigrationRecordResult>>(
+      `/api/regx/v1/migration-batches/${publicId}/results/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  reconciliation: (tenantSlug: string, publicId: string) =>
+    apiRequest<ReconciliationReport>(
+      `/api/regx/v1/migration-batches/${publicId}/reconciliation.json`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  review: (
+    tenantSlug: string,
+    publicId: string,
+    duplicateResolutions: { public_id: string; resolution: string; reason?: string }[]
+  ) =>
+    apiRequest<{ resolved: string[] }>(`/api/regx/v1/migration-batches/${publicId}/review/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { duplicate_resolutions: duplicateResolutions },
+    }),
+};
+
 export const mfa = {
   setup: () => apiRequest<{ totp_uri: string; recovery_codes: string[] }>("/api/regx/v1/mfa/setup/", { method: "POST" }),
 
