@@ -349,6 +349,7 @@ function DocumentDetailPageInner() {
             <input
               ref={versionInputRef}
               type="file"
+              aria-label="New version file"
               accept=".pdf,.docx,.xlsx,.pptx"
               onChange={(e) => setVersionFile(e.target.files?.[0] ?? null)}
               style={{ fontSize: 13 }}
