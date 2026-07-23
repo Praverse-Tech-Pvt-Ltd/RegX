@@ -17,7 +17,7 @@ Guarantees:
 
 from __future__ import annotations
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from .audit_events import TemplateEvent, emit
 from .checksums import sha256_payload, sha256_text
@@ -218,7 +218,17 @@ def _get_or_create_template(tenant, canonical_code: str, title: str, category: s
 def _get_or_create_draft_version(template: RegulatoryTemplate, source_package, created_by):
     """Every import batch for a template lands in its own new
     draft/imported version (never edits an existing version, immutable or
-    not) -- corrections and re-imports both flow through new versions."""
+    not) -- corrections and re-imports both flow through new versions.
+
+    Concurrency: two imports for the same template running at the same time
+    must not race on the next version_number. select_for_update() locks the
+    parent RegulatoryTemplate row before computing it, so a second concurrent
+    caller blocks until the first commits (and then sees its new version via
+    the re-check below) instead of independently computing the same number.
+    The unique_template_version_number DB constraint remains a backstop; a
+    small bounded retry absorbs the rare case where it still fires (e.g. a
+    caller reusing a connection/isolation level that doesn't block on the
+    row lock the way default PostgreSQL READ COMMITTED does)."""
     existing_draft = TemplateVersion.objects.filter(
         template=template,
         source_package=source_package,
@@ -226,16 +236,42 @@ def _get_or_create_draft_version(template: RegulatoryTemplate, source_package, c
     ).first()
     if existing_draft:
         return existing_draft
-    last_version = (
-        TemplateVersion.objects.filter(template=template).order_by("-version_number").first()
-    )
-    next_number = (last_version.version_number + 1) if last_version else 1
-    return TemplateVersion.objects.create(
-        template=template,
-        version_number=next_number,
-        source_package=source_package,
-        status=TemplateLifecycleStatus.IMPORTED,
-        created_by=created_by,
+
+    for _attempt in range(3):
+        try:
+            with transaction.atomic():
+                RegulatoryTemplate.objects.select_for_update().get(pk=template.pk)
+                # Re-check now that we hold the lock -- another concurrent
+                # import for this exact template+source_package may have
+                # created the draft between the unlocked check above and
+                # acquiring the lock here.
+                existing_draft = TemplateVersion.objects.filter(
+                    template=template,
+                    source_package=source_package,
+                    status__in=[
+                        TemplateLifecycleStatus.DRAFT,
+                        TemplateLifecycleStatus.IMPORTED,
+                    ],
+                ).first()
+                if existing_draft:
+                    return existing_draft
+                last_version = (
+                    TemplateVersion.objects.filter(template=template)
+                    .order_by("-version_number")
+                    .first()
+                )
+                next_number = (last_version.version_number + 1) if last_version else 1
+                return TemplateVersion.objects.create(
+                    template=template,
+                    version_number=next_number,
+                    source_package=source_package,
+                    status=TemplateLifecycleStatus.IMPORTED,
+                    created_by=created_by,
+                )
+        except IntegrityError:
+            continue
+    raise IntegrityError(
+        f"Could not allocate a version number for template {template.pk} after 3 attempts."
     )
 
 
