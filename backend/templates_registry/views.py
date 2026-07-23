@@ -28,6 +28,7 @@ from .models import (
 from .permissions import (
     CanActivate,
     CanApprove,
+    CanExportReconciliation,
     CanImportSources,
     CanInventorySources,
     CanRetire,
@@ -340,7 +341,7 @@ class TemplateSourcePackageListView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [CanImportSources()]
-        return [CanInventorySources()]
+        return [CanViewTemplates()]
 
     def get(self, request):
         tenant = _get_tenant(request)
@@ -396,7 +397,7 @@ class MigrationBatchListView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [CanImportSources()]
-        return [CanInventorySources()]
+        return [CanViewTemplates()]
 
     def get(self, request):
         tenant = _get_tenant(request)
@@ -424,7 +425,7 @@ class MigrationBatchListView(APIView):
 )
 class MigrationBatchDetailView(APIView):
     def get_permissions(self):
-        return [CanInventorySources()]
+        return [CanViewTemplates()]
 
     def get(self, request, public_id):
         tenant = _get_tenant(request)
@@ -441,7 +442,7 @@ class MigrationBatchResultsView(APIView):
     pagination_class = TemplatePagination
 
     def get_permissions(self):
-        return [CanInventorySources()]
+        return [CanViewTemplates()]
 
     def get(self, request, public_id):
         tenant = _get_tenant(request)
@@ -511,7 +512,7 @@ class MigrationBatchReviewView(APIView):
 )
 class MigrationBatchReconciliationCsvView(APIView):
     def get_permissions(self):
-        return [CanInventorySources()]
+        return [CanExportReconciliation()]
 
     def get(self, request, public_id):
         tenant = _get_tenant(request)
@@ -530,7 +531,11 @@ class MigrationBatchReconciliationCsvView(APIView):
 )
 class MigrationBatchReconciliationJsonView(APIView):
     def get_permissions(self):
-        return [CanInventorySources()]
+        # Reviewing reconciliation data (to make duplicate/normalization
+        # decisions) and formally exporting it are distinct actions --
+        # a Reviewer may view this report, but only VP/Tenant Admin may
+        # download it as a file (see MigrationBatchReconciliationCsvView).
+        return [(CanReview | CanExportReconciliation)()]
 
     def get(self, request, public_id):
         tenant = _get_tenant(request)

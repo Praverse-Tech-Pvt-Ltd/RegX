@@ -15,6 +15,7 @@ from .models import (
     TemplateDuplicateCandidate,
     TemplateSourceRecord,
 )
+from .serializers import NormalizationMappingSerializer, TemplateDuplicateCandidateSerializer
 
 
 def build_reconciliation_report(batch) -> dict:
@@ -89,23 +90,12 @@ def build_reconciliation_report(batch) -> dict:
             }
             for r in unmatched
         ],
-        "normalization_mappings": [
-            {
-                "source_record_identifier": m.source_record.source_record_identifier,
-                "field_name": m.field_name,
-                "normalization_rule": m.normalization_rule,
-                "reviewer": m.reviewer.email if m.reviewer else None,
-            }
-            for m in mapping_qs
-        ],
-        "duplicate_candidates": [
-            {
-                "match_type": d.match_type,
-                "resolution": d.resolution,
-                "reviewer": d.reviewer.email if d.reviewer else None,
-            }
-            for d in duplicate_qs.distinct()
-        ],
+        "normalization_mappings": NormalizationMappingSerializer(
+            mapping_qs.select_related("source_record", "reviewer"), many=True
+        ).data,
+        "duplicate_candidates": TemplateDuplicateCandidateSerializer(
+            duplicate_qs.select_related("reviewer", "suspected_match_item").distinct(), many=True
+        ).data,
         "approvals": [
             {
                 "template_version": str(a.template_version.public_id),
