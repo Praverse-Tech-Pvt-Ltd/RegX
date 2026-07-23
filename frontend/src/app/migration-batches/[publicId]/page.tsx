@@ -41,14 +41,25 @@ function MigrationBatchDetailPageInner() {
   async function load() {
     if (!tenantSlug) return;
     try {
-      const [batchData, resultsData, reportData] = await Promise.all([
+      const [batchData, resultsData] = await Promise.all([
         migrationBatches.get(tenantSlug, publicId),
         migrationBatches.results(tenantSlug, publicId),
-        migrationBatches.reconciliation(tenantSlug, publicId),
       ]);
       setBatch(batchData);
       setResults(resultsData.results);
-      setReport(reportData);
+      // Reconciliation reports require the export-reconciliation permission
+      // (VP/tenant admin) -- fetched separately so a Doer without that
+      // permission still sees their batch and per-record results instead
+      // of a blanket page failure.
+      try {
+        setReport(await migrationBatches.reconciliation(tenantSlug, publicId));
+      } catch (reportErr) {
+        if (reportErr instanceof ApiError && reportErr.status === 403) {
+          setReport(null);
+        } else {
+          throw reportErr;
+        }
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
         router.push("/signin");
@@ -90,7 +101,7 @@ function MigrationBatchDetailPageInner() {
 
   if (loading) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p>Loading…</p></main>;
   if (error) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p role="alert" style={{ color: "#b91c1c" }}>{error}</p></main>;
-  if (!batch || !report) return null;
+  if (!batch) return null;
 
   const csvUrl = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/regx/v1/migration-batches/${publicId}/reconciliation.csv`;
 
@@ -107,23 +118,32 @@ function MigrationBatchDetailPageInner() {
 
       <section style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ fontSize: 16, marginBottom: "0.5rem" }}>Reconciliation summary</h2>
-        <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
-          <tbody>
-            {Object.entries(report.counts).map(([key, value]) => (
-              <tr key={key}>
-                <td style={{ padding: "2px 12px 2px 0", color: "#6b7280", textTransform: "capitalize" }}>
-                  {key.replace(/_/g, " ")}
-                </td>
-                <td style={{ padding: "2px 0", fontWeight: 600 }}>{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{ marginTop: 8 }}>
-          <a href={csvUrl} style={{ fontSize: 13, color: "#1d4ed8" }}>
-            Download reconciliation.csv
-          </a>
-        </div>
+        {!report && (
+          <p style={{ color: "#6b7280", fontSize: 13 }}>
+            Reconciliation reports are restricted to reviewers with export permission.
+          </p>
+        )}
+        {report && (
+          <>
+            <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
+              <tbody>
+                {Object.entries(report.counts).map(([key, value]) => (
+                  <tr key={key}>
+                    <td style={{ padding: "2px 12px 2px 0", color: "#6b7280", textTransform: "capitalize" }}>
+                      {key.replace(/_/g, " ")}
+                    </td>
+                    <td style={{ padding: "2px 0", fontWeight: 600 }}>{value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ marginTop: 8 }}>
+              <a href={csvUrl} style={{ fontSize: 13, color: "#1d4ed8" }}>
+                Download reconciliation.csv
+              </a>
+            </div>
+          </>
+        )}
       </section>
 
       <section style={{ marginBottom: "1.5rem" }}>
@@ -162,7 +182,7 @@ function MigrationBatchDetailPageInner() {
         </table>
       </section>
 
-      {report.normalization_mappings.length > 0 && (
+      {report && report.normalization_mappings.length > 0 && (
         <section style={{ marginBottom: "1.5rem" }}>
           <h2 style={{ fontSize: 16, marginBottom: "0.5rem" }}>
             Normalization mappings ({report.normalization_mappings.length})
@@ -194,6 +214,7 @@ function MigrationBatchDetailPageInner() {
         </section>
       )}
 
+      {report && (
       <section>
         <h2 style={{ fontSize: 16, marginBottom: "0.5rem" }}>
           Duplicate candidates ({report.duplicate_candidates.length})
@@ -256,6 +277,7 @@ function MigrationBatchDetailPageInner() {
           </>
         )}
       </section>
+      )}
     </main>
   );
 }
