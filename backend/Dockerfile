@@ -18,6 +18,11 @@ RUN pip install -r requirements/base.txt
 COPY . .
 
 RUN addgroup --system regx && adduser --system --ingroup regx regx
+# document_storage is created and written to at runtime (local document
+# storage backend) by the non-root user below; COPY above leaves /app
+# root-owned, which otherwise makes every upload fail with a permission
+# error the moment a real request tries to create it.
+RUN mkdir -p document_storage && chown -R regx:regx document_storage
 USER regx
 
 EXPOSE 8000

@@ -91,6 +91,28 @@ class TestNoSecretLikeDefaultsInSettings:
         ), "MFA_ENCRYPTION_KEY has a hardcoded default. Remove the default= parameter."
 
 
+class TestCorsAllowsTenantHeader:
+    """
+    GUARD: CORS_ALLOW_HEADERS must include x-tenant-slug.
+
+    The frontend sends X-Tenant-Slug on every tenant-scoped document request.
+    django-cors-headers' default allow-list does not include it, so without
+    an explicit CORS_ALLOW_HEADERS override, a real cross-origin browser
+    blocks the preflight and every document request fails — undetectable by
+    Django's test client, which does not enforce CORS at all. Confirmed by
+    running the production Docker stack under an actual browser.
+    """
+
+    def test_settings_declare_x_tenant_slug_header(self):
+        from django.conf import settings
+
+        allowed = [h.lower() for h in getattr(settings, "CORS_ALLOW_HEADERS", [])]
+        assert "x-tenant-slug" in allowed, (
+            "CORS_ALLOW_HEADERS must include 'x-tenant-slug', or every "
+            "cross-origin document request fails preflight in a real browser."
+        )
+
+
 class TestNoLocalStorageAuthToken:
     """GUARD: Frontend must not store auth tokens in localStorage or sessionStorage."""
 

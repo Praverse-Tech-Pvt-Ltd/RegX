@@ -17,19 +17,25 @@ class TenantMiddleware:
         clear_current_tenant()
 
         slug = request.headers.get("X-Tenant-Slug")
-        if slug and request.user and request.user.is_authenticated:
+        if slug:
             try:
                 tenant = Tenant.objects.get(slug=slug, status=Tenant.Status.ACTIVE)
-                if TenantMembership.objects.filter(
-                    tenant=tenant, user=request.user, is_active=True
+            except Tenant.DoesNotExist:
+                return JsonResponse({"detail": "Tenant not found."}, status=404)
+
+            # If Django auth has already resolved a session user, check membership now.
+            # DRF force_authenticate / token auth run inside the view, so we can't
+            # check membership for requests that authenticate at the view layer;
+            # permission classes enforce tenant membership for those requests.
+            user = getattr(request, "user", None)
+            if user is not None and user.is_authenticated:
+                if not TenantMembership.objects.filter(
+                    tenant=tenant, user=user, is_active=True
                 ).exists():
-                    set_current_tenant(tenant)
-                else:
                     return JsonResponse(
                         {"detail": "User is not a member of this tenant."}, status=403
                     )
-            except Tenant.DoesNotExist:
-                return JsonResponse({"detail": "Tenant not found."}, status=404)
+            set_current_tenant(tenant)
 
         response = self.get_response(request)
         clear_current_tenant()

@@ -5,6 +5,7 @@ Never import AIDatabase, legacy RAAI, or legacy AdminMaster here.
 
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 from decouple import Csv, config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -39,6 +40,7 @@ INSTALLED_APPS = [
     "audit",
     "workflows",
     "common",
+    "documents",
 ]
 
 MIDDLEWARE = [
@@ -127,6 +129,13 @@ CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="http://localhost:
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False  # Explicit; never wildcard
 
+# django-cors-headers' default allow-list does not include the tenant-scoping
+# header the frontend sends on every document API request; without this, a
+# real cross-origin browser blocks the preflight and every document request
+# fails, even though same-process test clients (which don't enforce CORS)
+# never catch it.
+CORS_ALLOW_HEADERS = [*default_headers, "x-tenant-slug"]
+
 # ---------------------------------------------------------------------------
 # Content Security Policy
 # ---------------------------------------------------------------------------
@@ -153,9 +162,29 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
+    "DEFAULT_PARSER_CLASSES": [
+        "rest_framework.parsers.JSONParser",
+        "rest_framework.parsers.MultiPartParser",
+        "rest_framework.parsers.FormParser",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 25,
     "EXCEPTION_HANDLER": "common.exceptions.regx_exception_handler",
 }
+
+# ---------------------------------------------------------------------------
+# Document platform
+# ---------------------------------------------------------------------------
+DOCUMENT_STORAGE_BACKEND = config("DOCUMENT_STORAGE_BACKEND", default="local")
+DOCUMENT_LOCAL_STORAGE_ROOT = config(
+    "DOCUMENT_LOCAL_STORAGE_ROOT",
+    default=str(BASE_DIR / "document_storage"),
+)
+DOCUMENT_MAX_UPLOAD_BYTES = config("DOCUMENT_MAX_UPLOAD_BYTES", cast=int, default=50 * 1024 * 1024)
+# Scanner: "stub" (dev default, marks all clean), "clamav" (requires running clamd)
+DOCUMENT_SCANNER_BACKEND = config("DOCUMENT_SCANNER_BACKEND", default="stub")
+DOCUMENT_CLAMAV_HOST = config("DOCUMENT_CLAMAV_HOST", default="127.0.0.1")
+DOCUMENT_CLAMAV_PORT = config("DOCUMENT_CLAMAV_PORT", cast=int, default=3310)
 
 # ---------------------------------------------------------------------------
 # OpenAPI
