@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = [".", "regx", "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry"]
+src = [".", "regx", "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment"]
 
 [tool.ruff.lint]
 select = [
@@ -29,24 +29,25 @@ ignore = [
 "*/migrations/*" = ["N806", "E501", "RUF012", "I001"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "regx"]
+known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "regx"]
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "common-has-no-domain-imports"
 type = "forbidden"
 source_modules = ["common"]
-forbidden_modules = ["identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "AIDatabase"]
+forbidden_modules = ["identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "AIDatabase"]
 
 [[tool.importlinter.contracts]]
 name = "no-aidatabase-imports-anywhere"
 type = "forbidden"
 source_modules = [
-    "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry"
+    "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry",
+    "fda_data", "formulations", "iid_assessment"
 ]
 forbidden_modules = ["AIDatabase"]
 
@@ -61,6 +62,18 @@ name = "identity-no-tenancy"
 type = "forbidden"
 source_modules = ["identity"]
 forbidden_modules = ["tenancy", "authorization", "AIDatabase"]
+
+[[tool.importlinter.contracts]]
+name = "fda-iid-foundation-no-legacy-django-apps"
+type = "forbidden"
+source_modules = ["fda_data", "formulations", "iid_assessment"]
+forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
+
+[[tool.importlinter.contracts]]
+name = "fda-data-is-platform-level-not-coupled-to-tenant-formulations"
+type = "forbidden"
+source_modules = ["fda_data"]
+forbidden_modules = ["formulations", "iid_assessment"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "regx.settings.test"
