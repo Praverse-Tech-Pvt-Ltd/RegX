@@ -89,6 +89,72 @@ jobs:
           curl -sf -o /dev/null -w "signin: %{http_code}\n" http://localhost:3000/signin
           curl -sf -o /dev/null -w "documents: %{http_code}\n" http://localhost:3000/documents
 
+      - name: Verify FDA/formulation/IID frontend routes return HTTP 200
+        run: |
+          curl -sf -o /dev/null -w "fda-data/releases: %{http_code}\n" "http://localhost:3000/fda-data/releases?tenant=x"
+          curl -sf -o /dev/null -w "formulations: %{http_code}\n" "http://localhost:3000/formulations?tenant=x"
+          curl -sf -o /dev/null -w "iid-assessments/preview: %{http_code}\n" "http://localhost:3000/iid-assessments/preview?tenant=x"
+
+      - name: Verify FDA/formulation/IID API routes are wired (401/403, never 404)
+        run: |
+          check() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$2" ${3:+-X "$3"})
+            echo "$1: $code"
+            [ "$code" = "401" ] || [ "$code" = "403" ] || { echo "$1 unexpectedly returned $code (route may be unwired)"; exit 1; }
+          }
+          check "fda-data releases" http://localhost:8000/api/regx/v1/fda-data/releases/
+          check "formulations products" http://localhost:8000/api/regx/v1/formulations/products/
+          check "iid-assessments preview" http://localhost:8000/api/regx/v1/iid-assessments/preview/ POST
+
+      - name: Synthetic FDA/IID smoke flow (register -> lifecycle-gated activate -> product -> formulation -> IID preview)
+        run: |
+          docker compose -p regx-ci exec -T backend python manage.py shell -c "
+          from decimal import Decimal
+          import io, json
+          from django.contrib.auth import get_user_model
+          from fda_data import importer, lifecycle
+          from fda_data.adapters import fda_iid_adapter
+          from fda_data.models import (
+              ControlledDosageForm, ControlledRoute, ControlledUnit,
+              DosageFormMapping, FDAReleaseStatus, IIDIngredient, RouteMapping,
+          )
+          from formulations.models import FormulationVersion, ProductDevelopmentRecord
+          from iid_assessment.assess import run_preview
+          from tenancy.models import Tenant
+
+          User = get_user_model()
+          tenant, _ = Tenant.objects.get_or_create(slug='docker-ci-smoke', defaults={'name': 'Docker CI Smoke'})
+          importer_user, _ = User.objects.get_or_create(email='ci-smoke-importer@example.com', defaults={'full_name': 'CI Smoke Importer'})
+          approver_user, _ = User.objects.get_or_create(email='ci-smoke-approver@example.com', defaults={'full_name': 'CI Smoke Approver'})
+
+          route, _ = ControlledRoute.objects.get_or_create(code='oral', defaults={'canonical_label': 'Oral', 'lifecycle': 'active'})
+          RouteMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='ORAL', defaults={'controlled_route': route, 'status': 'approved'})
+          dosage_form, _ = ControlledDosageForm.objects.get_or_create(code='tablet', defaults={'canonical_label': 'Tablet', 'lifecycle': 'active'})
+          DosageFormMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='TABLET', defaults={'controlled_dosage_form': dosage_form, 'status': 'approved'})
+          ControlledUnit.objects.get_or_create(code='milligram', defaults={'symbol': 'MG', 'dimension': 'mass', 'active': True})
+
+          rows = [{'Ingredient Name': 'SYNTHETIC-CI-SMOKE', 'UNII': 'CISMOKE01', 'Route': 'ORAL', 'Dosage Form': 'TABLET', 'Potency': '50', 'Unit': 'MG', 'Maximum Daily Exposure': '200', 'MDE Unit': 'MG'}]
+          file_obj = io.BytesIO(json.dumps(rows).encode('utf-8'))
+          release = importer.register_release(dataset_type='fda_iid', source_name='CI Smoke Synthetic IID', official_source_reference='synthetic://ci-smoke', file_obj=file_obj, original_filename='ci-smoke.json', imported_by=importer_user)
+          importer.import_iid_rows(release, fda_iid_adapter(rows), importer_user)
+          assert release.status == 'registered'
+
+          release = lifecycle.submit_for_review(release, importer_user)
+          release = lifecycle.approve(release, approver_user)
+          release = lifecycle.activate(release, approver_user)
+          assert release.status == 'active'
+
+          product = ProductDevelopmentRecord.objects.create(tenant=tenant, product_code='CI-SMOKE-1', proposed_product_name='CI Smoke Tablet', active_ingredient='Synthetic CI Smoke')
+          version = FormulationVersion.objects.create(product=product, version_number=1, total_dosage_unit_weight=Decimal('500'), total_dosage_unit_weight_unit='milligram', maximum_dosage_units_per_day=Decimal('4'))
+
+          ingredient = IIDIngredient.objects.get(normalized_name='SYNTHETIC-CI-SMOKE')
+          preview = run_preview(ingredient_public_id=ingredient.public_id, route_code='oral', dosage_form_code='tablet', active_release_public_id=release.public_id, proposed_quantity_per_unit=Decimal('30'), proposed_quantity_unit='milligram', total_dosage_unit_weight=Decimal('500'), total_dosage_unit_weight_unit='milligram', maximum_dosage_units_per_day=Decimal('4'))
+          assert preview.match_status == 'EXACT_MATCH', preview.match_status
+          assert preview.decision_status == 'PASS_WITH_IID_PRECEDENT', preview.decision_status
+          assert 'not an automatic safety' in preview.decision_note.lower()
+          print('SMOKE FLOW: PASS')
+          "
+
       - name: Verify production CSP header is present
         run: |
           curl -sD - -o /dev/null http://localhost:3000/signin | grep -i "content-security-policy" || { echo "CSP header missing"; exit 1; }
