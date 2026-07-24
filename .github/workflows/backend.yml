@@ -202,6 +202,45 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         run: pytest templates_registry/tests/test_planted_failures.py -v --tb=short --no-cov
 
+      - name: FDA data — import, lifecycle, API, and security tests
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest fda_data -v --tb=short --no-cov
+
+      - name: Formulations — model, tenant-isolation, and API tests
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest formulations -v --tb=short --no-cov
+
+      - name: IID assessment — unit conversion, calculation, matching, and decision engine tests
+        env:
+          DJANGO_SETTINGS_MODULE: regx.settings.test
+          DJANGO_SECRET_KEY: ci-test-secret-key-not-for-production
+          MFA_ENCRYPTION_KEY: test_key_not_for_production_use_only_32b
+          DB_NAME: regx_test
+          DB_USER: regx
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest iid_assessment -v --tb=short --no-cov
+
       - name: OpenAPI schema generates and validates
         env:
           DJANGO_SETTINGS_MODULE: regx.settings.test
@@ -236,18 +275,19 @@ jobs:
           print('OK: No AIDatabase imports found.')
           PYEOF
 
-      - name: Guard — no 483/warning-letter content in templates_registry fixtures or migrations
+      - name: Guard — no 483/warning-letter content in templates_registry/fda_data/formulations/iid_assessment migrations
         run: |
           python - <<'PYEOF'
           import re, pathlib, sys
           pattern = re.compile(r'\bform\s*483\b|\b483\s*observation|\bwarning\s*letter\b', re.IGNORECASE)
           violations = []
-          for p in pathlib.Path('templates_registry/migrations').glob('*.py'):
-              src = p.read_text(errors='ignore')
-              if pattern.search(src):
-                  violations.append(str(p))
+          for app in ('templates_registry', 'fda_data', 'formulations', 'iid_assessment'):
+              for p in pathlib.Path(app, 'migrations').glob('*.py'):
+                  src = p.read_text(errors='ignore')
+                  if pattern.search(src):
+                      violations.append(str(p))
           if violations:
               print('FAIL: 483/warning-letter content referenced in migrations:', violations)
               sys.exit(1)
-          print('OK: No 483/warning-letter content baked into templates_registry migrations.')
+          print('OK: No 483/warning-letter content baked into governed-domain migrations.')
           PYEOF
