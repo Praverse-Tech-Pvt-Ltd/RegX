@@ -11,7 +11,16 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { makeDocument, makeLocator, makeVersion, paginate } from "./fixtures";
+import {
+  makeAssessmentPreview,
+  makeDocument,
+  makeFdaRelease,
+  makeLocator,
+  makeOrangeBookProduct,
+  makeProduct,
+  makeVersion,
+  paginate,
+} from "./fixtures";
 
 const nav = vi.hoisted(() => ({ push: vi.fn(), tenant: "alpha", publicId: "doc-public-0001" }));
 
@@ -47,23 +56,50 @@ const api = vi.hoisted(() => ({
   locators: vi.fn(),
 }));
 
+const fdaApi = vi.hoisted(() => ({
+  releasesList: vi.fn(),
+  releasesGet: vi.fn(),
+  orangeBookSearch: vi.fn(),
+  productsGet: vi.fn(),
+  preview: vi.fn(),
+}));
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
     documents: { ...actual.documents, ...api },
+    fdaData: {
+      releases: {
+        ...actual.fdaData.releases,
+        list: fdaApi.releasesList,
+        get: fdaApi.releasesGet,
+      },
+      orangeBook: { search: fdaApi.orangeBookSearch },
+    },
+    formulations: {
+      ...actual.formulations,
+      products: { ...actual.formulations.products, get: fdaApi.productsGet },
+    },
+    iidAssessments: { ...actual.iidAssessments, preview: fdaApi.preview },
   };
 });
 
 import SignInPage from "@/app/signin/page";
 import DocumentsPage from "@/app/documents/page";
 import DocumentDetailPage from "@/app/documents/[publicId]/page";
+import FdaReleasesPage from "@/app/fda-data/releases/page";
+import FdaReleaseDetailPage from "@/app/fda-data/releases/[publicId]/page";
+import OrangeBookSearchPage from "@/app/fda-data/orange-book/page";
+import FormulationDetailPage from "@/app/formulations/[publicId]/page";
+import IidPreviewPage from "@/app/iid-assessments/preview/page";
 
 beforeEach(() => {
   nav.push.mockReset();
   nav.tenant = "alpha";
   nav.publicId = "doc-public-0001";
   Object.values(api).forEach((fn) => fn.mockReset());
+  Object.values(fdaApi).forEach((fn) => fn.mockReset());
   api.versionStatus.mockResolvedValue({ scan_status: "clean", processing_status: "complete" });
 });
 
@@ -207,5 +243,107 @@ describe("Accessibility — /documents/{public_id}", () => {
 
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /fda-data/releases", () => {
+  it("has no serious or critical automated violations in the release inventory", async () => {
+    fdaApi.releasesList.mockResolvedValue(paginate([makeFdaRelease()]));
+    const { container } = render(<FdaReleasesPage />);
+    await screen.findByRole("link", { name: "Synthetic FDA IID" });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("has no serious or critical automated violations in the registration form", async () => {
+    const user = userEvent.setup();
+    fdaApi.releasesList.mockResolvedValue(paginate([]));
+    const { container } = render(<FdaReleasesPage />);
+    await screen.findByText(/No FDA data-source releases/i);
+    await user.click(screen.getByRole("button", { name: /register release/i }));
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /fda-data/releases/{public_id}", () => {
+  it("has no serious or critical automated violations, including lifecycle action buttons", async () => {
+    fdaApi.releasesGet.mockResolvedValue(makeFdaRelease({ status: "under_review" }));
+    const { container } = render(<FdaReleaseDetailPage />);
+    await screen.findByRole("button", { name: /^approve$/i });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /fda-data/orange-book", () => {
+  it("has no serious or critical automated violations in the search form and results", async () => {
+    const user = userEvent.setup();
+    fdaApi.orangeBookSearch.mockResolvedValue(paginate([makeOrangeBookProduct()]));
+    const { container } = render(<OrangeBookSearchPage />);
+    await user.click(screen.getByRole("button", { name: /^search$/i }));
+    await screen.findByText("Synthacet");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /formulations/{public_id}", () => {
+  it("has no serious or critical automated violations, including the reference-selection form", async () => {
+    nav.publicId = "product-public-0001";
+    const user = userEvent.setup();
+    fdaApi.productsGet.mockResolvedValue(makeProduct());
+    const { container } = render(<FormulationDetailPage />);
+    await user.click(await screen.findByRole("button", { name: /select reference product/i }));
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /iid-assessments/preview", () => {
+  it("has no serious or critical automated violations in the empty form", async () => {
+    const { container } = render(<IidPreviewPage />);
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("has no serious or critical automated violations in the calculation-result view", async () => {
+    const user = userEvent.setup();
+    fdaApi.preview.mockResolvedValue(makeAssessmentPreview());
+    const { container } = render(<IidPreviewPage />);
+
+    await user.type(screen.getByLabelText(/ingredient id/i), "ing-1");
+    await user.type(screen.getByLabelText(/active fda release id/i), "rel-1");
+    await user.type(screen.getByLabelText(/^route code/i), "oral");
+    await user.type(screen.getByLabelText(/dosage form code/i), "tablet");
+    await user.type(screen.getByLabelText(/proposed quantity per unit/i), "30");
+    await user.type(screen.getByLabelText(/total dosage-unit weight/i), "500");
+    await user.click(screen.getByRole("button", { name: /run preview/i }));
+
+    await screen.findByRole("status");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("the warning/error summary uses an accessible live region", async () => {
+    const user = userEvent.setup();
+    fdaApi.preview.mockResolvedValue(
+      makeAssessmentPreview({
+        decision_status: "EXCEEDS_IID_PRECEDENT",
+        decision_note: "Proposed amount per dosage unit exceeds the selected IID potency precedent.",
+        escalation_required: true,
+      }),
+    );
+    render(<IidPreviewPage />);
+    await user.type(screen.getByLabelText(/ingredient id/i), "ing-1");
+    await user.type(screen.getByLabelText(/active fda release id/i), "rel-1");
+    await user.type(screen.getByLabelText(/^route code/i), "oral");
+    await user.type(screen.getByLabelText(/dosage form code/i), "tablet");
+    await user.type(screen.getByLabelText(/proposed quantity per unit/i), "999");
+    await user.type(screen.getByLabelText(/total dosage-unit weight/i), "1500");
+    await user.click(screen.getByRole("button", { name: /run preview/i }));
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/exceeds/i);
   });
 });
