@@ -142,10 +142,10 @@ function ReleaseDetailInner() {
           </button>
         )}
         <Link
-          href={fdaData.releases.reconciliationCsvUrl(release.public_id)}
+          href={`/fda-data/releases/${release.public_id}/reconciliation?tenant=${tenantSlug}`}
           style={{ ...buttonStyle, background: "#374151", textDecoration: "none", display: "inline-block" }}
         >
-          Download reconciliation (CSV)
+          View reconciliation summary
         </Link>
       </div>
       {actionError && (

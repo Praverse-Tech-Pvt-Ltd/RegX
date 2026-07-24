@@ -629,6 +629,43 @@ export interface OrangeBookProduct {
   discontinued: boolean;
 }
 
+export type MappingType = "route" | "dosage_form" | "unit";
+export type MappingDecisionStatus = "proposed" | "reviewed" | "approved" | "rejected";
+
+export interface TerminologyMapping {
+  public_id: string;
+  mapping_type: MappingType;
+  source_dataset: string;
+  source_raw_value: string;
+  proposed_controlled_value: string | null;
+  status: MappingDecisionStatus;
+  is_current: boolean;
+  reviewer_email: string | null;
+  reason: string;
+  affected_record_count: number;
+  created_at: string;
+}
+
+export interface FdaImportRowResultItem {
+  public_id: string;
+  row_locator: string;
+  target_public_identifier: string | null;
+  result: "imported" | "duplicate" | "failed" | "review_required";
+  reason_code: string;
+  safe_detail: string;
+}
+
+export interface FdaReconciliationReport {
+  release: { public_id: string; dataset_type: string; status: string };
+  counts: {
+    expected: number;
+    extracted: number;
+    imported: number;
+    failed: number;
+  };
+  results: FdaImportRowResultItem[];
+}
+
 export const fdaData = {
   releases: {
     list: (tenantSlug: string, params?: { dataset_type?: string; page?: number }) => {
@@ -684,7 +721,7 @@ export const fdaData = {
       }),
 
     reconciliationJson: (tenantSlug: string, publicId: string) =>
-      apiRequest<Record<string, unknown>>(
+      apiRequest<FdaReconciliationReport>(
         `/api/regx/v1/fda-data/releases/${publicId}/reconciliation.json`,
         { headers: { "X-Tenant-Slug": tenantSlug } }
       ),
@@ -696,12 +733,28 @@ export const fdaData = {
   orangeBook: {
     search: (
       tenantSlug: string,
-      params?: { active_ingredient?: string; route?: string; dosage_form?: string; page?: number }
+      params?: {
+        active_ingredient?: string;
+        route?: string;
+        dosage_form?: string;
+        strength?: string;
+        application_type?: string;
+        rld?: boolean;
+        reference_standard?: boolean;
+        discontinued?: boolean;
+        page?: number;
+      }
     ) => {
       const qs = new URLSearchParams();
       if (params?.active_ingredient) qs.set("active_ingredient", params.active_ingredient);
       if (params?.route) qs.set("route", params.route);
       if (params?.dosage_form) qs.set("dosage_form", params.dosage_form);
+      if (params?.strength) qs.set("strength", params.strength);
+      if (params?.application_type) qs.set("application_type", params.application_type);
+      if (params?.rld !== undefined) qs.set("rld", String(params.rld));
+      if (params?.reference_standard !== undefined)
+        qs.set("reference_standard", String(params.reference_standard));
+      if (params?.discontinued !== undefined) qs.set("discontinued", String(params.discontinued));
       if (params?.page) qs.set("page", String(params.page));
       const query = qs.toString() ? `?${qs}` : "";
       return apiRequest<PaginatedResponse<OrangeBookProduct>>(
@@ -709,6 +762,37 @@ export const fdaData = {
         { headers: { "X-Tenant-Slug": tenantSlug } }
       );
     },
+
+    get: (tenantSlug: string, publicId: string) =>
+      apiRequest<OrangeBookProduct>(`/api/regx/v1/fda-data/orange-book/products/${publicId}/`, {
+        headers: { "X-Tenant-Slug": tenantSlug },
+      }),
+  },
+
+  mappings: {
+    list: (tenantSlug: string, params?: { type?: string; status?: string; page?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.type) qs.set("type", params.type);
+      if (params?.status) qs.set("status", params.status);
+      if (params?.page) qs.set("page", String(params.page));
+      const query = qs.toString() ? `?${qs}` : "";
+      return apiRequest<PaginatedResponse<TerminologyMapping>>(
+        `/api/regx/v1/fda-data/mappings/${query}`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
+      );
+    },
+
+    approve: (tenantSlug: string, mappingType: string, publicId: string, reason?: string) =>
+      apiRequest<TerminologyMapping>(
+        `/api/regx/v1/fda-data/mappings/${mappingType}/${publicId}/approve/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { reason: reason ?? "" } }
+      ),
+
+    reject: (tenantSlug: string, mappingType: string, publicId: string, reason?: string) =>
+      apiRequest<TerminologyMapping>(
+        `/api/regx/v1/fda-data/mappings/${mappingType}/${publicId}/reject/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { reason: reason ?? "" } }
+      ),
   },
 };
 
@@ -862,6 +946,12 @@ export const formulations = {
       apiRequest<FormulationVersion>(`/api/regx/v1/formulations/versions/${publicId}/`, {
         headers: { "X-Tenant-Slug": tenantSlug },
       }),
+
+    list: (tenantSlug: string, productPublicId: string) =>
+      apiRequest<PaginatedResponse<FormulationVersion>>(
+        `/api/regx/v1/formulations/products/${productPublicId}/versions/`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
+      ),
   },
 
   components: {
@@ -881,6 +971,12 @@ export const formulations = {
         `/api/regx/v1/formulations/versions/${versionPublicId}/components/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
       ),
+
+    list: (tenantSlug: string, versionPublicId: string) =>
+      apiRequest<FormulationComponent[]>(
+        `/api/regx/v1/formulations/versions/${versionPublicId}/components/`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
+      ),
   },
 
   dosingRegimens: {
@@ -899,6 +995,12 @@ export const formulations = {
       apiRequest<DosingRegimen>(
         `/api/regx/v1/formulations/versions/${versionPublicId}/dosing-regimens/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+      ),
+
+    list: (tenantSlug: string, versionPublicId: string) =>
+      apiRequest<DosingRegimen[]>(
+        `/api/regx/v1/formulations/versions/${versionPublicId}/dosing-regimens/`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
       ),
   },
 };
@@ -983,7 +1085,39 @@ export const iidAssessments = {
       headers: { "X-Tenant-Slug": tenantSlug },
       body: data,
     }),
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<AssessmentSnapshotDetail>(`/api/regx/v1/iid-assessments/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
 };
+
+export interface AssessmentSnapshotDetail {
+  public_id: string;
+  formulation_component_public_id: string;
+  formulation_version_public_id: string;
+  iid_release_public_id: string | null;
+  iid_precedent_record_public_id: string | null;
+  iid_ingredient_name: string;
+  iid_route: string;
+  iid_dosage_form: string;
+  iid_potency_amount: string | null;
+  iid_potency_unit: string;
+  iid_mde: string | null;
+  iid_mde_unit: string;
+  proposed_quantity_per_unit: string | null;
+  proposed_quantity_unit: string;
+  proposed_daily_exposure: string | null;
+  calculation_results: Record<string, Record<string, unknown>>;
+  match_status: MatchStatus;
+  decision_status: PrecedentDecisionStatus;
+  decision_note: string;
+  reviewer_confirmed_match: boolean;
+  override_applied: boolean;
+  override_justification: string;
+  final_conclusion: string;
+  created_at: string;
+}
 
 export const mfa = {
   setup: () => apiRequest<{ totp_uri: string; recovery_codes: string[] }>("/api/regx/v1/mfa/setup/", { method: "POST" }),

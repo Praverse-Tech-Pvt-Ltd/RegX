@@ -35,17 +35,6 @@ function StatusBadge({ status }: { status: FdaReleaseStatus }) {
   );
 }
 
-const DATASET_TYPES = [
-  "orange_book_products",
-  "orange_book_discontinued",
-  "orange_book_patents",
-  "orange_book_exclusivity",
-  "fda_iid",
-  "fda_substance_identifiers",
-  "fda_route_terminology",
-  "fda_dosage_form_terminology",
-];
-
 function FdaReleasesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,20 +43,13 @@ function FdaReleasesPageInner() {
   const [items, setItems] = useState<FdaDataSourceRelease[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [showForm, setShowForm] = useState(false);
-  const [datasetType, setDatasetType] = useState<string>("fda_iid");
-  const [sourceName, setSourceName] = useState("");
-  const [sourceReference, setSourceReference] = useState("");
-  const [rowsJson, setRowsJson] = useState("[]");
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  const [datasetFilter, setDatasetFilter] = useState("");
 
   function load() {
     if (!tenantSlug) return;
     setLoading(true);
     fdaData.releases
-      .list(tenantSlug)
+      .list(tenantSlug, datasetFilter ? { dataset_type: datasetFilter } : undefined)
       .then((resp) => setItems(resp.results))
       .catch((err: unknown) => {
         if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
@@ -85,38 +67,7 @@ function FdaReleasesPageInner() {
       return;
     }
     load();
-  }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleRegister(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setFormError(null);
-    let rows: Record<string, unknown>[];
-    try {
-      rows = JSON.parse(rowsJson);
-    } catch {
-      setFormError("Rows must be valid JSON (an array of row objects).");
-      setSubmitting(false);
-      return;
-    }
-    try {
-      await fdaData.releases.register(tenantSlug, {
-        dataset_type: datasetType,
-        source_name: sourceName,
-        official_source_reference: sourceReference,
-        rows,
-      });
-      setShowForm(false);
-      setSourceName("");
-      setSourceReference("");
-      setRowsJson("[]");
-      load();
-    } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Registration failed.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  }, [tenantSlug, datasetFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!tenantSlug) return null;
 
@@ -138,8 +89,14 @@ function FdaReleasesPageInner() {
           >
             Orange Book search
           </Link>
-          <button
-            onClick={() => setShowForm((s) => !s)}
+          <Link
+            href={`/fda-data/mappings?tenant=${tenantSlug}`}
+            style={{ fontSize: 13, color: "#1d4ed8", textDecoration: "none" }}
+          >
+            Terminology mappings
+          </Link>
+          <Link
+            href={`/fda-data/releases/new?tenant=${tenantSlug}`}
             style={{
               background: "#1d4ed8",
               color: "#fff",
@@ -148,10 +105,12 @@ function FdaReleasesPageInner() {
               padding: "8px 18px",
               cursor: "pointer",
               fontWeight: 600,
+              textDecoration: "none",
+              display: "inline-block",
             }}
           >
-            {showForm ? "Cancel" : "Register release"}
-          </button>
+            Register release
+          </Link>
         </div>
       </div>
 
@@ -161,67 +120,26 @@ function FdaReleasesPageInner() {
         auto-activates.
       </p>
 
-      {showForm && (
-        <form
-          onSubmit={handleRegister}
-          style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "1rem", marginBottom: "1.5rem" }}
-        >
-          <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, fontSize: 13 }}>
-            Dataset type
-            <select
-              value={datasetType}
-              onChange={(e) => setDatasetType(e.target.value)}
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4 }}
-            >
-              {DATASET_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, fontSize: 13 }}>
-            Source name
-            <input
-              value={sourceName}
-              onChange={(e) => setSourceName(e.target.value)}
-              required
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, fontSize: 13 }}>
-            Official source reference
-            <input
-              value={sourceReference}
-              onChange={(e) => setSourceReference(e.target.value)}
-              required
-              placeholder="e.g. FDA Orange Book, 2026-06 edition"
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "1rem", fontWeight: 500, fontSize: 13 }}>
-            Rows (JSON array, synthetic/test data only)
-            <textarea
-              value={rowsJson}
-              onChange={(e) => setRowsJson(e.target.value)}
-              rows={5}
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box", fontFamily: "monospace", fontSize: 12 }}
-            />
-          </label>
-          {formError && (
-            <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
-              {formError}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={submitting}
-            style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: submitting ? "#93c5fd" : "#1d4ed8", color: "#fff", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
+      <div style={{ marginBottom: "1rem" }}>
+        <label style={{ fontSize: 13, color: "#374151" }}>
+          Filter by dataset type:{" "}
+          <select
+            value={datasetFilter}
+            onChange={(e) => setDatasetFilter(e.target.value)}
+            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #d1d5db", fontSize: 13 }}
           >
-            {submitting ? "Registering…" : "Register"}
-          </button>
-        </form>
-      )}
+            <option value="">All</option>
+            <option value="orange_book_products">Orange Book products</option>
+            <option value="orange_book_discontinued">Orange Book discontinued</option>
+            <option value="orange_book_patents">Orange Book patents</option>
+            <option value="orange_book_exclusivity">Orange Book exclusivity</option>
+            <option value="fda_iid">FDA IID</option>
+            <option value="fda_substance_identifiers">FDA substance identifiers</option>
+            <option value="fda_route_terminology">FDA route terminology</option>
+            <option value="fda_dosage_form_terminology">FDA dosage-form terminology</option>
+          </select>
+        </label>
+      </div>
 
       {loading && <p>Loading…</p>}
       {error && (
@@ -229,7 +147,7 @@ function FdaReleasesPageInner() {
           {error}
         </p>
       )}
-      {!loading && items.length === 0 && (
+      {!loading && items.length === 0 && !error && (
         <p style={{ color: "#6b7280" }}>No FDA data-source releases registered yet.</p>
       )}
 
@@ -237,13 +155,21 @@ function FdaReleasesPageInner() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
             <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
-              <th style={{ padding: "8px 12px" }}>Source</th>
-              <th style={{ padding: "8px 12px" }}>Dataset type</th>
-              <th style={{ padding: "8px 12px" }}>
+              <th style={{ padding: "8px 12px" }} scope="col">
+                Source
+              </th>
+              <th style={{ padding: "8px 12px" }} scope="col">
+                Dataset type
+              </th>
+              <th style={{ padding: "8px 12px" }} scope="col">
                 Publication date <ProvenanceLabel kind="FDA_SOURCE" />
               </th>
-              <th style={{ padding: "8px 12px" }}>Status</th>
-              <th style={{ padding: "8px 12px" }}>Records</th>
+              <th style={{ padding: "8px 12px" }} scope="col">
+                Status
+              </th>
+              <th style={{ padding: "8px 12px" }} scope="col">
+                Records
+              </th>
             </tr>
           </thead>
           <tbody>
