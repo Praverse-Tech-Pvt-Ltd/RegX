@@ -3,12 +3,16 @@ import type {
   Document,
   DocumentLocator,
   DocumentVersion,
+  MigrationBatch,
   PaginatedResponse,
   ProcessingStatus,
+  RegulatoryTemplate,
   ScanStatus,
 } from "@/lib/api";
 
-export function makeVersion(overrides: Partial<DocumentVersion> = {}): DocumentVersion {
+export function makeVersion(
+  overrides: Partial<DocumentVersion> = {},
+): DocumentVersion {
   return {
     public_id: "ver-public-0001",
     version_number: 1,
@@ -42,7 +46,9 @@ export function makeDocument(overrides: Partial<Document> = {}): Document {
   };
 }
 
-export function makeLocator(overrides: Partial<DocumentLocator> = {}): DocumentLocator {
+export function makeLocator(
+  overrides: Partial<DocumentLocator> = {},
+): DocumentLocator {
   return {
     public_id: "loc-public-0001",
     locator_type: "page",
@@ -56,4 +62,39 @@ export function makeLocator(overrides: Partial<DocumentLocator> = {}): DocumentL
 
 export function paginate<T>(results: T[]): PaginatedResponse<T> {
   return { count: results.length, next: null, previous: null, results };
+}
+
+export function makeTemplate(
+  overrides: Partial<RegulatoryTemplate> = {},
+): RegulatoryTemplate {
+  return {
+    public_id: "tpl-public-0001",
+    canonical_code: "ANDA-SOLID-ORAL",
+    title: "ANDA — Solid Oral Dosage",
+    category: "Formulation",
+    regulatory_pathway: "",
+    dosage_form_applicability: "",
+    description: "",
+    lifecycle_status: "imported",
+    current_approved_version: null,
+    created_at: "2026-07-20T09:59:00Z",
+    updated_at: "2026-07-20T09:59:00Z",
+    ...overrides,
+  };
+}
+
+export function makeMigrationBatch(
+  overrides: Partial<MigrationBatch> = {},
+): MigrationBatch {
+  return {
+    public_id: "batch-public-0001",
+    source_package: "pkg-public-0001",
+    status: "completed",
+    started_by_email: "doer@example.com",
+    started_at: "2026-07-20T09:00:00Z",
+    completed_at: "2026-07-20T09:01:00Z",
+    counts: { imported: 2, excluded: 0, requires_review: 0, failed: 0 },
+    correlation_id: "corr-0001",
+    ...overrides,
+  };
 }

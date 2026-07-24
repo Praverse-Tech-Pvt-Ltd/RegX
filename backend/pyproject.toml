@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = [".", "regx", "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents"]
+src = [".", "regx", "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry"]
 
 [tool.ruff.lint]
 select = [
@@ -29,26 +29,32 @@ ignore = [
 "*/migrations/*" = ["N806", "E501", "RUF012", "I001"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "regx"]
+known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "regx"]
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "common-has-no-domain-imports"
 type = "forbidden"
 source_modules = ["common"]
-forbidden_modules = ["identity", "tenancy", "authorization", "audit", "workflows", "AIDatabase"]
+forbidden_modules = ["identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "AIDatabase"]
 
 [[tool.importlinter.contracts]]
 name = "no-aidatabase-imports-anywhere"
 type = "forbidden"
 source_modules = [
-    "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents"
+    "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry"
 ]
 forbidden_modules = ["AIDatabase"]
+
+[[tool.importlinter.contracts]]
+name = "templates_registry-no-legacy-django-apps"
+type = "forbidden"
+source_modules = ["templates_registry"]
+forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
 
 [[tool.importlinter.contracts]]
 name = "identity-no-tenancy"

@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "workflows",
     "common",
     "documents",
+    "templates_registry",
 ]
 
 MIDDLEWARE = [

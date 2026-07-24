@@ -9,4 +9,5 @@ urlpatterns = [
     path("permissions/", include("authorization.urls")),
     path("mfa/", include("identity.mfa_urls")),
     path("documents/", include("documents.urls")),
+    path("", include("templates_registry.urls")),
 ]
