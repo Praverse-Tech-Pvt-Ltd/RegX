@@ -196,6 +196,31 @@ class TestTenantIsolationApi:
         cross_resp = api_client_b.get(f"{BASE}/formulations/products/{public_id}/")
         assert cross_resp.status_code == 404
 
+    def test_duplicate_product_code_returns_structured_400(self, api_client_a):
+        # A duplicate product_code within the same tenant hits the DB
+        # UniqueConstraint -- must surface as a clean 400, never a raw
+        # IntegrityError/500.
+        first = api_client_a.post(
+            f"{BASE}/formulations/products/",
+            data={
+                "product_code": "PROD-DUP",
+                "proposed_product_name": "Name",
+                "active_ingredient": "X",
+            },
+            format="json",
+        )
+        assert first.status_code == 201
+        second = api_client_a.post(
+            f"{BASE}/formulations/products/",
+            data={
+                "product_code": "PROD-DUP",
+                "proposed_product_name": "Name 2",
+                "active_ingredient": "Y",
+            },
+            format="json",
+        )
+        assert second.status_code == 400
+
     def test_no_numeric_id_in_response(self, api_client_a):
         resp = api_client_a.post(
             f"{BASE}/formulations/products/",
@@ -282,21 +307,54 @@ class TestFormulationVersionComponentApi:
         assert "id" not in body
 
     def test_create_component_rejects_negative_quantity(self, api_client_a):
-        # PLANTED VIOLATION (detected): the API must never persist a
-        # negative excipient quantity -- the DB check constraint is the
-        # backstop (defense-in-depth, same as the model-level test).
+        # PLANTED VIOLATION (detected): the API must return a clean,
+        # structured 400 for a negative excipient quantity -- never a raw
+        # database IntegrityError. Serializer-level validation is the
+        # primary defense; the DB check constraint is the backstop.
         version_public_id = self._version_public_id(api_client_a)
-        with pytest.raises(IntegrityError), transaction.atomic():
-            api_client_a.post(
-                f"{BASE}/formulations/versions/{version_public_id}/components/",
-                data={
-                    "component_type": ComponentType.INACTIVE,
-                    "ingredient_name": "Synthetic Starch",
-                    "quantity_per_dosage_unit": "-5",
-                    "quantity_unit": "milligram",
-                },
-                format="json",
-            )
+        resp = api_client_a.post(
+            f"{BASE}/formulations/versions/{version_public_id}/components/",
+            data={
+                "component_type": ComponentType.INACTIVE,
+                "ingredient_name": "Synthetic Starch",
+                "quantity_per_dosage_unit": "-5",
+                "quantity_unit": "milligram",
+            },
+            format="json",
+        )
+        assert resp.status_code == 400
+
+    def test_create_component_rejects_zero_quantity(self, api_client_a):
+        version_public_id = self._version_public_id(api_client_a)
+        resp = api_client_a.post(
+            f"{BASE}/formulations/versions/{version_public_id}/components/",
+            data={
+                "component_type": ComponentType.INACTIVE,
+                "ingredient_name": "Synthetic Starch",
+                "quantity_per_dosage_unit": "0",
+                "quantity_unit": "milligram",
+            },
+            format="json",
+        )
+        assert resp.status_code == 400
+
+    def test_create_version_rejects_zero_total_weight(self, api_client_a):
+        product_resp = api_client_a.post(
+            f"{BASE}/formulations/products/",
+            data={
+                "product_code": "PROD-ZERO-WEIGHT",
+                "proposed_product_name": "Name",
+                "active_ingredient": "X",
+            },
+            format="json",
+        )
+        product_public_id = product_resp.json()["public_id"]
+        resp = api_client_a.post(
+            f"{BASE}/formulations/products/{product_public_id}/versions/",
+            data={"total_dosage_unit_weight": "0", "total_dosage_unit_weight_unit": "milligram"},
+            format="json",
+        )
+        assert resp.status_code == 400
 
     def test_cross_tenant_component_creation_returns_generic_404(self, api_client_a, api_client_b):
         # PLANTED VIOLATION (detected): tenant B must never be able to add
@@ -333,15 +391,16 @@ class TestFormulationVersionComponentApi:
 
     def test_create_dosing_regimen_rejects_zero_max_units(self, api_client_a):
         # PLANTED VIOLATION (detected): a zero maximum-units-per-day must
-        # never be persisted -- the DB check constraint is the backstop.
+        # return a clean structured 400, never a raw database
+        # IntegrityError -- the DB check constraint is the backstop only.
         version_public_id = self._version_public_id(api_client_a)
-        with pytest.raises(IntegrityError), transaction.atomic():
-            api_client_a.post(
-                f"{BASE}/formulations/versions/{version_public_id}/dosing-regimens/",
-                data={
-                    "units_per_administration": "1",
-                    "administrations_per_day": "0",
-                    "maximum_units_per_day": "0",
-                },
-                format="json",
-            )
+        resp = api_client_a.post(
+            f"{BASE}/formulations/versions/{version_public_id}/dosing-regimens/",
+            data={
+                "units_per_administration": "1",
+                "administrations_per_day": "0",
+                "maximum_units_per_day": "0",
+            },
+            format="json",
+        )
+        assert resp.status_code == 400

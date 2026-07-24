@@ -113,6 +113,11 @@ class FormulationVersionCreateSerializer(serializers.Serializer):
     dosing_basis = serializers.CharField(max_length=255, required=False, allow_blank=True)
     rationale = serializers.CharField(required=False, allow_blank=True)
 
+    def validate_total_dosage_unit_weight(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("total_dosage_unit_weight must be greater than zero.")
+        return value
+
 
 class FormulationComponentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -138,6 +143,11 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["public_id", "percentage_w_w_snapshot"]
 
+    def validate_quantity_per_dosage_unit(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("quantity_per_dosage_unit must be greater than zero.")
+        return value
+
 
 class DosingRegimenSerializer(serializers.ModelSerializer):
     class Meta:
@@ -152,3 +162,13 @@ class DosingRegimenSerializer(serializers.ModelSerializer):
             "source_justification",
         ]
         read_only_fields = ["public_id"]
+
+    def validate_administrations_per_day(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("administrations_per_day must be greater than zero.")
+        return value
+
+    def validate_maximum_units_per_day(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("maximum_units_per_day must be greater than zero.")
+        return value

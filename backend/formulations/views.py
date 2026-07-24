@@ -1,8 +1,11 @@
 """Formulations domain API views. Tenant-scoped, UUID-only, generic 404."""
 
+from contextlib import contextmanager
+
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status as http_status
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -57,6 +60,20 @@ def _get_version_or_404(public_id, tenant) -> FormulationVersion:
         raise NotFound("Formulation version not found.") from exc
 
 
+@contextmanager
+def _integrity_error_as_validation_error(message: str):
+    """Backstop: a DB CheckConstraint/UniqueConstraint rejection must never
+    reach the client as a raw 500 IntegrityError -- serializer-level
+    validation is the primary defense (see validate_* methods in
+    serializers.py), this is the last line of defense for anything a
+    serializer validator doesn't independently catch."""
+    try:
+        with transaction.atomic():
+            yield
+    except IntegrityError as exc:
+        raise ValidationError({"detail": message}) from exc
+
+
 class ProductListView(APIView):
     pagination_class = FormulationsPagination
 
@@ -78,9 +95,12 @@ class ProductListView(APIView):
         tenant = _get_tenant(request)
         serializer = ProductDevelopmentRecordCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        product = ProductDevelopmentRecord.objects.create(
-            tenant=tenant, created_by=request.user, **serializer.validated_data
-        )
+        with _integrity_error_as_validation_error(
+            "product_code must be unique within this tenant."
+        ):
+            product = ProductDevelopmentRecord.objects.create(
+                tenant=tenant, created_by=request.user, **serializer.validated_data
+            )
         emit(
             event_type=FormulationEvent.PRODUCT_CREATED,
             resource_id=str(product.public_id),
@@ -165,12 +185,15 @@ class FormulationVersionListCreateView(APIView):
         last = (
             FormulationVersion.objects.filter(product=product).order_by("-version_number").first()
         )
-        version = FormulationVersion.objects.create(
-            product=product,
-            version_number=(last.version_number + 1) if last else 1,
-            created_by=request.user,
-            **serializer.validated_data,
-        )
+        with _integrity_error_as_validation_error(
+            "Formulation version could not be created with the given values."
+        ):
+            version = FormulationVersion.objects.create(
+                product=product,
+                version_number=(last.version_number + 1) if last else 1,
+                created_by=request.user,
+                **serializer.validated_data,
+            )
         emit(
             event_type=FormulationEvent.FORMULATION_VERSION_CREATED,
             resource_id=str(version.public_id),
@@ -203,9 +226,12 @@ class FormulationComponentListView(APIView):
         version = _get_version_or_404(public_id, tenant)
         serializer = FormulationComponentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        component = FormulationComponent.objects.create(
-            formulation_version=version, **serializer.validated_data
-        )
+        with _integrity_error_as_validation_error(
+            "Formulation component could not be created with the given values."
+        ):
+            component = FormulationComponent.objects.create(
+                formulation_version=version, **serializer.validated_data
+            )
         emit(
             event_type=FormulationEvent.COMPONENT_ADDED,
             resource_id=str(component.public_id),
@@ -228,9 +254,12 @@ class DosingRegimenListView(APIView):
         version = _get_version_or_404(public_id, tenant)
         serializer = DosingRegimenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        regimen = DosingRegimen.objects.create(
-            formulation_version=version, **serializer.validated_data
-        )
+        with _integrity_error_as_validation_error(
+            "Dosing regimen could not be created with the given values."
+        ):
+            regimen = DosingRegimen.objects.create(
+                formulation_version=version, **serializer.validated_data
+            )
         emit(
             event_type=FormulationEvent.DOSING_REGIMEN_CHANGED,
             resource_id=str(regimen.public_id),
