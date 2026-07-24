@@ -64,3 +64,23 @@ empty raw value simply fails the subsequent mapping lookup.
 (`"500 MG"`). Ratios, combination-product strengths, and ranges are left
 `status="review_required"` with the original text preserved verbatim — never
 partially parsed or guessed.
+
+## Mapping-review API and UI
+
+`GET /api/regx/v1/fda-data/mappings/` (requires `fda_data.review`) lists
+route/dosage-form/unit mappings in one normalized shape
+(`TerminologyMappingSerializer.from_instance`), optionally filtered by
+`?type=` and `?status=`, including a best-effort `affected_record_count`
+(a count of Orange Book/IID rows referencing that raw value — informational
+only, never used to gate the decision). `POST .../mappings/{type}/{public_id}/
+approve/` and `.../reject/` require the same permission and always set the
+acting user as `reviewer`; both are rejected by `full_clean()` if the
+mapping is already approved (immutability, see `_BaseTerminologyMapping.clean()`
+in `FDA_DATA_GOVERNANCE.md`).
+
+`frontend/src/app/fda-data/mappings/page.tsx` consumes this API: every
+approve/reject requires an explicit confirmation-dialog click (never a
+bare button click), and the multi-select bulk-approve control calls the
+same per-mapping scoped endpoint for each selection sequentially — there
+is no unscoped "approve everything" action, consistent with the
+"no bulk operation without tenant/platform scope" requirement.

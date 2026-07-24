@@ -1,8 +1,8 @@
 # IID Foundation Test Strategy
 
 Covers `fda_data`, `formulations`, and `iid_assessment` — Milestone
-4A-4C's controlled, synthetic-data-only test suite. 154 backend tests
-(422 across the full repo), all passing, all against synthetic
+4A-4C's controlled, synthetic-data-only test suite. 171 backend tests
+(439 across the full repo), all passing, all against synthetic
 FDA-shaped fixtures (never real Orange Book/IID content, never AIDatabase
 or 483 content, never legacy IIG answer data).
 
@@ -79,35 +79,77 @@ unit-conversion engine fails closed (never raises) on a value that can't
 become a `Decimal` at all; calculation output is deterministic across
 repeated calls with identical `Decimal` inputs.
 
+**`fda_data/tests/test_mappings_api.py`** (11 tests) — mapping list
+filtered by type/status, Doer cannot list or approve/reject a mapping
+(VP/Reviewer only), approve/reject persist the reviewer and reason,
+approved mappings are immutable at the model layer, nonexistent mapping
+and unknown mapping-type both return generic 404, no numeric ID in the
+response.
+
+**`fda_data/tests/test_orange_book_api.py`** (6 tests) — RLD /
+reference-standard / discontinued / application-type / strength filters
+each narrow results correctly; a non-RLD product is never returned when
+filtering for RLD, even when it shares an application with an RLD
+product.
+
 ## Frontend coverage
 
-`frontend/tests/unit/fda-iid.test.tsx` (23 tests) and additions to
-`frontend/tests/unit/accessibility.test.tsx` (8 new tests, 18 total)
-cover the FDA release inventory/detail, Orange Book search, formulation
-reference-selection (including the required confirmation checkbox), and
-IID preview screens — provenance labels, no-prefill-from-IID, blocked-
-calculation display, multiple-candidate selection, and the absence of any
-forbidden safety-claim word. `frontend/e2e/fda-iid.spec.ts` (9 Playwright
-tests) covers the same screens end-to-end against deterministic API
-mocks. See `FRONTEND_FOUNDATION.md` for what the frontend build covers and
-what it explicitly does not (the full 14-screen surface was not built;
-see the Milestone 4A-4C final report for the exact accounting).
+`frontend/tests/unit/fda-iid.test.tsx` (40 tests) and
+`frontend/tests/unit/accessibility.test.tsx` (24 tests) cover all 13
+routes in `FRONTEND_FOUNDATION.md`'s route matrix — provenance labels,
+no-prefill-from-IID, no-auto-mapping-approval, no-auto-reference-selection,
+blocked-calculation display, multiple-candidate selection, structured
+form-validation errors, and the absence of any forbidden safety-claim
+word. `frontend/e2e/fda-iid.spec.ts` (22 Playwright tests, 78 across the
+full frontend suite) covers the same screens end-to-end against
+deterministic API mocks.
+
+### 20/20 required E2E scenario matrix (`frontend/e2e/fda-iid.spec.ts`)
+
+| # | Scenario | Test name |
+|---|---|---|
+| 1 | FDA release inventory loads | `FDA release inventory > loads and lists a registered release` |
+| 2 | New release registration | `FDA release inventory > new release registration navigates to detail and does not auto-activate` |
+| 3 | Release reconciliation screen | `FDA release reconciliation screen > shows counts and per-row reconciliation results` |
+| 4 | Terminology mapping review | `Terminology mapping review > lists a proposed mapping and requires explicit confirmation to approve, never auto-approved` |
+| 5 | Orange Book search | `Orange Book search > searches and shows FDA-sourced results` |
+| 6 | Orange Book filters | `Orange Book filters and product detail > RLD filter narrows results to only RLD-flagged products` |
+| 7 | Orange Book product detail | `Orange Book filters and product detail > product detail shows FDA-sourced provenance and never implies auto-selection` |
+| 8 | Explicit reference selection | `Formulation record and explicit reference selection > creating a product record and selecting a reference product requires explicit confirmation` |
+| 9 | Product record creation | `Formulation version creation, component entry, and dosing regimen > creates a product record via the standalone new-product route` |
+| 10 | Formulation version creation | `Formulation version creation, component entry, and dosing regimen > creates a formulation version, then adds an inactive component and a dosing regimen` |
+| 11 | Inactive component entry | (same test as #10 — component entry step) |
+| 12 | Dosing regimen entry | (same test as #10 — dosing-regimen step) |
+| 13 | Exact IID match preview | `IID assessment preview > exact match within precedent shows the required disclaimer and no automatic safety language` |
+| 14 | Multiple-match review state | `IID assessment preview > multiple exact matches require explicit reviewer selection, never auto-picked` |
+| 15 | Missing-MDE review state | `IID assessment preview > missing-MDE shows review-required, never a fabricated MDE value` |
+| 16 | Route mismatch | `IID assessment preview > route mismatch is shown distinctly and never treated as comparable` |
+| 17 | Dosage-form mismatch | `IID assessment preview > dosage-form mismatch is shown distinctly and never treated as comparable` |
+| 18 | Unit mismatch | `IID assessment preview > unit mismatch is shown when the proposed unit cannot be reconciled with the precedent` |
+| 19 | Percentage w/w and daily-exposure calculation | `IID assessment preview > percentage w/w and daily-exposure calculations are displayed with calculated provenance` |
+| 20 | Exceeds-IID-precedent warning and required disclaimer | `IID assessment preview > exceeding the IID precedent shows an escalation warning, never a pass` |
+
+Also covered as distinct tests: no automatic quantity defaulting
+(`no automatic quantity defaulting -- proposed field never pre-fills
+from a precedent`), an API error state (`an API error surfaces distinctly,
+not as a fabricated result`), and a reconciliation permission-error state
+(`a permission-denied reconciliation request shows a distinct error, not
+a blank page`). Loading/empty states, raw-path absence, and numeric-ID
+absence are covered at the unit-test level in `fda-iid.test.tsx` and
+`accessibility.test.tsx` rather than duplicated in Playwright.
 
 ## What remains explicitly out of scope
 
-- Not every one of the 20 example Playwright scenarios listed in the
-  milestone spec has a discrete spec file entry — 9 of the highest-value,
-  safety-critical ones do (exact match, multiple candidates, route
-  mismatch, exceeds-precedent, no-auto-safety-language, provenance,
-  explicit reference confirmation, release registration, Orange Book
-  search). The remaining scenarios (dosage-form mismatch, unit mismatch,
-  missing-MDE review state, percentage-w/w and daily-exposure calculation
-  detail views, dosing-regimen/component entry as standalone E2E flows)
-  are covered at the unit/component level instead, not end-to-end.
+- No dedicated UI or tests for substance/UNII synonym mappings — no
+  backend model exists for this mapping type.
+- No "view affected records" drill-down from a mapping row (the count is
+  shown; the underlying record list is not).
 - Storage-level authorization for raw FDA source files is inherited from
   `documents.storage` and re-verified here only at the API-response-shape
   level (`storage_key` never serialized) — the storage backend's own
   access control is not independently re-tested in this pass.
+- Milestone 4D (final checklist execution and approval workflow) is not
+  implemented and remains fully out of scope.
 
 ## Running
 
@@ -120,4 +162,4 @@ python -m pytest fda_data formulations iid_assessment -q --no-cov
 Local gates also run clean: `ruff check`, `ruff format --check`,
 `lint-imports` (6/6 contracts kept), `manage.py check`,
 `makemigrations --check --dry-run`, and the full repo-wide suite
-(422 tests, 92.5% coverage).
+(439 tests, 92.4% coverage).
