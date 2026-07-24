@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     "common",
     "documents",
     "templates_registry",
+    "fda_data",
+    "formulations",
+    "iid_assessment",
 ]
 
 MIDDLEWARE = [
