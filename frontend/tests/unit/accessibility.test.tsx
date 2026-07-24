@@ -15,14 +15,23 @@ import {
   makeAssessmentPreview,
   makeDocument,
   makeFdaRelease,
+  makeFormulationComponent,
+  makeFormulationVersion,
   makeLocator,
   makeOrangeBookProduct,
   makeProduct,
+  makeReconciliationReport,
+  makeTerminologyMapping,
   makeVersion,
   paginate,
 } from "./fixtures";
 
-const nav = vi.hoisted(() => ({ push: vi.fn(), tenant: "alpha", publicId: "doc-public-0001" }));
+const nav = vi.hoisted(() => ({
+  push: vi.fn(),
+  tenant: "alpha",
+  publicId: "doc-public-0001",
+  versionPublicId: "version-public-0001",
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -34,7 +43,7 @@ vi.mock("next/navigation", () => ({
     prefetch: vi.fn(),
   }),
   useSearchParams: () => new URLSearchParams(nav.tenant ? `tenant=${nav.tenant}` : ""),
-  useParams: () => ({ publicId: nav.publicId }),
+  useParams: () => ({ publicId: nav.publicId, versionPublicId: nav.versionPublicId }),
 }));
 
 vi.mock("next/link", () => ({
@@ -59,8 +68,14 @@ const api = vi.hoisted(() => ({
 const fdaApi = vi.hoisted(() => ({
   releasesList: vi.fn(),
   releasesGet: vi.fn(),
+  releasesReconciliationJson: vi.fn(),
   orangeBookSearch: vi.fn(),
   productsGet: vi.fn(),
+  versionsGet: vi.fn(),
+  versionsList: vi.fn(),
+  componentsList: vi.fn(),
+  dosingRegimensList: vi.fn(),
+  mappingsList: vi.fn(),
   preview: vi.fn(),
 }));
 
@@ -74,12 +89,21 @@ vi.mock("@/lib/api", async (importOriginal) => {
         ...actual.fdaData.releases,
         list: fdaApi.releasesList,
         get: fdaApi.releasesGet,
+        reconciliationJson: fdaApi.releasesReconciliationJson,
       },
-      orangeBook: { search: fdaApi.orangeBookSearch },
+      orangeBook: { ...actual.fdaData.orangeBook, search: fdaApi.orangeBookSearch },
+      mappings: { ...actual.fdaData.mappings, list: fdaApi.mappingsList },
     },
     formulations: {
       ...actual.formulations,
       products: { ...actual.formulations.products, get: fdaApi.productsGet },
+      versions: {
+        ...actual.formulations.versions,
+        get: fdaApi.versionsGet,
+        list: fdaApi.versionsList,
+      },
+      components: { ...actual.formulations.components, list: fdaApi.componentsList },
+      dosingRegimens: { ...actual.formulations.dosingRegimens, list: fdaApi.dosingRegimensList },
     },
     iidAssessments: { ...actual.iidAssessments, preview: fdaApi.preview },
   };
@@ -89,9 +113,13 @@ import SignInPage from "@/app/signin/page";
 import DocumentsPage from "@/app/documents/page";
 import DocumentDetailPage from "@/app/documents/[publicId]/page";
 import FdaReleasesPage from "@/app/fda-data/releases/page";
+import NewReleasePage from "@/app/fda-data/releases/new/page";
 import FdaReleaseDetailPage from "@/app/fda-data/releases/[publicId]/page";
+import ReconciliationPage from "@/app/fda-data/releases/[publicId]/reconciliation/page";
+import MappingsPage from "@/app/fda-data/mappings/page";
 import OrangeBookSearchPage from "@/app/fda-data/orange-book/page";
 import FormulationDetailPage from "@/app/formulations/[publicId]/page";
+import VersionDetailPage from "@/app/formulations/[publicId]/versions/[versionPublicId]/page";
 import IidPreviewPage from "@/app/iid-assessments/preview/page";
 
 beforeEach(() => {
@@ -101,6 +129,9 @@ beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset());
   Object.values(fdaApi).forEach((fn) => fn.mockReset());
   api.versionStatus.mockResolvedValue({ scan_status: "clean", processing_status: "complete" });
+  fdaApi.versionsList.mockResolvedValue(paginate([]));
+  fdaApi.componentsList.mockResolvedValue([]);
+  fdaApi.dosingRegimensList.mockResolvedValue([]);
 });
 
 describe("Accessibility — /signin", () => {
@@ -256,11 +287,7 @@ describe("Accessibility — /fda-data/releases", () => {
   });
 
   it("has no serious or critical automated violations in the registration form", async () => {
-    const user = userEvent.setup();
-    fdaApi.releasesList.mockResolvedValue(paginate([]));
-    const { container } = render(<FdaReleasesPage />);
-    await screen.findByText(/No FDA data-source releases/i);
-    await user.click(screen.getByRole("button", { name: /register release/i }));
+    const { container } = render(<NewReleasePage />);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });
@@ -345,5 +372,73 @@ describe("Accessibility — /iid-assessments/preview", () => {
 
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/exceeds/i);
+  });
+});
+
+describe("Accessibility — /fda-data/releases/{public_id}/reconciliation", () => {
+  it("has no serious or critical automated violations, table headers are proper th scope", async () => {
+    fdaApi.releasesReconciliationJson.mockResolvedValue(makeReconciliationReport());
+    const { container } = render(<ReconciliationPage />);
+    await screen.findByText("row:0");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+    for (const header of screen.getAllByRole("columnheader")) {
+      expect(header).toHaveAttribute("scope", "col");
+    }
+  });
+});
+
+describe("Accessibility — /fda-data/mappings", () => {
+  it("has no serious or critical automated violations in the list view", async () => {
+    fdaApi.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping()]));
+    const { container } = render(<MappingsPage />);
+    await screen.findByText("ORAL");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("the approve/reject confirmation dialog traps focus semantics and has no violations", async () => {
+    const user = userEvent.setup();
+    fdaApi.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping()]));
+    const { container } = render(<MappingsPage />);
+    await screen.findByText("ORAL");
+    await user.click(screen.getByRole("button", { name: /^approve$/i }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog).toHaveAccessibleName();
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("checkboxes for multi-selection are accessibly labeled", async () => {
+    fdaApi.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping()]));
+    render(<MappingsPage />);
+    await screen.findByText("ORAL");
+    expect(screen.getByRole("checkbox", { name: /select mapping ORAL/i })).toBeInTheDocument();
+  });
+});
+
+describe("Accessibility — /formulations/{public_id}/versions/{version_public_id}", () => {
+  it("has no serious or critical automated violations with components and dosing regimen listed", async () => {
+    fdaApi.versionsGet.mockResolvedValue(makeFormulationVersion());
+    fdaApi.componentsList.mockResolvedValue([makeFormulationComponent()]);
+    fdaApi.dosingRegimensList.mockResolvedValue([]);
+    const { container } = render(<VersionDetailPage />);
+    await screen.findByText("Synthetic Starch");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+
+  it("the IID preview link is keyboard-focusable and accessibly named", async () => {
+    fdaApi.versionsGet.mockResolvedValue(makeFormulationVersion());
+    fdaApi.componentsList.mockResolvedValue([]);
+    fdaApi.dosingRegimensList.mockResolvedValue([]);
+    render(<VersionDetailPage />);
+    const link = await screen.findByRole("link", { name: /run iid assessment preview/i });
+    expect(link).toHaveAccessibleName();
+    link.focus();
+    expect(link).toHaveFocus();
   });
 });

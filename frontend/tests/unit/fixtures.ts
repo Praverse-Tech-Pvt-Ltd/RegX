@@ -1,10 +1,12 @@
 // Synthetic, non-confidential fixtures for frontend unit/component tests.
 import type {
   AssessmentPreview,
+  AssessmentSnapshotDetail,
   Document,
   DocumentLocator,
   DocumentVersion,
   FdaDataSourceRelease,
+  FdaReconciliationReport,
   FormulationComponent,
   FormulationVersion,
   MatchCandidate,
@@ -15,6 +17,7 @@ import type {
   ProductDevelopmentRecord,
   RegulatoryTemplate,
   ScanStatus,
+  TerminologyMapping,
 } from "@/lib/api";
 
 export function makeVersion(
@@ -256,6 +259,88 @@ export function makeAssessmentPreview(
     decision_note:
       "Within selected FDA IID precedent. This is not an automatic safety determination or regulatory approval.",
     escalation_required: false,
+    ...overrides,
+  };
+}
+
+export function makeTerminologyMapping(
+  overrides: Partial<TerminologyMapping> = {},
+): TerminologyMapping {
+  return {
+    public_id: "mapping-public-0001",
+    mapping_type: "route",
+    source_dataset: "fda_iid",
+    source_raw_value: "ORAL",
+    proposed_controlled_value: "Oral",
+    status: "proposed",
+    is_current: true,
+    reviewer_email: null,
+    reason: "",
+    affected_record_count: 2,
+    created_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+export function makeReconciliationReport(
+  overrides: Partial<FdaReconciliationReport> = {},
+): FdaReconciliationReport {
+  return {
+    release: { public_id: "fda-release-public-0001", dataset_type: "fda_iid", status: "registered" },
+    counts: { expected: 2, extracted: 2, imported: 1, failed: 1 },
+    results: [
+      {
+        public_id: "row-public-0001",
+        row_locator: "row:0",
+        target_public_identifier: "target-0001",
+        result: "imported",
+        reason_code: "",
+        safe_detail: "",
+      },
+      {
+        public_id: "row-public-0002",
+        row_locator: "row:1",
+        target_public_identifier: null,
+        result: "failed",
+        reason_code: "potency_missing",
+        safe_detail: "",
+      },
+    ],
+    ...overrides,
+  };
+}
+
+export function makeSnapshotDetail(
+  overrides: Partial<AssessmentSnapshotDetail> = {},
+): AssessmentSnapshotDetail {
+  return {
+    public_id: "snapshot-public-0001",
+    formulation_component_public_id: "component-public-0001",
+    formulation_version_public_id: "version-public-0001",
+    iid_release_public_id: "fda-release-public-0001",
+    iid_precedent_record_public_id: "precedent-public-0001",
+    iid_ingredient_name: "Synthetic Starch",
+    iid_route: "Oral",
+    iid_dosage_form: "Tablet",
+    iid_potency_amount: "50.000000",
+    iid_potency_unit: "milligram",
+    iid_mde: "200.000000",
+    iid_mde_unit: "milligram",
+    proposed_quantity_per_unit: "30.000000",
+    proposed_quantity_unit: "milligram",
+    proposed_daily_exposure: "120.000000",
+    calculation_results: {
+      percentage_w_w: { status: "OK", value: "6", unit: "percent_w_w" },
+    },
+    match_status: "EXACT_MATCH",
+    decision_status: "PASS_WITH_IID_PRECEDENT",
+    decision_note:
+      "Within selected FDA IID precedent. This is not an automatic safety determination or regulatory approval.",
+    reviewer_confirmed_match: false,
+    override_applied: false,
+    override_justification: "",
+    final_conclusion: "",
+    created_at: "2026-01-01T00:00:00Z",
     ...overrides,
   };
 }
