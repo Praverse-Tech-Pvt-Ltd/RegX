@@ -85,3 +85,15 @@ product, version, component, or dosing regimen returns a generic 404 (see
 Every quantity field is a `DecimalField`; nothing here is ever a `float`.
 See `IID_CALCULATION_RULES.md` and `UNIT_CONVERSION_ENGINE.md` for how these
 values flow into calculations without ever crossing into floating point.
+
+## API-level validation
+
+Invalid quantities (negative/zero `quantity_per_dosage_unit`, zero
+`total_dosage_unit_weight`, zero `administrations_per_day`/
+`maximum_units_per_day`) are rejected by serializer-level `validate_*`
+methods before they ever reach the database, returning a clean structured
+400 — never a raw `IntegrityError`. The DB `CheckConstraint`s remain as a
+defense-in-depth backstop (see `formulations/views.py`'s
+`_integrity_error_as_validation_error` context manager, which converts any
+constraint violation that slips past serializer validation into the same
+structured 400 response instead of a 500).
