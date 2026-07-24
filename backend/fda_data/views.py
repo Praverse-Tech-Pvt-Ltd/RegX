@@ -24,6 +24,7 @@ from .models import (
     ControlledUnit,
     FDADataSourceRelease,
     IIDPrecedentRecord,
+    MappingDecisionStatus,
     OrangeBookProduct,
 )
 from .permissions import (
@@ -32,11 +33,13 @@ from .permissions import (
     CanExportFdaReconciliation,
     CanImportFdaData,
     CanRegisterFdaData,
+    CanReviewFdaData,
     CanViewFdaData,
     CanViewRawFdaData,
     has_fda_data_permission,
 )
 from .serializers import (
+    MAPPING_TYPE_CONFIG,
     ControlledDosageFormSerializer,
     ControlledRouteSerializer,
     ControlledUnitSerializer,
@@ -44,9 +47,11 @@ from .serializers import (
     FDADataSourceReleaseSerializer,
     FdaImportRowResultSerializer,
     IIDPrecedentRecordSerializer,
+    MappingReviewActionSerializer,
     OrangeBookProductSerializer,
     ReleaseRegistrationSerializer,
     ReviewActionSerializer,
+    TerminologyMappingSerializer,
 )
 
 
@@ -297,15 +302,32 @@ class OrangeBookProductListView(APIView):
         qs = OrangeBookProduct.objects.filter(release__status="active").order_by(
             "active_ingredient_raw"
         )
-        ingredient = request.query_params.get("active_ingredient")
-        route = request.query_params.get("route")
-        dosage_form = request.query_params.get("dosage_form")
+        params = request.query_params
+        ingredient = params.get("active_ingredient")
+        route = params.get("route")
+        dosage_form = params.get("dosage_form")
+        strength = params.get("strength")
+        application_type = params.get("application_type")
+        rld = params.get("rld")
+        reference_standard = params.get("reference_standard")
+        discontinued = params.get("discontinued")
         if ingredient:
             qs = qs.filter(active_ingredient_raw__icontains=ingredient)
         if route:
             qs = qs.filter(route_normalized__code=route)
         if dosage_form:
             qs = qs.filter(dosage_form_normalized__code=dosage_form)
+        if strength:
+            qs = qs.filter(strength_raw__icontains=strength)
+        if application_type:
+            qs = qs.filter(application__application_type=application_type)
+        truthy = ("1", "true", "yes")
+        if rld is not None:
+            qs = qs.filter(rld_flag=rld.lower() in truthy)
+        if reference_standard is not None:
+            qs = qs.filter(reference_standard_flag=reference_standard.lower() in truthy)
+        if discontinued is not None:
+            qs = qs.filter(discontinued=discontinued.lower() in truthy)
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response(OrangeBookProductSerializer(page, many=True).data)
@@ -375,3 +397,135 @@ class ControlledUnitListView(APIView):
     def get(self, request):
         qs = ControlledUnit.objects.filter(active=True)
         return Response(ControlledUnitSerializer(qs, many=True).data)
+
+
+def _affected_record_count(mapping_type: str, source_raw_value: str) -> int:
+    """Best-effort count of records referencing this raw value -- used only
+    to inform a reviewer's decision, never to gate it."""
+    from django.db.models import Q
+
+    if mapping_type == "route":
+        return (
+            OrangeBookProduct.objects.filter(route_raw=source_raw_value).count()
+            + IIDPrecedentRecord.objects.filter(route_raw=source_raw_value).count()
+        )
+    if mapping_type == "dosage_form":
+        return (
+            OrangeBookProduct.objects.filter(dosage_form_raw=source_raw_value).count()
+            + IIDPrecedentRecord.objects.filter(dosage_form_raw=source_raw_value).count()
+        )
+    if mapping_type == "unit":
+        return IIDPrecedentRecord.objects.filter(
+            Q(potency_unit_raw=source_raw_value) | Q(mde_unit_raw=source_raw_value)
+        ).count()
+    return 0
+
+
+def _get_mapping_or_404(mapping_type: str, public_id):
+    model_cls, _, _ = MAPPING_TYPE_CONFIG.get(mapping_type, (None, None, None))
+    if model_cls is None:
+        raise NotFound("Unknown mapping type.")
+    try:
+        return model_cls.objects.select_related("reviewer").get(public_id=public_id)
+    except model_cls.DoesNotExist as exc:
+        raise NotFound("Terminology mapping not found.") from exc
+
+
+class TerminologyMappingListView(APIView):
+    """Read-only inventory across route/dosage-form/unit mappings, unified
+    into one shape for the mapping-review UI. Filter by ?type= and
+    ?status= (both optional; omitting type returns all three kinds)."""
+
+    pagination_class = FdaDataPagination
+
+    def get_permissions(self):
+        return [CanReviewFdaData()]
+
+    def get(self, request):
+        type_filter = request.query_params.get("type")
+        status_filter = request.query_params.get("status")
+        types = [type_filter] if type_filter else list(MAPPING_TYPE_CONFIG.keys())
+
+        results = []
+        for mapping_type in types:
+            model_cls, _, _ = MAPPING_TYPE_CONFIG.get(mapping_type, (None, None, None))
+            if model_cls is None:
+                continue
+            qs = model_cls.objects.select_related("reviewer").order_by("-created_at")
+            if status_filter:
+                qs = qs.filter(status=status_filter)
+            for instance in qs:
+                results.append(
+                    TerminologyMappingSerializer.from_instance(
+                        mapping_type,
+                        instance,
+                        _affected_record_count(mapping_type, instance.source_raw_value),
+                    )
+                )
+        results.sort(key=lambda r: r["created_at"], reverse=True)
+
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(results, request)
+        return paginator.get_paginated_response(page)
+
+
+class TerminologyMappingApproveView(APIView):
+    def get_permissions(self):
+        return [CanReviewFdaData()]
+
+    def post(self, request, mapping_type, public_id):
+        mapping = _get_mapping_or_404(mapping_type, public_id)
+        serializer = MappingReviewActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        mapping.status = MappingDecisionStatus.APPROVED
+        mapping.reviewer = request.user
+        if serializer.validated_data.get("reason"):
+            mapping.reason = serializer.validated_data["reason"]
+        mapping.full_clean()
+        mapping.save(update_fields=["status", "reviewer", "reason", "updated_at"])
+        emit(
+            event_type=FdaDataEvent.MAPPING_APPROVED,
+            resource_type="fda_data_mapping",
+            resource_id=str(mapping.public_id),
+            payload={"mapping_type": mapping_type, "source_raw_value": mapping.source_raw_value},
+            actor_id=request.user.id,
+            actor_email=request.user.email,
+        )
+        return Response(
+            TerminologyMappingSerializer.from_instance(
+                mapping_type,
+                mapping,
+                _affected_record_count(mapping_type, mapping.source_raw_value),
+            )
+        )
+
+
+class TerminologyMappingRejectView(APIView):
+    def get_permissions(self):
+        return [CanReviewFdaData()]
+
+    def post(self, request, mapping_type, public_id):
+        mapping = _get_mapping_or_404(mapping_type, public_id)
+        serializer = MappingReviewActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        mapping.status = MappingDecisionStatus.REJECTED
+        mapping.reviewer = request.user
+        if serializer.validated_data.get("reason"):
+            mapping.reason = serializer.validated_data["reason"]
+        mapping.full_clean()
+        mapping.save(update_fields=["status", "reviewer", "reason", "updated_at"])
+        emit(
+            event_type=FdaDataEvent.MAPPING_REJECTED,
+            resource_type="fda_data_mapping",
+            resource_id=str(mapping.public_id),
+            payload={"mapping_type": mapping_type, "source_raw_value": mapping.source_raw_value},
+            actor_id=request.user.id,
+            actor_email=request.user.email,
+        )
+        return Response(
+            TerminologyMappingSerializer.from_instance(
+                mapping_type,
+                mapping,
+                _affected_record_count(mapping_type, mapping.source_raw_value),
+            )
+        )

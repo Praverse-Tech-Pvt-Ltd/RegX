@@ -11,10 +11,13 @@ from .models import (
     ControlledDosageForm,
     ControlledRoute,
     ControlledUnit,
+    DosageFormMapping,
     FDADataSourceRelease,
     FdaImportRowResult,
     IIDPrecedentRecord,
     OrangeBookProduct,
+    RouteMapping,
+    UnitMapping,
 )
 
 
@@ -207,3 +210,53 @@ class ReleaseRegistrationSerializer(serializers.Serializer):
 
 class ReviewActionSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
+
+
+MAPPING_TYPE_CONFIG = {
+    "route": (RouteMapping, "controlled_route", "canonical_label"),
+    "dosage_form": (DosageFormMapping, "controlled_dosage_form", "canonical_label"),
+    "unit": (UnitMapping, "controlled_unit", "code"),
+}
+
+
+class TerminologyMappingSerializer(serializers.Serializer):
+    """Normalized shape shared across RouteMapping/DosageFormMapping/
+    UnitMapping so the mapping-review UI can render one table regardless
+    of type. No fuzzy mapping is ever exposed as auto-approved -- status
+    always reflects the real MappingDecisionStatus."""
+
+    public_id = serializers.UUIDField(read_only=True)
+    mapping_type = serializers.CharField(read_only=True)
+    source_dataset = serializers.CharField(read_only=True)
+    source_raw_value = serializers.CharField(read_only=True)
+    proposed_controlled_value = serializers.CharField(read_only=True, allow_null=True)
+    status = serializers.CharField(read_only=True)
+    is_current = serializers.BooleanField(read_only=True)
+    reviewer_email = serializers.CharField(read_only=True, allow_null=True)
+    reason = serializers.CharField(read_only=True)
+    affected_record_count = serializers.IntegerField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+
+    @staticmethod
+    def from_instance(mapping_type: str, instance, affected_record_count: int) -> dict:
+        _, fk_name, label_field = MAPPING_TYPE_CONFIG[mapping_type]
+        controlled = getattr(instance, fk_name, None)
+        return {
+            "public_id": instance.public_id,
+            "mapping_type": mapping_type,
+            "source_dataset": instance.source_dataset,
+            "source_raw_value": instance.source_raw_value,
+            "proposed_controlled_value": getattr(controlled, label_field, None)
+            if controlled
+            else None,
+            "status": instance.status,
+            "is_current": instance.is_current,
+            "reviewer_email": instance.reviewer.email if instance.reviewer else None,
+            "reason": instance.reason,
+            "affected_record_count": affected_record_count,
+            "created_at": instance.created_at,
+        }
+
+
+class MappingReviewActionSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True)

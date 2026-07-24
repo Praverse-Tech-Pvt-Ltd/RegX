@@ -74,4 +74,15 @@ urlpatterns = [
         views.ControlledUnitListView.as_view(),
         name="controlled-unit-list",
     ),
+    path("fda-data/mappings/", views.TerminologyMappingListView.as_view(), name="mapping-list"),
+    path(
+        "fda-data/mappings/<str:mapping_type>/<uuid:public_id>/approve/",
+        views.TerminologyMappingApproveView.as_view(),
+        name="mapping-approve",
+    ),
+    path(
+        "fda-data/mappings/<str:mapping_type>/<uuid:public_id>/reject/",
+        views.TerminologyMappingRejectView.as_view(),
+        name="mapping-reject",
+    ),
 ]

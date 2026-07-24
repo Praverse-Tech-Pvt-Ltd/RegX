@@ -172,10 +172,20 @@ class SelectReferenceProductView(APIView):
 
 
 class FormulationVersionListCreateView(APIView):
+    pagination_class = FormulationsPagination
+
     def get_permissions(self):
         if self.request.method == "POST":
             return [CanCreateFormulations()]
         return [CanViewFormulations()]
+
+    def get(self, request, public_id):
+        tenant = _get_tenant(request)
+        product = _get_product_or_404(public_id, tenant)
+        qs = FormulationVersion.objects.filter(product=product).order_by("-version_number")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(qs, request)
+        return paginator.get_paginated_response(FormulationVersionSerializer(page, many=True).data)
 
     def post(self, request, public_id):
         tenant = _get_tenant(request)
@@ -219,7 +229,17 @@ class FormulationVersionDetailView(APIView):
 
 class FormulationComponentListView(APIView):
     def get_permissions(self):
-        return [CanCreateFormulations()]
+        if self.request.method == "POST":
+            return [CanCreateFormulations()]
+        return [CanViewFormulations()]
+
+    def get(self, request, public_id):
+        tenant = _get_tenant(request)
+        version = _get_version_or_404(public_id, tenant)
+        qs = FormulationComponent.objects.filter(formulation_version=version).order_by(
+            "display_order"
+        )
+        return Response(FormulationComponentSerializer(qs, many=True).data)
 
     def post(self, request, public_id):
         tenant = _get_tenant(request)
@@ -247,7 +267,15 @@ class FormulationComponentListView(APIView):
 
 class DosingRegimenListView(APIView):
     def get_permissions(self):
-        return [CanCreateFormulations()]
+        if self.request.method == "POST":
+            return [CanCreateFormulations()]
+        return [CanViewFormulations()]
+
+    def get(self, request, public_id):
+        tenant = _get_tenant(request)
+        version = _get_version_or_404(public_id, tenant)
+        qs = DosingRegimen.objects.filter(formulation_version=version).order_by("-created_at")
+        return Response(DosingRegimenSerializer(qs, many=True).data)
 
     def post(self, request, public_id):
         tenant = _get_tenant(request)
