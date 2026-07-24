@@ -14,13 +14,20 @@ function OrangeBookSearchInner() {
   const [ingredient, setIngredient] = useState("");
   const [route, setRoute] = useState("");
   const [dosageForm, setDosageForm] = useState("");
+  const [strength, setStrength] = useState("");
+  const [applicationType, setApplicationType] = useState("");
+  const [rldOnly, setRldOnly] = useState(false);
+  const [referenceStandardOnly, setReferenceStandardOnly] = useState(false);
+  const [discontinuedFilter, setDiscontinuedFilter] = useState<"" | "true" | "false">("");
+
   const [results, setResults] = useState<OrangeBookProduct[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
+  async function runSearch(targetPage: number) {
     if (!tenantSlug) return;
     setLoading(true);
     setError(null);
@@ -29,8 +36,16 @@ function OrangeBookSearchInner() {
         active_ingredient: ingredient || undefined,
         route: route || undefined,
         dosage_form: dosageForm || undefined,
+        strength: strength || undefined,
+        application_type: applicationType || undefined,
+        rld: rldOnly ? true : undefined,
+        reference_standard: referenceStandardOnly ? true : undefined,
+        discontinued: discontinuedFilter ? discontinuedFilter === "true" : undefined,
+        page: targetPage,
       });
       setResults(resp.results);
+      setHasNext(resp.next !== null);
+      setPage(targetPage);
       setSearched(true);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
@@ -43,6 +58,11 @@ function OrangeBookSearchInner() {
     }
   }
 
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    await runSearch(1);
+  }
+
   useEffect(() => {
     if (!tenantSlug) router.push("/tenants");
   }, [tenantSlug]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -50,7 +70,7 @@ function OrangeBookSearchInner() {
   if (!tenantSlug) return null;
 
   return (
-    <main style={{ maxWidth: 960, margin: "2rem auto", padding: "0 1rem" }}>
+    <main style={{ maxWidth: 1000, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
         <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
           ← FDA releases
@@ -60,10 +80,11 @@ function OrangeBookSearchInner() {
       <p style={{ fontSize: 13, color: "#6b7280", marginTop: -8, marginBottom: "1rem" }}>
         Results shown here are FDA-sourced reference records only. Selecting one as your
         reference product is always a separate, explicit step on your product record — no
-        product is ever auto-selected as an RLD or reference standard.
+        product is ever auto-selected as an RLD or reference standard, even when it is the
+        only candidate returned.
       </p>
 
-      <form onSubmit={handleSearch} style={{ display: "flex", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
+      <form onSubmit={handleSearch} style={{ display: "flex", gap: 8, marginBottom: "0.75rem", flexWrap: "wrap" }}>
         <input
           value={ingredient}
           onChange={(e) => setIngredient(e.target.value)}
@@ -74,13 +95,25 @@ function OrangeBookSearchInner() {
           value={route}
           onChange={(e) => setRoute(e.target.value)}
           placeholder="Route code (e.g. oral)"
-          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 160 }}
+          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 150 }}
         />
         <input
           value={dosageForm}
           onChange={(e) => setDosageForm(e.target.value)}
           placeholder="Dosage form code (e.g. tablet)"
-          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 200 }}
+          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 180 }}
+        />
+        <input
+          value={strength}
+          onChange={(e) => setStrength(e.target.value)}
+          placeholder="Strength (e.g. 500MG)"
+          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 140 }}
+        />
+        <input
+          value={applicationType}
+          onChange={(e) => setApplicationType(e.target.value)}
+          placeholder="Application type (e.g. A)"
+          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 160 }}
         />
         <button
           type="submit"
@@ -90,6 +123,33 @@ function OrangeBookSearchInner() {
           {loading ? "Searching…" : "Search"}
         </button>
       </form>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: "1.5rem", fontSize: 13, alignItems: "center" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <input type="checkbox" checked={rldOnly} onChange={(e) => setRldOnly(e.target.checked)} />
+          RLD only
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <input
+            type="checkbox"
+            checked={referenceStandardOnly}
+            onChange={(e) => setReferenceStandardOnly(e.target.checked)}
+          />
+          Reference standard only
+        </label>
+        <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          Discontinued:{" "}
+          <select
+            value={discontinuedFilter}
+            onChange={(e) => setDiscontinuedFilter(e.target.value as "" | "true" | "false")}
+            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #d1d5db" }}
+          >
+            <option value="">Any</option>
+            <option value="false">Active only</option>
+            <option value="true">Discontinued only</option>
+          </select>
+        </label>
+      </div>
 
       {error && (
         <p role="alert" style={{ color: "#b91c1c" }}>
@@ -101,37 +161,75 @@ function OrangeBookSearchInner() {
       )}
 
       {results.length > 0 && (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
-              <th style={{ padding: "8px 12px" }}>
-                Trade name <ProvenanceLabel kind="FDA_SOURCE" />
-              </th>
-              <th style={{ padding: "8px 12px" }}>Application</th>
-              <th style={{ padding: "8px 12px" }}>Strength</th>
-              <th style={{ padding: "8px 12px" }}>Route / dosage form</th>
-              <th style={{ padding: "8px 12px" }}>RLD / RS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((p) => (
-              <tr key={p.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <td style={{ padding: "10px 12px" }}>{p.trade_name || "—"}</td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
-                  {p.application_number}-{p.product_number}
-                </td>
-                <td style={{ padding: "10px 12px" }}>{p.strength_raw}</td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
-                  {p.route_normalized ?? p.route_raw} / {p.dosage_form_normalized ?? p.dosage_form_raw}
-                </td>
-                <td style={{ padding: "10px 12px", fontSize: 12 }}>
-                  {p.rld_flag ? "RLD" : ""} {p.reference_standard_flag ? "RS" : ""}
-                  {!p.rld_flag && !p.reference_standard_flag && "—"}
-                </td>
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+                <th style={{ padding: "8px 12px" }} scope="col">
+                  Trade name <ProvenanceLabel kind="FDA_SOURCE" />
+                </th>
+                <th style={{ padding: "8px 12px" }} scope="col">
+                  Application
+                </th>
+                <th style={{ padding: "8px 12px" }} scope="col">
+                  Strength
+                </th>
+                <th style={{ padding: "8px 12px" }} scope="col">
+                  Route / dosage form
+                </th>
+                <th style={{ padding: "8px 12px" }} scope="col">
+                  RLD / RS
+                </th>
+                <th style={{ padding: "8px 12px" }} scope="col">
+                  Discontinued
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {results.map((p) => (
+                <tr key={p.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "10px 12px" }}>
+                    <Link
+                      href={`/fda-data/orange-book/${p.public_id}?tenant=${tenantSlug}`}
+                      style={{ color: "#1d4ed8", textDecoration: "none" }}
+                    >
+                      {p.trade_name || "(untitled)"}
+                    </Link>
+                  </td>
+                  <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                    {p.application_number}-{p.product_number}
+                  </td>
+                  <td style={{ padding: "10px 12px" }}>{p.strength_raw}</td>
+                  <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                    {p.route_normalized ?? p.route_raw} / {p.dosage_form_normalized ?? p.dosage_form_raw}
+                  </td>
+                  <td style={{ padding: "10px 12px", fontSize: 12 }}>
+                    {p.rld_flag ? "RLD" : ""} {p.reference_standard_flag ? "RS" : ""}
+                    {!p.rld_flag && !p.reference_standard_flag && "—"}
+                  </td>
+                  <td style={{ padding: "10px 12px", fontSize: 12 }}>{p.discontinued ? "Yes" : "No"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button
+              onClick={() => runSearch(page - 1)}
+              disabled={page <= 1 || loading}
+              style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: page <= 1 ? "not-allowed" : "pointer", fontSize: 13 }}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: 13, color: "#6b7280", alignSelf: "center" }}>Page {page}</span>
+            <button
+              onClick={() => runSearch(page + 1)}
+              disabled={!hasNext || loading}
+              style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: !hasNext ? "not-allowed" : "pointer", fontSize: 13 }}
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
     </main>
   );
