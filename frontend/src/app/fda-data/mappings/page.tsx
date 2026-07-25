@@ -9,9 +9,22 @@ import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 const STATUS_COLOURS: Record<string, string> = {
   proposed: "#374151",
   reviewed: "#1d4ed8",
+  under_review: "#b45309",
   approved: "#166534",
   rejected: "#991b1b",
+  returned: "#6d28d9",
 };
+
+type MappingAction = "submit_review" | "approve" | "reject" | "return";
+
+const ACTION_LABELS: Record<MappingAction, string> = {
+  submit_review: "Submit for review",
+  approve: "Approve",
+  reject: "Reject",
+  return: "Return for correction",
+};
+
+const TERMINAL_STATUSES = new Set(["approved", "rejected"]);
 
 function StatusBadge({ status }: { status: string }) {
   return (
@@ -26,10 +39,19 @@ function StatusBadge({ status }: { status: string }) {
         textTransform: "uppercase",
       }}
     >
-      {status}
+      {/* Text label, never colour alone, communicates status. */}
+      {status.replace("_", " ")}
     </span>
   );
 }
+
+const TYPE_TABS: { value: MappingType | ""; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "route", label: "Routes" },
+  { value: "dosage_form", label: "Dosage forms" },
+  { value: "unit", label: "Units" },
+  { value: "substance", label: "Substance / UNII" },
+];
 
 function MappingsPageInner() {
   const router = useRouter();
@@ -42,9 +64,8 @@ function MappingsPageInner() {
   const [typeFilter, setTypeFilter] = useState<MappingType | "">("");
   const [statusFilter, setStatusFilter] = useState("");
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmAction, setConfirmAction] = useState<{
-    action: "approve" | "reject";
+    action: MappingAction;
     mapping: TerminologyMapping;
   } | null>(null);
   const [reason, setReason] = useState("");
@@ -84,11 +105,11 @@ function MappingsPageInner() {
     setActionError(null);
     try {
       const { action, mapping } = confirmAction;
-      if (action === "approve") {
-        await fdaData.mappings.approve(tenantSlug, mapping.mapping_type, mapping.public_id, reason);
-      } else {
-        await fdaData.mappings.reject(tenantSlug, mapping.mapping_type, mapping.public_id, reason);
-      }
+      const id = mapping.public_id;
+      if (action === "approve") await fdaData.mappings.approve(tenantSlug, id, reason);
+      else if (action === "reject") await fdaData.mappings.reject(tenantSlug, id, reason);
+      else if (action === "return") await fdaData.mappings.return(tenantSlug, id, reason);
+      else await fdaData.mappings.submitReview(tenantSlug, id, reason);
       setConfirmAction(null);
       setReason("");
       load();
@@ -99,65 +120,84 @@ function MappingsPageInner() {
     }
   }
 
-  function toggleSelect(publicId: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(publicId)) next.delete(publicId);
-      else next.add(publicId);
-      return next;
-    });
-  }
-
-  async function bulkApproveSelected() {
-    setActionBusy(true);
-    setActionError(null);
-    try {
-      // Each selected mapping is approved individually against its own
-      // scoped endpoint -- there is no unscoped "approve everything"
-      // backend action, so a partial failure never silently approves
-      // mappings beyond the ones this reviewer explicitly selected.
-      const targets = items.filter((m) => selected.has(m.public_id) && m.status === "proposed");
-      for (const mapping of targets) {
-        await fdaData.mappings.approve(tenantSlug, mapping.mapping_type, mapping.public_id);
-      }
-      setSelected(new Set());
-      load();
-    } catch (err) {
-      setActionError(err instanceof ApiError ? err.message : "Bulk approval failed partway through.");
-    } finally {
-      setActionBusy(false);
-    }
+  function availableActions(m: TerminologyMapping): MappingAction[] {
+    if (TERMINAL_STATUSES.has(m.status)) return [];
+    const actions: MappingAction[] = [];
+    if (m.status === "proposed" || m.status === "returned") actions.push("submit_review");
+    actions.push("approve", "reject");
+    if (m.status !== "returned") actions.push("return");
+    return actions;
   }
 
   if (!tenantSlug) return null;
 
+  const showSubstanceColumns = typeFilter === "substance";
+
   return (
-    <main style={{ maxWidth: 1000, margin: "2rem auto", padding: "0 1rem" }}>
+    <main style={{ maxWidth: 1120, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link
+          href={`/fda-data/releases?tenant=${tenantSlug}`}
+          style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}
+        >
           ← FDA releases
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.5rem" }}>Terminology Mapping Review</h1>
-      <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0, marginBottom: "1rem" }}>
-        No mapping is ever auto-approved. Every approval or rejection here requires an
-        explicit reviewer action and is fully auditable.
+      <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0, marginBottom: "0.75rem" }}>
+        No mapping is ever auto-approved. Every approval, rejection, or return here requires an
+        explicit reviewer action and is fully auditable. Fuzzy matches only ever surface as
+        proposals for a human to decide.
       </p>
 
+      <div
+        role="note"
+        style={{
+          fontSize: 12,
+          color: "#78350f",
+          background: "#fffbeb",
+          border: "1px solid #fde68a",
+          borderRadius: 6,
+          padding: "8px 12px",
+          marginBottom: "1rem",
+        }}
+      >
+        <strong>Segregation of duties:</strong> a reviewer who has already reviewed a mapping
+        cannot also approve it. Approval requires a separate VP-level approver.
+      </div>
+
+      {/* Type tabs */}
+      <div
+        role="tablist"
+        aria-label="Mapping type"
+        style={{ display: "flex", gap: 4, marginBottom: "0.75rem", flexWrap: "wrap" }}
+      >
+        {TYPE_TABS.map((tab) => {
+          const active = typeFilter === tab.value;
+          return (
+            <button
+              key={tab.value || "all"}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTypeFilter(tab.value)}
+              style={{
+                fontSize: 13,
+                padding: "6px 12px",
+                borderRadius: 6,
+                border: active ? "1px solid #1d4ed8" : "1px solid #d1d5db",
+                background: active ? "#eff6ff" : "#fff",
+                color: active ? "#1d4ed8" : "#374151",
+                fontWeight: active ? 600 : 400,
+                cursor: "pointer",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div style={{ display: "flex", gap: 12, marginBottom: "1rem" }}>
-        <label style={{ fontSize: 13, color: "#374151" }}>
-          Type:{" "}
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as MappingType | "")}
-            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #d1d5db", fontSize: 13 }}
-          >
-            <option value="">All</option>
-            <option value="route">Route</option>
-            <option value="dosage_form">Dosage form</option>
-            <option value="unit">Unit</option>
-          </select>
-        </label>
         <label style={{ fontSize: 13, color: "#374151" }}>
           Status:{" "}
           <select
@@ -167,104 +207,134 @@ function MappingsPageInner() {
           >
             <option value="">All</option>
             <option value="proposed">Proposed</option>
+            <option value="under_review">Under review</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
+            <option value="returned">Returned</option>
           </select>
         </label>
       </div>
 
-      {selected.size > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          <button onClick={bulkApproveSelected} disabled={actionBusy} style={{ ...actionButtonStyle, background: "#166534" }}>
-            Approve {selected.size} selected
-          </button>
-        </div>
-      )}
-
       {loading && <p>Loading…</p>}
       {error && (
-        <p role="alert" style={{ color: "#b91c1c" }}>
-          {error}
-        </p>
+        <div role="alert" style={{ color: "#b91c1c" }}>
+          <p>{error}</p>
+          <button onClick={load} style={{ ...actionButtonStyle, background: "#1d4ed8" }}>
+            Retry
+          </button>
+        </div>
       )}
       {!loading && items.length === 0 && !error && (
         <p style={{ color: "#6b7280" }}>No terminology mappings match this filter.</p>
       )}
 
       {items.length > 0 && (
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Select
-              </th>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Source value <ProvenanceLabel kind="FDA_SOURCE" />
-              </th>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Type
-              </th>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Proposed controlled value
-              </th>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Status
-              </th>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Reviewer
-              </th>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Affected records
-              </th>
-              <th style={{ padding: "8px 10px" }} scope="col">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((m) => (
-              <tr key={m.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <td style={{ padding: "8px 10px" }}>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select mapping ${m.source_raw_value}`}
-                    checked={selected.has(m.public_id)}
-                    onChange={() => toggleSelect(m.public_id)}
-                  />
-                </td>
-                <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>{m.source_raw_value}</td>
-                <td style={{ padding: "8px 10px", color: "#6b7280" }}>{m.mapping_type.replace("_", " ")}</td>
-                <td style={{ padding: "8px 10px" }}>{m.proposed_controlled_value ?? "—"}</td>
-                <td style={{ padding: "8px 10px" }}>
-                  <StatusBadge status={m.status} />
-                </td>
-                <td style={{ padding: "8px 10px", color: "#6b7280" }}>
-                  {m.reviewer_email ?? "—"}
-                  {m.reviewer_email && <ProvenanceLabel kind="REVIEWER_CONFIRMED" />}
-                </td>
-                <td style={{ padding: "8px 10px", color: "#6b7280" }}>{m.affected_record_count}</td>
-                <td style={{ padding: "8px 10px" }}>
-                  {m.status === "proposed" && (
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button
-                        onClick={() => setConfirmAction({ action: "approve", mapping: m })}
-                        style={{ ...actionButtonStyle, background: "#166534" }}
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => setConfirmAction({ action: "reject", mapping: m })}
-                        style={{ ...actionButtonStyle, background: "#991b1b" }}
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  )}
-                </td>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+                <th style={{ padding: "8px 10px" }} scope="col">
+                  Source value <ProvenanceLabel kind="FDA_SOURCE" />
+                </th>
+                <th style={{ padding: "8px 10px" }} scope="col">
+                  Type
+                </th>
+                <th style={{ padding: "8px 10px" }} scope="col">
+                  {showSubstanceColumns ? "Proposed ingredient" : "Proposed controlled value"}
+                </th>
+                {showSubstanceColumns && (
+                  <>
+                    <th style={{ padding: "8px 10px" }} scope="col">
+                      UNII
+                    </th>
+                    <th style={{ padding: "8px 10px" }} scope="col">
+                      CAS
+                    </th>
+                    <th style={{ padding: "8px 10px" }} scope="col">
+                      Method
+                    </th>
+                  </>
+                )}
+                <th style={{ padding: "8px 10px" }} scope="col">
+                  Status
+                </th>
+                <th style={{ padding: "8px 10px" }} scope="col">
+                  Reviewer
+                </th>
+                <th style={{ padding: "8px 10px" }} scope="col">
+                  Affected records
+                </th>
+                <th style={{ padding: "8px 10px" }} scope="col">
+                  Actions
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((m) => (
+                <tr key={m.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>
+                    {m.source_raw_value}
+                  </td>
+                  <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                    {m.mapping_type.replace("_", " ")}
+                  </td>
+                  <td style={{ padding: "8px 10px" }}>{m.proposed_controlled_value ?? "—"}</td>
+                  {showSubstanceColumns && (
+                    <>
+                      <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>
+                        {m.proposed_unii ?? "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>
+                        {m.proposed_cas_number ?? "—"}
+                      </td>
+                      <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                        {m.mapping_method ?? "—"}
+                      </td>
+                    </>
+                  )}
+                  <td style={{ padding: "8px 10px" }}>
+                    <StatusBadge status={m.status} />
+                  </td>
+                  <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                    {m.reviewer_email ?? "—"}
+                    {m.reviewer_email && <ProvenanceLabel kind="REVIEWER_CONFIRMED" />}
+                  </td>
+                  <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                    <Link
+                      href={`/fda-data/mappings/${m.public_id}?tenant=${tenantSlug}`}
+                      style={{ color: "#1d4ed8", textDecoration: "none" }}
+                    >
+                      {m.affected_record_count} record(s) →
+                    </Link>
+                  </td>
+                  <td style={{ padding: "8px 10px" }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {availableActions(m).map((action) => (
+                        <button
+                          key={action}
+                          onClick={() => setConfirmAction({ action, mapping: m })}
+                          style={{
+                            ...actionButtonStyle,
+                            background:
+                              action === "approve"
+                                ? "#166534"
+                                : action === "reject"
+                                  ? "#991b1b"
+                                  : action === "return"
+                                    ? "#6d28d9"
+                                    : "#1d4ed8",
+                          }}
+                        >
+                          {ACTION_LABELS[action]}
+                        </button>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {confirmAction && (
@@ -281,22 +351,38 @@ function MappingsPageInner() {
             justifyContent: "center",
           }}
         >
-          <div style={{ background: "#fff", borderRadius: 8, padding: "1.5rem", maxWidth: 420, width: "90%" }}>
+          <div
+            style={{ background: "#fff", borderRadius: 8, padding: "1.5rem", maxWidth: 440, width: "90%" }}
+          >
             <h2 id="mapping-confirm-title" style={{ fontSize: 16, marginTop: 0 }}>
-              {confirmAction.action === "approve" ? "Approve" : "Reject"} mapping
+              {ACTION_LABELS[confirmAction.action]}
             </h2>
             <p style={{ fontSize: 13, color: "#6b7280" }}>
               {confirmAction.mapping.source_raw_value} →{" "}
               {confirmAction.mapping.proposed_controlled_value ?? "(no controlled value)"}. This
               affects {confirmAction.mapping.affected_record_count} record(s).
             </p>
+            {confirmAction.action === "approve" && (
+              <p style={{ fontSize: 12, color: "#78350f" }}>
+                Approving records your identity as the approver. You cannot approve a mapping you
+                have already reviewed.
+              </p>
+            )}
             <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
               Reason
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={2}
-                style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginTop: 4,
+                  padding: "6px 8px",
+                  border: "1px solid #d1d5db",
+                  borderRadius: 4,
+                  boxSizing: "border-box",
+                }}
               />
             </label>
             {actionError && (
@@ -315,7 +401,11 @@ function MappingsPageInner() {
               >
                 Cancel
               </button>
-              <button onClick={confirmAndRun} disabled={actionBusy} style={{ ...actionButtonStyle, background: "#1d4ed8" }}>
+              <button
+                onClick={confirmAndRun}
+                disabled={actionBusy}
+                style={{ ...actionButtonStyle, background: "#1d4ed8" }}
+              >
                 {actionBusy ? "Working…" : "Confirm"}
               </button>
             </div>

@@ -629,8 +629,14 @@ export interface OrangeBookProduct {
   discontinued: boolean;
 }
 
-export type MappingType = "route" | "dosage_form" | "unit";
-export type MappingDecisionStatus = "proposed" | "reviewed" | "approved" | "rejected";
+export type MappingType = "route" | "dosage_form" | "unit" | "substance";
+export type MappingDecisionStatus =
+  | "proposed"
+  | "reviewed"
+  | "under_review"
+  | "approved"
+  | "rejected"
+  | "returned";
 
 export interface TerminologyMapping {
   public_id: string;
@@ -644,6 +650,24 @@ export interface TerminologyMapping {
   reason: string;
   affected_record_count: number;
   created_at: string;
+  // Substance/UNII synonym mappings only; null for the other three types.
+  proposed_unii?: string | null;
+  proposed_cas_number?: string | null;
+  mapping_method?: string | null;
+  release_public_id?: string | null;
+}
+
+export interface AffectedRecord {
+  record_public_id: string;
+  dataset_type: string;
+  release_public_id: string | null;
+  source_row_locator?: string | null;
+  raw_value: string;
+  normalized_value: string | null;
+  mapping_status: string | null;
+  calculability_status?: string | null;
+  blocked: boolean;
+  reason_code: string;
 }
 
 export interface FdaImportRowResultItem {
@@ -770,10 +794,23 @@ export const fdaData = {
   },
 
   mappings: {
-    list: (tenantSlug: string, params?: { type?: string; status?: string; page?: number }) => {
+    list: (
+      tenantSlug: string,
+      params?: {
+        type?: string;
+        status?: string;
+        release?: string;
+        raw_value?: string;
+        reviewer?: string;
+        page?: number;
+      }
+    ) => {
       const qs = new URLSearchParams();
       if (params?.type) qs.set("type", params.type);
       if (params?.status) qs.set("status", params.status);
+      if (params?.release) qs.set("release", params.release);
+      if (params?.raw_value) qs.set("raw_value", params.raw_value);
+      if (params?.reviewer) qs.set("reviewer", params.reviewer);
       if (params?.page) qs.set("page", String(params.page));
       const query = qs.toString() ? `?${qs}` : "";
       return apiRequest<PaginatedResponse<TerminologyMapping>>(
@@ -782,17 +819,47 @@ export const fdaData = {
       );
     },
 
-    approve: (tenantSlug: string, mappingType: string, publicId: string, reason?: string) =>
+    get: (tenantSlug: string, publicId: string) =>
+      apiRequest<TerminologyMapping>(`/api/regx/v1/fda-data/mappings/${publicId}/`, {
+        headers: { "X-Tenant-Slug": tenantSlug },
+      }),
+
+    affectedRecords: (tenantSlug: string, publicId: string, page?: number) => {
+      const qs = new URLSearchParams();
+      if (page) qs.set("page", String(page));
+      const query = qs.toString() ? `?${qs}` : "";
+      return apiRequest<PaginatedResponse<AffectedRecord>>(
+        `/api/regx/v1/fda-data/mappings/${publicId}/affected-records/${query}`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
+      );
+    },
+
+    submitReview: (tenantSlug: string, publicId: string, reason?: string) =>
       apiRequest<TerminologyMapping>(
-        `/api/regx/v1/fda-data/mappings/${mappingType}/${publicId}/approve/`,
+        `/api/regx/v1/fda-data/mappings/${publicId}/submit-review/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { reason: reason ?? "" } }
       ),
 
-    reject: (tenantSlug: string, mappingType: string, publicId: string, reason?: string) =>
-      apiRequest<TerminologyMapping>(
-        `/api/regx/v1/fda-data/mappings/${mappingType}/${publicId}/reject/`,
-        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { reason: reason ?? "" } }
-      ),
+    approve: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<TerminologyMapping>(`/api/regx/v1/fda-data/mappings/${publicId}/approve/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason: reason ?? "" },
+      }),
+
+    reject: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<TerminologyMapping>(`/api/regx/v1/fda-data/mappings/${publicId}/reject/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason: reason ?? "" },
+      }),
+
+    return: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<TerminologyMapping>(`/api/regx/v1/fda-data/mappings/${publicId}/return/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason: reason ?? "" },
+      }),
   },
 };
 
@@ -1049,10 +1116,21 @@ export interface AssessmentPreview {
   decision_status: PrecedentDecisionStatus;
   decision_note: string;
   escalation_required: boolean;
+  // Set only when identity was resolved through a raw substance/UNII/CAS
+  // lookup rather than an already-known ingredient_public_id.
+  substance_mapping_public_id?: string | null;
+  substance_resolution_status?: string | null;
 }
 
 export interface PreviewRequest {
-  ingredient_public_id: string;
+  // Supply exactly one identity path: an already-resolved ingredient, or a
+  // raw substance identity resolved via the governed synonym-mapping
+  // service (approved mappings only -- proposed/rejected mappings never
+  // produce a confirmed match).
+  ingredient_public_id?: string;
+  substance_name?: string;
+  substance_unii?: string;
+  substance_cas?: string;
   route_code: string;
   dosage_form_code: string;
   active_release_public_id: string;
@@ -1098,6 +1176,7 @@ export interface AssessmentSnapshotDetail {
   formulation_version_public_id: string;
   iid_release_public_id: string | null;
   iid_precedent_record_public_id: string | null;
+  iid_substance_mapping_public_id: string | null;
   iid_ingredient_name: string;
   iid_route: string;
   iid_dosage_form: string;
