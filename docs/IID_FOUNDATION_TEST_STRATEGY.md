@@ -1,10 +1,12 @@
 # IID Foundation Test Strategy
 
 Covers `fda_data`, `formulations`, and `iid_assessment` — Milestone
-4A-4C's controlled, synthetic-data-only test suite. 171 backend tests
-(439 across the full repo), all passing, all against synthetic
-FDA-shaped fixtures (never real Orange Book/IID content, never AIDatabase
-or 483 content, never legacy IIG answer data).
+4A-4C's controlled, synthetic-data-only test suite, including the
+terminology-governance pass adding the substance/UNII synonym-mapping
+domain. 196 tests across `fda_data`+`iid_assessment` (485 across the
+full repo), all passing, all against synthetic FDA-shaped fixtures (never
+real Orange Book/IID content, never AIDatabase or 483 content, never
+legacy IIG answer data).
 
 ## What is covered
 
@@ -79,12 +81,54 @@ unit-conversion engine fails closed (never raises) on a value that can't
 become a `Decimal` at all; calculation output is deterministic across
 repeated calls with identical `Decimal` inputs.
 
-**`fda_data/tests/test_mappings_api.py`** (11 tests) — mapping list
-filtered by type/status, Doer cannot list or approve/reject a mapping
-(VP/Reviewer only), approve/reject persist the reviewer and reason,
-approved mappings are immutable at the model layer, nonexistent mapping
-and unknown mapping-type both return generic 404, no numeric ID in the
-response.
+**`fda_data/tests/test_mappings_api.py`** (21 tests) — mapping list
+filtered by type/status, Doer cannot list or approve/reject a mapping,
+Reviewer (holding `fda_data.review` but not `.approve`) cannot approve,
+approve/reject/return persist the reviewer and reason, approved mappings
+are immutable at the model layer, self-approval is blocked, nonexistent
+mapping returns generic 404, no numeric ID in the response, mapping
+detail and affected-records endpoints, substance-mapping-specific list
+fields (`proposed_unii`/`proposed_cas_number`/`mapping_method`),
+submit-review/return lifecycle, submit-review correctly fails closed
+(structured 400) on a route mapping whose status field has no
+`under_review` choice, Doer blocked from submit-review/return,
+affected-records return only safe fields (no storage path, no numeric
+ID), nonexistent mapping still returns generic 404 on affected-records.
+
+**`fda_data/tests/test_substance_mapping_model.py`** (7 tests) — UUID
+public_id uniqueness, raw-source-identity immutability, full immutability
+once approved, no duplicate current mapping per release/raw-identity,
+superseding a mapping retires `is_current` rather than editing it,
+release relation is `PROTECT`-on-delete, a platform-master mapping (no
+release) is valid.
+
+**`fda_data/tests/test_substance_matching.py`** (12 tests) —
+`resolve_substance_identity` candidate generation: no identity supplied,
+exact canonical name/UNII/CAS match, approved-synonym resolution,
+proposed/rejected mappings never usable (and distinguishable from each
+other), multiple conflicting approved mappings never auto-resolved, no
+mapping at all is `REVIEW_REQUIRED`, fuzzy similarity never auto-approves,
+a superseded release's mapping stops resolving, a platform-master mapping
+always resolves.
+
+**`fda_data/tests/test_substance_planted_failures.py`** (10 tests) — the
+10 named substance/UNII synonym-mapping scenarios: fuzzy synonym
+auto-approved, proposed mapping used in an IID exact match, rejected
+mapping used, same reviewer self-approves, Doer approves, affected
+records leak storage path, affected records leak numeric ID,
+cross-release affected-record leakage, approved mapping edited in place,
+completed assessment snapshot changes after a mapping update. Each plants
+the violation via the real service/API layer, asserts the guard rejects
+it, then reruns the legitimate path.
+
+**`iid_assessment/tests/test_substance_iid_integration.py`** (7 tests) —
+an approved synonym permits `EXACT_MATCH`; a proposed synonym produces
+`REVIEW_REQUIRED`; a rejected synonym produces `INGREDIENT_AMBIGUOUS`;
+an unseen identity is `REVIEW_REQUIRED`, never silently matched; multiple
+conflicting approved mappings produce `REVIEW_REQUIRED`; a raw-name
+variant near (but not equal to) a canonical ingredient's name never
+matches; the selected mapping is frozen into the `AssessmentSnapshot` and
+survives a later mapping retirement/correction untouched.
 
 **`fda_data/tests/test_orange_book_api.py`** (6 tests) — RLD /
 reference-standard / discontinued / application-type / strength filters
@@ -94,15 +138,19 @@ product.
 
 ## Frontend coverage
 
-`frontend/tests/unit/fda-iid.test.tsx` (40 tests) and
-`frontend/tests/unit/accessibility.test.tsx` (24 tests) cover all 13
+`frontend/tests/unit/fda-iid.test.tsx` and
+`frontend/tests/unit/accessibility.test.tsx` (97 tests total across both
+files, plus 3 more unit-test files in the wider suite) cover all 14
 routes in `FRONTEND_FOUNDATION.md`'s route matrix — provenance labels,
-no-prefill-from-IID, no-auto-mapping-approval, no-auto-reference-selection,
-blocked-calculation display, multiple-candidate selection, structured
-form-validation errors, and the absence of any forbidden safety-claim
-word. `frontend/e2e/fda-iid.spec.ts` (22 Playwright tests, 78 across the
-full frontend suite) covers the same screens end-to-end against
-deterministic API mocks.
+no-prefill-from-IID, no-auto-mapping-approval (including the substance
+type-less submit-review/approve/reject/return actions), the
+segregation-of-duties notice, the affected-record drill-down's safe
+fields and pagination, no-auto-reference-selection, blocked-calculation
+display, multiple-candidate selection, structured form-validation errors,
+and the absence of any forbidden safety-claim word.
+`frontend/e2e/fda-iid.spec.ts` (28 Playwright tests, 62 across the full
+frontend suite) covers the same screens end-to-end against deterministic
+API mocks.
 
 ### 20/20 required E2E scenario matrix (`frontend/e2e/fda-iid.spec.ts`)
 
@@ -138,12 +186,28 @@ a blank page`). Loading/empty states, raw-path absence, and numeric-ID
 absence are covered at the unit-test level in `fda-iid.test.tsx` and
 `accessibility.test.tsx` rather than duplicated in Playwright.
 
+### Substance/UNII synonym-mapping E2E scenarios (`Terminology mapping review` describe block)
+
+| # | Scenario | Test name |
+|---|---|---|
+| 1 | Open mapping inventory | `lists a proposed mapping and requires explicit confirmation to approve, never auto-approved` |
+| 2 | Filter substance mappings | `filters the mapping inventory to substance/UNII synonyms` |
+| 3 | Inspect a proposed synonym + drill-down | `inspects a proposed synonym mapping and opens the affected-record drill-down` |
+| 4 | Approve a mapping | `approves a substance mapping via the type-less endpoint` |
+| 5 | Reject a mapping | `rejects a substance mapping` |
+| 6 | Return a mapping for correction | `returns a substance mapping for correction` |
+| 7 | Doer cannot approve | `a Doer cannot approve a mapping -- the API rejects it and the UI surfaces the error` |
+
+Scenario 3 also asserts the affected-record page contains no raw storage
+path and no numeric-ID-shaped field. Verifying a proposed mapping is never
+auto-used in an IID assessment is covered at the backend level
+(`iid_assessment/tests/test_substance_iid_integration.py`,
+`fda_data/tests/test_substance_planted_failures.py::test_s2_*`) rather
+than duplicated as a Playwright scenario, since that guarantee lives
+entirely in server-side resolution logic the frontend never sees.
+
 ## What remains explicitly out of scope
 
-- No dedicated UI or tests for substance/UNII synonym mappings — no
-  backend model exists for this mapping type.
-- No "view affected records" drill-down from a mapping row (the count is
-  shown; the underlying record list is not).
 - Storage-level authorization for raw FDA source files is inherited from
   `documents.storage` and re-verified here only at the API-response-shape
   level (`storage_key` never serialized) — the storage backend's own

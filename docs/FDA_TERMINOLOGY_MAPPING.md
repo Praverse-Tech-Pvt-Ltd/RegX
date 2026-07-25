@@ -65,22 +65,126 @@ empty raw value simply fails the subsequent mapping lookup.
 `status="review_required"` with the original text preserved verbatim — never
 partially parsed or guessed.
 
+## Substance/UNII synonym mappings
+
+`SubstanceSynonymMapping` (`fda_data/models.py`) is a fourth, richer
+mapping type governing ingredient identity — raw ingredient name → a
+proposed canonical `IIDIngredient`, UNII, and/or CAS number. It exists
+because ingredient identity carries more risk than a route/dosage-form/unit
+label: a wrong ingredient match can silently compare the wrong precedent.
+Its lifecycle is deliberately larger than the other three types'
+`MappingDecisionStatus` (`proposed`/`reviewed`/`approved`/`rejected`):
+`SubstanceMappingStatus` adds `under_review` and `returned`, modeling a
+real segregation-of-duties review step before approval.
+
+Fields: `release` (nullable — null means "platform master", not scoped to
+one release; **`on_delete=PROTECT`**, so a release with mapping history can
+never be silently deleted), `source_dataset`, `raw_ingredient_name` /
+`normalized_ingredient_name` / `raw_unii` / `raw_cas_number` (all
+immutable once the row exists — see `clean()`), `proposed_ingredient` /
+`proposed_unii` / `proposed_cas_number`, `mapping_method`
+(`exact_name`/`exact_unii`/`exact_cas`/`reviewed_synonym`/`manual`),
+`status`, `is_current`, `reviewer` / `review_reason` / `reviewed_at`,
+`approved_by` / `approved_at`.
+
+Rules enforced at the model layer:
+
+- Raw source-identity fields (`raw_ingredient_name`, `normalized_ingredient_name`,
+  `raw_unii`, `raw_cas_number`, `release`, `source_dataset`,
+  `source_row_locator`) are immutable from the moment the row is created —
+  never just once approved.
+- Once `status == APPROVED`, every field is immutable except `is_current`
+  and `updated_at`. A correction requires a new mapping row with the old
+  row's `is_current` flipped to `False` — never an in-place edit.
+- `UniqueConstraint` on `(source_dataset, raw_ingredient_name, release)`
+  where `is_current=True` prevents two simultaneously-active mappings for
+  the same raw identity in the same release.
+
+### Candidate generation (`fda_data/substance_matching.py`)
+
+`resolve_substance_identity(normalized_name=, unii=, cas_number=)` is the
+single shared service used by IID import normalization, the IID matching
+engine, the terminology-review API, and the affected-record drill-down.
+It tries, in order: an approved mapping matching UNII, CAS, or normalized
+name; then a direct exact match against the canonical `IIDIngredient`
+table (covers identities that never needed a governed mapping because the
+raw value was already exact). **The direct `IIDIngredient` fallback never
+runs if any non-approved mapping already references this identity** — a
+proposed/rejected/under-review/returned mapping means a human has already
+flagged this identity for governance, and string equality must never
+silently bypass that unresolved state.
+
+Returns one of:
+
+- `EXACT_MATCH` — exactly one candidate resolved.
+- `MULTIPLE_CANDIDATES` — two or more approved mappings resolve to
+  different ingredients; never auto-picked.
+- `REVIEW_REQUIRED` — no approved mapping exists, but a
+  proposed/under_review/returned one does (reason code
+  `MAPPING_PENDING_REVIEW`), or nothing at all was ever proposed (reason
+  code `NO_APPROVED_MAPPING`).
+- `INGREDIENT_AMBIGUOUS` — either no identity was supplied at all
+  (`NO_IDENTITY_SUPPLIED`), or the only mapping found was explicitly
+  `REJECTED` (`REJECTED_MAPPING`) — deliberately distinct from
+  `REVIEW_REQUIRED` so a denied identity is never confused with one that
+  simply hasn't been reviewed yet.
+
+A mapping scoped to a specific (non-null) `release` is only honored while
+that release's status is `approved` or `active` — a superseded release's
+mappings stop supplying resolutions the moment it is superseded.
+
 ## Mapping-review API and UI
 
 `GET /api/regx/v1/fda-data/mappings/` (requires `fda_data.review`) lists
-route/dosage-form/unit mappings in one normalized shape
-(`TerminologyMappingSerializer.from_instance`), optionally filtered by
-`?type=` and `?status=`, including a best-effort `affected_record_count`
-(a count of Orange Book/IID rows referencing that raw value — informational
-only, never used to gate the decision). `POST .../mappings/{type}/{public_id}/
-approve/` and `.../reject/` require the same permission and always set the
-acting user as `reviewer`; both are rejected by `full_clean()` if the
-mapping is already approved (immutability, see `_BaseTerminologyMapping.clean()`
-in `FDA_DATA_GOVERNANCE.md`).
+route/dosage-form/unit/substance mappings in one normalized shape
+(`TerminologyMappingSerializer.from_instance`), filterable by `?type=`,
+`?status=`, `?release=` (release public_id), `?raw_value=` (substring,
+case-insensitive), and `?reviewer=` (reviewer email), including a
+best-effort `affected_record_count` — informational only, never used to
+gate a decision. Substance-mapping rows additionally carry
+`proposed_unii`, `proposed_cas_number`, `mapping_method`, and
+`release_public_id`.
 
-`frontend/src/app/fda-data/mappings/page.tsx` consumes this API: every
-approve/reject requires an explicit confirmation-dialog click (never a
-bare button click), and the multi-select bulk-approve control calls the
-same per-mapping scoped endpoint for each selection sequentially — there
-is no unscoped "approve everything" action, consistent with the
-"no bulk operation without tenant/platform scope" requirement.
+The mapping action routes are **type-less** — a mapping's `public_id` is
+resolved across all four model types by `_find_mapping_or_404`, so the URL
+never needs to encode which kind of mapping it is:
+
+```
+GET  /api/regx/v1/fda-data/mappings/{public_id}/
+GET  /api/regx/v1/fda-data/mappings/{public_id}/affected-records/
+POST /api/regx/v1/fda-data/mappings/{public_id}/submit-review/
+POST /api/regx/v1/fda-data/mappings/{public_id}/approve/
+POST /api/regx/v1/fda-data/mappings/{public_id}/reject/
+POST /api/regx/v1/fda-data/mappings/{public_id}/return/
+```
+
+`submit-review` and `return` transition to `under_review`/`returned` —
+statuses that only exist on `SubstanceSynonymMapping`; calling them on a
+route/dosage-form/unit mapping fails closed with a structured 400 (model
+`full_clean()` rejects the invalid status choice) rather than a raw
+exception. `approve` requires `fda_data.approve` (VP only); `submit-review`/
+`reject`/`return` require `fda_data.review` (Reviewer or VP). Approval is
+blocked with a 400 if the acting user is already the mapping's `reviewer`
+(segregation of duties). Every action emits an audit event
+(`fda_data.mapping.submitted_for_review` / `.approved` / `.rejected` /
+`.returned`).
+
+### Affected-record drill-down
+
+`GET .../mappings/{public_id}/affected-records/` returns the paginated set
+of FDA records (IID precedent rows, Orange Book products) whose raw value
+matches this mapping's raw identity. Response fields are deliberately
+narrow and safe: `record_public_id`, `dataset_type`, `release_public_id`,
+`source_row_locator`, `raw_value`, `normalized_value`, `mapping_status`,
+`calculability_status`, `blocked`, `reason_code`. Never present: storage
+keys, filesystem paths, the full raw source row, or any internal numeric
+ID. A nonexistent mapping returns a generic 404, matching the rest of the
+mapping API.
+
+`frontend/src/app/fda-data/mappings/page.tsx` consumes this API: type tabs
+(Routes/Dosage forms/Units/Substance-UNII), every lifecycle action requires
+an explicit confirmation-dialog click (never a bare button click), a
+visible segregation-of-duties notice, and a link from each row's affected-
+record count to `frontend/src/app/fda-data/mappings/[publicId]/page.tsx` —
+the drill-down screen showing the mapping summary, FDA release provenance,
+and the paginated affected-record table.

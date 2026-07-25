@@ -5,11 +5,11 @@
 The full Milestone 4A-4C frontend route matrix, built against the
 existing Next.js App Router conventions (`frontend/src/app/**`, the
 typed `@/lib/api.ts` client, `?tenant=slug` query-param tenant scoping).
-13/13 required routes are implemented. See "What was not built" below
-for the remaining, explicitly out-of-scope gap (mapping-approval detail
-drill-down beyond the list view, Milestone 4D).
+14/14 required routes are implemented, including the substance/UNII
+synonym mapping tab and its affected-record drill-down added in the
+terminology-governance pass (see `FDA_TERMINOLOGY_MAPPING.md`).
 
-## Route matrix (13/13 implemented)
+## Route matrix (14/14 implemented)
 
 | # | Route | Screen | API dependency | Permission dependency |
 |---|---|---|---|---|
@@ -17,15 +17,16 @@ drill-down beyond the list view, Milestone 4D).
 | 2 | `/fda-data/releases/new` | Registration form (dataset type, source name/reference, schema version, synthetic rows JSON) | `fdaData.releases.register` | `fda_data.register` |
 | 3 | `/fda-data/releases/[publicId]` | Release detail: status, provenance, counts, lifecycle actions (submit/approve/activate) | `fdaData.releases.get`, `.submitReview`, `.approve`, `.activate` | `fda_data.view` / `.import` / `.approve` / `.activate` |
 | 4 | `/fda-data/releases/[publicId]/reconciliation` | Reconciliation summary: counts, per-row result/reason table, CSV download | `fdaData.releases.reconciliationJson` | `fda_data.export_reconciliation` |
-| 5 | `/fda-data/mappings` | Terminology mapping review: type/status filters, approve/reject with confirmation dialog, multi-select bulk-approve | `fdaData.mappings.list/.approve/.reject` | `fda_data.review` |
-| 6 | `/fda-data/orange-book` | Orange Book search: ingredient/route/dosage-form/strength/application-type text filters, RLD/reference-standard/discontinued filters, pagination | `fdaData.orangeBook.search` | `fda_data.view` |
-| 7 | `/fda-data/orange-book/[publicId]` | Product detail: parsed/raw strength, application/product number, TE code, approval-date text, RLD/RS/discontinued flags | `fdaData.orangeBook.get` | `fda_data.view` |
-| 8 | `/formulations` | Product-development record list, links to creation | `formulations.products.list` | `formulations.view` |
-| 9 | `/formulations/new` | Product creation form | `formulations.products.create` | `formulations.create` |
-| 10 | `/formulations/[publicId]` | Product detail: explicit reference-product selection, formulation-version list + creation | `formulations.products.get/.selectReference`, `.versions.list/.create` | `formulations.view` / `.edit_draft` / `.create` |
-| 11 | `/formulations/[publicId]/versions/[versionPublicId]` | Version detail: total weight/max units, component table (active/inactive, % w/w), dosing-regimen list + entry, link to IID preview | `formulations.versions.get`, `.components.list/.create`, `.dosingRegimens.list/.create` | `formulations.view` / `.create` |
-| 12 | `/iid-assessments/preview` | Match/calculation/decision preview, multi-candidate selection | `iidAssessments.preview` | `iid_assessment.preview` |
-| 13 | `/iid-assessments/[publicId]` | Persisted, immutable assessment snapshot detail | `iidAssessments.get` | `iid_assessment.preview` |
+| 5 | `/fda-data/mappings` | Terminology mapping review: type tabs (route/dosage-form/unit/substance-UNII), status filter, submit-review/approve/reject/return with confirmation dialog | `fdaData.mappings.list/.submitReview/.approve/.reject/.return` | `fda_data.review` / `.approve` |
+| 6 | `/fda-data/mappings/[publicId]` | Affected-record drill-down: mapping summary, FDA release provenance, paginated affected-record table | `fdaData.mappings.get/.affectedRecords` | `fda_data.review` |
+| 7 | `/fda-data/orange-book` | Orange Book search: ingredient/route/dosage-form/strength/application-type text filters, RLD/reference-standard/discontinued filters, pagination | `fdaData.orangeBook.search` | `fda_data.view` |
+| 8 | `/fda-data/orange-book/[publicId]` | Product detail: parsed/raw strength, application/product number, TE code, approval-date text, RLD/RS/discontinued flags | `fdaData.orangeBook.get` | `fda_data.view` |
+| 9 | `/formulations` | Product-development record list, links to creation | `formulations.products.list` | `formulations.view` |
+| 10 | `/formulations/new` | Product creation form | `formulations.products.create` | `formulations.create` |
+| 11 | `/formulations/[publicId]` | Product detail: explicit reference-product selection, formulation-version list + creation | `formulations.products.get/.selectReference`, `.versions.list/.create` | `formulations.view` / `.edit_draft` / `.create` |
+| 12 | `/formulations/[publicId]/versions/[versionPublicId]` | Version detail: total weight/max units, component table (active/inactive, % w/w), dosing-regimen list + entry, link to IID preview | `formulations.versions.get`, `.components.list/.create`, `.dosingRegimens.list/.create` | `formulations.view` / `.create` |
+| 13 | `/iid-assessments/preview` | Match/calculation/decision preview, multi-candidate selection | `iidAssessments.preview` | `iid_assessment.preview` |
+| 14 | `/iid-assessments/[publicId]` | Persisted, immutable assessment snapshot detail | `iidAssessments.get` | `iid_assessment.preview` |
 
 Every route is reachable via in-app navigation (not only direct URL) —
 see the cross-links table below.
@@ -35,6 +36,8 @@ see the cross-links table below.
 | `/fda-data/releases` | Orange Book search, Terminology mappings, Register release (new), each release's detail |
 | `/fda-data/releases/[publicId]` | Reconciliation summary, back to release list |
 | `/fda-data/releases/[publicId]/reconciliation` | Back to release detail, CSV download |
+| `/fda-data/mappings` | Each row's affected-record drill-down |
+| `/fda-data/mappings/[publicId]` | Back to mapping review, each affected Orange Book record's detail (where safely linkable) |
 | `/fda-data/orange-book` | Each product's detail page, back to release list |
 | `/fda-data/orange-book/[publicId]` | Back to search |
 | `/formulations` | New product record, each product's detail |
@@ -68,10 +71,10 @@ result. Each label carries `data-testid="provenance-label"` and
   "Select this precedent" button — nothing is pre-selected or
   auto-highlighted as preferred.
 - **No automatic mapping approval**: `/fda-data/mappings` requires an
-  explicit confirmation-dialog click for every approve/reject action,
-  including the multi-select bulk-approve path (which calls the same
-  scoped per-mapping endpoint sequentially — there is no unscoped
-  "approve everything" action).
+  explicit confirmation-dialog click for every submit-review/approve/
+  reject/return action; no fuzzy candidate is ever pre-selected or
+  auto-approved, and a visible segregation-of-duties notice is always
+  shown.
 - **No automatic Orange Book RLD/reference-standard selection**: the
   product-detail page's reference-product selection is always a separate,
   explicit, confirmed action — never inferred from a product's RLD/RS
@@ -102,13 +105,6 @@ result. Each label carries `data-testid="provenance-label"` and
 
 Being direct about the remaining gap against the full milestone spec:
 
-- No dedicated UI for substance/UNII synonym mappings — the backend has
-  no model for this (only route/dosage-form/unit mappings exist), so no
-  frontend or API work was added for it; adding one would have been
-  scope creep beyond "the minimal endpoint genuinely missing."
-- No standalone "view affected records" drill-down from a mapping row —
-  the affected-record *count* is shown, but not a list of the records
-  themselves.
 - Final checklist execution and approval workflow (Milestone 4D) is
   **not implemented** — this was explicitly out of scope for 4A-4C and
   remains so. No route, component, or backend endpoint in this branch

@@ -62,3 +62,41 @@ these are deliberately distinguishable and map to different
 See `iid_assessment/tests/test_matching_and_assess.py` for the full test
 matrix, including the planted-and-detected violations (unconfirmed route,
 multiple exact matches never auto-resolved).
+
+## Substance/UNII synonym governance in `assess.run_preview`
+
+`run_preview` accepts either an already-resolved `ingredient_public_id`
+**or** a raw substance identity (`substance_name`/`substance_unii`/
+`substance_cas`). When a raw identity is supplied, it is resolved through
+`fda_data.substance_matching.resolve_substance_identity` (see
+`FDA_TERMINOLOGY_MAPPING.md`) before `find_iid_candidates` ever runs:
+
+- `EXACT_MATCH` — the confirmed ingredient's public_id and the selected
+  mapping's public_id (`substance_mapping_public_id` on the returned
+  `AssessmentPreview`) feed into the normal match sequence above.
+- `MULTIPLE_CANDIDATES` or `REVIEW_REQUIRED` (proposed/under-review/
+  returned mapping, or none at all) — the match is overridden to
+  `MatchStatus.REVIEW_REQUIRED` with zero candidates. No IID lookup runs;
+  no calculation happens.
+- `INGREDIENT_AMBIGUOUS` (no identity supplied, or the only matching
+  mapping was `REJECTED`) — overridden to `MatchStatus.INGREDIENT_AMBIGUOUS`,
+  same fail-closed effect.
+
+**Ingredient-name string equality alone never overrides an unresolved
+identity state.** A raw name that happens to equal an `IIDIngredient`'s
+`normalized_name` only resolves if no non-approved `SubstanceSynonymMapping`
+already references that identity — the direct-`IIDIngredient` fallback in
+`resolve_substance_identity` is disabled the moment *any*
+proposed/rejected/under-review/returned mapping exists for it, precisely to
+prevent this override.
+
+### Snapshot preservation
+
+`AssessmentSnapshot.iid_substance_mapping_public_id` freezes exactly which
+`SubstanceSynonymMapping` version confirmed the ingredient identity used in
+that assessment. Like every other snapshot field, it is immutable once
+created (see `_BaseTerminologyMapping`-style `clean()` on
+`AssessmentSnapshot`). Retiring or superseding the mapping afterward
+(`is_current=False` + a new corrected row) never changes an
+already-persisted snapshot's frozen reference — a later re-assessment
+against the corrected mapping produces a distinct new snapshot instead.

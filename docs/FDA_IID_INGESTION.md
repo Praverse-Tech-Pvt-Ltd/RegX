@@ -65,3 +65,21 @@ The importer never activates a release, never picks a "best" precedent
 record, and never converts units — those are the `lifecycle`,
 `iid_assessment.matching`, and `iid_assessment.unit_conversion` modules'
 exclusive responsibilities respectively.
+
+## Relationship to substance/UNII synonym governance
+
+`_resolve_iid_ingredient` (above) is the FDA IID file's own, direct
+ingredient-identity resolution — the IID export *is* the authoritative
+source establishing canonical `IIDIngredient` rows in the first place, so
+import-time resolution matches by UNII then exact normalized name and
+creates a new canonical row only when neither matches. This is
+deliberately separate from `fda_data.substance_matching.resolve_substance_identity`
+(see `FDA_TERMINOLOGY_MAPPING.md`), which governs resolving a *raw,
+unverified* substance identity — coming from a formulation input, a
+different FDA dataset, or a later corrective mapping — against the
+canonical `IIDIngredient` table via reviewer-approved
+`SubstanceSynonymMapping` rows. The governed service is what
+`iid_assessment.assess.run_preview` and the terminology-review API use;
+the importer's direct resolver is what establishes the canonical
+ingredient inventory that the governed service ultimately resolves
+*against*.
