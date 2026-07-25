@@ -73,6 +73,21 @@ def vp_membership(db, tenant_a, vp_user):
 
 
 @pytest.fixture
+def reviewer_user(db):
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    return User.objects.create_user(
+        email="reviewer@example.com", password="TestPass1234!", full_name="Reviewer"
+    )
+
+
+@pytest.fixture
+def reviewer_membership(db, tenant_a, reviewer_user):
+    return _membership_with_role(tenant_a, reviewer_user, "reviewer")
+
+
+@pytest.fixture
 def api_client_doer(user_a, tenant_a, doer_membership):
     from rest_framework.test import APIClient
 
@@ -88,6 +103,16 @@ def api_client_vp(vp_user, tenant_a, vp_membership):
 
     client = APIClient()
     client.force_authenticate(user=vp_user)
+    client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
+    return client
+
+
+@pytest.fixture
+def api_client_reviewer(reviewer_user, tenant_a, reviewer_membership):
+    from rest_framework.test import APIClient
+
+    client = APIClient()
+    client.force_authenticate(user=reviewer_user)
     client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
     return client
 
