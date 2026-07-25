@@ -120,6 +120,10 @@ async function jsonMock(body: unknown, status = 200) {
   return { status, contentType: "application/json", body: JSON.stringify(body) };
 }
 
+function jsonRouteBody(body: unknown, status = 200) {
+  return { status, contentType: "application/json", body: JSON.stringify(body) };
+}
+
 test.describe("Orange Book search", () => {
   test("searches and shows FDA-sourced results", async ({ page }) => {
     await page.route(
@@ -674,7 +678,7 @@ test.describe("Terminology mapping review", () => {
       ),
     );
     await page.route(
-      /\/api\/regx\/v1\/fda-data\/mappings\/route\/mapping-e2e-1\/approve\/$/,
+      /\/api\/regx\/v1\/fda-data\/mappings\/mapping-e2e-1\/approve\/$/,
       async (route) => {
         status = "approved";
         return route.fulfill(await jsonMock({ status: "approved" }));
@@ -691,6 +695,183 @@ test.describe("Terminology mapping review", () => {
 
     await dialog.getByRole("button", { name: /^confirm$/i }).click();
     await expect(page.getByText("approved", { exact: true })).toBeVisible();
+  });
+
+  const SYNTHETIC_SUBSTANCE_MAPPING = {
+    public_id: "substance-mapping-e2e-1",
+    mapping_type: "substance",
+    source_dataset: "fda_iid",
+    source_raw_value: "SYNTHETIC-ACETAMINOPHEN",
+    proposed_controlled_value: "Acetaminophen (synthetic)",
+    status: "proposed",
+    is_current: true,
+    reviewer_email: null,
+    reason: "",
+    affected_record_count: 2,
+    created_at: "2026-01-01T00:00:00Z",
+    proposed_unii: "SYN0001",
+    proposed_cas_number: "9005-25-8",
+    mapping_method: "exact_unii",
+    release_public_id: "release-e2e-1",
+  };
+
+  test("filters the mapping inventory to substance/UNII synonyms", async ({ page }) => {
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/fda-data\/mappings\/(\?[^/]*)?$/, (route) => {
+      const url = new URL(route.request().url());
+      const type = url.searchParams.get("type");
+      const results = type === "substance" ? [SYNTHETIC_SUBSTANCE_MAPPING] : [];
+      return route.fulfill(jsonRouteBody(paginate(results)));
+    });
+
+    await page.goto(`/fda-data/mappings?tenant=${TENANT}`);
+    await page.getByRole("tab", { name: /substance/i }).click();
+    await expect(page.getByText("SYNTHETIC-ACETAMINOPHEN")).toBeVisible();
+    await expect(page.getByText("SYN0001")).toBeVisible();
+  });
+
+  test("inspects a proposed synonym mapping and opens the affected-record drill-down", async ({
+    page,
+  }) => {
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/fda-data\/mappings\/(\?[^/]*)?$/, (route) =>
+      route.fulfill(jsonRouteBody(paginate([SYNTHETIC_SUBSTANCE_MAPPING]))),
+    );
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/substance-mapping-e2e-1\/$/,
+      (route) => route.fulfill(jsonRouteBody(SYNTHETIC_SUBSTANCE_MAPPING)),
+    );
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/substance-mapping-e2e-1\/affected-records\/(\?[^/]*)?$/,
+      (route) =>
+        route.fulfill(
+          jsonRouteBody(
+            paginate([
+              {
+                record_public_id: "iid-record-e2e-1",
+                dataset_type: "fda_iid",
+                release_public_id: "release-e2e-1",
+                source_row_locator: "row:0",
+                raw_value: "SYNTHETIC-ACETAMINOPHEN",
+                normalized_value: "Acetaminophen (synthetic)",
+                mapping_status: "proposed",
+                calculability_status: "calculable",
+                blocked: false,
+                reason_code: "calculable",
+              },
+            ]),
+          ),
+        ),
+    );
+
+    await page.goto(`/fda-data/mappings?tenant=${TENANT}`);
+    await expect(page.getByText("SYNTHETIC-ACETAMINOPHEN")).toBeVisible();
+    await page.getByRole("link", { name: /record\(s\)/i }).click();
+    await expect(page).toHaveURL(/\/fda-data\/mappings\/substance-mapping-e2e-1/);
+    await expect(page.getByRole("heading", { name: /affected records/i })).toBeVisible();
+    // DETECT: no raw storage path or internal numeric ID anywhere on the
+    // drill-down page.
+    const bodyText = await page.locator("body").innerText();
+    expect(bodyText).not.toContain("/var/");
+    expect(bodyText).not.toMatch(/\bid["']?\s*:\s*\d+/);
+  });
+
+  test("approves a substance mapping via the type-less endpoint", async ({ page }) => {
+    await mockCsrf(page);
+    let status = "proposed";
+    await page.route(/\/api\/regx\/v1\/fda-data\/mappings\/(\?[^/]*)?$/, (route) =>
+      route.fulfill(
+        jsonRouteBody(paginate([{ ...SYNTHETIC_SUBSTANCE_MAPPING, status }])),
+      ),
+    );
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/substance-mapping-e2e-1\/approve\/$/,
+      async (route) => {
+        status = "approved";
+        return route.fulfill(await jsonMock({ status: "approved" }));
+      },
+    );
+
+    await page.goto(`/fda-data/mappings?tenant=${TENANT}`);
+    await page.getByRole("tab", { name: /substance/i }).click();
+    await expect(page.getByText("SYNTHETIC-ACETAMINOPHEN")).toBeVisible();
+    await page.getByRole("button", { name: /^approve$/i }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^confirm$/i }).click();
+    await expect(page.getByText("approved", { exact: true })).toBeVisible();
+  });
+
+  test("rejects a substance mapping", async ({ page }) => {
+    await mockCsrf(page);
+    let status = "proposed";
+    await page.route(/\/api\/regx\/v1\/fda-data\/mappings\/(\?[^/]*)?$/, (route) =>
+      route.fulfill(
+        jsonRouteBody(paginate([{ ...SYNTHETIC_SUBSTANCE_MAPPING, status }])),
+      ),
+    );
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/substance-mapping-e2e-1\/reject\/$/,
+      async (route) => {
+        status = "rejected";
+        return route.fulfill(await jsonMock({ status: "rejected" }));
+      },
+    );
+
+    await page.goto(`/fda-data/mappings?tenant=${TENANT}`);
+    await page.getByRole("tab", { name: /substance/i }).click();
+    await expect(page.getByText("SYNTHETIC-ACETAMINOPHEN")).toBeVisible();
+    await page.getByRole("button", { name: /^reject$/i }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^confirm$/i }).click();
+    await expect(page.getByText("rejected", { exact: true })).toBeVisible();
+  });
+
+  test("returns a substance mapping for correction", async ({ page }) => {
+    await mockCsrf(page);
+    let status = "under_review";
+    await page.route(/\/api\/regx\/v1\/fda-data\/mappings\/(\?[^/]*)?$/, (route) =>
+      route.fulfill(
+        jsonRouteBody(paginate([{ ...SYNTHETIC_SUBSTANCE_MAPPING, status }])),
+      ),
+    );
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/substance-mapping-e2e-1\/return\/$/,
+      async (route) => {
+        status = "returned";
+        return route.fulfill(await jsonMock({ status: "returned" }));
+      },
+    );
+
+    await page.goto(`/fda-data/mappings?tenant=${TENANT}`);
+    await page.getByRole("tab", { name: /substance/i }).click();
+    await expect(page.getByText("SYNTHETIC-ACETAMINOPHEN")).toBeVisible();
+    await page.getByRole("button", { name: /return for correction/i }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^confirm$/i }).click();
+    await expect(page.getByText("returned", { exact: true })).toBeVisible();
+  });
+
+  test("a Doer cannot approve a mapping -- the API rejects it and the UI surfaces the error", async ({
+    page,
+  }) => {
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/fda-data\/mappings\/(\?[^/]*)?$/, (route) =>
+      route.fulfill(jsonRouteBody(paginate([SYNTHETIC_SUBSTANCE_MAPPING]))),
+    );
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/substance-mapping-e2e-1\/approve\/$/,
+      (route) =>
+        route.fulfill(
+          jsonRouteBody(
+            { detail: "You do not have permission to perform this action." },
+            403,
+          ),
+        ),
+    );
+
+    await page.goto(`/fda-data/mappings?tenant=${TENANT}`);
+    await page.getByRole("tab", { name: /substance/i }).click();
+    await expect(page.getByText("SYNTHETIC-ACETAMINOPHEN")).toBeVisible();
+    await page.getByRole("button", { name: /^approve$/i }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^confirm$/i }).click();
+    await expect(page.getByRole("alert")).toBeVisible();
   });
 });
 
