@@ -4,7 +4,16 @@ from .models import AssessmentSnapshot
 
 
 class MatchPreviewRequestSerializer(serializers.Serializer):
-    ingredient_public_id = serializers.UUIDField()
+    # Exactly one identity path must be supplied: either an already-resolved
+    # ingredient_public_id, or a raw substance identity (name/UNII/CAS) that
+    # is resolved through the governed SubstanceSynonymMapping service.
+    # Supplying neither leaves ingredient identity unresolved
+    # (INGREDIENT_AMBIGUOUS); supplying a raw identity never bypasses
+    # approved-mapping governance.
+    ingredient_public_id = serializers.UUIDField(required=False, allow_null=True)
+    substance_name = serializers.CharField(max_length=500, required=False, allow_blank=True)
+    substance_unii = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    substance_cas = serializers.CharField(max_length=50, required=False, allow_blank=True)
     route_code = serializers.CharField(max_length=50)
     dosage_form_code = serializers.CharField(max_length=50)
     active_release_public_id = serializers.UUIDField()
@@ -35,6 +44,7 @@ class AssessmentSnapshotSerializer(serializers.ModelSerializer):
             "formulation_version_public_id",
             "iid_release_public_id",
             "iid_precedent_record_public_id",
+            "iid_substance_mapping_public_id",
             "iid_ingredient_name",
             "iid_route",
             "iid_dosage_form",

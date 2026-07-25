@@ -61,6 +61,8 @@ class MatchPreviewView(APIView):
                 "decision_status": preview.decision_status,
                 "decision_note": preview.decision_note,
                 "escalation_required": preview.escalation_required,
+                "substance_mapping_public_id": preview.substance_mapping_public_id,
+                "substance_resolution_status": preview.substance_resolution_status,
             }
         )
 
@@ -89,6 +91,7 @@ class SnapshotView(APIView):
             formulation_version_public_id=version_id,
             iid_release_public_id=data.get("active_release_public_id"),
             iid_precedent_record_public_id=selected.get("precedent_record_public_id"),
+            iid_substance_mapping_public_id=preview.substance_mapping_public_id,
             iid_ingredient_name=selected.get("ingredient_name", ""),
             iid_route=selected.get("route", ""),
             iid_dosage_form=selected.get("dosage_form", ""),

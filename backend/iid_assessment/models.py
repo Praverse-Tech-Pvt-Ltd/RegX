@@ -28,6 +28,11 @@ class AssessmentSnapshot(PublicIDModel, TimeStampedModel):
     # IID/Orange Book row is later superseded or its mapping changes.
     iid_release_public_id = models.UUIDField(null=True, blank=True)
     iid_precedent_record_public_id = models.UUIDField(null=True, blank=True)
+    # The exact SubstanceSynonymMapping version used to confirm ingredient
+    # identity, frozen by public_id. A later mapping correction or new
+    # version can never retroactively change which mapping this completed
+    # assessment relied on.
+    iid_substance_mapping_public_id = models.UUIDField(null=True, blank=True)
     iid_ingredient_name = models.CharField(max_length=500, blank=True)
     iid_route = models.CharField(max_length=255, blank=True)
     iid_dosage_form = models.CharField(max_length=255, blank=True)

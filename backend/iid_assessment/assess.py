@@ -22,7 +22,7 @@ from .calculations import (
     calculate_percentage_w_w,
 )
 from .decisions import decide
-from .matching import find_iid_candidates
+from .matching import MatchResult, MatchStatus, find_iid_candidates
 
 
 @dataclass
@@ -34,11 +34,13 @@ class AssessmentPreview:
     decision_status: str
     decision_note: str
     escalation_required: bool
+    substance_mapping_public_id: str | None = None
+    substance_resolution_status: str | None = None
 
 
 def run_preview(
     *,
-    ingredient_public_id,
+    ingredient_public_id=None,
     route_code: str,
     dosage_form_code: str,
     active_release_public_id,
@@ -49,6 +51,9 @@ def run_preview(
     maximum_dosage_units_per_day=None,
     density_g_per_ml=None,
     selected_precedent_record_public_id=None,
+    substance_name: str = "",
+    substance_unii: str = "",
+    substance_cas: str = "",
 ) -> AssessmentPreview:
     route = ControlledRoute.objects.filter(code=route_code, lifecycle="active").first()
     dosage_form = ControlledDosageForm.objects.filter(
@@ -61,12 +66,66 @@ def run_preview(
     resolved_ingredient_public_id = (
         str(ingredient_public_id) if ingredient_public_id is not None else None
     )
+
+    # Substance/UNII synonym governance: when the caller supplies a raw
+    # substance identity instead of an already-resolved ingredient, the
+    # ingredient identity is confirmed *only* by an exact approved
+    # SubstanceSynonymMapping (or exact canonical IIDIngredient). A
+    # proposed/rejected/returned/ambiguous synonym can never silently
+    # become the confirmed identity -- it fails closed to REVIEW_REQUIRED
+    # or INGREDIENT_AMBIGUOUS. String equality alone never overrides an
+    # unresolved identity state.
+    selected_substance_mapping_public_id = None
+    substance_resolution = None
+    if resolved_ingredient_public_id is None and (
+        substance_name or substance_unii or substance_cas
+    ):
+        from fda_data.substance_matching import (
+            SubstanceMatchStatus,
+            resolve_substance_identity,
+        )
+
+        substance_resolution = resolve_substance_identity(
+            normalized_name=substance_name,
+            unii=substance_unii,
+            cas_number=substance_cas,
+        )
+        if substance_resolution.status == SubstanceMatchStatus.EXACT_MATCH:
+            confirmed = substance_resolution.candidates[0]
+            resolved_ingredient_public_id = confirmed.ingredient_public_id
+            selected_substance_mapping_public_id = confirmed.mapping_public_id
+
     match = find_iid_candidates(
         ingredient_public_id=resolved_ingredient_public_id,
         controlled_route_id=route.id if route else None,
         controlled_dosage_form_id=dosage_form.id if dosage_form else None,
         active_release_id=release.id if release else None,
     )
+
+    # Governance override: a substance identity that was attempted but not
+    # confirmed as an exact approved match is escalated to REVIEW_REQUIRED
+    # (pending or multiple conflicting approved mappings) rather than being
+    # reported as mere ambiguous free-text input. A rejected identity stays
+    # INGREDIENT_AMBIGUOUS. Either way the IID lookup ran with a null
+    # ingredient, so there are no candidates and no calculation happens.
+    if substance_resolution is not None:
+        from fda_data.substance_matching import SubstanceMatchStatus
+
+        if substance_resolution.status in (
+            SubstanceMatchStatus.MULTIPLE_CANDIDATES,
+            SubstanceMatchStatus.REVIEW_REQUIRED,
+        ):
+            match = MatchResult(
+                status=MatchStatus.REVIEW_REQUIRED,
+                candidates=[],
+                reason_code=substance_resolution.reason_code,
+            )
+        elif substance_resolution.status == SubstanceMatchStatus.INGREDIENT_AMBIGUOUS:
+            match = MatchResult(
+                status=MatchStatus.INGREDIENT_AMBIGUOUS,
+                candidates=[],
+                reason_code=substance_resolution.reason_code,
+            )
 
     candidates_data = [asdict(c) for c in match.candidates]
 
@@ -180,6 +239,8 @@ def run_preview(
         decision_status=decision.status,
         decision_note=decision.note,
         escalation_required=decision.escalation_required,
+        substance_mapping_public_id=selected_substance_mapping_public_id,
+        substance_resolution_status=(substance_resolution.status if substance_resolution else None),
     )
 
 
