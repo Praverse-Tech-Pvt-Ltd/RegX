@@ -17,6 +17,7 @@ from .models import (
     IIDPrecedentRecord,
     OrangeBookProduct,
     RouteMapping,
+    SubstanceSynonymMapping,
     UnitMapping,
 )
 
@@ -212,18 +213,38 @@ class ReviewActionSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
 
 
+# Each entry: (model_cls, controlled_fk_attr, controlled_label_attr,
+# raw_value_attr, reason_attr). The substance mapping type uses different
+# field names (raw_ingredient_name/review_reason) than the shared
+# _BaseTerminologyMapping shape (source_raw_value/reason), so the
+# serializer below reads through these per-type attribute names rather
+# than assuming one fixed shape.
 MAPPING_TYPE_CONFIG = {
-    "route": (RouteMapping, "controlled_route", "canonical_label"),
-    "dosage_form": (DosageFormMapping, "controlled_dosage_form", "canonical_label"),
-    "unit": (UnitMapping, "controlled_unit", "code"),
+    "route": (RouteMapping, "controlled_route", "canonical_label", "source_raw_value", "reason"),
+    "dosage_form": (
+        DosageFormMapping,
+        "controlled_dosage_form",
+        "canonical_label",
+        "source_raw_value",
+        "reason",
+    ),
+    "unit": (UnitMapping, "controlled_unit", "code", "source_raw_value", "reason"),
+    "substance": (
+        SubstanceSynonymMapping,
+        "proposed_ingredient",
+        "canonical_name",
+        "raw_ingredient_name",
+        "review_reason",
+    ),
 }
 
 
 class TerminologyMappingSerializer(serializers.Serializer):
     """Normalized shape shared across RouteMapping/DosageFormMapping/
-    UnitMapping so the mapping-review UI can render one table regardless
-    of type. No fuzzy mapping is ever exposed as auto-approved -- status
-    always reflects the real MappingDecisionStatus."""
+    UnitMapping/SubstanceSynonymMapping so the mapping-review UI can
+    render one table regardless of type. No fuzzy mapping is ever exposed
+    as auto-approved -- status always reflects the real, persisted
+    mapping status."""
 
     public_id = serializers.UUIDField(read_only=True)
     mapping_type = serializers.CharField(read_only=True)
@@ -236,27 +257,55 @@ class TerminologyMappingSerializer(serializers.Serializer):
     reason = serializers.CharField(read_only=True)
     affected_record_count = serializers.IntegerField(read_only=True)
     created_at = serializers.DateTimeField(read_only=True)
+    # Substance-mapping-specific fields, null for other mapping types.
+    proposed_unii = serializers.CharField(read_only=True, allow_null=True, required=False)
+    proposed_cas_number = serializers.CharField(read_only=True, allow_null=True, required=False)
+    mapping_method = serializers.CharField(read_only=True, allow_null=True, required=False)
+    release_public_id = serializers.CharField(read_only=True, allow_null=True, required=False)
 
     @staticmethod
     def from_instance(mapping_type: str, instance, affected_record_count: int) -> dict:
-        _, fk_name, label_field = MAPPING_TYPE_CONFIG[mapping_type]
+        _, fk_name, label_field, raw_value_attr, reason_attr = MAPPING_TYPE_CONFIG[mapping_type]
         controlled = getattr(instance, fk_name, None)
-        return {
+        data = {
             "public_id": instance.public_id,
             "mapping_type": mapping_type,
             "source_dataset": instance.source_dataset,
-            "source_raw_value": instance.source_raw_value,
+            "source_raw_value": getattr(instance, raw_value_attr),
             "proposed_controlled_value": getattr(controlled, label_field, None)
             if controlled
             else None,
             "status": instance.status,
             "is_current": instance.is_current,
             "reviewer_email": instance.reviewer.email if instance.reviewer else None,
-            "reason": instance.reason,
+            "reason": getattr(instance, reason_attr),
             "affected_record_count": affected_record_count,
             "created_at": instance.created_at,
         }
+        if mapping_type == "substance":
+            data["proposed_unii"] = instance.proposed_unii or (
+                controlled.unii if controlled else None
+            )
+            data["proposed_cas_number"] = instance.proposed_cas_number
+            data["mapping_method"] = instance.mapping_method
+            data["release_public_id"] = (
+                str(instance.release.public_id) if instance.release_id else None
+            )
+        return data
 
 
 class MappingReviewActionSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
+
+
+class AffectedRecordSerializer(serializers.Serializer):
+    record_public_id = serializers.CharField()
+    dataset_type = serializers.CharField()
+    release_public_id = serializers.CharField(allow_null=True)
+    source_row_locator = serializers.CharField(allow_null=True, required=False)
+    raw_value = serializers.CharField()
+    normalized_value = serializers.CharField(allow_null=True)
+    mapping_status = serializers.CharField(allow_null=True)
+    calculability_status = serializers.CharField(allow_null=True, required=False)
+    blocked = serializers.BooleanField()
+    reason_code = serializers.CharField(allow_blank=True)

@@ -8,6 +8,7 @@ missing/forbidden record returns a generic 404.
 import io
 import json
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
@@ -24,7 +25,6 @@ from .models import (
     ControlledUnit,
     FDADataSourceRelease,
     IIDPrecedentRecord,
-    MappingDecisionStatus,
     OrangeBookProduct,
 )
 from .permissions import (
@@ -399,11 +399,16 @@ class ControlledUnitListView(APIView):
         return Response(ControlledUnitSerializer(qs, many=True).data)
 
 
-def _affected_record_count(mapping_type: str, source_raw_value: str) -> int:
+def _affected_record_count(mapping_type: str, mapping) -> int:
     """Best-effort count of records referencing this raw value -- used only
     to inform a reviewer's decision, never to gate it."""
     from django.db.models import Q
 
+    if mapping_type == "substance":
+        from .substance_matching import affected_record_count
+
+        return affected_record_count(mapping)
+    source_raw_value = mapping.source_raw_value
     if mapping_type == "route":
         return (
             OrangeBookProduct.objects.filter(route_raw=source_raw_value).count()
@@ -421,8 +426,120 @@ def _affected_record_count(mapping_type: str, source_raw_value: str) -> int:
     return 0
 
 
+def _affected_records_page(mapping_type: str, mapping) -> list[dict]:
+    """Safe, paginated-by-caller list of records referencing this mapping's
+    raw value -- public IDs and safe fields only, never storage keys,
+    filesystem paths, or numeric IDs."""
+    from django.db.models import Q
+
+    results = []
+    if mapping_type == "substance":
+        qs = IIDPrecedentRecord.objects.filter(
+            ingredient_name_raw=mapping.raw_ingredient_name
+        ).select_related("release")
+        for record in qs:
+            results.append(
+                {
+                    "record_public_id": str(record.public_id),
+                    "dataset_type": record.release.dataset_type,
+                    "release_public_id": str(record.release.public_id),
+                    "source_row_locator": record.source_row_locator,
+                    "raw_value": record.ingredient_name_raw,
+                    "normalized_value": (
+                        record.ingredient.canonical_name if record.ingredient else None
+                    ),
+                    "mapping_status": mapping.status,
+                    "calculability_status": record.calculability_status,
+                    "blocked": record.calculability_status != "calculable",
+                    "reason_code": record.calculability_status,
+                }
+            )
+        return results
+
+    source_raw_value = mapping.source_raw_value
+    if mapping_type in ("route", "dosage_form"):
+        field = "route_raw" if mapping_type == "route" else "dosage_form_raw"
+        iid_qs = IIDPrecedentRecord.objects.filter(**{field: source_raw_value}).select_related(
+            "release"
+        )
+        for record in iid_qs:
+            results.append(
+                {
+                    "record_public_id": str(record.public_id),
+                    "dataset_type": record.release.dataset_type,
+                    "release_public_id": str(record.release.public_id),
+                    "source_row_locator": record.source_row_locator,
+                    "raw_value": getattr(record, field),
+                    "normalized_value": (
+                        record.route_normalized.canonical_label
+                        if mapping_type == "route" and record.route_normalized
+                        else record.dosage_form_normalized.canonical_label
+                        if mapping_type == "dosage_form" and record.dosage_form_normalized
+                        else None
+                    ),
+                    "mapping_status": mapping.status,
+                    "calculability_status": record.calculability_status,
+                    "blocked": record.calculability_status != "calculable",
+                    "reason_code": record.calculability_status,
+                }
+            )
+        ob_qs = OrangeBookProduct.objects.filter(**{field: source_raw_value}).select_related(
+            "release"
+        )
+        for product in ob_qs:
+            results.append(
+                {
+                    "record_public_id": str(product.public_id),
+                    "dataset_type": product.release.dataset_type,
+                    "release_public_id": str(product.release.public_id),
+                    "source_row_locator": product.source_row_locator,
+                    "raw_value": getattr(product, field),
+                    "normalized_value": None,
+                    "mapping_status": mapping.status,
+                    "calculability_status": None,
+                    "blocked": False,
+                    "reason_code": "",
+                }
+            )
+    elif mapping_type == "unit":
+        qs = IIDPrecedentRecord.objects.filter(
+            Q(potency_unit_raw=source_raw_value) | Q(mde_unit_raw=source_raw_value)
+        ).select_related("release")
+        for record in qs:
+            results.append(
+                {
+                    "record_public_id": str(record.public_id),
+                    "dataset_type": record.release.dataset_type,
+                    "release_public_id": str(record.release.public_id),
+                    "source_row_locator": record.source_row_locator,
+                    "raw_value": record.potency_unit_raw or record.mde_unit_raw,
+                    "normalized_value": (
+                        record.potency_unit_normalized.code
+                        if record.potency_unit_normalized
+                        else None
+                    ),
+                    "mapping_status": mapping.status,
+                    "calculability_status": record.calculability_status,
+                    "blocked": record.calculability_status != "calculable",
+                    "reason_code": record.calculability_status,
+                }
+            )
+    return results
+
+
+def _find_mapping_or_404(public_id) -> tuple[str, object]:
+    """Resolve a mapping public_id to (mapping_type, instance) by checking
+    each governed mapping model in turn -- UUIDs are unique across all of
+    them in practice, so exactly one (or zero) will match."""
+    for mapping_type, (model_cls, *_rest) in MAPPING_TYPE_CONFIG.items():
+        instance = model_cls.objects.select_related("reviewer").filter(public_id=public_id).first()
+        if instance is not None:
+            return mapping_type, instance
+    raise NotFound("Terminology mapping not found.")
+
+
 def _get_mapping_or_404(mapping_type: str, public_id):
-    model_cls, _, _ = MAPPING_TYPE_CONFIG.get(mapping_type, (None, None, None))
+    model_cls, _, _, _, _ = MAPPING_TYPE_CONFIG.get(mapping_type, (None, None, None, None, None))
     if model_cls is None:
         raise NotFound("Unknown mapping type.")
     try:
@@ -432,9 +549,10 @@ def _get_mapping_or_404(mapping_type: str, public_id):
 
 
 class TerminologyMappingListView(APIView):
-    """Read-only inventory across route/dosage-form/unit mappings, unified
-    into one shape for the mapping-review UI. Filter by ?type= and
-    ?status= (both optional; omitting type returns all three kinds)."""
+    """Read-only inventory across route/dosage-form/unit/substance
+    mappings, unified into one shape for the mapping-review UI. Filter by
+    ?type=, ?status=, ?release=, ?raw_value=, ?reviewer= (all optional;
+    omitting type returns every kind)."""
 
     pagination_class = FdaDataPagination
 
@@ -442,24 +560,35 @@ class TerminologyMappingListView(APIView):
         return [CanReviewFdaData()]
 
     def get(self, request):
-        type_filter = request.query_params.get("type")
-        status_filter = request.query_params.get("status")
+        params = request.query_params
+        type_filter = params.get("type")
+        status_filter = params.get("status")
+        release_filter = params.get("release")
+        raw_value_filter = params.get("raw_value")
+        reviewer_filter = params.get("reviewer")
         types = [type_filter] if type_filter else list(MAPPING_TYPE_CONFIG.keys())
 
         results = []
         for mapping_type in types:
-            model_cls, _, _ = MAPPING_TYPE_CONFIG.get(mapping_type, (None, None, None))
-            if model_cls is None:
+            config = MAPPING_TYPE_CONFIG.get(mapping_type)
+            if config is None:
                 continue
+            model_cls, _, _, raw_value_attr, _ = config
             qs = model_cls.objects.select_related("reviewer").order_by("-created_at")
             if status_filter:
                 qs = qs.filter(status=status_filter)
+            if release_filter and hasattr(model_cls, "release"):
+                qs = qs.filter(release__public_id=release_filter)
+            if raw_value_filter:
+                qs = qs.filter(**{f"{raw_value_attr}__icontains": raw_value_filter})
+            if reviewer_filter:
+                qs = qs.filter(reviewer__email__iexact=reviewer_filter)
             for instance in qs:
                 results.append(
                     TerminologyMappingSerializer.from_instance(
                         mapping_type,
                         instance,
-                        _affected_record_count(mapping_type, instance.source_raw_value),
+                        _affected_record_count(mapping_type, instance),
                     )
                 )
         results.sort(key=lambda r: r["created_at"], reverse=True)
@@ -469,63 +598,114 @@ class TerminologyMappingListView(APIView):
         return paginator.get_paginated_response(page)
 
 
-class TerminologyMappingApproveView(APIView):
+class TerminologyMappingDetailView(APIView):
     def get_permissions(self):
         return [CanReviewFdaData()]
 
-    def post(self, request, mapping_type, public_id):
-        mapping = _get_mapping_or_404(mapping_type, public_id)
+    def get(self, request, public_id):
+        mapping_type, mapping = _find_mapping_or_404(public_id)
+        return Response(
+            TerminologyMappingSerializer.from_instance(
+                mapping_type, mapping, _affected_record_count(mapping_type, mapping)
+            )
+        )
+
+
+class _MappingActionViewBase(APIView):
+    """Shared action plumbing for submit-review/approve/reject/return.
+    Subclasses set target_status and event_type. A status transition that
+    isn't a valid choice for this mapping type's model (e.g. submit-review
+    on a route/dosage-form/unit mapping, which has no UNDER_REVIEW status)
+    fails closed with a structured 400, never a raw exception."""
+
+    target_status: str = ""
+    event_type: str = ""
+    self_approval_forbidden: bool = False
+    required_permission = CanReviewFdaData
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def post(self, request, public_id):
+        mapping_type, mapping = _find_mapping_or_404(public_id)
         serializer = MappingReviewActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        mapping.status = MappingDecisionStatus.APPROVED
+
+        if self.self_approval_forbidden and mapping.reviewer_id == request.user.id:
+            raise ValidationError("A reviewer cannot approve a mapping they already reviewed.")
+
+        _, _, _, _, reason_attr = MAPPING_TYPE_CONFIG[mapping_type]
+        mapping.status = self.target_status
         mapping.reviewer = request.user
-        if serializer.validated_data.get("reason"):
-            mapping.reason = serializer.validated_data["reason"]
-        mapping.full_clean()
-        mapping.save(update_fields=["status", "reviewer", "reason", "updated_at"])
+        reason = serializer.validated_data.get("reason")
+        if reason:
+            setattr(mapping, reason_attr, reason)
+        if hasattr(mapping, "reviewed_at"):
+            from django.utils import timezone
+
+            mapping.reviewed_at = timezone.now()
+        if self.target_status == "approved" and hasattr(mapping, "approved_by"):
+            from django.utils import timezone
+
+            mapping.approved_by = request.user
+            mapping.approved_at = timezone.now()
+
+        try:
+            mapping.full_clean()
+        except DjangoValidationError as exc:
+            raise ValidationError(str(exc)) from exc
+        mapping.save()
+
         emit(
-            event_type=FdaDataEvent.MAPPING_APPROVED,
+            event_type=self.event_type,
             resource_type="fda_data_mapping",
             resource_id=str(mapping.public_id),
-            payload={"mapping_type": mapping_type, "source_raw_value": mapping.source_raw_value},
+            payload={
+                "mapping_type": mapping_type,
+                "new_status": self.target_status,
+            },
             actor_id=request.user.id,
             actor_email=request.user.email,
         )
         return Response(
             TerminologyMappingSerializer.from_instance(
-                mapping_type,
-                mapping,
-                _affected_record_count(mapping_type, mapping.source_raw_value),
+                mapping_type, mapping, _affected_record_count(mapping_type, mapping)
             )
         )
 
 
-class TerminologyMappingRejectView(APIView):
+class TerminologyMappingSubmitReviewView(_MappingActionViewBase):
+    target_status = "under_review"
+    event_type = FdaDataEvent.MAPPING_SUBMITTED_FOR_REVIEW
+
+
+class TerminologyMappingApproveView(_MappingActionViewBase):
+    target_status = "approved"
+    event_type = FdaDataEvent.MAPPING_APPROVED
+    self_approval_forbidden = True
+    required_permission = CanApproveFdaData
+
+
+class TerminologyMappingRejectView(_MappingActionViewBase):
+    target_status = "rejected"
+    event_type = FdaDataEvent.MAPPING_REJECTED
+
+
+class TerminologyMappingReturnView(_MappingActionViewBase):
+    target_status = "returned"
+    event_type = FdaDataEvent.MAPPING_RETURNED
+
+
+class TerminologyMappingAffectedRecordsView(APIView):
+    pagination_class = FdaDataPagination
+
     def get_permissions(self):
         return [CanReviewFdaData()]
 
-    def post(self, request, mapping_type, public_id):
-        mapping = _get_mapping_or_404(mapping_type, public_id)
-        serializer = MappingReviewActionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        mapping.status = MappingDecisionStatus.REJECTED
-        mapping.reviewer = request.user
-        if serializer.validated_data.get("reason"):
-            mapping.reason = serializer.validated_data["reason"]
-        mapping.full_clean()
-        mapping.save(update_fields=["status", "reviewer", "reason", "updated_at"])
-        emit(
-            event_type=FdaDataEvent.MAPPING_REJECTED,
-            resource_type="fda_data_mapping",
-            resource_id=str(mapping.public_id),
-            payload={"mapping_type": mapping_type, "source_raw_value": mapping.source_raw_value},
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
-        return Response(
-            TerminologyMappingSerializer.from_instance(
-                mapping_type,
-                mapping,
-                _affected_record_count(mapping_type, mapping.source_raw_value),
-            )
-        )
+    def get(self, request, public_id):
+        mapping_type, mapping = _find_mapping_or_404(public_id)
+        records = _affected_records_page(mapping_type, mapping)
+        records.sort(key=lambda r: r["record_public_id"])
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(records, request)
+        return paginator.get_paginated_response(page)
