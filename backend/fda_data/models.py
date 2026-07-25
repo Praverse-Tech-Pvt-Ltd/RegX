@@ -607,3 +607,139 @@ class FdaImportRowResult(PublicIDModel, TimeStampedModel):
 
     def __str__(self):
         return f"{self.release_id}:{self.row_locator} -> {self.result}"
+
+
+class SubstanceMappingStatus(models.TextChoices):
+    PROPOSED = "proposed", "Proposed"
+    UNDER_REVIEW = "under_review", "Under Review"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+    RETURNED = "returned", "Returned"
+
+
+class SubstanceMappingMethod(models.TextChoices):
+    EXACT_NAME = "exact_name", "Exact Normalized Name"
+    EXACT_UNII = "exact_unii", "Exact UNII"
+    EXACT_CAS = "exact_cas", "Exact CAS Number"
+    REVIEWED_SYNONYM = "reviewed_synonym", "Reviewed Synonym"
+    MANUAL = "manual", "Manual"
+
+
+class SubstanceSynonymMapping(PublicIDModel, TimeStampedModel):
+    """Governed substance/UNII/CAS identity mapping: a raw ingredient
+    identity string (as it appears in an FDA IID/Orange Book row) proposed
+    against a canonical IIDIngredient, UNII, and/or CAS number. No fuzzy
+    candidate becomes approved automatically -- only an explicit reviewer
+    decision moves a row through PROPOSED -> UNDER_REVIEW -> APPROVED (or
+    REJECTED / RETURNED). Only an APPROVED, is_current row may be used by
+    the IID matching engine to resolve ingredient identity; every other
+    status fails closed to REVIEW_REQUIRED/INGREDIENT_AMBIGUOUS.
+
+    release is nullable: a null release means this mapping is scoped as an
+    explicit platform-master synonym (not tied to one release's raw rows).
+    release uses PROTECT, not CASCADE, so a release with approved mapping
+    history can never be silently deleted out from under it."""
+
+    release = models.ForeignKey(
+        FDADataSourceRelease,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="substance_synonym_mappings",
+    )
+    source_dataset = models.CharField(max_length=40, choices=FDADatasetType.choices)
+
+    # Raw source identity -- immutable once created (see clean()). Never
+    # rewritten in place even when a correction is needed.
+    raw_ingredient_name = models.CharField(max_length=500)
+    normalized_ingredient_name = models.CharField(max_length=500, db_index=True)
+    raw_unii = models.CharField(max_length=20, blank=True, db_index=True)
+    raw_cas_number = models.CharField(max_length=50, blank=True, db_index=True)
+    source_row_locator = models.CharField(max_length=255, blank=True)
+
+    # Proposed resolution -- never applied until approved.
+    proposed_ingredient = models.ForeignKey(
+        IIDIngredient,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="proposed_synonym_mappings",
+    )
+    proposed_unii = models.CharField(max_length=20, blank=True)
+    proposed_cas_number = models.CharField(max_length=50, blank=True)
+
+    mapping_method = models.CharField(max_length=20, choices=SubstanceMappingMethod.choices)
+    evidence_classification = models.CharField(max_length=100, blank=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=SubstanceMappingStatus.choices,
+        default=SubstanceMappingStatus.PROPOSED,
+        db_index=True,
+    )
+    is_current = models.BooleanField(default=True)
+
+    reviewer = models.ForeignKey(
+        "identity.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    review_reason = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(
+        "identity.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["release"]),
+            models.Index(fields=["normalized_ingredient_name"]),
+            models.Index(fields=["raw_unii"]),
+            models.Index(fields=["raw_cas_number"]),
+            models.Index(fields=["status"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_dataset", "raw_ingredient_name", "release"],
+                condition=models.Q(is_current=True),
+                name="unique_current_substance_mapping_per_release_raw_identity",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.raw_ingredient_name} -> {self.proposed_ingredient} ({self.status})"
+
+    def clean(self):
+        if self.pk:
+            original = SubstanceSynonymMapping.objects.filter(pk=self.pk).first()
+            if original is None:
+                return
+            immutable_raw_fields = {
+                "release_id",
+                "source_dataset",
+                "raw_ingredient_name",
+                "normalized_ingredient_name",
+                "raw_unii",
+                "raw_cas_number",
+                "source_row_locator",
+            }
+            changed_raw = {
+                f for f in immutable_raw_fields if getattr(original, f) != getattr(self, f)
+            }
+            if changed_raw:
+                raise ValidationError(
+                    f"SubstanceSynonymMapping {self.pk} raw source identity is immutable; "
+                    f"cannot change {sorted(changed_raw)}. Propose a new mapping instead."
+                )
+            if original.status == SubstanceMappingStatus.APPROVED:
+                mutable_once_approved = {"is_current", "updated_at"}
+                changed_fields = {
+                    f.name
+                    for f in self._meta.fields
+                    if f.name not in mutable_once_approved
+                    and getattr(original, f.name) != getattr(self, f.name)
+                }
+                if changed_fields:
+                    raise ValidationError(
+                        f"SubstanceSynonymMapping {self.pk} is approved and immutable; "
+                        f"cannot change {sorted(changed_fields)}. Propose a new mapping instead."
+                    )
