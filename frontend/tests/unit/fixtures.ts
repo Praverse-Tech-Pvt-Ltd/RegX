@@ -1,5 +1,6 @@
 // Synthetic, non-confidential fixtures for frontend unit/component tests.
 import type {
+  AffectedRecord,
   AssessmentPreview,
   AssessmentSnapshotDetail,
   Document,
@@ -278,6 +279,45 @@ export function makeTerminologyMapping(
     reason: "",
     affected_record_count: 2,
     created_at: "2026-01-01T00:00:00Z",
+    proposed_unii: null,
+    proposed_cas_number: null,
+    mapping_method: null,
+    release_public_id: null,
+    ...overrides,
+  };
+}
+
+export function makeSubstanceMapping(
+  overrides: Partial<TerminologyMapping> = {},
+): TerminologyMapping {
+  return makeTerminologyMapping({
+    public_id: "substance-mapping-0001",
+    mapping_type: "substance",
+    source_dataset: "fda_iid",
+    source_raw_value: "SYNTHETIC-ACETAMINOPHEN",
+    proposed_controlled_value: "Acetaminophen (synthetic)",
+    proposed_unii: "SYN0001",
+    proposed_cas_number: "9005-25-8",
+    mapping_method: "exact_unii",
+    release_public_id: "fda-release-public-0001",
+    ...overrides,
+  });
+}
+
+export function makeAffectedRecord(
+  overrides: Partial<AffectedRecord> = {},
+): AffectedRecord {
+  return {
+    record_public_id: "iid-record-public-0001",
+    dataset_type: "fda_iid",
+    release_public_id: "fda-release-public-0001",
+    source_row_locator: "row:0",
+    raw_value: "SYNTHETIC-ACETAMINOPHEN",
+    normalized_value: "Acetaminophen (synthetic)",
+    mapping_status: "proposed",
+    calculability_status: "calculable",
+    blocked: false,
+    reason_code: "calculable",
     ...overrides,
   };
 }
@@ -319,6 +359,7 @@ export function makeSnapshotDetail(
     formulation_version_public_id: "version-public-0001",
     iid_release_public_id: "fda-release-public-0001",
     iid_precedent_record_public_id: "precedent-public-0001",
+    iid_substance_mapping_public_id: null,
     iid_ingredient_name: "Synthetic Starch",
     iid_route: "Oral",
     iid_dosage_form: "Tablet",

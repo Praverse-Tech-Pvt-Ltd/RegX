@@ -20,7 +20,9 @@ import {
   makeLocator,
   makeOrangeBookProduct,
   makeProduct,
+  makeAffectedRecord,
   makeReconciliationReport,
+  makeSubstanceMapping,
   makeTerminologyMapping,
   makeVersion,
   paginate,
@@ -76,6 +78,8 @@ const fdaApi = vi.hoisted(() => ({
   componentsList: vi.fn(),
   dosingRegimensList: vi.fn(),
   mappingsList: vi.fn(),
+  mappingsGet: vi.fn(),
+  mappingsAffectedRecords: vi.fn(),
   preview: vi.fn(),
 }));
 
@@ -92,7 +96,12 @@ vi.mock("@/lib/api", async (importOriginal) => {
         reconciliationJson: fdaApi.releasesReconciliationJson,
       },
       orangeBook: { ...actual.fdaData.orangeBook, search: fdaApi.orangeBookSearch },
-      mappings: { ...actual.fdaData.mappings, list: fdaApi.mappingsList },
+      mappings: {
+        ...actual.fdaData.mappings,
+        list: fdaApi.mappingsList,
+        get: fdaApi.mappingsGet,
+        affectedRecords: fdaApi.mappingsAffectedRecords,
+      },
     },
     formulations: {
       ...actual.formulations,
@@ -117,6 +126,7 @@ import NewReleasePage from "@/app/fda-data/releases/new/page";
 import FdaReleaseDetailPage from "@/app/fda-data/releases/[publicId]/page";
 import ReconciliationPage from "@/app/fda-data/releases/[publicId]/reconciliation/page";
 import MappingsPage from "@/app/fda-data/mappings/page";
+import MappingDetailPage from "@/app/fda-data/mappings/[publicId]/page";
 import OrangeBookSearchPage from "@/app/fda-data/orange-book/page";
 import FormulationDetailPage from "@/app/formulations/[publicId]/page";
 import VersionDetailPage from "@/app/formulations/[publicId]/versions/[versionPublicId]/page";
@@ -412,11 +422,37 @@ describe("Accessibility — /fda-data/mappings", () => {
     expect(results).toHaveNoViolations();
   });
 
-  it("checkboxes for multi-selection are accessibly labeled", async () => {
+  it("mapping type tabs expose an accessible tablist and selected state", async () => {
     fdaApi.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping()]));
     render(<MappingsPage />);
     await screen.findByText("ORAL");
-    expect(screen.getByRole("checkbox", { name: /select mapping ORAL/i })).toBeInTheDocument();
+    const tablist = screen.getByRole("tablist", { name: /mapping type/i });
+    expect(tablist).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /substance/i })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+  });
+
+  it("the substance mapping table has no violations", async () => {
+    fdaApi.mappingsList.mockResolvedValue(paginate([makeSubstanceMapping()]));
+    const { container } = render(<MappingsPage />);
+    await screen.findByText("SYNTHETIC-ACETAMINOPHEN");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /fda-data/mappings/{public_id}", () => {
+  it("the affected-record drill-down has no violations and a data table", async () => {
+    nav.publicId = "substance-mapping-0001";
+    fdaApi.mappingsGet.mockResolvedValue(makeSubstanceMapping());
+    fdaApi.mappingsAffectedRecords.mockResolvedValue(paginate([makeAffectedRecord()]));
+    const { container } = render(<MappingDetailPage />);
+    await screen.findByText("SYN0001");
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
 

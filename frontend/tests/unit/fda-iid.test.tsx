@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  makeAffectedRecord,
   makeAssessmentPreview,
   makeFdaRelease,
   makeFormulationComponent,
@@ -12,9 +13,11 @@ import {
   makeProduct,
   makeReconciliationReport,
   makeSnapshotDetail,
+  makeSubstanceMapping,
   makeTerminologyMapping,
   paginate,
 } from "./fixtures";
+import { ApiError } from "@/lib/api";
 
 const nav = vi.hoisted(() => ({
   push: vi.fn(),
@@ -55,8 +58,12 @@ const api = vi.hoisted(() => ({
   orangeBookSearch: vi.fn(),
   orangeBookGet: vi.fn(),
   mappingsList: vi.fn(),
+  mappingsGet: vi.fn(),
+  mappingsAffectedRecords: vi.fn(),
   mappingsApprove: vi.fn(),
   mappingsReject: vi.fn(),
+  mappingsReturn: vi.fn(),
+  mappingsSubmitReview: vi.fn(),
   productsList: vi.fn(),
   productsCreate: vi.fn(),
   productsGet: vi.fn(),
@@ -91,8 +98,12 @@ vi.mock("@/lib/api", async (importOriginal) => {
       orangeBook: { search: api.orangeBookSearch, get: api.orangeBookGet },
       mappings: {
         list: api.mappingsList,
+        get: api.mappingsGet,
+        affectedRecords: api.mappingsAffectedRecords,
         approve: api.mappingsApprove,
         reject: api.mappingsReject,
+        return: api.mappingsReturn,
+        submitReview: api.mappingsSubmitReview,
       },
     },
     formulations: {
@@ -115,6 +126,7 @@ import NewReleasePage from "@/app/fda-data/releases/new/page";
 import FdaReleaseDetailPage from "@/app/fda-data/releases/[publicId]/page";
 import ReconciliationPage from "@/app/fda-data/releases/[publicId]/reconciliation/page";
 import MappingsPage from "@/app/fda-data/mappings/page";
+import MappingDetailPage from "@/app/fda-data/mappings/[publicId]/page";
 import OrangeBookSearchPage from "@/app/fda-data/orange-book/page";
 import OrangeBookDetailPage from "@/app/fda-data/orange-book/[publicId]/page";
 import FormulationDetailPage from "@/app/formulations/[publicId]/page";
@@ -511,13 +523,14 @@ describe("MappingsPage — terminology mapping review", () => {
     await user.click(screen.getByRole("button", { name: /^approve$/i }));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveAccessibleName(/approve mapping/i);
+    expect(dialog).toHaveAccessibleName(/approve/i);
 
     api.mappingsApprove.mockResolvedValue(makeTerminologyMapping({ status: "approved" }));
     api.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping({ status: "approved" })]));
     await user.click(within(dialog).getByRole("button", { name: /^confirm$/i }));
 
-    expect(api.mappingsApprove).toHaveBeenCalledWith("alpha", "route", "mapping-public-0001", "");
+    // Type-less URL scheme: approve is keyed by public_id alone, no mapping type.
+    expect(api.mappingsApprove).toHaveBeenCalledWith("alpha", "mapping-public-0001", "");
   });
 
   it("never auto-approves -- clicking approve alone does not call the API", async () => {
@@ -529,16 +542,134 @@ describe("MappingsPage — terminology mapping review", () => {
     expect(api.mappingsApprove).not.toHaveBeenCalled();
   });
 
-  it("filters by mapping type", async () => {
+  it("filters by mapping type via type tabs", async () => {
     const user = userEvent.setup();
     api.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping()]));
     render(<MappingsPage />);
     await screen.findByText("ORAL");
-    await user.selectOptions(screen.getByLabelText(/^type:/i), "unit");
+    await user.click(screen.getByRole("tab", { name: /units/i }));
     expect(api.mappingsList).toHaveBeenLastCalledWith(
       "alpha",
       expect.objectContaining({ type: "unit" }),
     );
+  });
+
+  it("shows a segregation-of-duties warning", async () => {
+    api.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping()]));
+    render(<MappingsPage />);
+    await screen.findByText("ORAL");
+    expect(screen.getByText(/segregation of duties/i)).toBeInTheDocument();
+  });
+
+  it("renders substance/UNII columns and provenance for a substance mapping", async () => {
+    const user = userEvent.setup();
+    api.mappingsList.mockResolvedValue(paginate([makeSubstanceMapping()]));
+    render(<MappingsPage />);
+    await user.click(screen.getByRole("tab", { name: /substance/i }));
+    expect(api.mappingsList).toHaveBeenLastCalledWith(
+      "alpha",
+      expect.objectContaining({ type: "substance" }),
+    );
+    expect(await screen.findByText("SYN0001")).toBeInTheDocument();
+    expect(screen.getByText("9005-25-8")).toBeInTheDocument();
+  });
+
+  it("submits a proposed mapping for review with the type-less endpoint", async () => {
+    const user = userEvent.setup();
+    api.mappingsList.mockResolvedValue(paginate([makeSubstanceMapping()]));
+    render(<MappingsPage />);
+    await user.click(screen.getByRole("tab", { name: /substance/i }));
+    await screen.findByText("SYN0001");
+    await user.click(screen.getByRole("button", { name: /submit for review/i }));
+    api.mappingsSubmitReview.mockResolvedValue(
+      makeSubstanceMapping({ status: "under_review" }),
+    );
+    api.mappingsList.mockResolvedValue(
+      paginate([makeSubstanceMapping({ status: "under_review" })]),
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /^confirm$/i }),
+    );
+    expect(api.mappingsSubmitReview).toHaveBeenCalledWith(
+      "alpha",
+      "substance-mapping-0001",
+      "",
+    );
+  });
+
+  it("returns a mapping for correction", async () => {
+    const user = userEvent.setup();
+    api.mappingsList.mockResolvedValue(
+      paginate([makeSubstanceMapping({ status: "under_review" })]),
+    );
+    render(<MappingsPage />);
+    await user.click(screen.getByRole("tab", { name: /substance/i }));
+    await screen.findByText("SYN0001");
+    await user.click(screen.getByRole("button", { name: /return for correction/i }));
+    api.mappingsReturn.mockResolvedValue(makeSubstanceMapping({ status: "returned" }));
+    api.mappingsList.mockResolvedValue(paginate([makeSubstanceMapping({ status: "returned" })]));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /^confirm$/i }),
+    );
+    expect(api.mappingsReturn).toHaveBeenCalledWith("alpha", "substance-mapping-0001", "");
+  });
+
+  it("does not offer approve/reject on an already-approved mapping", async () => {
+    api.mappingsList.mockResolvedValue(
+      paginate([makeTerminologyMapping({ status: "approved" })]),
+    );
+    render(<MappingsPage />);
+    await screen.findByText("ORAL");
+    expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^reject$/i })).not.toBeInTheDocument();
+  });
+
+  it("links each row to its affected-record drill-down", async () => {
+    api.mappingsList.mockResolvedValue(paginate([makeTerminologyMapping()]));
+    render(<MappingsPage />);
+    await screen.findByText("ORAL");
+    const link = screen.getByRole("link", { name: /record\(s\)/i });
+    expect(link).toHaveAttribute(
+      "href",
+      expect.stringContaining("/fda-data/mappings/mapping-public-0001"),
+    );
+  });
+});
+
+describe("MappingDetailPage — affected-record drill-down", () => {
+  beforeEach(() => {
+    nav.publicId = "substance-mapping-0001";
+  });
+
+  it("shows the mapping summary and its affected records", async () => {
+    api.mappingsGet.mockResolvedValue(makeSubstanceMapping());
+    api.mappingsAffectedRecords.mockResolvedValue(paginate([makeAffectedRecord()]));
+    render(<MappingDetailPage />);
+    // SYN0001 (proposed UNII) appears only once, in the summary block.
+    expect(await screen.findByText("SYN0001")).toBeInTheDocument();
+    // Raw value appears both in the summary and the affected-record row.
+    expect(screen.getAllByText("SYNTHETIC-ACETAMINOPHEN").length).toBeGreaterThan(0);
+  });
+
+  it("never renders a numeric internal id or storage path in affected records", async () => {
+    api.mappingsGet.mockResolvedValue(makeSubstanceMapping());
+    const leaky = makeAffectedRecord();
+    Object.assign(leaky, { id: 424242, storage_key: "s3://bucket/secret/path.csv" });
+    api.mappingsAffectedRecords.mockResolvedValue(paginate([leaky]));
+    render(<MappingDetailPage />);
+    await screen.findByText("SYN0001");
+    const body = document.body.textContent ?? "";
+    expect(body).not.toContain("424242");
+    expect(body).not.toContain("s3://");
+  });
+
+  it("shows a generic not-found on a 404", async () => {
+    api.mappingsGet.mockRejectedValue(new ApiError(404, "Terminology mapping not found."));
+    api.mappingsAffectedRecords.mockRejectedValue(
+      new ApiError(404, "Terminology mapping not found."),
+    );
+    render(<MappingDetailPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/not found/i);
   });
 });
 
