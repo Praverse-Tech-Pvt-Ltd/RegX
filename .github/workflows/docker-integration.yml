@@ -231,15 +231,31 @@ jobs:
 
           ingredient = IIDIngredient.objects.get(normalized_name='SYNTHETIC-CI-SYNONYM-BASE')
 
-          mapping = SubstanceSynonymMapping.objects.create(
-              source_dataset='fda_iid',
-              raw_ingredient_name='CI Synonym Brand Name (synthetic)',
-              normalized_ingredient_name='CI-SYNONYM-BRAND',
-              proposed_ingredient=ingredient,
-              mapping_method=SubstanceMappingMethod.MANUAL,
-              status=SubstanceMappingStatus.PROPOSED,
+          # HR-02 remediation: the proposal is created through the shipped
+          # production API (POST .../mappings/substances/proposals/), never
+          # via direct ORM insertion -- see docs/HUMAN_REVIEW_PR5_REMEDIATION.md.
+          propose_resp = doer_client.post(
+              BASE + '/fda-data/mappings/substances/proposals/',
+              data=json.dumps({
+                  'release_public_id': str(release.public_id),
+                  'raw_ingredient_name': 'CI Synonym Brand Name (synthetic)',
+                  'normalized_ingredient_name': 'CI-SYNONYM-BRAND',
+                  'proposed_ingredient_public_id': str(ingredient.public_id),
+                  'mapping_method': SubstanceMappingMethod.MANUAL,
+                  'reason': 'CI smoke: synthetic brand synonym without an exact UNII match.',
+              }),
+              content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug,
           )
-          print('STEP 5-6 canonical ingredient and proposed mapping created: OK')
+          assert propose_resp.status_code == 201, 'STEP 5-6 FAIL: proposal API returned %s' % propose_resp.status_code
+          mapping = SubstanceSynonymMapping.objects.get(public_id=propose_resp.json()['public_id'])
+          assert mapping.status == SubstanceMappingStatus.PROPOSED, 'STEP 5-6 FAIL: mapping not PROPOSED, got %s' % mapping.status
+          print('STEP 5-6 canonical ingredient identified and PROPOSED mapping created via production API: OK')
+
+          direct_approve_resp = vp_client.post(BASE + '/fda-data/mappings/' + str(mapping.public_id) + '/approve/', data=json.dumps({}), content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert direct_approve_resp.status_code == 400, 'STEP 5.5 FAIL: direct approval of a PROPOSED mapping was not blocked, got %s' % direct_approve_resp.status_code
+          mapping.refresh_from_db()
+          assert mapping.status == SubstanceMappingStatus.PROPOSED, 'STEP 5.5 FAIL: mapping status changed to %s after blocked direct approval' % mapping.status
+          print('STEP 5.5 direct approval of a PROPOSED mapping blocked (HR-01): OK')
 
           def run_synonym_preview(name, release_public_id):
               return run_preview(
