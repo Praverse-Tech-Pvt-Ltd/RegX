@@ -197,3 +197,95 @@ class TestResolveSubstanceIdentity:
         )
         result = resolve_substance_identity(normalized_name="ACETAMINOPHEN SYNTHETIC")
         assert result.status == SubstanceMatchStatus.EXACT_MATCH
+
+
+@pytest.mark.django_db
+class TestStaleReleaseNeverBlocksFallback:
+    """Human-review remediation HR-04: a non-approved mapping scoped to a
+    since-superseded release must never keep blocking a legitimate direct
+    IIDIngredient exact match for a brand-new active release. It remains
+    exactly as it was for any historical assessment snapshot that already
+    referenced it (snapshots freeze their own data and never re-resolve),
+    but it must not silently keep governing new resolutions."""
+
+    def test_stale_proposed_mapping_on_superseded_release_does_not_block_fallback(self):
+        superseded = _make_release("s4a" + "0" * 61, status=FDAReleaseStatus.SUPERSEDED)
+        ingredient = IIDIngredient.objects.create(
+            canonical_name="Stale Fallback Ingredient", normalized_name="STALE FALLBACK EXACT"
+        )
+        # A stale PROPOSED mapping left over on the now-superseded release.
+        SubstanceSynonymMapping.objects.create(
+            release=superseded,
+            source_dataset="fda_iid",
+            raw_ingredient_name="STALE-RAW",
+            normalized_ingredient_name="STALE FALLBACK EXACT",
+            mapping_method=SubstanceMappingMethod.MANUAL,
+            status=SubstanceMappingStatus.PROPOSED,
+        )
+        # DETECT: the direct canonical-ingredient fallback still resolves
+        # -- the stale mapping on an unusable release does not block it.
+        result = resolve_substance_identity(normalized_name="STALE FALLBACK EXACT")
+        assert result.status == SubstanceMatchStatus.EXACT_MATCH
+        assert result.candidates[0].ingredient_public_id == str(ingredient.public_id)
+
+    def test_current_release_proposed_mapping_still_produces_review_required(self):
+        active = _make_release("s4b" + "0" * 61, status=FDAReleaseStatus.ACTIVE)
+        IIDIngredient.objects.create(
+            canonical_name="Current Fallback Ingredient", normalized_name="CURRENT FALLBACK EXACT"
+        )
+        SubstanceSynonymMapping.objects.create(
+            release=active,
+            source_dataset="fda_iid",
+            raw_ingredient_name="CURRENT-RAW",
+            normalized_ingredient_name="CURRENT FALLBACK EXACT",
+            mapping_method=SubstanceMappingMethod.MANUAL,
+            status=SubstanceMappingStatus.PROPOSED,
+        )
+        # A mapping on a genuinely usable (active) release still correctly
+        # blocks the direct fallback and forces review.
+        result = resolve_substance_identity(normalized_name="CURRENT FALLBACK EXACT")
+        assert result.status == SubstanceMatchStatus.REVIEW_REQUIRED
+
+    def test_current_release_rejected_mapping_still_produces_ambiguous(self):
+        active = _make_release("s4c" + "0" * 61, status=FDAReleaseStatus.ACTIVE)
+        IIDIngredient.objects.create(
+            canonical_name="Rejected Fallback Ingredient",
+            normalized_name="REJECTED FALLBACK EXACT",
+        )
+        SubstanceSynonymMapping.objects.create(
+            release=active,
+            source_dataset="fda_iid",
+            raw_ingredient_name="REJECTED-RAW",
+            normalized_ingredient_name="REJECTED FALLBACK EXACT",
+            mapping_method=SubstanceMappingMethod.MANUAL,
+            status=SubstanceMappingStatus.REJECTED,
+        )
+        result = resolve_substance_identity(normalized_name="REJECTED FALLBACK EXACT")
+        assert result.status == SubstanceMatchStatus.INGREDIENT_AMBIGUOUS
+
+    def test_mapping_scoped_to_rejected_release_cannot_leak_into_resolution(self):
+        # A mapping scoped to a release that was REJECTED outright (never
+        # approved/activated at all, distinct from "superseded") must be
+        # just as unusable as a superseded one -- _release_usable() only
+        # ever honors APPROVED/ACTIVE.
+        rejected_release = _make_release("s4d" + "0" * 61, status=FDAReleaseStatus.REJECTED)
+        ingredient = IIDIngredient.objects.create(
+            canonical_name="Rejected Release Ingredient",
+            normalized_name="REJECTED RELEASE IDENTITY",
+        )
+        SubstanceSynonymMapping.objects.create(
+            release=rejected_release,
+            source_dataset="fda_iid",
+            raw_ingredient_name="REJECTED-RELEASE-RAW",
+            normalized_ingredient_name="REJECTED RELEASE IDENTITY",
+            proposed_ingredient=ingredient,
+            mapping_method=SubstanceMappingMethod.MANUAL,
+            status=SubstanceMappingStatus.APPROVED,
+        )
+        result = resolve_substance_identity(normalized_name="REJECTED RELEASE IDENTITY")
+        # The direct-IIDIngredient fallback still applies (no non-approved
+        # mapping is blocking it), so this correctly still resolves via
+        # the canonical ingredient table itself -- proving the approved
+        # mapping on the rejected release was NOT what supplied the match.
+        assert result.status == SubstanceMatchStatus.EXACT_MATCH
+        assert result.candidates[0].mapping_public_id is None

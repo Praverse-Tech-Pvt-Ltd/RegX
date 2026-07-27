@@ -175,11 +175,21 @@ def resolve_substance_identity(
 
 
 def _unapproved_state_for(normalized_name: str, unii: str, cas_number: str) -> str | None:
-    """Classify the best non-approved mapping state for a raw identity.
-    Returns "pending" if any proposed/under_review/returned mapping matches,
-    "rejected" if only a rejected mapping matches, or None if no mapping at
-    all references this identity. Pending outranks rejected so that a fresh
-    re-proposal after a rejection is treated as pending review, not denied."""
+    """Classify the best non-approved mapping state for a raw identity,
+    considering only mappings scoped to a currently-usable release (or
+    platform-master, release=None) -- see _release_usable(). A stale
+    proposed/rejected mapping left over on a since-superseded release must
+    never block a legitimate direct-IIDIngredient match for a brand-new
+    active release; it remains available for any historical assessment
+    snapshot that already referenced it, but it must not silently keep
+    governing new resolutions. See docs/HUMAN_REVIEW_PR5_REMEDIATION.md
+    (HR-04).
+
+    Returns "pending" if any usable proposed/under_review/returned mapping
+    matches, "rejected" if only a usable rejected mapping matches, or None
+    if no usable mapping references this identity. Pending outranks
+    rejected so that a fresh re-proposal after a rejection is treated as
+    pending review, not denied."""
     from django.db.models import Q
 
     identity_q = Q()
@@ -192,11 +202,12 @@ def _unapproved_state_for(normalized_name: str, unii: str, cas_number: str) -> s
     if not identity_q:
         return None
 
-    statuses = set(
+    candidates = (
         SubstanceSynonymMapping.objects.filter(identity_q)
         .exclude(status=SubstanceMappingStatus.APPROVED)
-        .values_list("status", flat=True)
+        .select_related("release")
     )
+    statuses = {m.status for m in candidates if _release_usable(m)}
     if not statuses:
         return None
     pending = {
