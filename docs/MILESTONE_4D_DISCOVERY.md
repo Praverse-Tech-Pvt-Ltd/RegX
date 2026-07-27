@@ -575,16 +575,24 @@ CalculationOutcome
                           versioning, this field already has the room to
                           carry it without a schema change)
   status                 iid_assessment.calculations.CalculationStatus value
-                          — the full nine-value set, see §6
-  value                   Decimal, nullable
-  unit
+                          — the full nine-distinct-value set, see §6
+                          (the class itself defines 12 named attributes,
+                          several of which alias to the same string value
+                          — e.g. IID_VALUE_MISSING/IID_VALUE_INVALID both
+                          resolve to FDA_VALUE_UNAVAILABLE; only the 9
+                          distinct resulting strings matter for storage)
+  value                   Decimal, nullable — copied verbatim from
+                          CalculationResult.value
+  unit                    copied verbatim from CalculationResult.unit
+  inputs                  copied verbatim from CalculationResult.inputs
+                          (the raw input values passed to the calculation)
+  input_provenance        copied verbatim from CalculationResult.input_provenance
+                          (distinct from `inputs` — this is which upstream
+                          answers/records those input values came from,
+                          not the values themselves)
   rounding_rule           copied verbatim from CalculationResult.rounding_rule
   reason_code             copied verbatim from CalculationResult.reason_code
-  input_provenance        copied verbatim from CalculationResult.input_provenance
-                          (which upstream answers/records fed the
-                          calculation — the mechanism this document
-                          originally described in prose is already a named
-                          field on the type being reused)
+  generated_at            copied verbatim from CalculationResult.generated_at
   source_assessment_snapshot   nullable FK to iid_assessment.AssessmentSnapshot
                           — when a checklist question's answer is exactly
                           "what did the IID assessment preview say," it
@@ -628,10 +636,16 @@ apply identically to applicability).
 }
 ```
 
-- A fixed, small operator vocabulary: `eq`, `in`, `exists`, `not_exists`,
-  composed only via `all` (AND) / `any` (OR) — no arbitrary boolean
-  expression language, no string-based comparisons beyond simple
-  equality/membership.
+- A fixed, small operator vocabulary: `eq`, `neq`, `in`, `not_in`,
+  `exists`, `not_exists`, `gt`, `gte`, `lt`, `lte`, composed only via
+  `all` (AND) / `any` (OR) — no arbitrary boolean expression language, no
+  string-based comparisons beyond these ten fixed comparisons. The
+  numeric comparisons (`gt`/`gte`/`lt`/`lte`) exist for threshold-shaped
+  conditions (e.g. "only applicable when maximum dosage units per day
+  exceeds N") — even though the paracetamol worked example (§19) only
+  exercises `eq`/`exists`, the vocabulary is sized for the realistic
+  range of conditions this kind of checklist needs, not expanded
+  speculatively beyond that.
 - `field` values are drawn from a fixed, allow-listed field set exposed
   by the execution's own formulation-version/FDA-precedent context
   (`route`, `dosage_form`, `release_type`, `iid_precedent.mde`,
@@ -1055,17 +1069,22 @@ acetaminophen-shaped data).
 
 ## Open questions requiring a decision before implementation
 
-**Status after the first design-review pass:** four of the original five
-questions below are now **decided** (see the "Decided" markers throughout
-this document, and
+**Status after the first design-review pass: five of five design
+questions resolved.** Four are resolved with a direct decision (see the
+"Decided"/"RESOLVED" markers throughout this document, and
 [MILESTONE_4D_DESIGN_REMEDIATION.md](MILESTONE_4D_DESIGN_REMEDIATION.md)
-for the full finding-by-finding traceability). One — the exact set of
-checklist templates to ship — is explicitly **deferred**, not decided, per
-the review's own recommendation: it is a regulatory-content decision that
-should not be resolved unilaterally by engineering judgment.
+for the full finding-by-finding traceability). The fifth — the exact set
+of checklist templates to ship — is resolved through **controlled
+deferral**: the decision made is that this specific choice is a
+regulatory-content question, not an engineering one, and is explicitly
+routed to a separate regulatory-content approval gate before 4D-4 rather
+than left ambiguous or silently decided by this document. Controlled
+deferral is itself a resolution, not an open item — what remains
+unresolved is only the specific content selection within that gate, not
+whether/how the question gets answered.
 
 1. **RESOLVED** — New app vs. extending `iid_assessment` for `ChecklistDefinition` (§1). **Decision: new app** (`iig_checklist`), for the reasons given in §1.
 2. **RESOLVED** — Whether evidence attachments need an independent lifecycle (§15). **Decision: no** — frozen with the parent execution the moment it is written into an `approved` execution.
 3. **RESOLVED** — Promote CSV-safety helper to `common` now vs. duplicate (§17). **Decision: promote now**, made public, `templates_registry` updated to import the promoted version.
-4. **DEFERRED — regulatory-content decision, not an engineering one.** Exact set of built-in `ChecklistDefinition` templates to ship (oral solid, oral liquid, parenteral, topical?) — not addressed in this document, needs a separate content-scoping conversation with whoever owns the IIG guidance interpretation. This does not block 4D-1 through 4D-3 (schema/execution/calculation-binding need no specific content), only 4D-4 onward (draft-answer generation needs at least one real or synthetic checklist definition to exercise). The paracetamol/acetaminophen worked example (§19) can serve as the synthetic test fixture regardless of which real template ships first, so engineering is not blocked by the content-scoping timeline.
+4. **RESOLVED BY CONTROLLED DEFERRAL** — Exact set of built-in `ChecklistDefinition` templates to ship (oral solid, oral liquid, parenteral, topical?) is a regulatory-content decision, not an engineering one, and is explicitly not decided in this document. **Decision: route it through a separate, dedicated regulatory-content approval gate**, owned by whoever holds IIG guidance interpretation authority, required before 4D-4 begins. No real regulatory checklist template exists in 4D-1 through 4D-3 — those stages use only synthetic `ChecklistDefinition` content (the paracetamol/acetaminophen worked example, §19, serves as the synthetic test fixture) — and implementation must never silently invent real regulatory questions in the absence of that separate approval. This is not a blocking gap in the design; it is a deliberate, documented boundary on what this document is authorized to decide.
 5. **RESOLVED** — Whether a `ChecklistExecution` can span multiple `FormulationVersion`s (e.g. one checklist per excipient across a whole formulation) or is strictly one-per-version (§8). **Decision: strictly one-per-version.** This is consistent with how `AssessmentSnapshot`/`FormulationComponent` already scope everything to a single `FormulationVersion` at a time everywhere else in this codebase; breaking that pattern only for checklists would be an inconsistency, not a feature, and would materially complicate §8's foreign-key shape and §18's reproducibility guarantee for no clear benefit. This was the most structurally load-bearing of the five original questions — a wrong choice here would have forced a breaking migration once execution-model implementation (4D-2) began, so it is resolved now rather than left open into implementation.
