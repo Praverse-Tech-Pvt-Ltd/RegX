@@ -17,6 +17,12 @@
 /media/
 /tmp/
 
+# Local FileSystemStorage output (MEDIA_ROOT default, backend/regx/settings/base.py)
+# -- test/dev-only runtime artifacts, never source. Root-anchored and
+# backend-scoped so it can't accidentally match an unrelated directory
+# of the same name elsewhere in the tree.
+/backend/document_storage/
+
 # Legacy files in root
 /manage.py
 build.sh

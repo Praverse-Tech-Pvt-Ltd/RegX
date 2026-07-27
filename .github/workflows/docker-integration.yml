@@ -89,6 +89,325 @@ jobs:
           curl -sf -o /dev/null -w "signin: %{http_code}\n" http://localhost:3000/signin
           curl -sf -o /dev/null -w "documents: %{http_code}\n" http://localhost:3000/documents
 
+      - name: Verify FDA/formulation/IID frontend routes return HTTP 200
+        run: |
+          curl -sf -o /dev/null -w "fda-data/releases: %{http_code}\n" "http://localhost:3000/fda-data/releases?tenant=x"
+          curl -sf -o /dev/null -w "formulations: %{http_code}\n" "http://localhost:3000/formulations?tenant=x"
+          curl -sf -o /dev/null -w "iid-assessments/preview: %{http_code}\n" "http://localhost:3000/iid-assessments/preview?tenant=x"
+
+      - name: Verify FDA/formulation/IID API routes are wired (401/403, never 404)
+        run: |
+          check() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$2" ${3:+-X "$3"})
+            echo "$1: $code"
+            [ "$code" = "401" ] || [ "$code" = "403" ] || { echo "$1 unexpectedly returned $code (route may be unwired)"; exit 1; }
+          }
+          check "fda-data releases" http://localhost:8000/api/regx/v1/fda-data/releases/
+          check "formulations products" http://localhost:8000/api/regx/v1/formulations/products/
+          check "iid-assessments preview" http://localhost:8000/api/regx/v1/iid-assessments/preview/ POST
+
+      - name: Synthetic FDA/IID smoke flow (register -> lifecycle-gated activate -> product -> formulation -> IID preview)
+        run: |
+          docker compose -p regx-ci exec -T backend python manage.py shell -c "
+          from decimal import Decimal
+          import io, json
+          from django.contrib.auth import get_user_model
+          from fda_data import importer, lifecycle
+          from fda_data.adapters import fda_iid_adapter
+          from fda_data.models import (
+              ControlledDosageForm, ControlledRoute, ControlledUnit,
+              DosageFormMapping, FDAReleaseStatus, IIDIngredient, RouteMapping,
+          )
+          from formulations.models import FormulationVersion, ProductDevelopmentRecord
+          from iid_assessment.assess import run_preview
+          from tenancy.models import Tenant
+
+          User = get_user_model()
+          tenant, _ = Tenant.objects.get_or_create(slug='docker-ci-smoke', defaults={'name': 'Docker CI Smoke'})
+          importer_user, _ = User.objects.get_or_create(email='ci-smoke-importer@example.com', defaults={'full_name': 'CI Smoke Importer'})
+          approver_user, _ = User.objects.get_or_create(email='ci-smoke-approver@example.com', defaults={'full_name': 'CI Smoke Approver'})
+
+          route, _ = ControlledRoute.objects.get_or_create(code='oral', defaults={'canonical_label': 'Oral', 'lifecycle': 'active'})
+          RouteMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='ORAL', defaults={'controlled_route': route, 'status': 'approved'})
+          dosage_form, _ = ControlledDosageForm.objects.get_or_create(code='tablet', defaults={'canonical_label': 'Tablet', 'lifecycle': 'active'})
+          DosageFormMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='TABLET', defaults={'controlled_dosage_form': dosage_form, 'status': 'approved'})
+          ControlledUnit.objects.get_or_create(code='milligram', defaults={'symbol': 'MG', 'dimension': 'mass', 'active': True})
+
+          rows = [{'Ingredient Name': 'SYNTHETIC-CI-SMOKE', 'UNII': 'CISMOKE01', 'Route': 'ORAL', 'Dosage Form': 'TABLET', 'Potency': '50', 'Unit': 'MG', 'Maximum Daily Exposure': '200', 'MDE Unit': 'MG'}]
+          file_obj = io.BytesIO(json.dumps(rows).encode('utf-8'))
+          release = importer.register_release(dataset_type='fda_iid', source_name='CI Smoke Synthetic IID', official_source_reference='synthetic://ci-smoke', file_obj=file_obj, original_filename='ci-smoke.json', imported_by=importer_user)
+          importer.import_iid_rows(release, fda_iid_adapter(rows), importer_user)
+          assert release.status == 'registered'
+
+          release = lifecycle.submit_for_review(release, importer_user)
+          release = lifecycle.approve(release, approver_user)
+          release = lifecycle.activate(release, approver_user)
+          assert release.status == 'active'
+
+          product = ProductDevelopmentRecord.objects.create(tenant=tenant, product_code='CI-SMOKE-1', proposed_product_name='CI Smoke Tablet', active_ingredient='Synthetic CI Smoke')
+          version = FormulationVersion.objects.create(product=product, version_number=1, total_dosage_unit_weight=Decimal('500'), total_dosage_unit_weight_unit='milligram', maximum_dosage_units_per_day=Decimal('4'))
+
+          ingredient = IIDIngredient.objects.get(normalized_name='SYNTHETIC-CI-SMOKE')
+          preview = run_preview(ingredient_public_id=ingredient.public_id, route_code='oral', dosage_form_code='tablet', active_release_public_id=release.public_id, proposed_quantity_per_unit=Decimal('30'), proposed_quantity_unit='milligram', total_dosage_unit_weight=Decimal('500'), total_dosage_unit_weight_unit='milligram', maximum_dosage_units_per_day=Decimal('4'))
+          assert preview.match_status == 'EXACT_MATCH', preview.match_status
+          assert preview.decision_status == 'PASS_WITH_IID_PRECEDENT', preview.decision_status
+          assert 'not an automatic safety' in preview.decision_note.lower()
+          print('SMOKE FLOW: PASS')
+          "
+
+      - name: Synthetic approved SubstanceSynonymMapping IID assessment smoke flow
+        run: |
+          set -euo pipefail
+          docker compose -p regx-ci exec -T backend python manage.py shell -c "
+          from decimal import Decimal
+          import io, json
+
+          from django.contrib.auth import get_user_model
+          from django.test import Client
+
+          from authorization.models import MembershipRole, Role
+          from tenancy.models import Tenant, TenantMembership
+
+          from fda_data import importer, lifecycle
+          from fda_data.adapters import fda_iid_adapter
+          from fda_data.audit_events import FdaDataEvent, emit as fda_emit
+          from fda_data.models import (
+              ControlledDosageForm, ControlledRoute, ControlledUnit,
+              DosageFormMapping, FDADataSourceRelease, FDAReleaseStatus, IIDIngredient,
+              RouteMapping, SubstanceMappingMethod, SubstanceMappingStatus, SubstanceSynonymMapping,
+          )
+          from formulations.models import FormulationVersion, ProductDevelopmentRecord
+          from iid_assessment.assess import run_preview
+          from iid_assessment.models import AssessmentSnapshot
+
+          User = get_user_model()
+          BASE = '/api/regx/v1'
+
+          tenant, _ = Tenant.objects.get_or_create(slug='docker-ci-synonym-smoke', defaults={'name': 'Docker CI Synonym Smoke'})
+
+          def make_actor(email, full_name, role_name):
+              user, _ = User.objects.get_or_create(email=email, defaults={'full_name': full_name})
+              membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
+              role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
+              MembershipRole.objects.get_or_create(membership=membership, role=role)
+              return user
+
+          def api_client(user):
+              c = Client(SERVER_NAME='localhost')
+              c.force_login(user)
+              return c
+
+          doer = make_actor('ci-synonym-doer@example.com', 'CI Synonym Doer', 'doer')
+          reviewer = make_actor('ci-synonym-reviewer@example.com', 'CI Synonym Reviewer', 'reviewer')
+          vp_release_approver = make_actor('ci-synonym-vp-release@example.com', 'CI Synonym VP Release', 'vp')
+          vp_mapping_approver = make_actor('ci-synonym-vp-mapping@example.com', 'CI Synonym VP Mapping', 'vp')
+
+          doer_client = api_client(doer)
+          reviewer_client = api_client(reviewer)
+          vp_client = api_client(vp_mapping_approver)
+
+          route, _ = ControlledRoute.objects.get_or_create(code='oral', defaults={'canonical_label': 'Oral', 'lifecycle': 'active'})
+          RouteMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='ORAL', defaults={'controlled_route': route, 'status': 'approved'})
+          dosage_form, _ = ControlledDosageForm.objects.get_or_create(code='tablet', defaults={'canonical_label': 'Tablet', 'lifecycle': 'active'})
+          DosageFormMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='TABLET', defaults={'controlled_dosage_form': dosage_form, 'status': 'approved'})
+          ControlledUnit.objects.get_or_create(code='milligram', defaults={'symbol': 'MG', 'dimension': 'mass', 'active': True})
+
+          rows = [{'Ingredient Name': 'SYNTHETIC-CI-SYNONYM-BASE', 'UNII': 'CISYN0001', 'Route': 'ORAL', 'Dosage Form': 'TABLET', 'Potency': '50', 'Unit': 'MG', 'Maximum Daily Exposure': '200', 'MDE Unit': 'MG'}]
+          file_obj = io.BytesIO(json.dumps(rows).encode('utf-8'))
+          release = importer.register_release(dataset_type='fda_iid', source_name='CI Synonym Smoke Synthetic IID', official_source_reference='synthetic://ci-synonym-smoke', file_obj=file_obj, original_filename='ci-synonym-smoke.json', imported_by=doer)
+          importer.import_iid_rows(release, fda_iid_adapter(rows), doer)
+          assert release.status == 'registered', 'STEP 1 FAIL: release status is %s' % release.status
+
+          fda_emit(event_type=FdaDataEvent.SCHEMA_VALIDATED, resource_id=str(release.public_id), payload={'record_count_extracted': release.record_count_extracted}, actor_id=doer.id, actor_email=doer.email)
+          print('STEP 1-2 registered and validated: OK')
+
+          release = lifecycle.submit_for_review(release, doer)
+          assert release.status == 'under_review', 'STEP 3 FAIL: release status is %s' % release.status
+          release = lifecycle.approve(release, vp_release_approver)
+          assert release.status == 'approved', 'STEP 4 FAIL: release status is %s' % release.status
+          release = lifecycle.activate(release, vp_release_approver)
+          assert release.status == 'active', 'STEP 4 FAIL: release status is %s' % release.status
+          print('STEP 3-4 submitted, approved, activated: OK')
+
+          ingredient = IIDIngredient.objects.get(normalized_name='SYNTHETIC-CI-SYNONYM-BASE')
+
+          # HR-02 remediation: the proposal is created through the shipped
+          # production API (POST .../mappings/substances/proposals/), never
+          # via direct ORM insertion -- see docs/HUMAN_REVIEW_PR5_REMEDIATION.md.
+          propose_resp = doer_client.post(
+              BASE + '/fda-data/mappings/substances/proposals/',
+              data=json.dumps({
+                  'release_public_id': str(release.public_id),
+                  'raw_ingredient_name': 'CI Synonym Brand Name (synthetic)',
+                  'normalized_ingredient_name': 'CI-SYNONYM-BRAND',
+                  'proposed_ingredient_public_id': str(ingredient.public_id),
+                  'mapping_method': SubstanceMappingMethod.MANUAL,
+                  'reason': 'CI smoke: synthetic brand synonym without an exact UNII match.',
+              }),
+              content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug,
+          )
+          assert propose_resp.status_code == 201, 'STEP 5-6 FAIL: proposal API returned %s' % propose_resp.status_code
+          mapping = SubstanceSynonymMapping.objects.get(public_id=propose_resp.json()['public_id'])
+          assert mapping.status == SubstanceMappingStatus.PROPOSED, 'STEP 5-6 FAIL: mapping not PROPOSED, got %s' % mapping.status
+          print('STEP 5-6 canonical ingredient identified and PROPOSED mapping created via production API: OK')
+
+          direct_approve_resp = vp_client.post(BASE + '/fda-data/mappings/' + str(mapping.public_id) + '/approve/', data=json.dumps({}), content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert direct_approve_resp.status_code == 400, 'STEP 5.5 FAIL: direct approval of a PROPOSED mapping was not blocked, got %s' % direct_approve_resp.status_code
+          mapping.refresh_from_db()
+          assert mapping.status == SubstanceMappingStatus.PROPOSED, 'STEP 5.5 FAIL: mapping status changed to %s after blocked direct approval' % mapping.status
+          print('STEP 5.5 direct approval of a PROPOSED mapping blocked (HR-01): OK')
+
+          def run_synonym_preview(name, release_public_id):
+              return run_preview(
+                  substance_name=name, route_code='oral', dosage_form_code='tablet',
+                  active_release_public_id=release_public_id,
+                  proposed_quantity_per_unit=Decimal('30'), proposed_quantity_unit='milligram',
+                  total_dosage_unit_weight=Decimal('500'), total_dosage_unit_weight_unit='milligram',
+                  maximum_dosage_units_per_day=Decimal('4'),
+              )
+
+          preview_proposed = run_synonym_preview('CI-SYNONYM-BRAND', release.public_id)
+          assert preview_proposed.match_status != 'EXACT_MATCH', 'STEP 16 FAIL: proposed mapping produced %s' % preview_proposed.match_status
+          assert preview_proposed.selected_record is None, 'STEP 16 FAIL: proposed mapping produced a selected record'
+
+          resp = doer_client.get(BASE + '/fda-data/mappings/', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert resp.status_code == 403, 'AUTH FAIL: Doer listed mappings with status %s' % resp.status_code
+
+          resp = doer_client.post(BASE + '/fda-data/mappings/' + str(mapping.public_id) + '/approve/', data=json.dumps({}), content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert resp.status_code == 403, 'AUTH FAIL: Doer approved mapping with status %s' % resp.status_code
+          mapping.refresh_from_db()
+          assert mapping.status == 'proposed', 'AUTH FAIL: mapping status changed to %s after blocked Doer approval' % mapping.status
+          print('STEP 3/16 Doer blocked from listing and approving: OK')
+
+          resp = reviewer_client.post(BASE + '/fda-data/mappings/' + str(mapping.public_id) + '/submit-review/', data=json.dumps({}), content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert resp.status_code == 200, 'STEP 7 FAIL: submit-review returned %s' % resp.status_code
+          mapping.refresh_from_db()
+          assert mapping.status == 'under_review', 'STEP 7 FAIL: mapping status is %s' % mapping.status
+          assert mapping.reviewer_id == reviewer.id, 'STEP 7 FAIL: reviewer not recorded'
+          print('STEP 7 submitted for review: OK')
+
+          resp = reviewer_client.post(BASE + '/fda-data/mappings/' + str(mapping.public_id) + '/approve/', data=json.dumps({}), content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert resp.status_code == 403, 'AUTH FAIL: Reviewer approved mapping with status %s' % resp.status_code
+          mapping.refresh_from_db()
+          assert mapping.status == 'under_review', 'AUTH FAIL: mapping status changed to %s' % mapping.status
+
+          resp = vp_client.post(BASE + '/fda-data/mappings/' + str(mapping.public_id) + '/approve/', data=json.dumps({}), content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert resp.status_code == 200, 'STEP 8 FAIL: VP approve returned %s' % resp.status_code
+          mapping.refresh_from_db()
+          assert mapping.status == 'approved', 'STEP 9 FAIL: mapping status is %s' % mapping.status
+          assert mapping.approved_by_id == vp_mapping_approver.id, 'STEP 9 FAIL: approved_by not recorded'
+          print('STEP 8-9 Reviewer self-approval blocked, VP approval succeeded: OK')
+
+          mapping_self = SubstanceSynonymMapping.objects.create(
+              source_dataset='fda_iid', raw_ingredient_name='CI Self Approval Check (synthetic)',
+              normalized_ingredient_name='CI-SELF-APPROVAL-CHECK', proposed_ingredient=ingredient,
+              mapping_method=SubstanceMappingMethod.MANUAL, status=SubstanceMappingStatus.UNDER_REVIEW,
+              reviewer=vp_mapping_approver,
+          )
+          resp = vp_client.post(BASE + '/fda-data/mappings/' + str(mapping_self.public_id) + '/approve/', data=json.dumps({}), content_type='application/json', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert resp.status_code == 400, 'AUTH FAIL: same-reviewer self-approval was not blocked, got %s' % resp.status_code
+          print('STEP 8 same-actor self-approval blocked: OK')
+
+          mapping_rejected = SubstanceSynonymMapping.objects.create(
+              source_dataset='fda_iid', raw_ingredient_name='CI Rejected Synonym (synthetic)',
+              normalized_ingredient_name='CI-REJECTED-SYNONYM', proposed_ingredient=ingredient,
+              mapping_method=SubstanceMappingMethod.MANUAL, status=SubstanceMappingStatus.REJECTED,
+          )
+          preview_rejected = run_synonym_preview('CI-REJECTED-SYNONYM', release.public_id)
+          assert preview_rejected.match_status != 'EXACT_MATCH', 'STEP 16 FAIL: rejected mapping produced %s' % preview_rejected.match_status
+          assert preview_rejected.selected_record is None, 'STEP 16 FAIL: rejected mapping produced a selected record'
+
+          other_release = FDADataSourceRelease.objects.create(
+              dataset_type='fda_iid', source_name='CI Synonym Other Release (synthetic)',
+              official_source_reference='synthetic://ci-synonym-other',
+              source_checksum_sha256='c1' + '0' * 62,
+              status=FDAReleaseStatus.SUPERSEDED,
+          )
+          mapping_other_release = SubstanceSynonymMapping.objects.create(
+              release=other_release, source_dataset='fda_iid', raw_ingredient_name='CI Other Release Synonym (synthetic)',
+              normalized_ingredient_name='CI-OTHER-RELEASE-SYNONYM', proposed_ingredient=ingredient,
+              mapping_method=SubstanceMappingMethod.MANUAL, status=SubstanceMappingStatus.APPROVED,
+          )
+          preview_other_release = run_synonym_preview('CI-OTHER-RELEASE-SYNONYM', release.public_id)
+          assert preview_other_release.match_status != 'EXACT_MATCH', 'FAIL: mapping scoped to a superseded release resolved, got %s' % preview_other_release.match_status
+
+          other_ingredient = IIDIngredient.objects.create(canonical_name='CI Synonym Ambiguous Other (synthetic)', normalized_name='CI-SYNONYM-AMBIGUOUS-OTHER')
+          SubstanceSynonymMapping.objects.create(
+              source_dataset='fda_iid', raw_ingredient_name='CI Ambiguous A (synthetic)',
+              normalized_ingredient_name='CI-SYNONYM-AMBIGUOUS', proposed_ingredient=ingredient,
+              mapping_method=SubstanceMappingMethod.MANUAL, status=SubstanceMappingStatus.APPROVED,
+          )
+          SubstanceSynonymMapping.objects.create(
+              source_dataset='fda_iid', raw_ingredient_name='CI Ambiguous B (synthetic)',
+              normalized_ingredient_name='CI-SYNONYM-AMBIGUOUS', proposed_ingredient=other_ingredient,
+              mapping_method=SubstanceMappingMethod.MANUAL, status=SubstanceMappingStatus.APPROVED,
+          )
+          preview_ambiguous = run_synonym_preview('CI-SYNONYM-AMBIGUOUS', release.public_id)
+          assert preview_ambiguous.match_status != 'EXACT_MATCH', 'FAIL: ambiguous synonym produced %s' % preview_ambiguous.match_status
+          print('STEP proposed/rejected/other-release/ambiguous mappings all fail closed: OK')
+
+          product = ProductDevelopmentRecord.objects.create(tenant=tenant, product_code='CI-SYN-SMOKE-1', proposed_product_name='CI Synonym Smoke Tablet', active_ingredient='CI Synonym Brand Name (synthetic)')
+          version = FormulationVersion.objects.create(product=product, version_number=1, total_dosage_unit_weight=Decimal('500'), total_dosage_unit_weight_unit='milligram', maximum_dosage_units_per_day=Decimal('4'))
+          print('STEP 10 synthetic tenant product/formulation created: OK')
+
+          preview_approved = run_synonym_preview('CI-SYNONYM-BRAND', release.public_id)
+          assert preview_approved.match_status == 'EXACT_MATCH', 'STEP 11 FAIL: approved synonym did not produce EXACT_MATCH, got %s' % preview_approved.match_status
+          assert preview_approved.selected_record is not None, 'STEP 11 FAIL: no selected record'
+          resolved_name = preview_approved.selected_record['ingredient_name']
+          assert resolved_name == ingredient.canonical_name, 'STEP 12 FAIL: resolved to unexpected ingredient %s' % resolved_name
+          assert preview_approved.substance_mapping_public_id == str(mapping.public_id), 'STEP 15 FAIL: assessment omits or mismatches mapping provenance'
+          assert preview_approved.decision_status == 'PASS_WITH_IID_PRECEDENT', 'STEP 14 FAIL: decision status is %s' % preview_approved.decision_status
+          print('STEP 11-12 approved synonym resolved to expected canonical ingredient: OK')
+
+          forbidden_words = ['SAFE', 'FDA APPROVED', 'AUTOMATICALLY ACCEPTABLE', 'REGULATORILY CLEARED']
+          note_upper = preview_approved.decision_note.upper()
+          for word in forbidden_words:
+              ok = (word not in note_upper) or ('NOT AN AUTOMATIC' in note_upper)
+              assert ok, 'STEP 15 FAIL: forbidden wording found: %s' % word
+          assert 'not an automatic safety' in preview_approved.decision_note.lower(), 'STEP 15 FAIL: required disclaimer missing'
+          print('STEP 15 no forbidden safety/approval wording: OK')
+
+          snapshot = AssessmentSnapshot.objects.create(
+              tenant=tenant,
+              formulation_component_public_id=version.public_id,
+              formulation_version_public_id=version.public_id,
+              iid_release_public_id=release.public_id,
+              iid_substance_mapping_public_id=preview_approved.substance_mapping_public_id,
+              match_status=preview_approved.match_status,
+              decision_status=preview_approved.decision_status,
+              decision_note=preview_approved.decision_note,
+          )
+          frozen_mapping_id = str(snapshot.iid_substance_mapping_public_id)
+          assert frozen_mapping_id == str(mapping.public_id), 'STEP 13 FAIL: snapshot did not persist the correct mapping public_id'
+          print('STEP 13 mapping public_id snapshotted: OK')
+
+          mapping.is_current = False
+          mapping.full_clean()
+          mapping.save(update_fields=['is_current', 'updated_at'])
+          replacement = SubstanceSynonymMapping.objects.create(
+              source_dataset='fda_iid', raw_ingredient_name='CI Synonym Brand Name (synthetic)',
+              normalized_ingredient_name='CI-SYNONYM-BRAND', proposed_ingredient=ingredient,
+              mapping_method=SubstanceMappingMethod.MANUAL, status=SubstanceMappingStatus.APPROVED,
+          )
+          snapshot.refresh_from_db()
+          assert str(snapshot.iid_substance_mapping_public_id) == frozen_mapping_id, 'SNAPSHOT IMMUTABILITY FAIL: snapshot changed after mapping superseded'
+          assert str(snapshot.iid_substance_mapping_public_id) != str(replacement.public_id), 'SNAPSHOT IMMUTABILITY FAIL: snapshot points at the replacement mapping'
+          print('SNAPSHOT IMMUTABILITY after mapping supersession: OK')
+
+          resp = vp_client.get(BASE + '/fda-data/mappings/' + str(mapping.public_id) + '/affected-records/', HTTP_X_TENANT_SLUG=tenant.slug)
+          assert resp.status_code == 200, 'STEP 17 FAIL: affected-records returned %s' % resp.status_code
+          records_body = resp.json()
+          body_text = json.dumps(records_body)
+          assert 'storage_key' not in body_text, 'STEP 18 FAIL: storage_key leaked in affected-records'
+          assert '/var/' not in body_text, 'STEP 18 FAIL: filesystem path leaked in affected-records'
+          for row in records_body.get('results', []):
+              assert 'id' not in row, 'STEP 18 FAIL: numeric id key leaked in affected-record row'
+              assert 'pk' not in row, 'STEP 18 FAIL: numeric pk key leaked in affected-record row'
+          print('STEP 17-18 affected-record response safe: OK')
+
+          print('APPROVED SYNONYM IID SMOKE FLOW: PASS')
+          "
+
       - name: Verify production CSP header is present
         run: |
           curl -sD - -o /dev/null http://localhost:3000/signin | grep -i "content-security-policy" || { echo "CSP header missing"; exit 1; }
