@@ -169,6 +169,42 @@ blocked with a 400 if the acting user is already the mapping's `reviewer`
 (`fda_data.mapping.submitted_for_review` / `.approved` / `.rejected` /
 `.returned`).
 
+Every action is additionally validated against a single authoritative
+transition table (`fda_data/mapping_transitions.py`) before any mutation:
+`approve` is only legal from `under_review` (never directly from
+`proposed`/`returned`/`rejected`), `submit-review` only from
+`proposed`/`returned`, `return` only from `under_review`, and
+`approved`/`rejected` are terminal for every mapping type. An illegal
+transition returns a structured 400, leaves the mapping's status
+unchanged, and emits no audit event — see
+[`HUMAN_REVIEW_PR5_REMEDIATION.md`](HUMAN_REVIEW_PR5_REMEDIATION.md)
+(HR-01). Provenance fields are single-write: `reviewer`/`reviewed_at` are
+set only by `submit-review`, `approved_by`/`approved_at` only by
+`approve`, `rejected_by`/`rejected_at` only by `reject` (substance only —
+falls back to `reviewer` for the three legacy mapping types, which have no
+dedicated `rejected_by` field), `returned_by`/`returned_at` only by
+`return` — no action overwrites another action's actor (HR-03).
+
+### Creating a substance mapping proposal
+
+`POST /api/regx/v1/fda-data/mappings/substances/proposals/` is the
+production entry point for creating a new `PROPOSED`
+`SubstanceSynonymMapping` — before this endpoint existed, the only way to
+start the substance mapping-review workflow was direct Django shell/ORM
+insertion, which is not a viable production path (HR-02). It requires
+`fda_data.import` or `fda_data.review` (`CanProposeSubstanceMapping`);
+accepts release public ID, raw/normalized ingredient name, an optional
+proposed canonical `IIDIngredient` public ID / UNII / CAS, a source row
+locator, `mapping_method`, and a reason/evidence field; always creates the
+row as `PROPOSED` (the request body has no `status` field, so a
+pre-approved row can never be created this way); and emits a
+`fda_data.substance_mapping.candidate_created` audit event with safe
+metadata (mapping/release public IDs, mapping method, actor — never the
+full raw FDA row). The frontend "Propose substance mapping" action on
+`frontend/src/app/fda-data/mappings/page.tsx` wraps this endpoint with a
+confirmation dialog that states explicitly the proposal is not
+auto-approved.
+
 ### Affected-record drill-down
 
 `GET .../mappings/{public_id}/affected-records/` returns the paginated set
