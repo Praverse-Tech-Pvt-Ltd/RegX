@@ -72,6 +72,68 @@ function MappingsPageInner() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
+  const [showProposeDialog, setShowProposeDialog] = useState(false);
+  const [proposeForm, setProposeForm] = useState({
+    release_public_id: "",
+    raw_ingredient_name: "",
+    normalized_ingredient_name: "",
+    proposed_ingredient_public_id: "",
+    proposed_unii: "",
+    proposed_cas_number: "",
+    raw_unii: "",
+    raw_cas_number: "",
+    source_row_locator: "",
+    mapping_method: "manual",
+    reason: "",
+  });
+  const [proposeError, setProposeError] = useState<string | null>(null);
+  const [proposeBusy, setProposeBusy] = useState(false);
+  const [proposeSuccess, setProposeSuccess] = useState<string | null>(null);
+
+  function resetProposeForm() {
+    setProposeForm({
+      release_public_id: "",
+      raw_ingredient_name: "",
+      normalized_ingredient_name: "",
+      proposed_ingredient_public_id: "",
+      proposed_unii: "",
+      proposed_cas_number: "",
+      raw_unii: "",
+      raw_cas_number: "",
+      source_row_locator: "",
+      mapping_method: "manual",
+      reason: "",
+    });
+    setProposeError(null);
+    setProposeSuccess(null);
+  }
+
+  async function submitProposal() {
+    setProposeBusy(true);
+    setProposeError(null);
+    try {
+      const created = await fdaData.mappings.proposeSubstance(tenantSlug, {
+        release_public_id: proposeForm.release_public_id || undefined,
+        raw_ingredient_name: proposeForm.raw_ingredient_name,
+        normalized_ingredient_name: proposeForm.normalized_ingredient_name,
+        proposed_ingredient_public_id: proposeForm.proposed_ingredient_public_id || undefined,
+        proposed_unii: proposeForm.proposed_unii || undefined,
+        proposed_cas_number: proposeForm.proposed_cas_number || undefined,
+        raw_unii: proposeForm.raw_unii || undefined,
+        raw_cas_number: proposeForm.raw_cas_number || undefined,
+        source_row_locator: proposeForm.source_row_locator || undefined,
+        mapping_method: proposeForm.mapping_method,
+        reason: proposeForm.reason || undefined,
+      });
+      setProposeSuccess(created.public_id);
+      load();
+    } catch (err) {
+      setProposeError(err instanceof ApiError ? err.message : "Failed to submit proposal.");
+    } finally {
+      setProposeBusy(false);
+    }
+  }
+
   function load() {
     if (!tenantSlug) return;
     setLoading(true);
@@ -197,7 +259,7 @@ function MappingsPageInner() {
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: "1rem" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: "1rem", alignItems: "center" }}>
         <label style={{ fontSize: 13, color: "#374151" }}>
           Status:{" "}
           <select
@@ -213,6 +275,17 @@ function MappingsPageInner() {
             <option value="returned">Returned</option>
           </select>
         </label>
+        {(typeFilter === "" || typeFilter === "substance") && (
+          <button
+            onClick={() => {
+              resetProposeForm();
+              setShowProposeDialog(true);
+            }}
+            style={{ ...actionButtonStyle, background: "#1d4ed8", marginLeft: "auto" }}
+          >
+            + Propose substance mapping
+          </button>
+        )}
       </div>
 
       {loading && <p>Loading…</p>}
@@ -412,6 +485,210 @@ function MappingsPageInner() {
           </div>
         </div>
       )}
+
+      {showProposeDialog && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="propose-mapping-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 8,
+              padding: "1.5rem",
+              maxWidth: 560,
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+            <h2 id="propose-mapping-title" style={{ fontSize: 16, marginTop: 0 }}>
+              Propose substance mapping
+            </h2>
+
+            {proposeSuccess ? (
+              <>
+                <p style={{ fontSize: 13, color: "#166534" }}>
+                  Proposal created. It is recorded as <strong>PROPOSED</strong> and has not been
+                  auto-approved — it now requires submit-for-review and a separate VP approval
+                  before it takes effect.
+                </p>
+                <p style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
+                  {proposeSuccess}
+                </p>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => {
+                      setShowProposeDialog(false);
+                      resetProposeForm();
+                    }}
+                    style={{ ...actionButtonStyle, background: "#1d4ed8" }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, color: "#6b7280" }}>
+                  This only creates a <strong>PROPOSED</strong> candidate mapping. It is never
+                  auto-approved: a reviewer must submit it for review, and a separate VP-level
+                  approver must approve it before it affects any IID assessment.
+                </p>
+
+                <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                  Release public ID (optional)
+                  <input
+                    value={proposeForm.release_public_id}
+                    onChange={(e) =>
+                      setProposeForm({ ...proposeForm, release_public_id: e.target.value })
+                    }
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                  Raw ingredient name (as seen in source)
+                  <input
+                    value={proposeForm.raw_ingredient_name}
+                    onChange={(e) =>
+                      setProposeForm({ ...proposeForm, raw_ingredient_name: e.target.value })
+                    }
+                    style={inputStyle}
+                  />
+                </label>
+                <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                  Normalized ingredient name
+                  <input
+                    value={proposeForm.normalized_ingredient_name}
+                    onChange={(e) =>
+                      setProposeForm({
+                        ...proposeForm,
+                        normalized_ingredient_name: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </label>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <label style={{ display: "block", fontSize: 13, marginBottom: 8, flex: 1 }}>
+                    Proposed canonical ingredient (public ID)
+                    <input
+                      value={proposeForm.proposed_ingredient_public_id}
+                      onChange={(e) =>
+                        setProposeForm({
+                          ...proposeForm,
+                          proposed_ingredient_public_id: e.target.value,
+                        })
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <label style={{ display: "block", fontSize: 13, marginBottom: 8, flex: 1 }}>
+                    Proposed UNII
+                    <input
+                      value={proposeForm.proposed_unii}
+                      onChange={(e) =>
+                        setProposeForm({ ...proposeForm, proposed_unii: e.target.value })
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                  <label style={{ display: "block", fontSize: 13, marginBottom: 8, flex: 1 }}>
+                    Proposed CAS
+                    <input
+                      value={proposeForm.proposed_cas_number}
+                      onChange={(e) =>
+                        setProposeForm({ ...proposeForm, proposed_cas_number: e.target.value })
+                      }
+                      style={inputStyle}
+                    />
+                  </label>
+                </div>
+
+                <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                  Mapping method
+                  <select
+                    value={proposeForm.mapping_method}
+                    onChange={(e) =>
+                      setProposeForm({ ...proposeForm, mapping_method: e.target.value })
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="manual">Manual</option>
+                    <option value="exact_unii">Exact UNII</option>
+                    <option value="exact_cas">Exact CAS</option>
+                    <option value="reviewed_synonym">Reviewed synonym</option>
+                  </select>
+                </label>
+
+                <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                  Source row locator (optional)
+                  <input
+                    value={proposeForm.source_row_locator}
+                    onChange={(e) =>
+                      setProposeForm({ ...proposeForm, source_row_locator: e.target.value })
+                    }
+                    style={inputStyle}
+                  />
+                </label>
+
+                <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
+                  Reason / evidence
+                  <textarea
+                    value={proposeForm.reason}
+                    onChange={(e) => setProposeForm({ ...proposeForm, reason: e.target.value })}
+                    rows={3}
+                    style={{ ...inputStyle, resize: "vertical" }}
+                  />
+                </label>
+
+                {proposeError && (
+                  <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+                    {proposeError}
+                  </p>
+                )}
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => {
+                      setShowProposeDialog(false);
+                      resetProposeForm();
+                    }}
+                    style={{ ...actionButtonStyle, background: "#6b7280" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitProposal}
+                    disabled={
+                      proposeBusy ||
+                      !proposeForm.raw_ingredient_name ||
+                      !proposeForm.normalized_ingredient_name
+                    }
+                    style={{ ...actionButtonStyle, background: "#1d4ed8" }}
+                  >
+                    {proposeBusy ? "Submitting…" : "Submit proposal"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
@@ -424,6 +701,17 @@ const actionButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   fontWeight: 600,
   fontSize: 12,
+};
+
+const inputStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  marginTop: 4,
+  padding: "6px 8px",
+  border: "1px solid #d1d5db",
+  borderRadius: 4,
+  boxSizing: "border-box",
+  fontSize: 13,
 };
 
 export default function MappingsPage() {

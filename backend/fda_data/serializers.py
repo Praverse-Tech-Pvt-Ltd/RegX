@@ -17,6 +17,7 @@ from .models import (
     IIDPrecedentRecord,
     OrangeBookProduct,
     RouteMapping,
+    SubstanceMappingMethod,
     SubstanceSynonymMapping,
     UnitMapping,
 )
@@ -295,6 +296,25 @@ class TerminologyMappingSerializer(serializers.Serializer):
 
 
 class MappingReviewActionSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True)
+
+
+class SubstanceMappingProposalSerializer(serializers.Serializer):
+    """Input for the production substance-mapping proposal endpoint. Never
+    accepts a status field -- every proposal created through this endpoint
+    is PROPOSED, full stop; there is no way to submit a pre-approved row.
+    """
+
+    release_public_id = serializers.UUIDField(required=False, allow_null=True)
+    raw_ingredient_name = serializers.CharField(max_length=500)
+    normalized_ingredient_name = serializers.CharField(max_length=500)
+    raw_unii = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    raw_cas_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    source_row_locator = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    proposed_ingredient_public_id = serializers.UUIDField(required=False, allow_null=True)
+    proposed_unii = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    proposed_cas_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    mapping_method = serializers.ChoiceField(choices=SubstanceMappingMethod.choices)
     reason = serializers.CharField(required=False, allow_blank=True)
 
 

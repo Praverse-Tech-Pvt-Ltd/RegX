@@ -76,6 +76,11 @@ urlpatterns = [
     ),
     path("fda-data/mappings/", views.TerminologyMappingListView.as_view(), name="mapping-list"),
     path(
+        "fda-data/mappings/substances/proposals/",
+        views.SubstanceMappingProposalView.as_view(),
+        name="mapping-substance-proposal",
+    ),
+    path(
         "fda-data/mappings/<uuid:public_id>/",
         views.TerminologyMappingDetailView.as_view(),
         name="mapping-detail",

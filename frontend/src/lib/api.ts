@@ -860,6 +860,28 @@ export const fdaData = {
         headers: { "X-Tenant-Slug": tenantSlug },
         body: { reason: reason ?? "" },
       }),
+
+    proposeSubstance: (
+      tenantSlug: string,
+      data: {
+        release_public_id?: string;
+        raw_ingredient_name: string;
+        normalized_ingredient_name: string;
+        raw_unii?: string;
+        raw_cas_number?: string;
+        source_row_locator?: string;
+        proposed_ingredient_public_id?: string;
+        proposed_unii?: string;
+        proposed_cas_number?: string;
+        mapping_method: string;
+        reason?: string;
+      }
+    ) =>
+      apiRequest<TerminologyMapping>("/api/regx/v1/fda-data/mappings/substances/proposals/", {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: data,
+      }),
   },
 };
 

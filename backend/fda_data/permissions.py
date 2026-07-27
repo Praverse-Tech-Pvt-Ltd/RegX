@@ -99,3 +99,23 @@ class CanViewRawFdaData(_FdaDataPermissionBase):
 
 class CanExportFdaReconciliation(_FdaDataPermissionBase):
     required_codename = PERM_EXPORT_RECONCILIATION
+
+
+class CanProposeSubstanceMapping(BasePermission):
+    """Proposing a substance/UNII synonym mapping candidate requires either
+    import or review standing -- a Doer who just imported a release and
+    noticed an unresolved identity, or a Reviewer proactively proposing a
+    correction, may both propose. Proposing never itself approves anything
+    (see mapping_transitions.py) -- this permission only gates creating a
+    new PROPOSED row, never a status transition."""
+
+    def has_permission(self, request, view) -> bool:
+        from tenancy.context import TenantScopeMissing, current_tenant
+
+        try:
+            tenant = current_tenant()
+        except (TenantScopeMissing, Exception):
+            return False
+        return has_fda_data_permission(
+            request.user, tenant, PERM_IMPORT
+        ) or has_fda_data_permission(request.user, tenant, PERM_REVIEW)

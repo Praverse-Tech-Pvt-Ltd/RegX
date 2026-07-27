@@ -14,6 +14,7 @@ class FdaDataEvent:
     MAPPING_REJECTED = "fda_data.mapping.rejected"
     MAPPING_SUBMITTED_FOR_REVIEW = "fda_data.mapping.submitted_for_review"
     MAPPING_RETURNED = "fda_data.mapping.returned"
+    SUBSTANCE_MAPPING_CANDIDATE_CREATED = "fda_data.substance_mapping.candidate_created"
     RELEASE_SUBMITTED_FOR_REVIEW = "fda_data.release.submitted_for_review"
     RELEASE_APPROVED = "fda_data.release.approved"
     RELEASE_ACTIVATED = "fda_data.release.activated"
