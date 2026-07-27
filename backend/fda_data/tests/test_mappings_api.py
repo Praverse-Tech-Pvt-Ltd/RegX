@@ -126,7 +126,19 @@ class TestMappingApproveReject:
         )
         assert resp.status_code == 403
 
-    def test_vp_approves_mapping(self, api_client_vp, route_mapping):
+    def test_vp_approves_mapping_after_review(
+        self, api_client_vp, api_client_reviewer, route_mapping
+    ):
+        # HR-01: approve is only legal from REVIEWED -- submit-review first,
+        # as a DIFFERENT actor (a same-actor submit-then-approve is
+        # correctly blocked by segregation of duties, see
+        # test_self_approval_blocked below).
+        submit = api_client_reviewer.post(
+            f"{BASE}/fda-data/mappings/{route_mapping.public_id}/submit-review/",
+            data={},
+            format="json",
+        )
+        assert submit.status_code == 200
         resp = api_client_vp.post(
             f"{BASE}/fda-data/mappings/{route_mapping.public_id}/approve/",
             data={"reason": "Exact match confirmed."},
@@ -139,6 +151,8 @@ class TestMappingApproveReject:
         assert route_mapping.reviewer is not None
 
     def test_vp_rejects_mapping(self, api_client_vp, dosage_form_mapping):
+        # Reject is legal directly from PROPOSED (rejecting is always the
+        # safe direction -- no forced review step required).
         resp = api_client_vp.post(
             f"{BASE}/fda-data/mappings/{dosage_form_mapping.public_id}/reject/",
             data={"reason": "Ambiguous source value."},
@@ -150,8 +164,12 @@ class TestMappingApproveReject:
         assert dosage_form_mapping.status == MappingDecisionStatus.REJECTED
 
     def test_self_approval_blocked(self, api_client_vp, route_mapping, vp_user):
+        # Move to REVIEWED (the only legal FROM-status for approve) with
+        # the same VP recorded as reviewer, then confirm that same VP is
+        # blocked from also approving it.
+        route_mapping.status = MappingDecisionStatus.REVIEWED
         route_mapping.reviewer = vp_user
-        route_mapping.save(update_fields=["reviewer"])
+        route_mapping.save(update_fields=["status", "reviewer"])
         resp = api_client_vp.post(
             f"{BASE}/fda-data/mappings/{route_mapping.public_id}/approve/",
             data={},
@@ -159,9 +177,14 @@ class TestMappingApproveReject:
         )
         assert resp.status_code == 400
         route_mapping.refresh_from_db()
-        assert route_mapping.status == MappingDecisionStatus.PROPOSED
+        assert route_mapping.status == MappingDecisionStatus.REVIEWED
 
-    def test_approved_mapping_is_immutable(self, api_client_vp, route_mapping):
+    def test_approved_mapping_is_immutable(self, api_client_vp, api_client_reviewer, route_mapping):
+        api_client_reviewer.post(
+            f"{BASE}/fda-data/mappings/{route_mapping.public_id}/submit-review/",
+            data={},
+            format="json",
+        )
         first = api_client_vp.post(
             f"{BASE}/fda-data/mappings/{route_mapping.public_id}/approve/",
             data={},
@@ -252,18 +275,35 @@ class TestSubstanceMappingLifecycle:
         assert substance_mapping.status == SubstanceMappingStatus.RETURNED
         assert substance_mapping.review_reason == "UNII does not match ingredient name."
 
-    def test_submit_review_not_valid_for_route_mapping(self, api_client_reviewer, route_mapping):
-        # A route mapping's status field has no "under_review" choice --
-        # attempting the substance-only lifecycle action on it must fail
-        # closed with a structured 400, never a raw 500.
+    def test_submit_review_succeeds_for_route_mapping(self, api_client_reviewer, route_mapping):
+        # HR-01: the unified transition matrix legitimately supports
+        # submit-review for all four mapping types -- route/dosage_form/
+        # unit transition PROPOSED -> REVIEWED (their own review status),
+        # not the substance-only "under_review" value.
         resp = api_client_reviewer.post(
             f"{BASE}/fda-data/mappings/{route_mapping.public_id}/submit-review/",
             data={},
             format="json",
         )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "reviewed"
+        route_mapping.refresh_from_db()
+        assert route_mapping.status == MappingDecisionStatus.REVIEWED
+
+    def test_return_not_valid_for_route_mapping(self, api_client_reviewer, route_mapping):
+        # Route/dosage_form/unit mappings have no RETURNED status at all --
+        # the return action must fail closed with a structured 400, never
+        # a raw exception, and must leave the mapping unchanged.
+        route_mapping.status = MappingDecisionStatus.REVIEWED
+        route_mapping.save(update_fields=["status"])
+        resp = api_client_reviewer.post(
+            f"{BASE}/fda-data/mappings/{route_mapping.public_id}/return/",
+            data={},
+            format="json",
+        )
         assert resp.status_code == 400
         route_mapping.refresh_from_db()
-        assert route_mapping.status == MappingDecisionStatus.PROPOSED
+        assert route_mapping.status == MappingDecisionStatus.REVIEWED
 
     def test_doer_cannot_submit_review_or_return(self, api_client_doer, substance_mapping):
         resp1 = api_client_doer.post(

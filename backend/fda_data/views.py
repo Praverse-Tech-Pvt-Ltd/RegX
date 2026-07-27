@@ -19,19 +19,25 @@ from rest_framework.views import APIView
 from . import importer, lifecycle
 from .adapters import fda_iid_adapter, orange_book_products_adapter
 from .audit_events import FdaDataEvent, emit
+from .mapping_transitions import MappingAction
 from .models import (
     ControlledDosageForm,
     ControlledRoute,
     ControlledUnit,
     FDADataSourceRelease,
+    FDAReleaseStatus,
+    IIDIngredient,
     IIDPrecedentRecord,
     OrangeBookProduct,
+    SubstanceMappingStatus,
+    SubstanceSynonymMapping,
 )
 from .permissions import (
     CanActivateFdaData,
     CanApproveFdaData,
     CanExportFdaReconciliation,
     CanImportFdaData,
+    CanProposeSubstanceMapping,
     CanRegisterFdaData,
     CanReviewFdaData,
     CanViewFdaData,
@@ -51,6 +57,7 @@ from .serializers import (
     OrangeBookProductSerializer,
     ReleaseRegistrationSerializer,
     ReviewActionSerializer,
+    SubstanceMappingProposalSerializer,
     TerminologyMappingSerializer,
 )
 
@@ -611,14 +618,119 @@ class TerminologyMappingDetailView(APIView):
         )
 
 
+class SubstanceMappingProposalView(APIView):
+    """The production entry point for creating a new PROPOSED
+    SubstanceSynonymMapping. Before this endpoint existed, nothing in the
+    shipped application could ever create one -- the entire substance
+    mapping-review lifecycle was reachable only by inserting a row
+    directly via the Django ORM/shell. See
+    docs/HUMAN_REVIEW_PR5_REMEDIATION.md (HR-02).
+
+    Always creates status=PROPOSED -- the request body has no status
+    field, so there is no way to submit a pre-approved row. Requires
+    fda_data.import or fda_data.review (CanProposeSubstanceMapping);
+    ordinary tenant users cannot reach this at all (fda_data has no
+    tenant-scoped permission path)."""
+
+    def get_permissions(self):
+        return [CanProposeSubstanceMapping()]
+
+    def post(self, request):
+        from django.db import IntegrityError, transaction
+
+        from .substance_matching import affected_record_count
+
+        serializer = SubstanceMappingProposalSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        release = None
+        release_public_id = data.get("release_public_id")
+        if release_public_id:
+            try:
+                release = FDADataSourceRelease.objects.get(public_id=release_public_id)
+            except FDADataSourceRelease.DoesNotExist as exc:
+                raise NotFound("FDA release not found.") from exc
+            if release.status not in (FDAReleaseStatus.APPROVED, FDAReleaseStatus.ACTIVE):
+                raise ValidationError(
+                    "This release is not in a usable status for new mapping proposals."
+                )
+
+        proposed_ingredient = None
+        ingredient_public_id = data.get("proposed_ingredient_public_id")
+        if ingredient_public_id:
+            try:
+                proposed_ingredient = IIDIngredient.objects.get(public_id=ingredient_public_id)
+            except IIDIngredient.DoesNotExist as exc:
+                raise ValidationError("Proposed canonical ingredient not found.") from exc
+
+        mapping = SubstanceSynonymMapping(
+            release=release,
+            source_dataset="fda_iid",
+            raw_ingredient_name=data["raw_ingredient_name"],
+            normalized_ingredient_name=data["normalized_ingredient_name"],
+            raw_unii=data.get("raw_unii", "") or "",
+            raw_cas_number=data.get("raw_cas_number", "") or "",
+            source_row_locator=data.get("source_row_locator", "") or "",
+            proposed_ingredient=proposed_ingredient,
+            proposed_unii=data.get("proposed_unii", "") or "",
+            proposed_cas_number=data.get("proposed_cas_number", "") or "",
+            mapping_method=data["mapping_method"],
+            review_reason=data.get("reason", "") or "",
+            status=SubstanceMappingStatus.PROPOSED,
+        )
+        try:
+            mapping.full_clean()
+        except DjangoValidationError as exc:
+            raise ValidationError(str(exc)) from exc
+
+        try:
+            with transaction.atomic():
+                mapping.save()
+        except IntegrityError as exc:
+            raise ValidationError(
+                "A current mapping already exists for this raw identity in this release."
+            ) from exc
+
+        emit(
+            event_type=FdaDataEvent.SUBSTANCE_MAPPING_CANDIDATE_CREATED,
+            resource_type="fda_data_mapping",
+            resource_id=str(mapping.public_id),
+            payload={
+                "mapping_type": "substance",
+                "release_public_id": str(release.public_id) if release else None,
+                "normalized_ingredient_name": mapping.normalized_ingredient_name,
+                "mapping_method": mapping.mapping_method,
+                "affected_record_count": affected_record_count(mapping),
+            },
+            actor_id=request.user.id,
+            actor_email=request.user.email,
+        )
+        return Response(
+            TerminologyMappingSerializer.from_instance(
+                "substance", mapping, affected_record_count(mapping)
+            ),
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class _MappingActionViewBase(APIView):
     """Shared action plumbing for submit-review/approve/reject/return.
-    Subclasses set target_status and event_type. A status transition that
-    isn't a valid choice for this mapping type's model (e.g. submit-review
-    on a route/dosage-form/unit mapping, which has no UNDER_REVIEW status)
-    fails closed with a structured 400, never a raw exception."""
 
-    target_status: str = ""
+    Every transition is validated against validate_mapping_transition()
+    (fda_data/mapping_transitions.py) -- the single authoritative lifecycle
+    source of truth for all four mapping types. An action that is not legal
+    from the mapping's CURRENT status (e.g. approving a still-PROPOSED or
+    REJECTED mapping, never having gone through submit-review) fails
+    closed with a structured 400 and the mapping is left completely
+    unchanged -- no partial mutation, no audit event. See
+    docs/HUMAN_REVIEW_PR5_REMEDIATION.md (HR-01).
+
+    The row is re-fetched with select_for_update() inside a transaction so
+    two concurrent actions against the same mapping can never both
+    "succeed" and leave inconsistent provenance."""
+
+    action: str = ""
     event_type: str = ""
     self_approval_forbidden: bool = False
     required_permission = CanReviewFdaData
@@ -627,34 +739,67 @@ class _MappingActionViewBase(APIView):
         return [self.required_permission()]
 
     def post(self, request, public_id):
-        mapping_type, mapping = _find_mapping_or_404(public_id)
+        from django.db import transaction
+        from django.utils import timezone
+
+        from .mapping_transitions import IllegalMappingTransition, validate_mapping_transition
+
+        mapping_type, _ = _find_mapping_or_404(public_id)
+        model_cls, _, _, _, reason_attr = MAPPING_TYPE_CONFIG[mapping_type]
         serializer = MappingReviewActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if self.self_approval_forbidden and mapping.reviewer_id == request.user.id:
-            raise ValidationError("A reviewer cannot approve a mapping they already reviewed.")
+        with transaction.atomic():
+            try:
+                mapping = model_cls.objects.select_for_update().get(public_id=public_id)
+            except model_cls.DoesNotExist as exc:
+                raise NotFound("Terminology mapping not found.") from exc
 
-        _, _, _, _, reason_attr = MAPPING_TYPE_CONFIG[mapping_type]
-        mapping.status = self.target_status
-        mapping.reviewer = request.user
-        reason = serializer.validated_data.get("reason")
-        if reason:
-            setattr(mapping, reason_attr, reason)
-        if hasattr(mapping, "reviewed_at"):
-            from django.utils import timezone
+            try:
+                target_status = validate_mapping_transition(
+                    mapping_type, mapping.status, self.action
+                )
+            except IllegalMappingTransition as exc:
+                raise ValidationError(str(exc)) from exc
 
-            mapping.reviewed_at = timezone.now()
-        if self.target_status == "approved" and hasattr(mapping, "approved_by"):
-            from django.utils import timezone
+            if self.self_approval_forbidden and mapping.reviewer_id == request.user.id:
+                raise ValidationError("A reviewer cannot approve a mapping they already reviewed.")
 
-            mapping.approved_by = request.user
-            mapping.approved_at = timezone.now()
+            reason = serializer.validated_data.get("reason")
+            if reason:
+                setattr(mapping, reason_attr, reason)
 
-        try:
-            mapping.full_clean()
-        except DjangoValidationError as exc:
-            raise ValidationError(str(exc)) from exc
-        mapping.save()
+            mapping.status = target_status
+            now = timezone.now()
+            if self.action == MappingAction.SUBMIT_REVIEW:
+                # reviewer/reviewed_at record who moved this into review --
+                # never touched again by a later approve/reject/return.
+                mapping.reviewer = request.user
+                if hasattr(mapping, "reviewed_at"):
+                    mapping.reviewed_at = now
+            elif self.action == MappingAction.APPROVE and hasattr(mapping, "approved_by"):
+                mapping.approved_by = request.user
+                mapping.approved_at = now
+            elif self.action == MappingAction.REJECT:
+                if hasattr(mapping, "rejected_by"):
+                    mapping.rejected_by = request.user
+                    mapping.rejected_at = now
+                elif not mapping.reviewer_id:
+                    # Legacy route/dosage_form/unit mappings have no
+                    # dedicated rejected_by field; only fall back to
+                    # reviewer here if nothing already recorded a reviewer
+                    # (i.e. this reject is a direct PROPOSED->REJECTED,
+                    # never went through submit-review).
+                    mapping.reviewer = request.user
+            elif self.action == MappingAction.RETURN and hasattr(mapping, "returned_by"):
+                mapping.returned_by = request.user
+                mapping.returned_at = now
+
+            try:
+                mapping.full_clean()
+            except DjangoValidationError as exc:
+                raise ValidationError(str(exc)) from exc
+            mapping.save()
 
         emit(
             event_type=self.event_type,
@@ -662,7 +807,7 @@ class _MappingActionViewBase(APIView):
             resource_id=str(mapping.public_id),
             payload={
                 "mapping_type": mapping_type,
-                "new_status": self.target_status,
+                "new_status": target_status,
             },
             actor_id=request.user.id,
             actor_email=request.user.email,
@@ -675,24 +820,24 @@ class _MappingActionViewBase(APIView):
 
 
 class TerminologyMappingSubmitReviewView(_MappingActionViewBase):
-    target_status = "under_review"
+    action = MappingAction.SUBMIT_REVIEW
     event_type = FdaDataEvent.MAPPING_SUBMITTED_FOR_REVIEW
 
 
 class TerminologyMappingApproveView(_MappingActionViewBase):
-    target_status = "approved"
+    action = MappingAction.APPROVE
     event_type = FdaDataEvent.MAPPING_APPROVED
     self_approval_forbidden = True
     required_permission = CanApproveFdaData
 
 
 class TerminologyMappingRejectView(_MappingActionViewBase):
-    target_status = "rejected"
+    action = MappingAction.REJECT
     event_type = FdaDataEvent.MAPPING_REJECTED
 
 
 class TerminologyMappingReturnView(_MappingActionViewBase):
-    target_status = "returned"
+    action = MappingAction.RETURN
     event_type = FdaDataEvent.MAPPING_RETURNED
 
 

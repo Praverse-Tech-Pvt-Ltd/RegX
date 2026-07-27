@@ -679,6 +679,10 @@ class SubstanceSynonymMapping(PublicIDModel, TimeStampedModel):
     )
     is_current = models.BooleanField(default=True)
 
+    # reviewer/reviewed_at record who moved this mapping into review (the
+    # submit-review actor) -- never overwritten by a later approve/reject/
+    # return action, so the actual reviewer's identity survives the whole
+    # lifecycle (see docs/HUMAN_REVIEW_PR5_REMEDIATION.md, HR-03).
     reviewer = models.ForeignKey(
         "identity.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
@@ -688,6 +692,14 @@ class SubstanceSynonymMapping(PublicIDModel, TimeStampedModel):
         "identity.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
     approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        "identity.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    returned_by = models.ForeignKey(
+        "identity.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    returned_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [
