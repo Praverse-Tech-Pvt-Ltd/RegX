@@ -2,6 +2,64 @@
 
 Tracks milestone status on the `regx-main` line. This branch is a clean-room implementation and shares no code with the legacy booking demo on `main` — see [LEGACY_BOUNDARY.md](LEGACY_BOUNDARY.md).
 
+## Milestone 4A–4C — FDA Data Governance, Formulation Foundation, and IID Assessment
+
+**Milestone 4A–4C technical foundation: COMPLETE**
+**Production FDA data ingestion: NOT STARTED**
+**Production client formulation use: NOT STARTED**
+**Milestone 4D (regulatory checklist execution): NOT STARTED**
+
+Three apps: `fda_data` (platform-level FDA source-data governance), `formulations` (tenant-scoped product/formulation records), and `iid_assessment` (IID precedent matching, unit conversion, calculation, and decision engine). See [FDA_DATA_GOVERNANCE.md](FDA_DATA_GOVERNANCE.md), [FDA_IID_INGESTION.md](FDA_IID_INGESTION.md), [FDA_TERMINOLOGY_MAPPING.md](FDA_TERMINOLOGY_MAPPING.md), [FORMULATION_DATA_MODEL.md](FORMULATION_DATA_MODEL.md), [IID_MATCHING_ENGINE.md](IID_MATCHING_ENGINE.md), [IID_CALCULATION_RULES.md](IID_CALCULATION_RULES.md), and [IID_DECISION_STATUSES.md](IID_DECISION_STATUSES.md) for architecture.
+
+### Scope delivered
+
+- **FDA source-data governance:** `FDADataSourceRelease` lifecycle (registered → validated → under_review → approved → active → superseded/rejected), segregation of duties (importer cannot approve their own import), no auto-activation.
+- **Orange Book support:** product/patent/exclusivity import and search.
+- **FDA IID support:** Inactive Ingredient Database import, `IIDIngredient`/`IIDPrecedentRecord` models.
+- **Terminology mapping governance:** `RouteMapping`, `DosageFormMapping`, `UnitMapping`, and `SubstanceSynonymMapping` (raw ingredient name → canonical ingredient/UNII/CAS identity) — a single authoritative transition service (`fda_data/mapping_transitions.py`) enforces legal lifecycle transitions across all four types; nothing is ever auto-approved.
+- **Production substance-mapping proposal API:** `POST /api/regx/v1/fda-data/mappings/substances/proposals/` — the shipped entry point for creating a `PROPOSED` mapping; no Django shell/ORM dependency remains to start this workflow.
+- **Reviewer/approver provenance:** `created_by`/`submitted_by`/`reviewer`/`approved_by`/`rejected_by`/`returned_by` are each recorded distinctly, never overwritten by a later action.
+- **Affected-record API and stale-release matching protection:** non-approved mappings scoped to a superseded/unrelated release can no longer block a legitimate fallback match against the active release.
+- **Formulation foundation:** `ProductDevelopmentRecord`, `FormulationVersion`, `FormulationComponent`, `DosingRegimen` — tenant-scoped, explicit (never automatic) reference-product selection, Decimal-only quantities.
+- **IID matching, unit conversion, and calculation:** deterministic precedent matching, mass/volume/count unit conversion (density-gated), six calculation formulas, and a closed-vocabulary decision engine that structurally forbids constructing a "SAFE"/"FDA APPROVED"/automatic-approval status. `AssessmentSnapshot` freezes a point-in-time result, including which mapping version confirmed identity.
+
+### Record
+
+- **PR:** [#5](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/5)
+- **Merge SHA:** `d9d0d13519a154bb2c0558a0aed6bbac313aa587` (two-parent merge commit into `regx-main`, not squashed)
+- **Release tag:** [`regx-fda-iid-foundation-v0.4.0`](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/releases/tag/regx-fda-iid-foundation-v0.4.0), on the merge commit
+- **Legacy `main`:** unchanged throughout (`8ed8cf4b79262c1f3f261e872dc387783818e9ed`)
+
+### Human review
+
+- **First focused review gate:** identified 1 Critical (mapping lifecycle transitions not validated against current status — e.g. a still-`PROPOSED` mapping could be approved directly) and 1 Major (no shipped API or import path could create a `PROPOSED` `SubstanceSynonymMapping` — only Django shell/ORM insertion could), plus 2 Minor findings (`reviewer` overwritten on every mapping action; a stale non-approved mapping from a superseded release could block a legitimate fallback match). Result: FAIL.
+- **Remediation (HR-01–HR-04):** a single authoritative transition table now gates every mapping-action view inside a `select_for_update()` transaction, returning a structured 400 with no mutation and no audit event on an illegal transition; a new production proposal endpoint always creates `PROPOSED` and is gated by a dedicated permission; `rejected_by`/`rejected_at`/`returned_by`/`returned_at` fields were added so each lifecycle action records only its own actor; `_unapproved_state_for()` now scopes blocking mappings to currently-usable releases. See [HUMAN_REVIEW_PR5_REMEDIATION.md](HUMAN_REVIEW_PR5_REMEDIATION.md) for the full traceability table.
+- **Second focused review gate:** PASS — all four findings independently confirmed closed by direct code inspection (not by trusting CI or the remediation doc's own claims); no new Critical or Major finding introduced. One non-blocking observation: the frontend still renders approve/reject buttons regardless of current status, relying on the server-side transition table (authoritative) to reject illegal actions with 400.
+
+### CI (post-merge, on `regx-main` at the merge commit)
+
+- [Backend CI](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/actions/runs/30242694946) — success (533 passed, 93.29% coverage)
+- [Frontend CI](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/actions/runs/30242694936) — success (99 unit/accessibility, 63 Playwright)
+- [Docker Integration](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/actions/runs/30242694991) — success, including the production substance-proposal path, a blocked direct-approval-of-`PROPOSED` check, and the full approved-synonym IID assessment flow
+
+### Test counts
+
+- **Backend:** 533 tests passed (141 in `fda_data`, 21 in `formulations`, 103 in `iid_assessment`), 93.29% coverage (gate 55%). Ruff lint/format clean, import-linter 6/6 contracts kept, OpenAPI generates, AIDatabase guard clean, 483/warning-letter guard clean.
+- **Frontend unit/accessibility:** 99 tests (Vitest + React Testing Library + jest-axe).
+- **Frontend Playwright:** 63 tests, including the full substance-mapping proposal → submit-review → approve lifecycle.
+
+### Known limitations
+
+1. Only synthetic, non-confidential fixtures are included — no real FDA source file (Orange Book, IID) has been imported.
+2. No real client formulation/product data is included; all formulation fixtures are synthetic.
+3. Milestone 4D (final regulatory checklist execution and approval workflow) is not implemented.
+4. Only one production substance-mapping creation path exists (the manual proposal API); an import-generated candidate path is a natural follow-on, not a blocking gap.
+5. No 21 CFR Part 11 compliance is claimed by this milestone.
+6. Human regulatory review remains mandatory at every mapping and assessment decision point — an IID precedent match is a comparison reference only, never an automatic safety or regulatory-approval determination.
+7. Storage-level authorization for raw FDA source files is inherited from the existing `documents.storage` layer and only re-verified here at the API-response-shape level (carried over from Milestone 2).
+
+---
+
 ## Milestone 3 — Regulatory Template Migration and Governance Foundation
 
 **Milestone 3 technical framework: COMPLETE**
@@ -108,10 +166,16 @@ Branch and tenancy/identity/authorization/audit foundation preceding the documen
 
 ## Next
 
-Milestone 4 has not been planned or started. Production regulatory-template
-migration (importing, reviewing, approving, and activating a real client
-source package) is not started and requires a client-approved source
-package plus confirmed ownership/licensing before it can begin. No
-checklist-execution engine, IIG automation, calculators, Orange Book,
-ANDA/DMF scoring, regulatory AI, report generation, or Word integration
-work has begun.
+Milestone 4A–4C (FDA data governance, formulation foundation, IID matching/
+calculation/decision engine) is technically complete on `regx-main` as of
+the merge and release tag recorded above. **Milestone 4D (final regulatory
+checklist-execution engine) has not been planned or started.** Production
+FDA data ingestion (importing, reviewing, approving, and activating a real
+Orange Book/IID source release) and production client formulation use are
+both not started and require, respectively, a confirmed real source file
+and real client formulation records entered by the client's own users
+through the tenant-scoped UI. Production regulatory-template migration
+(Milestone 3) likewise remains not started pending a client-approved
+source package plus confirmed ownership/licensing. No IIG checklist-
+execution engine, ANDA/DMF scoring, regulatory AI, report generation, or
+Word integration work has begun.
