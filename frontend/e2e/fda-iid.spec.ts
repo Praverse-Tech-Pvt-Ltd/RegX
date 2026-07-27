@@ -873,6 +873,95 @@ test.describe("Terminology mapping review", () => {
     await page.getByRole("dialog").getByRole("button", { name: /^confirm$/i }).click();
     await expect(page.getByRole("alert")).toBeVisible();
   });
+
+  test("proposes a substance mapping through the production API, then carries it through submit-review and approve, never auto-approved", async ({
+    page,
+  }) => {
+    await mockCsrf(page);
+
+    let status = "proposed";
+    let listing: Record<string, unknown>[] = [];
+
+    await page.route(/\/api\/regx\/v1\/fda-data\/mappings\/(\?[^/]*)?$/, (route) =>
+      route.fulfill(jsonRouteBody(paginate(listing))),
+    );
+
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/substances\/proposals\/$/,
+      async (route) => {
+        const body = JSON.parse(route.request().postData() ?? "{}");
+        expect(body.status).toBeUndefined();
+        const created = {
+          public_id: "proposed-e2e-1",
+          mapping_type: "substance",
+          source_dataset: "fda_iid",
+          source_raw_value: body.raw_ingredient_name,
+          proposed_controlled_value: null,
+          status: "proposed",
+          is_current: true,
+          reviewer_email: null,
+          reason: body.reason ?? "",
+          affected_record_count: 0,
+          created_at: "2026-01-01T00:00:00Z",
+          proposed_unii: null,
+          proposed_cas_number: null,
+          mapping_method: body.mapping_method,
+          release_public_id: null,
+        };
+        listing = [created];
+        return route.fulfill(jsonRouteBody(created, 201));
+      },
+    );
+
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/proposed-e2e-1\/submit-review\/$/,
+      async (route) => {
+        status = "under_review";
+        listing = [{ ...listing[0], status }];
+        return route.fulfill(await jsonMock({ status }));
+      },
+    );
+
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/mappings\/proposed-e2e-1\/approve\/$/,
+      async (route) => {
+        status = "approved";
+        listing = [{ ...listing[0], status }];
+        return route.fulfill(await jsonMock({ status }));
+      },
+    );
+
+    await page.goto(`/fda-data/mappings?tenant=${TENANT}`);
+    await page.getByRole("tab", { name: /substance/i }).click();
+    await page.getByRole("button", { name: /propose substance mapping/i }).click();
+
+    const proposeDialog = page.getByRole("dialog", { name: /propose substance mapping/i });
+    await expect(proposeDialog).toBeVisible();
+    await proposeDialog
+      .getByLabel(/raw ingredient name/i)
+      .fill("Synthetic Proposal Brand (raw)");
+    await proposeDialog
+      .getByLabel(/normalized ingredient name/i)
+      .fill("SYNTHETIC PROPOSAL BRAND");
+    await proposeDialog
+      .getByLabel(/reason \/ evidence/i)
+      .fill("Observed in synthetic IID row without an exact UNII match.");
+    await proposeDialog.getByRole("button", { name: /submit proposal/i }).click();
+
+    // Never auto-approved: the dialog confirms PROPOSED, not any decided status.
+    await expect(proposeDialog.getByText(/proposal created/i)).toBeVisible();
+    await expect(proposeDialog.getByText(/proposed-e2e-1/)).toBeVisible();
+    await proposeDialog.getByRole("button", { name: /^done$/i }).click();
+
+    await expect(page.getByText("Synthetic Proposal Brand (raw)")).toBeVisible();
+    await page.getByRole("button", { name: /submit for review/i }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^confirm$/i }).click();
+    await expect(page.getByText("under review", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: /^approve$/i }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^confirm$/i }).click();
+    await expect(page.getByText("approved", { exact: true })).toBeVisible();
+  });
 });
 
 test.describe("Orange Book filters and product detail", () => {

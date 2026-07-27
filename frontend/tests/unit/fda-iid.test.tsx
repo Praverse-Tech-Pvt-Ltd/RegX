@@ -64,6 +64,7 @@ const api = vi.hoisted(() => ({
   mappingsReject: vi.fn(),
   mappingsReturn: vi.fn(),
   mappingsSubmitReview: vi.fn(),
+  mappingsProposeSubstance: vi.fn(),
   productsList: vi.fn(),
   productsCreate: vi.fn(),
   productsGet: vi.fn(),
@@ -104,6 +105,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
         reject: api.mappingsReject,
         return: api.mappingsReturn,
         submitReview: api.mappingsSubmitReview,
+        proposeSubstance: api.mappingsProposeSubstance,
       },
     },
     formulations: {
@@ -633,6 +635,67 @@ describe("MappingsPage — terminology mapping review", () => {
       "href",
       expect.stringContaining("/fda-data/mappings/mapping-public-0001"),
     );
+  });
+
+  it("proposes a substance mapping via the production proposal path, never auto-approved", async () => {
+    const user = userEvent.setup();
+    api.mappingsList.mockResolvedValue(paginate([makeSubstanceMapping()]));
+    render(<MappingsPage />);
+    await user.click(screen.getByRole("tab", { name: /substance/i }));
+    await screen.findByText("SYN0001");
+
+    await user.click(screen.getByRole("button", { name: /propose substance mapping/i }));
+    const dialog = screen.getByRole("dialog", { name: /propose substance mapping/i });
+
+    await user.type(
+      within(dialog).getByLabelText(/raw ingredient name/i),
+      "Synthetic Brand (raw)",
+    );
+    await user.type(
+      within(dialog).getByLabelText(/normalized ingredient name/i),
+      "SYNTHETIC BRAND",
+    );
+
+    api.mappingsProposeSubstance.mockResolvedValue(
+      makeSubstanceMapping({ public_id: "new-proposal-0001", status: "proposed" }),
+    );
+    await user.click(within(dialog).getByRole("button", { name: /submit proposal/i }));
+
+    expect(api.mappingsProposeSubstance).toHaveBeenCalledWith(
+      "alpha",
+      expect.objectContaining({
+        raw_ingredient_name: "Synthetic Brand (raw)",
+        normalized_ingredient_name: "SYNTHETIC BRAND",
+      }),
+    );
+    expect(await within(dialog).findByText(/proposal created/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/new-proposal-0001/)).toBeInTheDocument();
+    // no automatic approval: the created mapping is never displayed as approved here.
+    expect(within(dialog).queryByText(/^approved$/i)).not.toBeInTheDocument();
+  });
+
+  it("keeps the propose dialog open with an error when the API rejects the proposal", async () => {
+    const user = userEvent.setup();
+    api.mappingsList.mockResolvedValue(paginate([makeSubstanceMapping()]));
+    render(<MappingsPage />);
+    await user.click(screen.getByRole("tab", { name: /substance/i }));
+    await screen.findByText("SYN0001");
+
+    await user.click(screen.getByRole("button", { name: /propose substance mapping/i }));
+    const dialog = screen.getByRole("dialog", { name: /propose substance mapping/i });
+    await user.type(
+      within(dialog).getByLabelText(/raw ingredient name/i),
+      "Synthetic Brand (raw)",
+    );
+    await user.type(
+      within(dialog).getByLabelText(/normalized ingredient name/i),
+      "SYNTHETIC BRAND",
+    );
+
+    api.mappingsProposeSubstance.mockRejectedValue(new ApiError(400, "Duplicate proposal."));
+    await user.click(within(dialog).getByRole("button", { name: /submit proposal/i }));
+
+    expect(await within(dialog).findByText(/duplicate proposal/i)).toBeInTheDocument();
   });
 });
 
