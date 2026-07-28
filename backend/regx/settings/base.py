@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "fda_data",
     "formulations",
     "iid_assessment",
+    "iig_checklist",
 ]
 
 MIDDLEWARE = [
