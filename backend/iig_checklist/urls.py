@@ -1,0 +1,100 @@
+"""IIG checklist definition-governance URL configuration."""
+
+from django.urls import path
+
+from . import views
+
+app_name = "iig_checklist"
+
+urlpatterns = [
+    path(
+        "iig-checklists/definitions/",
+        views.ChecklistDefinitionListCreateView.as_view(),
+        name="definition-list",
+    ),
+    path(
+        "iig-checklists/definitions/<uuid:public_id>/",
+        views.ChecklistDefinitionDetailView.as_view(),
+        name="definition-detail",
+    ),
+    path(
+        "iig-checklists/definitions/<uuid:public_id>/clone/",
+        views.ChecklistDefinitionCloneView.as_view(),
+        name="definition-clone",
+    ),
+    path(
+        "iig-checklists/definitions/<uuid:public_id>/versions/",
+        views.ChecklistVersionCreateView.as_view(),
+        name="version-create",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/",
+        views.ChecklistVersionDetailView.as_view(),
+        name="version-detail",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/submit-review/",
+        views.ChecklistVersionSubmitReviewView.as_view(),
+        name="version-submit-review",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/approve/",
+        views.ChecklistVersionApproveView.as_view(),
+        name="version-approve",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/return/",
+        views.ChecklistVersionReturnView.as_view(),
+        name="version-return",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/reject/",
+        views.ChecklistVersionRejectView.as_view(),
+        name="version-reject",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/activate/",
+        views.ChecklistVersionActivateView.as_view(),
+        name="version-activate",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/supersede/",
+        views.ChecklistVersionSupersedeView.as_view(),
+        name="version-supersede",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/retire/",
+        views.ChecklistVersionRetireView.as_view(),
+        name="version-retire",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/sections/",
+        views.ChecklistSectionListCreateView.as_view(),
+        name="section-list-create",
+    ),
+    path(
+        "iig-checklists/sections/<uuid:public_id>/",
+        views.ChecklistSectionDetailView.as_view(),
+        name="section-detail",
+    ),
+    path(
+        "iig-checklists/sections/<uuid:public_id>/questions/",
+        views.ChecklistQuestionListCreateView.as_view(),
+        name="question-list-create",
+    ),
+    path(
+        "iig-checklists/questions/<uuid:public_id>/",
+        views.ChecklistQuestionDetailView.as_view(),
+        name="question-detail",
+    ),
+    path(
+        "iig-checklists/versions/<uuid:public_id>/applicability-rules/",
+        views.ApplicabilityRuleListCreateView.as_view(),
+        name="applicability-rule-list-create",
+    ),
+    path(
+        "iig-checklists/applicability-rules/validate/",
+        views.ApplicabilityRuleValidateView.as_view(),
+        name="applicability-rule-validate",
+    ),
+]

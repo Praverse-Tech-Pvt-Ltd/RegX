@@ -1,0 +1,793 @@
+"""IIG checklist definition-governance API views.
+
+UUID-only identifiers; permission enforcement on every endpoint; a
+missing/forbidden record returns a generic 404; every lifecycle action
+goes through the single authoritative transition service
+(transitions.py) inside select_for_update()+transaction.atomic(), never
+a generic status PATCH.
+"""
+
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from tenancy.context import TenantScopeMissing, current_tenant
+
+from .audit import IigChecklistEvent, emit
+from .codes import CodeValidationError, normalize_code
+from .enums import ChecklistVersionStatus
+from .models import (
+    ApplicabilityRule,
+    ChecklistDefinition,
+    ChecklistQuestion,
+    ChecklistSection,
+    ChecklistVersion,
+)
+from .permissions import (
+    CanActivateChecklist,
+    CanApproveChecklist,
+    CanCloneChecklist,
+    CanCreateChecklistDefinition,
+    CanDeleteChecklistDraft,
+    CanEditChecklistDraft,
+    CanReviewChecklist,
+    CanRetireChecklist,
+    CanSubmitChecklistReview,
+    CanViewChecklistDefinition,
+)
+from .serializers import (
+    ApplicabilityRuleSerializer,
+    ChecklistDefinitionSerializer,
+    ChecklistQuestionSerializer,
+    ChecklistSectionSerializer,
+    ChecklistVersionSerializer,
+    CloneDefinitionSerializer,
+    VersionActionSerializer,
+)
+from .services import (
+    CloneRequest,
+    CloneSourceNotEligible,
+    DuplicateCodeError,
+    VersionAllocationConflict,
+    clone_definition,
+    create_next_version,
+)
+from .transitions import IllegalVersionTransition, VersionAction, validate_version_transition
+
+_ACTION_EVENT_MAP = {
+    VersionAction.SUBMIT_REVIEW: IigChecklistEvent.VERSION_SUBMITTED,
+    VersionAction.APPROVE: IigChecklistEvent.VERSION_APPROVED,
+    VersionAction.RETURN: IigChecklistEvent.VERSION_RETURNED,
+    VersionAction.REJECT: IigChecklistEvent.VERSION_REJECTED,
+    VersionAction.ACTIVATE: IigChecklistEvent.VERSION_ACTIVATED,
+    VersionAction.SUPERSEDE: IigChecklistEvent.VERSION_SUPERSEDED,
+    VersionAction.RETIRE: IigChecklistEvent.VERSION_RETIRED,
+}
+
+
+class _Pagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+def _require_tenant():
+    try:
+        return current_tenant()
+    except (TenantScopeMissing, Exception) as exc:
+        raise PermissionDenied("Tenant context required.") from exc
+
+
+def _get_definition_or_404(public_id, tenant):
+    try:
+        return ChecklistDefinition.objects.visible_to(tenant).get(public_id=public_id)
+    except ChecklistDefinition.DoesNotExist as exc:
+        raise NotFound("Checklist definition not found.") from exc
+
+
+def _get_version_or_404(public_id, tenant):
+    try:
+        return ChecklistVersion.objects.visible_to(tenant).select_related("definition").get(
+            public_id=public_id
+        )
+    except ChecklistVersion.DoesNotExist as exc:
+        raise NotFound("Checklist version not found.") from exc
+
+
+def _get_section_or_404(public_id, tenant):
+    try:
+        return ChecklistSection.objects.visible_to(tenant).select_related(
+            "checklist_version__definition"
+        ).get(public_id=public_id)
+    except ChecklistSection.DoesNotExist as exc:
+        raise NotFound("Checklist section not found.") from exc
+
+
+def _get_question_or_404(public_id, tenant):
+    try:
+        return ChecklistQuestion.objects.visible_to(tenant).select_related(
+            "section__checklist_version__definition"
+        ).get(public_id=public_id)
+    except ChecklistQuestion.DoesNotExist as exc:
+        raise NotFound("Checklist question not found.") from exc
+
+
+def _raise_django_validation_as_drf(exc: DjangoValidationError):
+    detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages}
+    raise ValidationError(detail) from exc
+
+
+# --------------------------------------------------------------------------
+# Definitions
+# --------------------------------------------------------------------------
+
+
+class ChecklistDefinitionListCreateView(APIView):
+    pagination_class = _Pagination
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [CanCreateChecklistDefinition()]
+        return [CanViewChecklistDefinition()]
+
+    def get(self, request):
+        tenant = _require_tenant()
+        queryset = ChecklistDefinition.objects.visible_to(tenant)
+        scope_type = request.query_params.get("scope_type")
+        if scope_type:
+            queryset = queryset.filter(scope_type=scope_type)
+        code = request.query_params.get("code")
+        if code:
+            queryset = queryset.filter(code__icontains=code)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        return paginator.get_paginated_response(
+            ChecklistDefinitionSerializer(page, many=True).data
+        )
+
+    def post(self, request):
+        tenant = _require_tenant()
+        serializer = ChecklistDefinitionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        scope_type = serializer.validated_data["scope_type"]
+        definition_tenant = tenant if scope_type == "tenant" else None
+
+        with transaction.atomic():
+            try:
+                definition = ChecklistDefinition(
+                    code=serializer.validated_data["code"],
+                    title=serializer.validated_data["title"],
+                    description=serializer.validated_data.get("description", ""),
+                    scope_type=scope_type,
+                    tenant=definition_tenant,
+                    created_by=request.user,
+                )
+                definition.full_clean()
+                definition.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+            except IntegrityError as exc:
+                raise ValidationError(
+                    {"error_code": "DUPLICATE_CODE", "detail": "Code already exists in this scope."}
+                ) from exc
+
+            emit(
+                event_type=IigChecklistEvent.DEFINITION_CREATED,
+                resource_id=str(definition.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(definition_tenant, "id", None),
+                payload={"code": definition.code, "scope_type": scope_type},
+            )
+        return Response(
+            ChecklistDefinitionSerializer(definition).data, status=status.HTTP_201_CREATED
+        )
+
+
+class ChecklistDefinitionDetailView(APIView):
+    def get_permissions(self):
+        if self.request.method == "DELETE":
+            return [CanDeleteChecklistDraft()]
+        return [CanViewChecklistDefinition()]
+
+    def get(self, request, public_id):
+        tenant = _require_tenant()
+        definition = _get_definition_or_404(public_id, tenant)
+        return Response(ChecklistDefinitionSerializer(definition).data)
+
+    def delete(self, request, public_id):
+        """Narrow, permissioned exception only -- see spec §8b. Everything
+        else is retired, never hard-deleted."""
+        tenant = _require_tenant()
+        with transaction.atomic():
+            definition = (
+                ChecklistDefinition.objects.visible_to(tenant)
+                .select_for_update()
+                .get(public_id=public_id)
+            )
+            versions = list(definition.versions.all())
+            if len(versions) != 1:
+                raise ValidationError(
+                    "Only a definition with exactly one version may be deleted."
+                )
+            version = versions[0]
+            if version.status != ChecklistVersionStatus.DRAFT or version.submitted_at is not None:
+                raise ValidationError(
+                    "Only a definition whose single version has never been "
+                    "submitted for review may be deleted."
+                )
+
+            # Audit is emitted before the cascade delete -- AuditEvent
+            # stores denormalized JSON/string metadata, never a live FK
+            # into the deleted row, so the event survives intact.
+            emit(
+                event_type=IigChecklistEvent.DEFINITION_DELETED,
+                resource_id=str(definition.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(definition.tenant, "id", None),
+                payload={"code": definition.code, "scope_type": definition.scope_type},
+            )
+            # ChecklistVersion.definition is on_delete=PROTECT (governed
+            # versions must never be silently cascaded away) -- the single
+            # eligible version must be removed explicitly before the
+            # definition, since every condition above already proved it
+            # safe to delete (never submitted, still draft).
+            version.delete()
+            definition.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChecklistDefinitionCloneView(APIView):
+    required_permission = CanCloneChecklist
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def post(self, request, public_id):
+        tenant = _require_tenant()
+        definition = _get_definition_or_404(public_id, tenant)
+        serializer = CloneDefinitionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        source_version = _get_version_or_404(data["source_version_public_id"], tenant)
+        if source_version.definition_id != definition.id:
+            raise NotFound("Source version does not belong to this definition.")
+
+        target_scope_type = data["target_scope_type"]
+        target_tenant = None
+        if target_scope_type == "tenant":
+            from tenancy.models import Tenant
+
+            try:
+                target_tenant = Tenant.objects.get(public_id=data["target_tenant_public_id"])
+            except Tenant.DoesNotExist as exc:
+                raise NotFound("Target tenant not found.") from exc
+            if target_tenant.id != tenant.id:
+                # Cross-tenant cloning requires a separate, explicit
+                # platform-level grant this permission alone does not
+                # imply -- see spec §8a.
+                raise PermissionDenied(
+                    "Cloning into a different tenant requires a separate authorization."
+                )
+        elif definition.scope_type != "platform_master" and definition.tenant_id != tenant.id:
+            raise PermissionDenied("Cannot clone another tenant's content to platform-master.")
+
+        try:
+            result = clone_definition(
+                CloneRequest(
+                    source_version=source_version,
+                    target_scope_type=target_scope_type,
+                    target_tenant=target_tenant,
+                    new_code=data["new_code"],
+                    new_title=data["new_title"],
+                    actor=request.user,
+                    clone_sections=data["clone_sections"],
+                    clone_questions=data["clone_questions"],
+                    clone_applicability_rules=data["clone_applicability_rules"],
+                    reason=data.get("reason", ""),
+                )
+            )
+        except CloneSourceNotEligible as exc:
+            raise ValidationError(str(exc)) from exc
+        except DuplicateCodeError as exc:
+            raise ValidationError({"error_code": "DUPLICATE_CODE", "detail": str(exc)}) from exc
+        except CodeValidationError as exc:
+            raise ValidationError({"error_code": exc.error_code, "detail": str(exc)}) from exc
+
+        return Response(
+            {
+                "public_id": str(result.definition.public_id),
+                "code": result.definition.code,
+                "title": result.definition.title,
+                "scope_type": result.definition.scope_type,
+                "tenant_public_id": (
+                    str(result.definition.tenant.public_id) if result.definition.tenant_id else None
+                ),
+                "current_version": {
+                    "public_id": str(result.version.public_id),
+                    "version_number": result.version.version_number,
+                    "status": result.version.status,
+                    "cloned_from_version_public_id": str(source_version.public_id),
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+# --------------------------------------------------------------------------
+# Versions
+# --------------------------------------------------------------------------
+
+
+class ChecklistVersionCreateView(APIView):
+    required_permission = CanCreateChecklistDefinition
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def post(self, request, public_id):
+        tenant = _require_tenant()
+        definition = _get_definition_or_404(public_id, tenant)
+        try:
+            version = create_next_version(definition=definition, actor=request.user)
+        except VersionAllocationConflict as exc:
+            raise ValidationError(
+                {"error_code": "VERSION_ALLOCATION_CONFLICT", "detail": str(exc)}
+            ) from exc
+        return Response(ChecklistVersionSerializer(version).data, status=status.HTTP_201_CREATED)
+
+
+class ChecklistVersionDetailView(APIView):
+    def get_permissions(self):
+        if self.request.method == "PATCH":
+            return [CanEditChecklistDraft()]
+        return [CanViewChecklistDefinition()]
+
+    def get(self, request, public_id):
+        tenant = _require_tenant()
+        version = _get_version_or_404(public_id, tenant)
+        data = ChecklistVersionSerializer(version).data
+        data["sections"] = [
+            {**ChecklistSectionSerializer(section).data, "questions": [
+                ChecklistQuestionSerializer(q).data for q in section.questions.all()
+            ]}
+            for section in version.sections.all()
+        ]
+        return Response(data)
+
+    def patch(self, request, public_id):
+        tenant = _require_tenant()
+        with transaction.atomic():
+            version = (
+                ChecklistVersion.objects.visible_to(tenant)
+                .select_for_update()
+                .get(public_id=public_id)
+            )
+            if not version.is_editable():
+                raise ValidationError(
+                    {
+                        "error_code": "VERSION_NO_LONGER_EDITABLE",
+                        "detail": f"Version is {version.status!r}, no longer editable.",
+                    }
+                )
+            for field in ("effective_date", "expiry_date", "regulatory_basis", "change_summary"):
+                if field in request.data:
+                    setattr(version, field, request.data[field])
+            try:
+                version.full_clean()
+                version.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+        return Response(ChecklistVersionSerializer(version).data)
+
+
+class _ChecklistVersionActionViewBase(APIView):
+    """Shared action plumbing for submit-review/approve/return/reject/
+    activate/supersede/retire -- structurally identical in shape to
+    fda_data's _MappingActionViewBase. Every transition is validated
+    against validate_version_transition() before any mutation; an
+    illegal transition returns a structured 400 with the row untouched
+    and no audit event emitted."""
+
+    action: str = ""
+    self_approval_forbidden: bool = False
+    required_permission = CanReviewChecklist
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def post(self, request, public_id):
+        tenant = _require_tenant()
+        serializer = VersionActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        reason = serializer.validated_data.get("reason", "")
+
+        with transaction.atomic():
+            try:
+                version = (
+                    ChecklistVersion.objects.visible_to(tenant)
+                    .select_for_update()
+                    .get(public_id=public_id)
+                )
+            except ChecklistVersion.DoesNotExist as exc:
+                raise NotFound("Checklist version not found.") from exc
+
+            previous_status = version.status
+            try:
+                target_status = validate_version_transition(version.status, self.action)
+            except IllegalVersionTransition as exc:
+                raise ValidationError(str(exc)) from exc
+
+            if self.action == VersionAction.ACTIVATE and not version.effective_date:
+                raise ValidationError("effective_date is required before activation.")
+
+            if self.action == VersionAction.ACTIVATE:
+                other_active = (
+                    ChecklistVersion.objects.select_for_update()
+                    .filter(definition_id=version.definition_id, status=ChecklistVersionStatus.ACTIVE)
+                    .exclude(pk=version.pk)
+                )
+                for prior_active in other_active:
+                    prior_active.status = ChecklistVersionStatus.SUPERSEDED
+                    prior_active.save(update_fields=["status", "updated_at"])
+                    emit(
+                        event_type=IigChecklistEvent.VERSION_SUPERSEDED,
+                        resource_id=str(prior_active.public_id),
+                        actor_id=request.user.id,
+                        actor_email=getattr(request.user, "email", ""),
+                        tenant_id=getattr(version.definition.tenant, "id", None),
+                        payload={"superseded_by": str(version.public_id)},
+                    )
+
+            if (
+                self.self_approval_forbidden
+                and version.submitted_by_id == request.user.id
+            ):
+                raise ValidationError(
+                    "A user cannot approve a version they submitted for review."
+                )
+
+            now = timezone.now()
+            if self.action == VersionAction.SUBMIT_REVIEW:
+                version.submitted_by = request.user
+                version.submitted_at = now
+            elif self.action == VersionAction.APPROVE:
+                version.approved_by = request.user
+                version.approved_at = now
+            elif self.action == VersionAction.RETURN:
+                version.returned_by = request.user
+                version.returned_at = now
+                if reason:
+                    version.return_reason = reason
+            elif self.action == VersionAction.REJECT:
+                version.rejected_by = request.user
+                version.rejected_at = now
+            elif self.action == VersionAction.ACTIVATE:
+                version.activated_by = request.user
+                version.activated_at = now
+            elif self.action == VersionAction.RETIRE:
+                version.retired_by = request.user
+                version.retired_at = now
+
+            version.status = target_status
+            try:
+                version.full_clean()
+                version.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+
+            emit(
+                event_type=_ACTION_EVENT_MAP[self.action],
+                resource_id=str(version.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(version.definition.tenant, "id", None),
+                payload={"previous_status": previous_status, "new_status": target_status},
+            )
+        return Response(ChecklistVersionSerializer(version).data)
+
+
+class ChecklistVersionSubmitReviewView(_ChecklistVersionActionViewBase):
+    action = VersionAction.SUBMIT_REVIEW
+    required_permission = CanSubmitChecklistReview
+
+
+class ChecklistVersionApproveView(_ChecklistVersionActionViewBase):
+    action = VersionAction.APPROVE
+    required_permission = CanApproveChecklist
+    self_approval_forbidden = True
+
+
+class ChecklistVersionReturnView(_ChecklistVersionActionViewBase):
+    action = VersionAction.RETURN
+    required_permission = CanReviewChecklist
+
+
+class ChecklistVersionRejectView(_ChecklistVersionActionViewBase):
+    action = VersionAction.REJECT
+    required_permission = CanReviewChecklist
+
+
+class ChecklistVersionActivateView(_ChecklistVersionActionViewBase):
+    action = VersionAction.ACTIVATE
+    required_permission = CanActivateChecklist
+
+
+class ChecklistVersionSupersedeView(_ChecklistVersionActionViewBase):
+    action = VersionAction.SUPERSEDE
+    required_permission = CanActivateChecklist
+
+
+class ChecklistVersionRetireView(_ChecklistVersionActionViewBase):
+    action = VersionAction.RETIRE
+    required_permission = CanRetireChecklist
+
+
+# --------------------------------------------------------------------------
+# Sections / questions / applicability rules
+# --------------------------------------------------------------------------
+
+
+def _require_editable(version: ChecklistVersion):
+    if not version.is_editable():
+        raise ValidationError(
+            {
+                "error_code": "VERSION_NO_LONGER_EDITABLE",
+                "detail": f"Version is {version.status!r}, not editable.",
+            }
+        )
+
+
+class ChecklistSectionListCreateView(APIView):
+    required_permission = CanEditChecklistDraft
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [CanViewChecklistDefinition()]
+        return [self.required_permission()]
+
+    def get(self, request, public_id):
+        tenant = _require_tenant()
+        version = _get_version_or_404(public_id, tenant)
+        return Response(
+            ChecklistSectionSerializer(version.sections.all(), many=True).data
+        )
+
+    def post(self, request, public_id):
+        tenant = _require_tenant()
+        version = _get_version_or_404(public_id, tenant)
+        _require_editable(version)
+        serializer = ChecklistSectionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            section = ChecklistSection(checklist_version=version, **serializer.validated_data)
+            section.full_clean()
+            section.save()
+        except DjangoValidationError as exc:
+            _raise_django_validation_as_drf(exc)
+        emit(
+            event_type=IigChecklistEvent.SECTION_CREATED,
+            resource_id=str(section.public_id),
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(version.definition.tenant, "id", None),
+            payload={"checklist_version_public_id": str(version.public_id)},
+        )
+        return Response(ChecklistSectionSerializer(section).data, status=status.HTTP_201_CREATED)
+
+
+class ChecklistSectionDetailView(APIView):
+    required_permission = CanEditChecklistDraft
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def patch(self, request, public_id):
+        tenant = _require_tenant()
+        section = _get_section_or_404(public_id, tenant)
+        _require_editable(section.checklist_version)
+        for field in ("title", "description", "display_order", "criticality"):
+            if field in request.data:
+                setattr(section, field, request.data[field])
+        try:
+            section.full_clean()
+            section.save()
+        except DjangoValidationError as exc:
+            _raise_django_validation_as_drf(exc)
+        emit(
+            event_type=IigChecklistEvent.SECTION_UPDATED,
+            resource_id=str(section.public_id),
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(section.checklist_version.definition.tenant, "id", None),
+            payload={},
+        )
+        return Response(ChecklistSectionSerializer(section).data)
+
+    def delete(self, request, public_id):
+        tenant = _require_tenant()
+        section = _get_section_or_404(public_id, tenant)
+        _require_editable(section.checklist_version)
+        section_public_id = str(section.public_id)
+        section.delete()
+        emit(
+            event_type=IigChecklistEvent.SECTION_DELETED,
+            resource_id=section_public_id,
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(tenant, "id", None),
+            payload={},
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ChecklistQuestionListCreateView(APIView):
+    required_permission = CanEditChecklistDraft
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def post(self, request, public_id):
+        tenant = _require_tenant()
+        section = _get_section_or_404(public_id, tenant)
+        _require_editable(section.checklist_version)
+        serializer = ChecklistQuestionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            question = ChecklistQuestion(section=section, **serializer.validated_data)
+            question.full_clean()
+            question.save()
+        except DjangoValidationError as exc:
+            _raise_django_validation_as_drf(exc)
+        emit(
+            event_type=IigChecklistEvent.QUESTION_CREATED,
+            resource_id=str(question.public_id),
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(section.checklist_version.definition.tenant, "id", None),
+            payload={"section_public_id": str(section.public_id)},
+        )
+        return Response(
+            ChecklistQuestionSerializer(question).data, status=status.HTTP_201_CREATED
+        )
+
+
+class ChecklistQuestionDetailView(APIView):
+    required_permission = CanEditChecklistDraft
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def patch(self, request, public_id):
+        tenant = _require_tenant()
+        question = _get_question_or_404(public_id, tenant)
+        _require_editable(question.section.checklist_version)
+        editable_fields = [
+            "question_text",
+            "help_text",
+            "display_order",
+            "answer_type",
+            "data_source_classification",
+            "required",
+            "allowed_units",
+            "evidence_requirement",
+            "calculation_binding_identifier",
+            "prefill_source",
+            "reviewer_confirmation_required",
+            "escalation_rule_identifier",
+            "criticality",
+            "regulatory_reference",
+            "default_value_binding",
+            "validation_rule",
+        ]
+        for field in editable_fields:
+            if field in request.data:
+                setattr(question, field, request.data[field])
+        try:
+            question.full_clean()
+            question.save()
+        except DjangoValidationError as exc:
+            _raise_django_validation_as_drf(exc)
+        emit(
+            event_type=IigChecklistEvent.QUESTION_UPDATED,
+            resource_id=str(question.public_id),
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(question.section.checklist_version.definition.tenant, "id", None),
+            payload={},
+        )
+        return Response(ChecklistQuestionSerializer(question).data)
+
+    def delete(self, request, public_id):
+        tenant = _require_tenant()
+        question = _get_question_or_404(public_id, tenant)
+        _require_editable(question.section.checklist_version)
+        question_public_id = str(question.public_id)
+        question.delete()
+        emit(
+            event_type=IigChecklistEvent.QUESTION_DELETED,
+            resource_id=question_public_id,
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(tenant, "id", None),
+            payload={},
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ApplicabilityRuleListCreateView(APIView):
+    required_permission = CanEditChecklistDraft
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [CanViewChecklistDefinition()]
+        return [self.required_permission()]
+
+    def get(self, request, public_id):
+        tenant = _require_tenant()
+        version = _get_version_or_404(public_id, tenant)
+        return Response(
+            ApplicabilityRuleSerializer(version.applicability_rules.all(), many=True).data
+        )
+
+    def post(self, request, public_id):
+        tenant = _require_tenant()
+        version = _get_version_or_404(public_id, tenant)
+        _require_editable(version)
+        serializer = ApplicabilityRuleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            rule = ApplicabilityRule(checklist_version=version, **serializer.validated_data)
+            rule.full_clean()
+            rule.save()
+        except DjangoValidationError as exc:
+            _raise_django_validation_as_drf(exc)
+        emit(
+            event_type=IigChecklistEvent.APPLICABILITY_RULE_CREATED,
+            resource_id=str(rule.public_id),
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(version.definition.tenant, "id", None),
+            payload={"checklist_version_public_id": str(version.public_id)},
+        )
+        return Response(ApplicabilityRuleSerializer(rule).data, status=status.HTTP_201_CREATED)
+
+
+class ApplicabilityRuleValidateView(APIView):
+    required_permission = CanEditChecklistDraft
+
+    def get_permissions(self):
+        return [self.required_permission()]
+
+    def post(self, request):
+        """Validate a condition_json payload without persisting it --
+        used by the frontend rule editor for live feedback."""
+        from .applicability import ApplicabilityRuleValidationError, validate_condition_json
+        from .field_registry import FIELD_REGISTRY_VERSION, is_known_registry_version
+
+        condition_json = request.data.get("condition_json")
+        registry_version = request.data.get("field_registry_version", FIELD_REGISTRY_VERSION)
+        if not is_known_registry_version(registry_version):
+            raise ValidationError(
+                {"error_code": "UNSUPPORTED_FIELD_REGISTRY_VERSION", "detail": "Unknown registry version."}
+            )
+        try:
+            validate_condition_json(condition_json, registry_version)
+        except ApplicabilityRuleValidationError as exc:
+            raise ValidationError({"error_code": exc.error_code, "detail": str(exc)}) from exc
+
+        emit(
+            event_type=IigChecklistEvent.APPLICABILITY_RULE_VALIDATED,
+            resource_id="",
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            payload={"field_registry_version": registry_version},
+        )
+        return Response({"valid": True})
