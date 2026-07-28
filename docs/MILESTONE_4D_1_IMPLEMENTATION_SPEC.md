@@ -1369,7 +1369,16 @@ as a deliberate boundary. Stated explicitly here:
   - The deletion is audited (`iig_checklist.definition.deleted` — a new
     event added to §10's list) with the definition's `code`/`scope_type`/
     actor, since even a permitted deletion of ungoverned content should
-    leave a trace of *that it happened*.
+    leave a trace of *that it happened*. **Ordering, stated explicitly:**
+    the audit event is emitted *before* the `.delete()` call, inside the
+    same `transaction.atomic()` block — `AuditEvent` (per `audit/models.py`)
+    stores `resource_id`/metadata as plain strings/JSON, never a live
+    foreign key into the deleted row, so the event's payload is a
+    denormalized snapshot captured at emission time and survives the
+    parent row's deletion intact; emitting first (rather than after)
+    simply avoids ever reaching a state where the delete succeeded but
+    the audit write failed and rolled back the whole transaction with no
+    record of why.
   - **Everything else — an abandoned definition with more than one
     version, or any version beyond the first that has ever been
     submitted — is never deleted, only retired** (`retire` action, §6),
@@ -1648,10 +1657,13 @@ rows; the deletion emits `iig_checklist.definition.deleted`; an actor
 holding only `PERM_EDIT_DRAFT` (not `PERM_DELETE_DRAFT`) is blocked
 (403) from the same otherwise-eligible deletion.
 
-**Field-registry versioning (§4b, SR-08):** a rule created against
-`allowed_field_registry_version=1` remains valid and reproducible after
-`FIELD_REGISTRY_VERSION` is (in the test, monkeypatched/fixture-bumped
-to) `2`; a newly-created rule is rejected if it declares an
+**Field-registry versioning (§4b, SR-08):** **historical reproducibility**
+— a rule created against `allowed_field_registry_version=1` remains
+valid and reproducible (re-fetchable and re-displayable with no error)
+after `FIELD_REGISTRY_VERSION` is (in the test, monkeypatched/fixture-
+bumped to) `2`, explicitly asserting the v1 rule's own
+`allowed_field_registry_version` and `condition_json` are byte-for-byte
+unchanged; a newly-created rule is rejected if it declares an
 `allowed_field_registry_version` other than the current constant; an
 `activate` attempt on a version whose applicability rules reference an
 explicitly-unsupported registry version is blocked (400
