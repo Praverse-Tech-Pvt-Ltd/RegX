@@ -123,7 +123,7 @@ function DefinitionDetailInner() {
         new_code: `${definition!.code}-CLONE`,
         new_title: `${definition!.title} (clone)`,
       });
-      router.push(`/iig-checklists/${result.definition.public_id}?tenant=${tenantSlug}`);
+      router.push(`/iig-checklists/${result.public_id}?tenant=${tenantSlug}`);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Clone failed.");
       setActionBusy(false);

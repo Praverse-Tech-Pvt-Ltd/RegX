@@ -274,8 +274,13 @@ test.describe("Clone", () => {
     await page.route(
       `${API}/api/regx/v1/iig-checklists/definitions/def-e2e-1/clone/`,
       jsonRoute({
-        definition: definitionFixture({ public_id: "def-e2e-clone", code: "IIG-ORAL-SOLID-CLONE" }),
-        current_version: versionFixture({ public_id: "ver-e2e-clone", status: "draft" }),
+        ...definitionFixture({ public_id: "def-e2e-clone", code: "IIG-ORAL-SOLID-CLONE" }),
+        current_version: {
+          public_id: "ver-e2e-clone",
+          version_number: 1,
+          status: "draft",
+          cloned_from_version_public_id: "ver-e2e-1",
+        },
       }),
     );
     await page.route(

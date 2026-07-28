@@ -1328,10 +1328,18 @@ export const iigChecklists = {
         reason?: string;
       }
     ) =>
-      apiRequest<{ definition: ChecklistDefinition; current_version: ChecklistVersion }>(
-        `/api/regx/v1/iig-checklists/definitions/${publicId}/clone/`,
-        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
-      ),
+      apiRequest<
+        ChecklistDefinition & {
+          current_version: Pick<
+            ChecklistVersion,
+            "public_id" | "version_number" | "status" | "cloned_from_version_public_id"
+          >;
+        }
+      >(`/api/regx/v1/iig-checklists/definitions/${publicId}/clone/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: data,
+      }),
   },
 
   versions: {
