@@ -2,6 +2,20 @@
 
 **Status: SPECIFICATION ONLY. No code in this document. Not an authorization to implement.**
 
+**Revision note:** this is the **revised** version, produced after a
+first specification-review gate on PR #8 returned **FAIL** — 1 Critical
+finding (an undisclosed lifecycle deviation from the approved Milestone
+4D design) and 4 Major findings (clone semantics, code normalization,
+concurrent version-number allocation, and the answer-type/classification
+compatibility matrix all underspecified), plus 3 Minor findings. Every
+finding is closed below (marked `SR-01` through `SR-08`), with the
+lifecycle deviation specifically **kept and explicitly disclosed as an
+approved, intentional refinement** rather than reverted — see §6a. Full
+finding-by-finding traceability is in
+[MILESTONE_4D_1_SPEC_REMEDIATION.md](MILESTONE_4D_1_SPEC_REMEDIATION.md).
+This document is not rewritten from scratch — it is the same
+specification, corrected and completed.
+
 This document specifies stage 4D-1 (checklist-definition governance) of
 Milestone 4D's approved implementation sequence, following the
 technically-complete design in
@@ -232,6 +246,10 @@ class ChecklistVersion(PublicIDModel, TimeStampedModel):
     superseded_by = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="supersedes",
     )
+    # Audit-trail readability only -- deliberately NOT a ForeignKey, so
+    # retiring/deleting the source version years later can never cascade
+    # into or block operations on a clone. See §8a.
+    cloned_from_version_public_id = models.UUIDField(null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -403,7 +421,7 @@ convention alone:
 
 - `calculation_binding_identifier` may be non-blank **only** when
   `data_source_classification == SYSTEM_CALCULATED` (validated against
-  the declarative calculation-identifier allow-list in §6, at *shape*
+  the declarative calculation-identifier allow-list, at *shape*
   level only in 4D-1 — see §2's runtime-coupling note).
 - `evidence_requirement` must be `required` whenever
   `data_source_classification == EVIDENCE_DERIVED` (never `none`/
@@ -414,6 +432,88 @@ convention alone:
   `data_source_classification == REVIEWER_CONFIRMED`.
 - Immutable once the parent `ChecklistVersion.status` leaves `draft`/
   `returned`, same mechanism as §3c.
+
+### 3d-i. Answer-type × classification compatibility matrix (closes SR-05)
+
+The three rules above were the only cross-field constraints in the first
+pass of this document — insufficient, since roughly 90 `(answer_type,
+data_source_classification)` combinations were left entirely undefined
+(e.g. nothing blocked `answer_type=APPROVAL_METADATA` paired with
+`data_source_classification=USER_REQUIRED`, which would let a tenant user
+author their own "approval" field). The full **normative** matrix below
+replaces the three ad hoc rules — it is the single source of truth,
+implemented as one central registry
+(`iig_checklist/compatibility.py:ANSWER_TYPE_CLASSIFICATION_MATRIX`, a
+plain `dict[AnswerType, set[DataSourceClassification]]` of **allowed**
+classifications per answer type), consulted by both the serializer and
+`ChecklistQuestion.clean()` — never scattered ad hoc `if` checks
+duplicated in multiple places.
+
+| `answer_type` | `FDA_DERIVED_DEFAULT` | `USER_REQUIRED` | `SYSTEM_CALCULATED` | `REVIEWER_CONFIRMED` | `EVIDENCE_DERIVED` |
+|---|---|---|---|---|---|
+| `SHORT_TEXT` | ALLOWED | ALLOWED | PROHIBITED | ALLOWED | ALLOWED |
+| `LONG_NARRATIVE` | PROHIBITED | ALLOWED | PROHIBITED | ALLOWED | ALLOWED |
+| `INTEGER` | ALLOWED | ALLOWED | PROHIBITED | PROHIBITED | ALLOWED |
+| `DECIMAL` | ALLOWED | ALLOWED | PROHIBITED | PROHIBITED | ALLOWED |
+| `QUANTITY_WITH_UNIT` | ALLOWED | ALLOWED | PROHIBITED | PROHIBITED | ALLOWED |
+| `PERCENTAGE` | PROHIBITED | PROHIBITED | ALLOWED | PROHIBITED | PROHIBITED |
+| `DATE` | ALLOWED | ALLOWED | PROHIBITED | PROHIBITED | ALLOWED |
+| `YES_NO` | ALLOWED | ALLOWED | PROHIBITED | ALLOWED | PROHIBITED |
+| `YES_NO_NOT_APPLICABLE` | ALLOWED | PROHIBITED | ALLOWED | ALLOWED | PROHIBITED |
+| `SINGLE_SELECT` | ALLOWED | ALLOWED | PROHIBITED | ALLOWED | PROHIBITED |
+| `MULTI_SELECT` | ALLOWED | ALLOWED | PROHIBITED | ALLOWED | PROHIBITED |
+| `FDA_RECORD_REFERENCE` | ALLOWED | PROHIBITED | PROHIBITED | CONDITIONALLY_ALLOWED* | PROHIBITED |
+| `FORMULATION_COMPONENT_REFERENCE` | PROHIBITED | ALLOWED | PROHIBITED | CONDITIONALLY_ALLOWED* | PROHIBITED |
+| `EVIDENCE_ATTACHMENT_REFERENCE` | PROHIBITED | CONDITIONALLY_ALLOWED** | PROHIBITED | PROHIBITED | ALLOWED |
+| `CALCULATED_VALUE` | PROHIBITED | PROHIBITED | ALLOWED | PROHIBITED | PROHIBITED |
+| `CALCULATED_STATUS` | PROHIBITED | PROHIBITED | ALLOWED | PROHIBITED | PROHIBITED |
+| `REVIEWER_CONCLUSION` | PROHIBITED | PROHIBITED | PROHIBITED | ALLOWED | PROHIBITED |
+| `APPROVAL_METADATA` | PROHIBITED | PROHIBITED | PROHIBITED | ALLOWED | PROHIBITED |
+
+`*` **`FDA_RECORD_REFERENCE`/`FORMULATION_COMPONENT_REFERENCE` as
+`REVIEWER_CONFIRMED`** is allowed only for the specific "reviewer
+confirms a system-proposed selection" shape (e.g. confirming which of
+several candidate IID precedent records applies) — `reviewer_confirmed`
+here is a *confirmation of a reference*, not authorship of arbitrary
+narrative, and `reviewer_confirmation_required=True` is still mandatory
+per the existing rule.
+
+`**` **`EVIDENCE_ATTACHMENT_REFERENCE` as `USER_REQUIRED`** is allowed
+only when the question represents the user voluntarily supplying
+supporting evidence for their own answer, not a mandatory evidence-backed
+fact (that case is `EVIDENCE_DERIVED`, which forces
+`evidence_requirement=required`, §3d) — for `USER_REQUIRED`,
+`evidence_requirement` may be `optional`, never `required` (that
+combination is itself PROHIBITED and separately checked).
+
+**Non-negotiable floors, explicitly enforced regardless of what the
+matrix table alone might permit at a glance:**
+- `APPROVAL_METADATA` is **never** `USER_REQUIRED`, `FDA_DERIVED_DEFAULT`,
+  `SYSTEM_CALCULATED`, or `EVIDENCE_DERIVED` — only `REVIEWER_CONFIRMED`
+  (approval-adjacent metadata must always be a reviewer/approver action,
+  never something a tenant user, an FDA-data sync, or a formula can
+  author).
+- `REVIEWER_CONCLUSION` is **only** `REVIEWER_CONFIRMED` — never
+  system-generated, never user-authored as an ordinary answer.
+- `CALCULATED_VALUE`/`CALCULATED_STATUS` are **only**
+  `SYSTEM_CALCULATED` — never manually authored under any classification,
+  matching the design's existing "a calculation is never directly
+  hand-edited" rule (discovery §12).
+- `FDA_DERIVED_DEFAULT` questions must always resolve through a
+  controlled source binding (an actual FDA-governed lookup, per §4 of
+  the discovery document) — `FDA_DERIVED_DEFAULT` is therefore never
+  paired with `LONG_NARRATIVE`/`REVIEWER_CONCLUSION`/`APPROVAL_METADATA`/
+  `CALCULATED_VALUE`/`CALCULATED_STATUS`/`PERCENTAGE` (all of which would
+  let free narrative or an unbound value masquerade as an FDA fact
+  without real source provenance).
+- `USER_REQUIRED` is never `APPROVAL_METADATA`, `CALCULATED_VALUE`, or
+  `CALCULATED_STATUS` (already covered above, restated for emphasis since
+  this was the specific gap flagged by the review).
+
+Any `(answer_type, data_source_classification)` pair not explicitly
+`ALLOWED`/`CONDITIONALLY_ALLOWED` in the matrix above is `PROHIBITED` —
+the matrix is exhaustive and closed, not "everything not forbidden is
+permitted."
 
 ### 3e. `ApplicabilityRule`
 
@@ -475,9 +575,93 @@ the risk this codebase has consistently closed elsewhere. The minor
 storage cost of duplicate rows across versions is accepted deliberately
 in exchange for this guarantee.
 
-`condition_json` is validated against the schema in §7 at both
+`condition_json` is validated against the schema in §5 at both
 `clean()`-time and at `approve`/`activate` time (defense in depth, not a
 single check point) — never accepted as opaque JSON.
+
+### 3f. Code normalization (closes SR-03)
+
+**One authoritative normalization function**,
+`iig_checklist.codes.normalize_code(raw: str) -> str`, applied to every
+`code` field in this app — `ChecklistDefinition.code`,
+`ChecklistSection.code`, `ChecklistQuestion.code`, and
+`ApplicabilityRule.code` — before it is stored or checked for uniqueness.
+This was previously unspecified, leaving collision behavior to incidental
+database collation; it is fully specified here instead.
+
+**Grammar (the normalized, *stored* form):**
+```
+^[A-Z0-9][A-Z0-9_-]*$
+```
+
+**Normalization algorithm, applied in this exact order:**
+1. Strip leading/trailing whitespace.
+2. Collapse any run of internal whitespace to a single `_`.
+3. Uppercase the entire string (`str.upper()` — plain ASCII case
+   folding; **no locale-dependent case transformation** of any kind, so
+   behavior is identical regardless of server locale).
+4. Reject the value (raise a validation error, `CODE_BLANK`) if, after
+   steps 1–3, the result is empty.
+5. Reject the value (`CODE_INVALID_CHARACTERS`) if the result does not
+   match the grammar above — i.e. only `A`–`Z`, `0`–`9`, `_`, and `-` are
+   permitted, and the first character must be alphanumeric (never a
+   leading `_`/`-`). No other separator character is silently rewritten
+   into `_`/`-`; an unrecognized character is a hard rejection, not a
+   best-effort substitution.
+6. Reject the value (`CODE_TOO_LONG`) if the result exceeds the maximum
+   length for that field: **100 characters** for
+   `ChecklistDefinition.code`/`ChecklistSection.code`/
+   `ChecklistQuestion.code`, **100 characters** for
+   `ApplicabilityRule.code` (matching the `max_length=100` already
+   specified on each field in §3a/§3c/§3d/§3e).
+
+**Worked examples** (all four inputs below normalize to the identical
+stored value `IIG_ORAL`, and therefore **do** collide — this is the one
+explicit rule requested, chosen over silent case-sensitive collation,
+because two humans typing the "same" code in different case/spacing
+should not be able to accidentally create two distinct, confusable
+`code`s):
+- `"iig oral"` → `"IIG_ORAL"`
+- `"IIG_ORAL"` → `"IIG_ORAL"` (already normalized, unchanged)
+- `" iig_oral "` → `"IIG_ORAL"`
+- `"iig_oral"` → `"IIG_ORAL"`
+
+**Where normalization is applied (defense in depth, not a single check
+point):**
+- **Serializer layer:** every create/update serializer for the four
+  models calls `normalize_code()` on the incoming `code` field before
+  passing it to the model layer, so a `400` with a specific error code
+  (`CODE_BLANK`/`CODE_INVALID_CHARACTERS`/`CODE_TOO_LONG`) is returned
+  before any database round-trip.
+- **Model/service layer:** `clean()` on each of the four models
+  re-normalizes and re-validates independently (never trusts that the
+  serializer was the only caller — matching this codebase's consistent
+  "service layer re-validates, never trusts the API layer alone"
+  practice already established for e.g. `fda_data`'s transition
+  validation happening inside the view/service, not only in the
+  serializer).
+- **Database layer:** the `UniqueConstraint`s specified in §3a/§3c/§3d/
+  §3e are declared against the `code` **column as stored** — since the
+  column only ever holds already-normalized values (steps above), the
+  plain-`code`-column unique constraint is sufficient; **no reliance on
+  PostgreSQL collation settings** (e.g. `citext` or a case-insensitive
+  index) is used or needed, because normalization happens before storage,
+  not at query time.
+- **Display title is a separate field** (`title`/`question_text`, not
+  `code`) and is never normalized or subject to a uniqueness
+  constraint — a human-readable title may contain any casing/punctuation
+  the author chooses; only the machine-facing `code` identifier is
+  constrained.
+
+**Deterministic conflict response:** a normalized-`code` collision at
+create/update time returns a structured **409** (`DUPLICATE_CODE`), never
+a raw `IntegrityError`/500 — the same `select`-before-`insert` pattern
+used for version-number allocation (§6b) applies here: the serializer
+performs an explicit existence check for the normalized code within the
+appropriate scope before attempting the insert, and the `UniqueConstraint`
+remains the backstop against a race between that check and the insert
+(caught and converted to the same structured 409, never surfaced as a
+raw database exception).
 
 ---
 
@@ -519,6 +703,56 @@ correctly reflect a real `IIDPrecedentRecord`'s MDE presence) is a 4D-2/
 This registry is expected to grow in later stages; 4D-1 ships only the
 fields the paracetamol worked example needs, not a speculative complete
 set.
+
+### 4b. Field-registry version-bump behavior (closes SR-08)
+
+Previously unspecified: what happens to existing `ApplicabilityRule` rows
+when `FIELD_REGISTRY_VERSION` is bumped (e.g. a later stage adds new
+`ALLOWED_FIELDS` entries and increments the constant to `2`). Specified
+here in full:
+
+- `FIELD_REGISTRY_VERSION` (and, by extension, the specific
+  `allowed_field_registry_version` an `ApplicabilityRule` declares) is
+  **immutable once that rule is referenced by an `approved` or `active`
+  `ChecklistVersion`** — the same immutability boundary already applied
+  to every other field on an approved rule (§3e).
+- **A registry change is additive, versioned, and non-destructive:**
+  bumping `FIELD_REGISTRY_VERSION` to `2` creates a new registry version
+  (e.g. `ALLOWED_FIELDS_V2`, a superset or revision of `ALLOWED_FIELDS`)
+  in code; it never mutates the meaning of version `1` retroactively.
+- **Existing rules keep the registry version they were created
+  against.** A rule created with `allowed_field_registry_version=1`
+  remains validated against `ALLOWED_FIELDS` (v1) forever — it is never
+  automatically re-validated or silently reinterpreted against a newer
+  registry.
+- **New or edited (still-`draft`/`returned`) rules must target the
+  current, latest `FIELD_REGISTRY_VERSION`** — a rule cannot be newly
+  authored declaring an old registry version once a newer one exists
+  (the serializer rejects `allowed_field_registry_version` values other
+  than the current constant for any rule not yet `approved`).
+- **Historical validation remains possible against an old registry
+  version** — the field-registry module retains every past
+  `ALLOWED_FIELDS_V{n}` set (never deletes an old version's field list),
+  so a historical, already-approved rule can always be re-displayed/
+  re-validated against the exact registry it was authored under, for
+  reproducibility (discovery §18).
+- **A registry version may eventually be marked unsupported for new
+  activation** (e.g. after several stages have superseded it) — an
+  unsupported version's rules remain viewable, and any `ChecklistVersion`
+  that already reached `active` while referencing them is unaffected,
+  but a *new* `activate` attempt on a `ChecklistVersion` whose
+  applicability rules declare an unsupported registry version is
+  blocked with a structured 400 (`UNSUPPORTED_FIELD_REGISTRY_VERSION`) —
+  activation is the one point where registry-version support is
+  actively checked, not merely at rule-creation time.
+- **No automatic migration of stored `condition_json` ever occurs** — a
+  registry bump never rewrites, reinterprets, or mutates any existing
+  rule's stored condition tree. A registry change is treated as an
+  **advisory prompt for a human to review** whether existing checklist
+  content should be revised in a *new* `ChecklistVersion` (never a
+  trigger for the system to silently reinterpret old content) —
+  consistent with this specification's broader "no automatic
+  reassessment of approved governed content" principle (discovery §16).
 
 ---
 
@@ -605,6 +839,77 @@ entry, matching the design's precedent (an action attempted against a
 mapping/release/version in a terminal status raises a structured 400,
 never succeeds).
 
+### 6a. Approved lifecycle refinement from the Milestone 4D design (closes SR-01)
+
+**This table is a disclosed, approved refinement of
+[MILESTONE_4D_DISCOVERY.md](MILESTONE_4D_DISCOVERY.md) §1a, not an
+accidental deviation.** The approved design's own §1a table for
+`ChecklistDefinition` governance had 6 actions and no `RETURNED` status
+(`submit_review`/`approve`/`reject → retired`/`activate`/`supersede`/
+`retire`), deliberately mirroring `FDADataSourceRelease`'s leaner release-
+governance pattern. A first specification-review pass on this document
+correctly flagged that the table above — which adds a `return` action, a
+distinct `RETURNED` status, and a distinct terminal `REJECTED` status
+(rather than folding rejection into `retired`) — diverges from that
+approved table without saying so. That divergence is intentional and is
+now explicitly disclosed here, with the following rationale, matching
+exactly how §3a already discloses the `ChecklistDefinition`/
+`ChecklistVersion` split as a deliberate refinement rather than a silent
+change:
+
+- **`RETURNED` supports controlled correction and resubmission.**
+  Checklist-content authoring is inherently iterative — a reviewer
+  finding a fixable gap in a draft's sections/questions should be able to
+  send it back for correction without terminating the version outright.
+  This is the same reasoning `SubstanceSynonymMapping` already applies
+  (its richer `SubstanceMappingStatus` adds `under_review`/`returned`
+  specifically because ingredient-identity content review benefits from
+  a correction cycle) and the same reasoning `ChecklistExecution` itself
+  applies in the approved design (its own transition table, discovery
+  §8, includes `return`). Applying the same pattern to
+  `ChecklistVersion` content-governance is consistent with, not
+  contrary to, the design's own precedent elsewhere — the design
+  document's §1a simply modeled `ChecklistDefinition` on
+  `FDADataSourceRelease` instead of on the richer mapping/execution
+  pattern, and this specification corrects that choice for definition
+  governance specifically, since checklist authoring is much closer in
+  kind to iterative mapping/content review than to a one-shot data
+  import.
+- **`REJECTED` remains a distinct, genuinely terminal state** — separate
+  from `RETIRED`, which represents a version being withdrawn from future
+  use *after* having been in good standing (e.g. a `draft`, `approved`,
+  or previously-`active` version taken out of service), whereas
+  `REJECTED` represents a reviewer/approver's explicit determination that
+  this specific version's content should never proceed at all. Collapsing
+  both into `retired` (as the original design's leaner table did) loses
+  this distinction; keeping them separate matches how `fda_data` mapping
+  governance and `ChecklistExecution` both already keep `rejected` and
+  any withdrawal/supersession state distinct.
+- **Review provenance remains fully preserved** across a return/resubmit
+  cycle (§6's `RETURNED` behavior note below) — this refinement does not
+  weaken auditability, it strengthens it, since a resubmission cycle is
+  now representable at all (the original 6-action table had no way to
+  send a definition back for correction short of rejecting it outright
+  and starting over).
+- **Rejected versions cannot be resurrected** — `REJECTED` has no
+  outgoing transition, identical in spirit to `SubstanceSynonymMapping`'s
+  `REJECTED` being terminal. Correcting rejected content always means
+  authoring a **new** `ChecklistVersion` (a new `version_number` under
+  the same `ChecklistDefinition`, per §3b), never resubmitting or
+  reopening the rejected row.
+- **Returned versions may be edited and resubmitted** — per §6's
+  `RETURNED` behavior note, content is mutable while `returned`, exactly
+  as it is while `draft`.
+- **This aligns definition governance with existing mapping and
+  execution lifecycle patterns** rather than with the narrower release
+  pattern the original design borrowed from — a considered choice, made
+  explicit here rather than left as an unstated inconsistency.
+
+This refinement is recorded in the traceability table (§16, row SR-01)
+and in
+[MILESTONE_4D_1_SPEC_REMEDIATION.md](MILESTONE_4D_1_SPEC_REMEDIATION.md)
+as an approved specification correction, not merely noted in passing.
+
 **Enforcement, identical shape to `fda_data/mapping_transitions.py` +
 `_MappingActionViewBase`:**
 - One shared `_ChecklistVersionActionViewBase`, no per-action bespoke
@@ -647,14 +952,104 @@ record, never cleared), so the audit trail shows the full
 draft→submit→return→edit→resubmit cycle rather than losing the fact a
 return ever happened.
 
-**Concurrency:** the `unique_active_version_per_definition` constraint
-(§3b) is the backstop; `select_for_update()` on both the version being
-activated *and* the row query for "any other active version of this
-definition" inside the same transaction is the primary mechanism,
-mirroring the concurrent-approval test pattern already proven in
-`backend/fda_data/tests/test_mapping_lifecycle_transitions.py`'s
+**Concurrency (activation):** the `unique_active_version_per_definition`
+constraint (§3b) is the backstop; `select_for_update()` on both the
+version being activated *and* the row query for "any other active
+version of this definition" inside the same transaction is the primary
+mechanism, mirroring the concurrent-approval test pattern already proven
+in `backend/fda_data/tests/test_mapping_lifecycle_transitions.py`'s
 `TestConcurrentApproval` (real `threading.Thread` + separate `APIClient`
 connections, `pytest.mark.django_db(transaction=True)`).
+
+### 6b. Concurrent version-number allocation (closes SR-04)
+
+**This was unspecified in the first pass of this document and is a real
+class of defect this same codebase has already hit once** —
+`templates_registry`'s `_get_or_create_draft_version()` originally raced
+on `version_number` allocation under concurrent import, fixed in
+Milestone 3's own remediation (see
+`backend/templates_registry/importer.py`, and the regression test
+`TestConcurrentVersionAllocation` in
+`backend/templates_registry/tests/test_review_remediation.py`). The
+`POST /iig-checklists/definitions/{public_id}/versions/` endpoint
+(§8) must apply the identical fix from day one, not rediscover the bug:
+
+**Authoritative version-creation service, exact algorithm:**
+1. Open `transaction.atomic()`.
+2. `ChecklistDefinition.objects.select_for_update().get(public_id=…)` —
+   lock the **parent** definition row for the duration of the
+   transaction (the same row-to-lock choice `templates_registry`'s fix
+   uses: locking the parent, not the not-yet-existent child, is what
+   actually serializes concurrent allocation attempts).
+3. `ChecklistVersion.objects.filter(definition=definition
+   ).aggregate(Max("version_number"))` inside the same transaction (only
+   possible to run consistently because step 2 already holds the lock).
+4. `next_number = (max_version_number or 0) + 1`.
+5. Create the new `ChecklistVersion` with `version_number=next_number`,
+   `status=draft`.
+6. Commit — releasing the lock only once the new row exists, so a second
+   concurrent request blocks at step 2 until the first fully completes,
+   then computes its own `next_number` against the now-updated maximum.
+
+**Required API/model behavior:**
+- `version_number` is **never client-supplied** — the create-version
+  serializer does not expose `version_number` as a writable input field
+  at all (read-only in the response only); the service above is the sole
+  place it is computed.
+- The `unique_version_number_per_definition` constraint (§3b) remains
+  the database-level backstop, but because step 2's lock genuinely
+  serializes allocation, the constraint should never actually fire in
+  correct operation — it exists as defense in depth, not as the primary
+  mechanism, and never surfaces as a raw `IntegrityError`/500 to a
+  client: if the constraint is ever violated despite the lock (e.g. a
+  future code path that bypasses this service), the view catches the
+  resulting `IntegrityError` and returns a structured **409**
+  (`VERSION_ALLOCATION_CONFLICT`) — no code path returns a raw database
+  exception.
+- Two genuinely concurrent `POST .../versions/` requests against the
+  same definition must produce two distinct, sequential `version_number`
+  values (`1` and `2`, never both `1`) — never a silent overwrite of one
+  request's row by the other.
+- Audit event `iig_checklist.version.created` is emitted only after the
+  transaction in steps 1–6 commits successfully — never for a request
+  that lost the race and had to retry or was rejected.
+
+### 6c. Why `ChecklistVersion` has no distinct `REVIEW_COMPLETE` state (closes SR-07)
+
+An explicit decision, not an omission left unexplained. The discovery
+document (§8a) discusses and rejects a distinct `REVIEW_COMPLETE` state
+for `ChecklistExecution` on the grounds that it describes *readiness*
+rather than a governance-relevant transition. The same question, asked
+here for `ChecklistVersion` content-governance specifically:
+
+- Definition governance's `UNDER_REVIEW → APPROVED` is a single reviewer/
+  approver decision point: a `ChecklistVersion` is either judged ready to
+  approve, or it is `return`ed/`reject`ed. There is no intermediate
+  "review work is finished, but a separate approval act is still
+  pending" state that this governance actually needs to represent as its
+  own status — the reviewer and approver are already distinct actors via
+  permissions (`PERM_REVIEW` vs. `PERM_APPROVE`) and distinct provenance
+  fields (`reviewed_by`/`reviewed_at` vs. `approved_by`/`approved_at`,
+  §3b), so "who reviewed" and "who approved" are already separately
+  recorded without needing a state-machine node between them.
+- `ChecklistExecution`'s eventual lifecycle (a later 4D stage) may have a
+  materially different completeness picture — an execution's "review" can
+  involve per-question confirmations, overrides, and evidence, with
+  genuinely more granular sub-states of completeness than a content
+  version's binary "approve or don't." That richer surface is why the
+  discovery document's own reasoning for executions doesn't
+  automatically transfer to definitions — the two lifecycles are allowed
+  to differ in state-machine richness because they govern materially
+  different kinds of content.
+- Adding a `REVIEW_COMPLETE` state to `ChecklistVersion` here would
+  introduce state-machine complexity (a new status, new legal-transition
+  rows, new permission checks on the new transition) without a
+  corresponding controlled business event it would represent — exactly
+  the "complexity without governance benefit" standard this document
+  already applies when explicitly rejecting `DATA_ENTRY_COMPLETE`/
+  `CALCULATED` as formal states in favor of computed readiness flags
+  (a pattern this specification would otherwise be inconsistent with if
+  it added `REVIEW_COMPLETE` here without the same justification bar).
 
 ---
 
@@ -677,11 +1072,12 @@ PERM_ACTIVATE = "iig_checklist.activate"
 PERM_RETIRE = "iig_checklist.retire"
 PERM_CLONE = "iig_checklist.clone"
 PERM_VIEW_AUDIT = "iig_checklist.view_audit"
+PERM_DELETE_DRAFT = "iig_checklist.delete_draft"  # narrow, §8b -- distinct from edit_draft
 
 ROLE_PERMISSIONS = {
     Role.BuiltIn.DOER: [
         PERM_VIEW_DEFINITION, PERM_CREATE_DEFINITION, PERM_EDIT_DRAFT,
-        PERM_SUBMIT_REVIEW, PERM_CLONE,
+        PERM_SUBMIT_REVIEW, PERM_CLONE, PERM_DELETE_DRAFT,
     ],
     Role.BuiltIn.REVIEWER: [
         PERM_VIEW_DEFINITION, PERM_REVIEW, PERM_VIEW_AUDIT,
@@ -793,6 +1189,224 @@ request/response bodies use the field names given in §3 verbatim.
 }
 ```
 
+### 8a. Clone semantics (closes SR-02)
+
+`POST /iig-checklists/definitions/{public_id}/clone/` — exact request and
+response contract, previously underspecified.
+
+**Request body:**
+```json
+{
+  "source_version_public_id": "…",
+  "target_scope_type": "tenant",
+  "target_tenant_public_id": "…",
+  "new_code": "iig-oral-solid-v2-tenant-draft",
+  "new_title": "IIG Oral Solid (tenant working copy)",
+  "clone_sections": true,
+  "clone_questions": true,
+  "clone_applicability_rules": true,
+  "reason": "Starting point for a tenant-specific oral-solid checklist"
+}
+```
+
+- `source_version_public_id` (required): the specific `ChecklistVersion`
+  to clone from. **Must be `approved`, `active`, or `superseded`** — a
+  `draft`/`under_review`/`returned` version is never clonable (cloning an
+  unreviewed draft would let unreviewed content silently become the seed
+  of a new definition without ever itself having been reviewed).
+  `rejected`/`retired` versions are likewise not valid clone sources —
+  their content was specifically found unsuitable or withdrawn, and
+  reusing it as a starting point without that context is a governance
+  risk, not a convenience.
+- `target_scope_type` (required): `platform_master` or `tenant`.
+- `target_tenant_public_id` (required when `target_scope_type ==
+  "tenant"`, forbidden otherwise): the destination tenant.
+- `new_code` (required, always — never auto-generated or auto-suffixed):
+  the caller must supply an explicit code for the new definition,
+  normalized per §4b before the uniqueness check. Requiring an explicit
+  code (rather than silently deriving one, e.g.
+  `f"{source_code}_clone"`) avoids an implicit naming decision the
+  caller may not want and makes the clone's identity a deliberate choice,
+  not a side effect.
+- `new_title` (required): likewise never derived automatically.
+- `clone_sections`/`clone_questions`/`clone_applicability_rules`
+  (booleans, default `true`): when `false`, the new definition/version is
+  created as an **empty shell** (no sections/questions copied) — useful
+  when only the definition's identity/scope is wanted as a starting
+  point, not its content. `clone_questions: false` with
+  `clone_sections: true` copies section structure without question
+  content. `clone_applicability_rules` is independent of the other two:
+  when `true`, any `ApplicabilityRule` referenced by a copied section/
+  question is itself cloned (new `ApplicabilityRule` row, `version=1`,
+  same `condition_json`) rather than the new question referencing the
+  original rule row — consistent with §3e's "rules are cloned, not
+  globally shared and mutable."
+
+**Behavior:**
+- Creates exactly one new `ChecklistDefinition` (scope/tenant per the
+  request) and exactly one new `ChecklistVersion` on it, always
+  `version_number=1`, always `status=draft` — **cloning never produces
+  `approved` or `active` content**, regardless of the source version's
+  own status. A clone is always a fresh starting point requiring its own
+  full review cycle.
+- When `clone_sections`/`clone_questions`/`clone_applicability_rules` are
+  `true`, every copied `ChecklistSection`/`ChecklistQuestion`/
+  `ApplicabilityRule` row receives a **new `public_id`** (never reuses
+  the source row's `public_id`) and is attached to the new
+  `ChecklistVersion` — the source rows are completely unchanged (read-
+  only source, matching the design's "correction never mutates existing
+  approved content" principle).
+- **No provenance is copied**: the new `ChecklistVersion`'s
+  `submitted_by`/`reviewed_by`/`approved_by`/`activated_by`/`returned_by`/
+  `rejected_by`/`retired_by` and their timestamps are all `NULL` — this
+  is a brand-new draft with its own review history starting from zero,
+  never inheriting the source's approval chain.
+- **No `superseded_by`/active-version pointer is copied** — the new
+  version is not linked to the source definition's active-version state
+  in any way; it belongs to an entirely separate `ChecklistDefinition`.
+- **No `AuditEvent`/history rows are copied** — only a single new
+  `iig_checklist.definition.cloned` event is emitted (§10), referencing
+  both the source and destination public IDs plus `reason`; the source
+  definition's own audit history is untouched and not duplicated onto
+  the clone.
+- **Authorization:** cloning **to** a `tenant` scope requires the acting
+  user to hold `iig_checklist.clone` within that target tenant (checked
+  against `target_tenant_public_id`, not the source's tenant).
+  Platform-master → tenant cloning is permitted only when the actor
+  additionally holds a platform-level grant (the same "platform-level,
+  not tenant-membership-derived" check already specified in §7 for
+  platform-master content) — **not** implied merely by holding
+  `iig_checklist.clone` in some tenant. Tenant-to-*another*-tenant
+  cloning (source tenant ≠ destination tenant) is **prohibited** unless
+  the actor separately holds a platform-level cross-tenant grant — by
+  default, a tenant user may only clone platform-master content or their
+  own tenant's content into their own tenant, never reach into another
+  tenant's definitions.
+- **Conflict handling:** if `new_code` (post-normalization, §4b) already
+  exists in the target scope, the endpoint returns a structured **409**
+  (`DUPLICATE_CODE`), never a raw `IntegrityError`/500.
+- **Atomicity:** the entire clone (new definition + new version + all
+  copied sections/questions/rules) is created inside one
+  `transaction.atomic()` block. Any failure partway through (including
+  the 409 case above, checked before the transaction commits) rolls back
+  the whole operation — never a partially-created definition with some
+  but not all sections copied.
+
+**Response** (`201`):
+```json
+{
+  "public_id": "…",
+  "code": "iig-oral-solid-v2-tenant-draft",
+  "title": "IIG Oral Solid (tenant working copy)",
+  "scope_type": "tenant",
+  "tenant_public_id": "…",
+  "current_version": {
+    "public_id": "…",
+    "version_number": 1,
+    "status": "draft",
+    "cloned_from_version_public_id": "…"
+  }
+}
+```
+
+`cloned_from_version_public_id` is retained on the response (and stored
+as a plain, non-FK `CharField`/`UUIDField` reference on `ChecklistVersion`
+for audit-trail readability only — not a foreign key, so deleting or
+retiring the source version years later can never cascade into or block
+operations on the clone) so a reviewer of the new draft can see what it
+originated from without that link constituting shared, mutable state.
+
+### 8b. Deletion policy (closes SR-06)
+
+Previously implicit (via the `PROTECT` choices in §3) rather than stated
+as a deliberate boundary. Stated explicitly here:
+
+- **`ChecklistDefinition` is never hard-deleted once any `ChecklistVersion`
+  exists on it.** No `DELETE /iig-checklists/definitions/{public_id}/`
+  endpoint exists (§8's endpoint list has none, by design, confirmed
+  here rather than left as a silent omission).
+- **`ChecklistVersion` is never hard-deleted**, in any status. `approved`/
+  `active`/`rejected`/`superseded`/`retired` versions are retained
+  permanently (matching the design's reproducibility guarantee,
+  discovery §18) — a version that reaches any of these statuses is
+  governed history, not disposable data.
+- **Sections/questions/rules belonging to a version that has ever been
+  `submitted_review`d or later are likewise retained permanently** — the
+  `DELETE` endpoints on `ChecklistSection`/`ChecklistQuestion` (§8) only
+  succeed while the parent `ChecklistVersion.status` is `draft` or
+  `returned` (already the same gate as the "editable while
+  draft/returned" rule elsewhere in this document — restated here as a
+  deletion-specific rule, not merely inferred from the edit-window rule).
+- **One explicit, tightly-scoped exception:** an empty, never-submitted
+  `ChecklistDefinition` may be hard-deleted (via a dedicated
+  `DELETE /iig-checklists/definitions/{public_id}/` — the endpoint list
+  in §8 is amended to add this one narrow case), **only when all of the
+  following hold simultaneously**:
+  1. The definition has **exactly one** `ChecklistVersion`.
+  2. That version's `status == draft` and `submitted_at IS NULL` (i.e.
+     it has never once been submitted for review, even if since
+     returned to draft by some other path — though note nothing in this
+     specification's transition table, §6, allows reaching `draft` from
+     anywhere except initial creation, so in practice this reduces to
+     "the definition's only version is its original, never-submitted
+     draft").
+  3. That version has no `ChecklistSection`/`ChecklistQuestion`/
+     `ApplicabilityRule` rows referencing it that themselves have any
+     audit-relevant history (in 4D-1, since sections/questions/rules are
+     only ever created after the version, this reduces in practice to
+     "the version may have sections/questions, since none of them can
+     have audit-relevant history independent of a still-`draft`,
+     never-submitted parent").
+  4. The acting user holds a dedicated `iig_checklist.delete_draft`
+     permission (a Doer-level grant, distinct from `edit_draft` — narrow
+     enough that granting ordinary draft-editing access does not also
+     grant deletion).
+  - This delete **cascades** the definition's single version and its
+    sections/questions/rules (a true `CASCADE`, not `PROTECT`, is used
+    **only** for this specific in-practice-unreachable-any-other-way
+    parent/child relationship — since nothing governed can exist here by
+    construction of conditions 1–3).
+  - The deletion is audited (`iig_checklist.definition.deleted` — a new
+    event added to §10's list) with the definition's `code`/`scope_type`/
+    actor, since even a permitted deletion of ungoverned content should
+    leave a trace of *that it happened*.
+  - **Everything else — an abandoned definition with more than one
+    version, or any version beyond the first that has ever been
+    submitted — is never deleted, only retired** (`retire` action, §6),
+    which is the correct way to withdraw an unwanted definition/version
+    from future use while preserving its history.
+
+### 8c. API error semantics
+
+A structured, consistent HTTP-status/error-code contract across every
+endpoint in this app — no raw database exception or unhandled Python
+exception ever reaches a client:
+
+| Status | Used for |
+|---|---|
+| `400` | Field-level validation errors; illegal lifecycle transition (`IllegalVersionTransition`, §6); malformed `condition_json` (any of §5's error codes); `UNSUPPORTED_FIELD_REGISTRY_VERSION` (§4b) at `activate` time. |
+| `403` | Permission denied — the acting user lacks the required `PERM_*` for the action, or fails the self-approval/scope check (§6/§7). |
+| `404` | The requested `public_id` does not exist, or exists but is not visible to the acting user's tenant/scope (generic — never distinguishes "doesn't exist" from "exists but you can't see it," matching every other API in this codebase). |
+| `409` | `DUPLICATE_CODE` (normalized-code collision, §3f, §8a); `VERSION_ALLOCATION_CONFLICT` (§6b, defense-in-depth only — should not occur in correct operation); `unique_active_version_per_definition` conflict surfaced as a structured conflict rather than a raw constraint-violation message (§6); a stale-data conflict on `PATCH` (see below). |
+
+Every `400`/`409` response body carries a machine-readable `error_code`
+field (one of the specific codes named throughout this document —
+`CODE_BLANK`, `CODE_INVALID_CHARACTERS`, `CODE_TOO_LONG`,
+`DUPLICATE_CODE`, `VERSION_ALLOCATION_CONFLICT`,
+`UNSUPPORTED_FIELD_REGISTRY_VERSION`, plus §5's ten applicability-rule
+error codes) alongside a human-readable message — never a bare message
+string alone, so a frontend can branch on the exact failure without
+string-matching.
+
+**Stale-data/concurrency conflicts on `PATCH`** (editing a
+section/question while another actor has concurrently changed the parent
+version's status, e.g. it was `submit_review`d by someone else between
+the frontend loading the edit form and the `PATCH` being sent): the
+serializer re-checks `ChecklistVersion.status` is still `draft`/
+`returned` at write time (not just at page-load time) and returns `409`
+(`VERSION_NO_LONGER_EDITABLE`) rather than silently succeeding against a
+version that has since moved to `under_review` or beyond.
+
 ---
 
 ## 9. Frontend specification
@@ -846,6 +1460,7 @@ authoring/governance only, matching the backend scope split in §1.
 class IigChecklistEvent:
     DEFINITION_CREATED = "iig_checklist.definition.created"
     DEFINITION_CLONED = "iig_checklist.definition.cloned"
+    DEFINITION_DELETED = "iig_checklist.definition.deleted"  # §8b's narrow empty-draft case only
     VERSION_CREATED = "iig_checklist.version.created"
     VERSION_UPDATED = "iig_checklist.version.updated"
     VERSION_SUBMITTED = "iig_checklist.version.submitted_for_review"
@@ -959,6 +1574,91 @@ condition value containing Python syntax, asserting it is treated as an
 inert string/rejected as a type mismatch, never executed — matching this
 codebase's existing planted-failure test convention).
 
+**Lifecycle refinement (§6a, SR-01):** `return` from `under_review`
+succeeds and sets `returned_by`/`returned_at`/`return_reason`; content is
+editable while `returned`; a direct `approve` attempt against a
+`returned` version is illegal (400) — it must go through `submit_review`
+again first; `resubmit` (i.e. `submit_review` from `returned`) sets a new
+`submitted_at`/`submitted_by` while the prior `returned_by`/`returned_at`/
+`return_reason` remain unchanged in the row (asserted explicitly, not
+merely not-cleared); `reject` is terminal — no action succeeds against a
+`rejected` version, including a second `reject` call; a rejected
+version cannot be resubmitted, approved, activated, or edited under any
+permission.
+
+**Clone (§8a, SR-02):** cloning a specified `source_version_public_id`
+produces a new `ChecklistDefinition` + a `version_number=1` `draft`
+`ChecklistVersion`; cloning an `under_review`/`draft`/`returned`/
+`rejected`/`retired` source version is rejected (400); copied section/
+question/rule rows have `public_id`s distinct from the source's; no
+`submitted_by`/`reviewed_by`/`approved_by`/etc. provenance is copied
+(all `NULL` on the clone); a cross-tenant clone (destination tenant ≠
+actor's tenant, without a platform-level grant) is blocked (403); a
+platform-master → tenant clone without the platform-level grant is
+blocked (403); a duplicate `new_code` (post-normalization) returns 409
+(`DUPLICATE_CODE`); a clone that fails partway through (e.g. the 409
+case) leaves no partially-created definition/version/section rows behind
+(atomic rollback, asserted by querying for orphaned rows after the
+failed attempt).
+
+**Code normalization (§3f, SR-03):** `"iig oral"`, `"IIG_ORAL"`,
+`" iig_oral "`, and `"iig_oral"` all normalize to the identical stored
+value and therefore collide (the second creation attempt with any of
+these four inputs returns 409 `DUPLICATE_CODE` after the first
+succeeds); an invalid character (e.g. `"iig.oral"`, `"iig#oral"`) is
+rejected with `CODE_INVALID_CHARACTERS`; a blank/whitespace-only code is
+rejected with `CODE_BLANK`; a code exceeding 100 characters is rejected
+with `CODE_TOO_LONG`; the stored value in the database is confirmed to
+be the normalized (uppercase, whitespace-collapsed) form, not the raw
+input, for all four code-bearing models.
+
+**Concurrent version-number allocation (§6b, SR-04):** two genuinely
+concurrent `POST .../versions/` requests against the same definition
+(real `threading.Thread` + separate `APIClient`/DB connections,
+`pytest.mark.django_db(transaction=True)`, mirroring
+`TestConcurrentVersionAllocation` from
+`templates_registry/tests/test_review_remediation.py`) produce exactly
+two versions numbered `1` and `2` — never a duplicate, never a raw
+`IntegrityError` surfaced to either caller; `version_number` is confirmed
+absent from the create-version request schema (supplying it in the
+request body has no effect on the stored value); an audit event is
+emitted only for the version that successfully persists, once per
+successful creation.
+
+**Answer-type/classification compatibility matrix (§3d-i, SR-05):** a
+single parametrized test exercises **every** `(answer_type,
+data_source_classification)` pair against the matrix table, asserting
+`ALLOWED`/`CONDITIONALLY_ALLOWED` pairs succeed and every other pair is
+rejected with a structured 400; specific floor assertions:
+`APPROVAL_METADATA` can never be created with
+`data_source_classification` other than `REVIEWER_CONFIRMED`;
+`CALCULATED_VALUE`/`CALCULATED_STATUS` can never be created with
+anything other than `SYSTEM_CALCULATED`; `EVIDENCE_DERIVED` always
+requires `evidence_requirement=required`; `REVIEWER_CONFIRMED` always
+requires `reviewer_confirmation_required=True`.
+
+**Deletion policy (§8b, SR-06):** a `ChecklistDefinition` with more than
+one version cannot be deleted (404/405 on the delete endpoint, or the
+endpoint simply does not exist for that case — confirmed by attempting
+it and asserting failure); a definition whose single version has ever
+been `submitted_review`d cannot be deleted; the one permitted case
+(single, never-submitted `draft` version, actor holds
+`PERM_DELETE_DRAFT`) succeeds and cascades its section/question/rule
+rows; the deletion emits `iig_checklist.definition.deleted`; an actor
+holding only `PERM_EDIT_DRAFT` (not `PERM_DELETE_DRAFT`) is blocked
+(403) from the same otherwise-eligible deletion.
+
+**Field-registry versioning (§4b, SR-08):** a rule created against
+`allowed_field_registry_version=1` remains valid and reproducible after
+`FIELD_REGISTRY_VERSION` is (in the test, monkeypatched/fixture-bumped
+to) `2`; a newly-created rule is rejected if it declares an
+`allowed_field_registry_version` other than the current constant; an
+`activate` attempt on a version whose applicability rules reference an
+explicitly-unsupported registry version is blocked (400
+`UNSUPPORTED_FIELD_REGISTRY_VERSION`); an already-`approved`/`active`
+rule's `allowed_field_registry_version` and `condition_json` are
+confirmed unchanged after a registry bump (no silent mutation).
+
 **API:** UUID-only in every response (numeric `id`/`pk` never present,
 asserted the same way `test_proposal_public_uuid_only` already asserts
 this for `fda_data`); generic 404 for a wrong-tenant or wrong-scope
@@ -969,7 +1669,11 @@ pagination and filter bounds; mass-assignment protection (a `PATCH`
 request smuggling a `status` field is silently ignored, matching
 `test_status_cannot_be_supplied_as_approved`'s pattern from Milestone
 4A–4C); a direct `activate`/`approve` call against a non-legal source
-status returns 400, not a 500 or a silent no-op.
+status returns 400, not a 500 or a silent no-op; every `400`/`409`
+response body carries the specific `error_code` named in §8c, asserted
+exactly (not just the HTTP status); a stale `PATCH` against a version
+that moved to `under_review` between page-load and submission returns
+409 `VERSION_NO_LONGER_EDITABLE`.
 
 **Audit:** every lifecycle action emits its corresponding event; an
 illegal transition emits **no** audit event (explicitly asserted absent,
@@ -1104,16 +1808,32 @@ own existence as a reviewable artifact.
 | Controlled-deferral resolution of checklist-template content (discovery, resolved open question 4) | Only synthetic definitions used anywhere in this stage | §1, §12, §14 | No privileged "seed real content" path exists | Acceptance criterion explicitly checked, §14 | Real regulatory content: a separate regulatory-content approval gate, before 4D-4 |
 | No Part 11 e-signature claim (discovery §16 additional decisions) | `approved_by`/`approved_at` etc. are standard authenticated-action logging, nothing more | §3b | — | — | — |
 | Reviewer/approver provenance never overwritten (HR-03 lesson, carried into discovery §8) | Six distinct provenance field-pairs on `ChecklistVersion` | §3b | Each field set only by its own action | Provenance tests §12 | — |
+| **SR-01** — Lifecycle refinement (`RETURNED`/`return`/`resubmit`, distinct terminal `REJECTED`) disclosed and approved, diverging intentionally from discovery §1a's leaner 6-action table | 7-action `ChecklistVersion` transition table | §6, §6a | Self-approval block, Doer-cannot-approve, structured 400, no audit-on-failure — all unchanged from the base pattern | Lifecycle-refinement tests §12 | — |
+| **SR-02** — Clone semantics fully specified (source-version eligibility, no provenance copy, new UUIDs, atomicity, cross-tenant/platform authorization, 409 on duplicate code) | `clone` endpoint exact contract | §8a | Atomic transaction, authorization checks, no privileged pre-approved output | Clone tests §12 | — |
+| **SR-03** — Code normalization (case/whitespace canonicalization, fixed grammar, deterministic 409) | `normalize_code()`, applied at serializer/model/DB layers | §3f | No reliance on DB collation; explicit collision rule | Normalization tests §12 | — |
+| **SR-04** — Concurrent version-number allocation (`select_for_update()` on parent, citing the `templates_registry` precedent) | Version-creation service | §6b | Row lock serializes allocation; 409 backstop, never a raw 500 | Concurrency test §12 | — |
+| **SR-05** — Answer-type × classification compatibility matrix (all 90 combinations classified, central registry) | `ANSWER_TYPE_CLASSIFICATION_MATRIX` | §3d-i | `APPROVAL_METADATA`/`CALCULATED_VALUE`/`CALCULATED_STATUS` floors enforced | Matrix-parametrized test §12 | — |
+| **SR-06** — Explicit deletion policy (no hard-delete of governed content; one narrow, permissioned empty-draft exception) | Deletion rules + `PERM_DELETE_DRAFT` | §8b, §7 | `PROTECT` by default; `CASCADE` only for the in-practice-unreachable-otherwise empty-draft case | Deletion tests §12 | — |
+| **SR-07** — Explicit decision: no `REVIEW_COMPLETE` state for `ChecklistVersion` | Design-decision note | §6c | N/A (a documented non-change) | N/A | — |
+| **SR-08** — Field-registry version-bump behavior (immutable per-rule version, additive registry growth, no auto-migration) | `FIELD_REGISTRY_VERSION` handling | §4b | Activation-time support check (`UNSUPPORTED_FIELD_REGISTRY_VERSION`) | Field-registry tests §12 | — |
+
+Full finding-by-finding traceability for SR-01 through SR-08, including
+original gap/severity/decision/correction/test-impact/closure status, is
+recorded separately in
+[MILESTONE_4D_1_SPEC_REMEDIATION.md](MILESTONE_4D_1_SPEC_REMEDIATION.md).
 
 ---
 
 ## 17. Self-review
 
 - No code, migration, workflow, or Docker file is added by this
-  specification — only `docs/MILESTONE_4D_1_IMPLEMENTATION_SPEC.md`.
+  specification — only `docs/MILESTONE_4D_1_IMPLEMENTATION_SPEC.md` and
+  `docs/MILESTONE_4D_1_SPEC_REMEDIATION.md`.
+- All 4 Critical/Major findings and all 3 Minor findings from the first
+  specification-review pass are closed (SR-01 through SR-08, §16).
 - No implementation branch is created beyond
   `regx/spec/milestone-4d-1-definition-governance`, which itself carries
-  only this one documentation file.
+  only these two documentation files.
 - Naming matches current repository conventions throughout: `PublicIDModel`/
   `TimeStampedModel` from `common.models`; `BigAutoField` internal PKs;
   `TextChoices` enums; `emit()`/event-constant-class pattern from
