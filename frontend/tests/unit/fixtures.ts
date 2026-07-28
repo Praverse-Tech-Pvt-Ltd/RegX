@@ -3,6 +3,9 @@ import type {
   AffectedRecord,
   AssessmentPreview,
   AssessmentSnapshotDetail,
+  ChecklistDefinition,
+  ChecklistSection,
+  ChecklistVersion,
   Document,
   DocumentLocator,
   DocumentVersion,
@@ -381,6 +384,63 @@ export function makeSnapshotDetail(
     override_applied: false,
     override_justification: "",
     final_conclusion: "",
+    created_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+export function makeChecklistDefinition(
+  overrides: Partial<ChecklistDefinition> = {},
+): ChecklistDefinition {
+  return {
+    public_id: "checklist-def-public-0001",
+    code: "IIG-ORAL-SOLID",
+    title: "IIG Oral Solid (synthetic)",
+    description: "",
+    scope_type: "tenant",
+    tenant_public_id: "tenant-public-0001",
+    created_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+export function makeChecklistSection(
+  overrides: Partial<ChecklistSection> = {},
+): ChecklistSection {
+  return {
+    public_id: "checklist-section-public-0001",
+    code: "SEC-1",
+    title: "Section 1",
+    description: "",
+    display_order: 1,
+    criticality: "medium",
+    questions: [],
+    ...overrides,
+  };
+}
+
+export function makeChecklistVersion(
+  overrides: Partial<ChecklistVersion> = {},
+): ChecklistVersion {
+  return {
+    public_id: "checklist-version-public-0001",
+    definition_public_id: "checklist-def-public-0001",
+    version_number: 1,
+    status: "draft",
+    effective_date: null,
+    expiry_date: null,
+    regulatory_basis: "",
+    change_summary: "",
+    cloned_from_version_public_id: null,
+    return_reason: "",
+    submitted_by_email: null,
+    reviewed_by_email: null,
+    approved_by_email: null,
+    activated_by_email: null,
+    returned_at: null,
+    rejected_at: null,
+    retired_at: null,
+    sections: [],
     created_at: "2026-01-01T00:00:00Z",
     ...overrides,
   };
