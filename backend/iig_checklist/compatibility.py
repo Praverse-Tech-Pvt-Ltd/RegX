@@ -7,17 +7,15 @@ pair not present in ALLOWED_MATRIX is PROHIBITED; the matrix is
 exhaustive and closed.
 """
 
-from .enums import AnswerType as AT
-from .enums import DataSourceClassification as DSC
+from .enums import AnswerType as AT  # noqa: N817
+from .enums import DataSourceClassification as DSC  # noqa: N817
 
 # {answer_type: {allowed classifications}}
 ALLOWED_MATRIX: dict[str, frozenset[str]] = {
     AT.SHORT_TEXT: frozenset(
         {DSC.FDA_DERIVED_DEFAULT, DSC.USER_REQUIRED, DSC.REVIEWER_CONFIRMED, DSC.EVIDENCE_DERIVED}
     ),
-    AT.LONG_NARRATIVE: frozenset(
-        {DSC.USER_REQUIRED, DSC.REVIEWER_CONFIRMED, DSC.EVIDENCE_DERIVED}
-    ),
+    AT.LONG_NARRATIVE: frozenset({DSC.USER_REQUIRED, DSC.REVIEWER_CONFIRMED, DSC.EVIDENCE_DERIVED}),
     AT.INTEGER: frozenset({DSC.FDA_DERIVED_DEFAULT, DSC.USER_REQUIRED, DSC.EVIDENCE_DERIVED}),
     AT.DECIMAL: frozenset({DSC.FDA_DERIVED_DEFAULT, DSC.USER_REQUIRED, DSC.EVIDENCE_DERIVED}),
     AT.QUANTITY_WITH_UNIT: frozenset(
@@ -36,9 +34,7 @@ ALLOWED_MATRIX: dict[str, frozenset[str]] = {
         {DSC.FDA_DERIVED_DEFAULT, DSC.USER_REQUIRED, DSC.REVIEWER_CONFIRMED}
     ),
     AT.FDA_RECORD_REFERENCE: frozenset({DSC.FDA_DERIVED_DEFAULT, DSC.REVIEWER_CONFIRMED}),
-    AT.FORMULATION_COMPONENT_REFERENCE: frozenset(
-        {DSC.USER_REQUIRED, DSC.REVIEWER_CONFIRMED}
-    ),
+    AT.FORMULATION_COMPONENT_REFERENCE: frozenset({DSC.USER_REQUIRED, DSC.REVIEWER_CONFIRMED}),
     AT.EVIDENCE_ATTACHMENT_REFERENCE: frozenset({DSC.USER_REQUIRED, DSC.EVIDENCE_DERIVED}),
     AT.CALCULATED_VALUE: frozenset({DSC.SYSTEM_CALCULATED}),
     AT.CALCULATED_STATUS: frozenset({DSC.SYSTEM_CALCULATED}),

@@ -16,7 +16,9 @@ MAX_RECURSION_DEPTH = 5
 MAX_CONDITION_COUNT = 50
 MAX_PAYLOAD_BYTES = 8 * 1024
 
-LEAF_OPERATORS = frozenset({"eq", "neq", "in", "not_in", "exists", "not_exists", "gt", "gte", "lt", "lte"})
+LEAF_OPERATORS = frozenset(
+    {"eq", "neq", "in", "not_in", "exists", "not_exists", "gt", "gte", "lt", "lte"}
+)
 COMPOSITE_OPERATORS = frozenset({"all", "any"})
 _NO_VALUE_OPERATORS = frozenset({"exists", "not_exists"})
 _ARRAY_VALUE_OPERATORS = frozenset({"in", "not_in"})
@@ -44,7 +46,8 @@ def _validate_node(node, allowed_fields: frozenset[str], depth: int, counter: li
     if "operator" in node and "conditions" in node:
         # Composite node.
         if keys - {"operator", "conditions"}:
-            _err("UNKNOWN_KEY", f"Unexpected keys on composite node: {keys - {'operator', 'conditions'}}")
+            extra = keys - {"operator", "conditions"}
+            _err("UNKNOWN_KEY", f"Unexpected keys on composite node: {extra}")
         op = node["operator"]
         if op not in COMPOSITE_OPERATORS:
             _err("UNKNOWN_OPERATOR", f"Unknown composite operator: {op!r}")
@@ -85,14 +88,17 @@ def _validate_node(node, allowed_fields: frozenset[str], depth: int, counter: li
             if not isinstance(value, list):
                 _err("TYPE_MISMATCH", f"Operator {op!r} requires an array 'value'.")
         elif op in _NUMERIC_VALUE_OPERATORS:
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
+            if isinstance(value, bool) or not isinstance(value, int | float):
                 _err("TYPE_MISMATCH", f"Operator {op!r} requires a numeric 'value'.")
         else:  # eq / neq
-            if not isinstance(value, (str, int, float, bool)):
+            if not isinstance(value, str | int | float | bool):
                 _err("TYPE_MISMATCH", f"Operator {op!r} requires a scalar 'value'.")
         return
 
-    _err("MALFORMED_JSON", "Node must be either a composite ({operator, conditions}) or a leaf ({field, op, value?}).")
+    _err(
+        "MALFORMED_JSON",
+        "Node must be either a composite ({operator, conditions}) or a leaf ({field, op, value?}).",
+    )
 
 
 def validate_condition_json(condition_json, field_registry_version: int) -> None:

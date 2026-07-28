@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from tenancy.context import TenantScopeMissing, current_tenant
 
 from .audit import IigChecklistEvent, emit
-from .codes import CodeValidationError, normalize_code
+from .codes import CodeValidationError
 from .enums import ChecklistVersionStatus
 from .models import (
     ApplicabilityRule,
@@ -35,8 +35,8 @@ from .permissions import (
     CanCreateChecklistDefinition,
     CanDeleteChecklistDraft,
     CanEditChecklistDraft,
-    CanReviewChecklist,
     CanRetireChecklist,
+    CanReviewChecklist,
     CanSubmitChecklistReview,
     CanViewChecklistDefinition,
 )
@@ -92,8 +92,10 @@ def _get_definition_or_404(public_id, tenant):
 
 def _get_version_or_404(public_id, tenant):
     try:
-        return ChecklistVersion.objects.visible_to(tenant).select_related("definition").get(
-            public_id=public_id
+        return (
+            ChecklistVersion.objects.visible_to(tenant)
+            .select_related("definition")
+            .get(public_id=public_id)
         )
     except ChecklistVersion.DoesNotExist as exc:
         raise NotFound("Checklist version not found.") from exc
@@ -101,18 +103,22 @@ def _get_version_or_404(public_id, tenant):
 
 def _get_section_or_404(public_id, tenant):
     try:
-        return ChecklistSection.objects.visible_to(tenant).select_related(
-            "checklist_version__definition"
-        ).get(public_id=public_id)
+        return (
+            ChecklistSection.objects.visible_to(tenant)
+            .select_related("checklist_version__definition")
+            .get(public_id=public_id)
+        )
     except ChecklistSection.DoesNotExist as exc:
         raise NotFound("Checklist section not found.") from exc
 
 
 def _get_question_or_404(public_id, tenant):
     try:
-        return ChecklistQuestion.objects.visible_to(tenant).select_related(
-            "section__checklist_version__definition"
-        ).get(public_id=public_id)
+        return (
+            ChecklistQuestion.objects.visible_to(tenant)
+            .select_related("section__checklist_version__definition")
+            .get(public_id=public_id)
+        )
     except ChecklistQuestion.DoesNotExist as exc:
         raise NotFound("Checklist question not found.") from exc
 
@@ -146,9 +152,7 @@ class ChecklistDefinitionListCreateView(APIView):
             queryset = queryset.filter(code__icontains=code)
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)
-        return paginator.get_paginated_response(
-            ChecklistDefinitionSerializer(page, many=True).data
-        )
+        return paginator.get_paginated_response(ChecklistDefinitionSerializer(page, many=True).data)
 
     def post(self, request):
         tenant = _require_tenant()
@@ -212,9 +216,7 @@ class ChecklistDefinitionDetailView(APIView):
             )
             versions = list(definition.versions.all())
             if len(versions) != 1:
-                raise ValidationError(
-                    "Only a definition with exactly one version may be deleted."
-                )
+                raise ValidationError("Only a definition with exactly one version may be deleted.")
             version = versions[0]
             if version.status != ChecklistVersionStatus.DRAFT or version.submitted_at is not None:
                 raise ValidationError(
@@ -341,9 +343,7 @@ class ChecklistVersionCreateView(APIView):
         queryset = definition.versions.order_by("-version_number")
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(queryset, request)
-        return paginator.get_paginated_response(
-            ChecklistVersionSerializer(page, many=True).data
-        )
+        return paginator.get_paginated_response(ChecklistVersionSerializer(page, many=True).data)
 
     def post(self, request, public_id):
         tenant = _require_tenant()
@@ -368,9 +368,10 @@ class ChecklistVersionDetailView(APIView):
         version = _get_version_or_404(public_id, tenant)
         data = ChecklistVersionSerializer(version).data
         data["sections"] = [
-            {**ChecklistSectionSerializer(section).data, "questions": [
-                ChecklistQuestionSerializer(q).data for q in section.questions.all()
-            ]}
+            {
+                **ChecklistSectionSerializer(section).data,
+                "questions": [ChecklistQuestionSerializer(q).data for q in section.questions.all()],
+            }
             for section in version.sections.all()
         ]
         return Response(data)
@@ -444,7 +445,10 @@ class _ChecklistVersionActionViewBase(APIView):
             if self.action == VersionAction.ACTIVATE:
                 other_active = (
                     ChecklistVersion.objects.select_for_update()
-                    .filter(definition_id=version.definition_id, status=ChecklistVersionStatus.ACTIVE)
+                    .filter(
+                        definition_id=version.definition_id,
+                        status=ChecklistVersionStatus.ACTIVE,
+                    )
                     .exclude(pk=version.pk)
                 )
                 for prior_active in other_active:
@@ -459,13 +463,8 @@ class _ChecklistVersionActionViewBase(APIView):
                         payload={"superseded_by": str(version.public_id)},
                     )
 
-            if (
-                self.self_approval_forbidden
-                and version.submitted_by_id == request.user.id
-            ):
-                raise ValidationError(
-                    "A user cannot approve a version they submitted for review."
-                )
+            if self.self_approval_forbidden and version.submitted_by_id == request.user.id:
+                raise ValidationError("A user cannot approve a version they submitted for review.")
 
             now = timezone.now()
             if self.action == VersionAction.SUBMIT_REVIEW:
@@ -569,9 +568,7 @@ class ChecklistSectionListCreateView(APIView):
     def get(self, request, public_id):
         tenant = _require_tenant()
         version = _get_version_or_404(public_id, tenant)
-        return Response(
-            ChecklistSectionSerializer(version.sections.all(), many=True).data
-        )
+        return Response(ChecklistSectionSerializer(version.sections.all(), many=True).data)
 
     def post(self, request, public_id):
         tenant = _require_tenant()
@@ -667,9 +664,7 @@ class ChecklistQuestionListCreateView(APIView):
             tenant_id=getattr(section.checklist_version.definition.tenant, "id", None),
             payload={"section_public_id": str(section.public_id)},
         )
-        return Response(
-            ChecklistQuestionSerializer(question).data, status=status.HTTP_201_CREATED
-        )
+        return Response(ChecklistQuestionSerializer(question).data, status=status.HTTP_201_CREATED)
 
 
 class ChecklistQuestionDetailView(APIView):
@@ -789,7 +784,10 @@ class ApplicabilityRuleValidateView(APIView):
         registry_version = request.data.get("field_registry_version", FIELD_REGISTRY_VERSION)
         if not is_known_registry_version(registry_version):
             raise ValidationError(
-                {"error_code": "UNSUPPORTED_FIELD_REGISTRY_VERSION", "detail": "Unknown registry version."}
+                {
+                    "error_code": "UNSUPPORTED_FIELD_REGISTRY_VERSION",
+                    "detail": "Unknown registry version.",
+                }
             )
         try:
             validate_condition_json(condition_json, registry_version)

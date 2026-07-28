@@ -35,9 +35,7 @@ class TestConcurrentVersionAllocation:
             t.join()
 
         assert sorted(results) == [1, 2]
-        assert (
-            ChecklistVersion.objects.filter(definition=tenant_definition).count() == 2
-        )
+        assert ChecklistVersion.objects.filter(definition=tenant_definition).count() == 2
 
     def test_version_number_never_client_supplied(self):
         from iig_checklist.serializers import ChecklistVersionSerializer

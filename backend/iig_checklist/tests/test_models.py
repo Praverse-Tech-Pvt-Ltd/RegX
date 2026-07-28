@@ -13,7 +13,12 @@ from iig_checklist.enums import (
     DataSourceClassification,
     EvidenceRequirement,
 )
-from iig_checklist.models import ChecklistDefinition, ChecklistQuestion, ChecklistSection, ChecklistVersion
+from iig_checklist.models import (
+    ChecklistDefinition,
+    ChecklistQuestion,
+    ChecklistSection,
+    ChecklistVersion,
+)
 
 
 @pytest.mark.django_db
@@ -75,7 +80,11 @@ class TestChecklistDefinitionScope:
         )
         with pytest.raises(IntegrityError), transaction.atomic():
             ChecklistDefinition.objects.create(
-                code="DUP-TENANT", title="b", scope_type="tenant", tenant=tenant_a, created_by=user_a
+                code="DUP-TENANT",
+                title="b",
+                scope_type="tenant",
+                tenant=tenant_a,
+                created_by=user_a,
             )
 
     def test_same_code_different_tenants_does_not_conflict(self, user_a, tenant_a, tenant_b):

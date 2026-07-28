@@ -23,14 +23,42 @@ class TestTransitionTableUnit:
     @pytest.mark.parametrize(
         "action,legal_from,result",
         [
-            (VersionAction.SUBMIT_REVIEW, ChecklistVersionStatus.DRAFT, ChecklistVersionStatus.UNDER_REVIEW),
-            (VersionAction.SUBMIT_REVIEW, ChecklistVersionStatus.RETURNED, ChecklistVersionStatus.UNDER_REVIEW),
-            (VersionAction.APPROVE, ChecklistVersionStatus.UNDER_REVIEW, ChecklistVersionStatus.APPROVED),
-            (VersionAction.RETURN, ChecklistVersionStatus.UNDER_REVIEW, ChecklistVersionStatus.RETURNED),
+            (
+                VersionAction.SUBMIT_REVIEW,
+                ChecklistVersionStatus.DRAFT,
+                ChecklistVersionStatus.UNDER_REVIEW,
+            ),
+            (
+                VersionAction.SUBMIT_REVIEW,
+                ChecklistVersionStatus.RETURNED,
+                ChecklistVersionStatus.UNDER_REVIEW,
+            ),
+            (
+                VersionAction.APPROVE,
+                ChecklistVersionStatus.UNDER_REVIEW,
+                ChecklistVersionStatus.APPROVED,
+            ),
+            (
+                VersionAction.RETURN,
+                ChecklistVersionStatus.UNDER_REVIEW,
+                ChecklistVersionStatus.RETURNED,
+            ),
             (VersionAction.REJECT, ChecklistVersionStatus.DRAFT, ChecklistVersionStatus.REJECTED),
-            (VersionAction.REJECT, ChecklistVersionStatus.UNDER_REVIEW, ChecklistVersionStatus.REJECTED),
-            (VersionAction.ACTIVATE, ChecklistVersionStatus.APPROVED, ChecklistVersionStatus.ACTIVE),
-            (VersionAction.SUPERSEDE, ChecklistVersionStatus.ACTIVE, ChecklistVersionStatus.SUPERSEDED),
+            (
+                VersionAction.REJECT,
+                ChecklistVersionStatus.UNDER_REVIEW,
+                ChecklistVersionStatus.REJECTED,
+            ),
+            (
+                VersionAction.ACTIVATE,
+                ChecklistVersionStatus.APPROVED,
+                ChecklistVersionStatus.ACTIVE,
+            ),
+            (
+                VersionAction.SUPERSEDE,
+                ChecklistVersionStatus.ACTIVE,
+                ChecklistVersionStatus.SUPERSEDED,
+            ),
             (VersionAction.RETIRE, ChecklistVersionStatus.DRAFT, ChecklistVersionStatus.RETIRED),
             (VersionAction.RETIRE, ChecklistVersionStatus.APPROVED, ChecklistVersionStatus.RETIRED),
             (VersionAction.RETIRE, ChecklistVersionStatus.ACTIVE, ChecklistVersionStatus.RETIRED),
@@ -77,10 +105,14 @@ class TestTransitionTableUnit:
 
 @pytest.mark.django_db
 class TestChecklistVersionLifecycleApi:
-    def test_full_lifecycle_walk(self, draft_version, api_client_doer, api_client_reviewer, api_client_vp):
+    def test_full_lifecycle_walk(
+        self, draft_version, api_client_doer, api_client_reviewer, api_client_vp
+    ):
         pid = draft_version.public_id
 
-        submit = api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
+        submit = api_client_doer.post(
+            f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={}
+        )
         assert submit.status_code == 200, submit.content
         assert submit.json()["status"] == "under_review"
 
@@ -121,7 +153,9 @@ class TestChecklistVersionLifecycleApi:
         from audit.models import AuditEvent
 
         before = AuditEvent.objects.filter(resource_id=str(draft_version.public_id)).count()
-        api_client_vp.post(f"{BASE}/iig-checklists/versions/{draft_version.public_id}/approve/", data={})
+        api_client_vp.post(
+            f"{BASE}/iig-checklists/versions/{draft_version.public_id}/approve/", data={}
+        )
         after = AuditEvent.objects.filter(resource_id=str(draft_version.public_id)).count()
         assert after == before
 
@@ -149,7 +183,9 @@ class TestChecklistVersionLifecycleApi:
         draft_version.refresh_from_db()
         assert draft_version.status == "under_review"
 
-    def test_doer_cannot_approve_or_activate(self, draft_version, api_client_doer, api_client_reviewer):
+    def test_doer_cannot_approve_or_activate(
+        self, draft_version, api_client_doer, api_client_reviewer
+    ):
         pid = draft_version.public_id
         api_client_reviewer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
         resp = api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/approve/", data={})
@@ -170,7 +206,9 @@ class TestChecklistVersionLifecycleApi:
         assert draft_version.return_reason == "fix section order"
         first_returned_at = draft_version.returned_at
 
-        resubmit = api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
+        resubmit = api_client_doer.post(
+            f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={}
+        )
         assert resubmit.status_code == 200
         draft_version.refresh_from_db()
         assert draft_version.returned_at == first_returned_at
@@ -182,7 +220,9 @@ class TestChecklistVersionLifecycleApi:
         pid = draft_version.public_id
         reject = api_client_reviewer.post(f"{BASE}/iig-checklists/versions/{pid}/reject/", data={})
         assert reject.status_code == 200
-        resubmit = api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
+        resubmit = api_client_doer.post(
+            f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={}
+        )
         assert resubmit.status_code == 400
 
     @pytest.mark.django_db(transaction=True)
@@ -194,7 +234,9 @@ class TestChecklistVersionLifecycleApi:
         from tenancy.models import TenantMembership
 
         membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp_user)
-        role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+        role, _ = Role.objects.get_or_create(
+            tenant=tenant_a, name="vp", defaults={"is_system": True}
+        )
         MembershipRole.objects.get_or_create(membership=membership, role=role)
 
         v1 = ChecklistVersion.objects.create(
@@ -218,7 +260,9 @@ class TestChecklistVersionLifecycleApi:
             client = APIClient()
             client.force_authenticate(user=vp_user)
             client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
-            resp = client.post(f"{BASE}/iig-checklists/versions/{version.public_id}/activate/", data={})
+            resp = client.post(
+                f"{BASE}/iig-checklists/versions/{version.public_id}/activate/", data={}
+            )
             results.append(resp.status_code)
             connection.close()
 

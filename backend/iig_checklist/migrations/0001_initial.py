@@ -7,195 +7,560 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('tenancy', '0001_initial'),
+        ("tenancy", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ApplicabilityRule',
+            name="ApplicabilityRule",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
-                ('code', models.CharField(max_length=100)),
-                ('rule_version', models.PositiveIntegerField(default=1)),
-                ('condition_json', models.JSONField()),
-                ('outcome_if_true', models.CharField(choices=[('applicable', 'Applicable'), ('not_applicable', 'Not applicable'), ('review_required', 'Review required')], max_length=20)),
-                ('outcome_if_false', models.CharField(choices=[('applicable', 'Applicable'), ('not_applicable', 'Not applicable'), ('review_required', 'Review required')], max_length=20)),
-                ('reason_code', models.CharField(max_length=100)),
-                ('explanation_template', models.CharField(max_length=500)),
-                ('field_registry_version', models.PositiveIntegerField()),
-                ('status', models.CharField(choices=[('draft', 'Draft'), ('approved', 'Approved')], default='draft', max_length=20)),
-                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "public_id",
+                    models.UUIDField(
+                        db_index=True, default=uuid.uuid4, editable=False, unique=True
+                    ),
+                ),
+                ("code", models.CharField(max_length=100)),
+                ("rule_version", models.PositiveIntegerField(default=1)),
+                ("condition_json", models.JSONField()),
+                (
+                    "outcome_if_true",
+                    models.CharField(
+                        choices=[
+                            ("applicable", "Applicable"),
+                            ("not_applicable", "Not applicable"),
+                            ("review_required", "Review required"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "outcome_if_false",
+                    models.CharField(
+                        choices=[
+                            ("applicable", "Applicable"),
+                            ("not_applicable", "Not applicable"),
+                            ("review_required", "Review required"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("reason_code", models.CharField(max_length=100)),
+                ("explanation_template", models.CharField(max_length=500)),
+                ("field_registry_version", models.PositiveIntegerField()),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[("draft", "Draft"), ("approved", "Approved")],
+                        default="draft",
+                        max_length=20,
+                    ),
+                ),
+                ("approved_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "approved_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['checklist_version', 'code', 'rule_version'],
+                "ordering": ["checklist_version", "code", "rule_version"],
             },
         ),
         migrations.CreateModel(
-            name='ChecklistDefinition',
+            name="ChecklistDefinition",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
-                ('code', models.CharField(max_length=100)),
-                ('title', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True)),
-                ('scope_type', models.CharField(choices=[('platform_master', 'Platform master'), ('tenant', 'Tenant')], max_length=20)),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('tenant', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='checklist_definitions', to='tenancy.tenant')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "public_id",
+                    models.UUIDField(
+                        db_index=True, default=uuid.uuid4, editable=False, unique=True
+                    ),
+                ),
+                ("code", models.CharField(max_length=100)),
+                ("title", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True)),
+                (
+                    "scope_type",
+                    models.CharField(
+                        choices=[("platform_master", "Platform master"), ("tenant", "Tenant")],
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "tenant",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="checklist_definitions",
+                        to="tenancy.tenant",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['code'],
+                "ordering": ["code"],
             },
         ),
         migrations.CreateModel(
-            name='ChecklistSection',
+            name="ChecklistSection",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
-                ('code', models.CharField(max_length=100)),
-                ('title', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True)),
-                ('display_order', models.PositiveIntegerField()),
-                ('criticality', models.CharField(choices=[('informational', 'Informational'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')], max_length=20)),
-                ('applicability_rule', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to='iig_checklist.applicabilityrule')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "public_id",
+                    models.UUIDField(
+                        db_index=True, default=uuid.uuid4, editable=False, unique=True
+                    ),
+                ),
+                ("code", models.CharField(max_length=100)),
+                ("title", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True)),
+                ("display_order", models.PositiveIntegerField()),
+                (
+                    "criticality",
+                    models.CharField(
+                        choices=[
+                            ("informational", "Informational"),
+                            ("low", "Low"),
+                            ("medium", "Medium"),
+                            ("high", "High"),
+                            ("critical", "Critical"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "applicability_rule",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to="iig_checklist.applicabilityrule",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['checklist_version', 'display_order'],
+                "ordering": ["checklist_version", "display_order"],
             },
         ),
         migrations.CreateModel(
-            name='ChecklistQuestion',
+            name="ChecklistQuestion",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
-                ('code', models.CharField(max_length=100)),
-                ('question_text', models.TextField()),
-                ('help_text', models.TextField(blank=True)),
-                ('display_order', models.PositiveIntegerField()),
-                ('answer_type', models.CharField(choices=[('short_text', 'Short text'), ('long_narrative', 'Long narrative'), ('integer', 'Integer'), ('decimal', 'Decimal'), ('quantity_with_unit', 'Quantity with unit'), ('percentage', 'Percentage'), ('date', 'Date'), ('yes_no', 'Yes/No'), ('yes_no_na', 'Yes/No/Not applicable'), ('single_select', 'Single select'), ('multi_select', 'Multi select'), ('fda_record_reference', 'FDA record reference'), ('formulation_component_reference', 'Formulation component reference'), ('attachment_reference', 'Evidence attachment reference'), ('calculated_value', 'Calculated value'), ('calculated_status', 'Calculated status'), ('reviewer_conclusion', 'Reviewer conclusion'), ('approval_metadata', 'Approval metadata')], max_length=40)),
-                ('data_source_classification', models.CharField(choices=[('fda_derived_default', 'FDA-derived default'), ('user_required', 'User required'), ('system_calculated', 'System calculated'), ('reviewer_confirmed', 'Reviewer confirmed'), ('evidence_derived', 'Evidence derived')], max_length=30)),
-                ('required', models.BooleanField(default=False)),
-                ('allowed_units', models.JSONField(blank=True, default=list)),
-                ('evidence_requirement', models.CharField(choices=[('none', 'None'), ('optional', 'Optional'), ('required', 'Required'), ('required_if_overridden', 'Required if overridden')], default='none', max_length=30)),
-                ('calculation_binding_identifier', models.CharField(blank=True, max_length=100)),
-                ('prefill_source', models.CharField(blank=True, max_length=100)),
-                ('reviewer_confirmation_required', models.BooleanField(default=False)),
-                ('escalation_rule_identifier', models.CharField(blank=True, max_length=100)),
-                ('criticality', models.CharField(choices=[('informational', 'Informational'), ('low', 'Low'), ('medium', 'Medium'), ('high', 'High'), ('critical', 'Critical')], max_length=20)),
-                ('regulatory_reference', models.CharField(blank=True, max_length=500)),
-                ('default_value_binding', models.CharField(blank=True, max_length=100)),
-                ('validation_rule', models.JSONField(blank=True, default=dict)),
-                ('applicability_rule', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to='iig_checklist.applicabilityrule')),
-                ('section', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='questions', to='iig_checklist.checklistsection')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "public_id",
+                    models.UUIDField(
+                        db_index=True, default=uuid.uuid4, editable=False, unique=True
+                    ),
+                ),
+                ("code", models.CharField(max_length=100)),
+                ("question_text", models.TextField()),
+                ("help_text", models.TextField(blank=True)),
+                ("display_order", models.PositiveIntegerField()),
+                (
+                    "answer_type",
+                    models.CharField(
+                        choices=[
+                            ("short_text", "Short text"),
+                            ("long_narrative", "Long narrative"),
+                            ("integer", "Integer"),
+                            ("decimal", "Decimal"),
+                            ("quantity_with_unit", "Quantity with unit"),
+                            ("percentage", "Percentage"),
+                            ("date", "Date"),
+                            ("yes_no", "Yes/No"),
+                            ("yes_no_na", "Yes/No/Not applicable"),
+                            ("single_select", "Single select"),
+                            ("multi_select", "Multi select"),
+                            ("fda_record_reference", "FDA record reference"),
+                            ("formulation_component_reference", "Formulation component reference"),
+                            ("attachment_reference", "Evidence attachment reference"),
+                            ("calculated_value", "Calculated value"),
+                            ("calculated_status", "Calculated status"),
+                            ("reviewer_conclusion", "Reviewer conclusion"),
+                            ("approval_metadata", "Approval metadata"),
+                        ],
+                        max_length=40,
+                    ),
+                ),
+                (
+                    "data_source_classification",
+                    models.CharField(
+                        choices=[
+                            ("fda_derived_default", "FDA-derived default"),
+                            ("user_required", "User required"),
+                            ("system_calculated", "System calculated"),
+                            ("reviewer_confirmed", "Reviewer confirmed"),
+                            ("evidence_derived", "Evidence derived"),
+                        ],
+                        max_length=30,
+                    ),
+                ),
+                ("required", models.BooleanField(default=False)),
+                ("allowed_units", models.JSONField(blank=True, default=list)),
+                (
+                    "evidence_requirement",
+                    models.CharField(
+                        choices=[
+                            ("none", "None"),
+                            ("optional", "Optional"),
+                            ("required", "Required"),
+                            ("required_if_overridden", "Required if overridden"),
+                        ],
+                        default="none",
+                        max_length=30,
+                    ),
+                ),
+                ("calculation_binding_identifier", models.CharField(blank=True, max_length=100)),
+                ("prefill_source", models.CharField(blank=True, max_length=100)),
+                ("reviewer_confirmation_required", models.BooleanField(default=False)),
+                ("escalation_rule_identifier", models.CharField(blank=True, max_length=100)),
+                (
+                    "criticality",
+                    models.CharField(
+                        choices=[
+                            ("informational", "Informational"),
+                            ("low", "Low"),
+                            ("medium", "Medium"),
+                            ("high", "High"),
+                            ("critical", "Critical"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("regulatory_reference", models.CharField(blank=True, max_length=500)),
+                ("default_value_binding", models.CharField(blank=True, max_length=100)),
+                ("validation_rule", models.JSONField(blank=True, default=dict)),
+                (
+                    "applicability_rule",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to="iig_checklist.applicabilityrule",
+                    ),
+                ),
+                (
+                    "section",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="questions",
+                        to="iig_checklist.checklistsection",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['section', 'display_order'],
+                "ordering": ["section", "display_order"],
             },
         ),
         migrations.CreateModel(
-            name='ChecklistVersion',
+            name="ChecklistVersion",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
-                ('version_number', models.PositiveIntegerField()),
-                ('status', models.CharField(choices=[('draft', 'Draft'), ('under_review', 'Under review'), ('returned', 'Returned'), ('approved', 'Approved'), ('active', 'Active'), ('rejected', 'Rejected'), ('superseded', 'Superseded'), ('retired', 'Retired')], db_index=True, default='draft', max_length=20)),
-                ('effective_date', models.DateField(blank=True, null=True)),
-                ('expiry_date', models.DateField(blank=True, null=True)),
-                ('regulatory_basis', models.CharField(blank=True, max_length=500)),
-                ('change_summary', models.TextField(blank=True)),
-                ('cloned_from_version_public_id', models.UUIDField(blank=True, null=True)),
-                ('submitted_at', models.DateTimeField(blank=True, null=True)),
-                ('reviewed_at', models.DateTimeField(blank=True, null=True)),
-                ('approved_at', models.DateTimeField(blank=True, null=True)),
-                ('activated_at', models.DateTimeField(blank=True, null=True)),
-                ('returned_at', models.DateTimeField(blank=True, null=True)),
-                ('return_reason', models.TextField(blank=True)),
-                ('rejected_at', models.DateTimeField(blank=True, null=True)),
-                ('retired_at', models.DateTimeField(blank=True, null=True)),
-                ('activated_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('definition', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='versions', to='iig_checklist.checklistdefinition')),
-                ('rejected_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('retired_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('returned_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('reviewed_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('submitted_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='+', to=settings.AUTH_USER_MODEL)),
-                ('superseded_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='supersedes', to='iig_checklist.checklistversion')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "public_id",
+                    models.UUIDField(
+                        db_index=True, default=uuid.uuid4, editable=False, unique=True
+                    ),
+                ),
+                ("version_number", models.PositiveIntegerField()),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("draft", "Draft"),
+                            ("under_review", "Under review"),
+                            ("returned", "Returned"),
+                            ("approved", "Approved"),
+                            ("active", "Active"),
+                            ("rejected", "Rejected"),
+                            ("superseded", "Superseded"),
+                            ("retired", "Retired"),
+                        ],
+                        db_index=True,
+                        default="draft",
+                        max_length=20,
+                    ),
+                ),
+                ("effective_date", models.DateField(blank=True, null=True)),
+                ("expiry_date", models.DateField(blank=True, null=True)),
+                ("regulatory_basis", models.CharField(blank=True, max_length=500)),
+                ("change_summary", models.TextField(blank=True)),
+                ("cloned_from_version_public_id", models.UUIDField(blank=True, null=True)),
+                ("submitted_at", models.DateTimeField(blank=True, null=True)),
+                ("reviewed_at", models.DateTimeField(blank=True, null=True)),
+                ("approved_at", models.DateTimeField(blank=True, null=True)),
+                ("activated_at", models.DateTimeField(blank=True, null=True)),
+                ("returned_at", models.DateTimeField(blank=True, null=True)),
+                ("return_reason", models.TextField(blank=True)),
+                ("rejected_at", models.DateTimeField(blank=True, null=True)),
+                ("retired_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "activated_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "approved_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "definition",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="versions",
+                        to="iig_checklist.checklistdefinition",
+                    ),
+                ),
+                (
+                    "rejected_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "retired_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "returned_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "reviewed_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "submitted_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="+",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "superseded_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="supersedes",
+                        to="iig_checklist.checklistversion",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['definition', 'version_number'],
+                "ordering": ["definition", "version_number"],
             },
         ),
         migrations.AddField(
-            model_name='checklistsection',
-            name='checklist_version',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sections', to='iig_checklist.checklistversion'),
+            model_name="checklistsection",
+            name="checklist_version",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="sections",
+                to="iig_checklist.checklistversion",
+            ),
         ),
         migrations.AddField(
-            model_name='applicabilityrule',
-            name='checklist_version',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='applicability_rules', to='iig_checklist.checklistversion'),
+            model_name="applicabilityrule",
+            name="checklist_version",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="applicability_rules",
+                to="iig_checklist.checklistversion",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistdefinition',
-            constraint=models.CheckConstraint(condition=models.Q(models.Q(('scope_type', 'platform_master'), ('tenant__isnull', True)), models.Q(('scope_type', 'tenant'), ('tenant__isnull', False)), _connector='OR'), name='checklist_definition_scope_tenant_consistency'),
+            model_name="checklistdefinition",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    models.Q(("scope_type", "platform_master"), ("tenant__isnull", True)),
+                    models.Q(("scope_type", "tenant"), ("tenant__isnull", False)),
+                    _connector="OR",
+                ),
+                name="checklist_definition_scope_tenant_consistency",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistdefinition',
-            constraint=models.UniqueConstraint(condition=models.Q(('scope_type', 'platform_master')), fields=('code',), name='unique_platform_master_checklist_code'),
+            model_name="checklistdefinition",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("scope_type", "platform_master")),
+                fields=("code",),
+                name="unique_platform_master_checklist_code",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistdefinition',
-            constraint=models.UniqueConstraint(condition=models.Q(('scope_type', 'tenant')), fields=('tenant', 'code'), name='unique_tenant_checklist_code'),
+            model_name="checklistdefinition",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("scope_type", "tenant")),
+                fields=("tenant", "code"),
+                name="unique_tenant_checklist_code",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistquestion',
-            constraint=models.UniqueConstraint(fields=('section', 'code'), name='unique_iig_question_code_per_section'),
+            model_name="checklistquestion",
+            constraint=models.UniqueConstraint(
+                fields=("section", "code"), name="unique_iig_question_code_per_section"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistquestion',
-            constraint=models.UniqueConstraint(fields=('section', 'display_order'), name='unique_iig_question_display_order_per_section'),
+            model_name="checklistquestion",
+            constraint=models.UniqueConstraint(
+                fields=("section", "display_order"),
+                name="unique_iig_question_display_order_per_section",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistversion',
-            constraint=models.UniqueConstraint(fields=('definition', 'version_number'), name='unique_version_number_per_definition'),
+            model_name="checklistversion",
+            constraint=models.UniqueConstraint(
+                fields=("definition", "version_number"), name="unique_version_number_per_definition"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistversion',
-            constraint=models.UniqueConstraint(condition=models.Q(('status', 'active')), fields=('definition',), name='unique_active_version_per_definition'),
+            model_name="checklistversion",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("status", "active")),
+                fields=("definition",),
+                name="unique_active_version_per_definition",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistversion',
-            constraint=models.CheckConstraint(condition=models.Q(('expiry_date__isnull', True), ('effective_date__isnull', True), ('expiry_date__gt', models.F('effective_date')), _connector='OR'), name='checklist_version_expiry_after_effective'),
+            model_name="checklistversion",
+            constraint=models.CheckConstraint(
+                condition=models.Q(
+                    ("expiry_date__isnull", True),
+                    ("effective_date__isnull", True),
+                    ("expiry_date__gt", models.F("effective_date")),
+                    _connector="OR",
+                ),
+                name="checklist_version_expiry_after_effective",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistsection',
-            constraint=models.UniqueConstraint(fields=('checklist_version', 'code'), name='unique_iig_section_code_per_version'),
+            model_name="checklistsection",
+            constraint=models.UniqueConstraint(
+                fields=("checklist_version", "code"), name="unique_iig_section_code_per_version"
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistsection',
-            constraint=models.UniqueConstraint(fields=('checklist_version', 'display_order'), name='unique_iig_section_display_order_per_version'),
+            model_name="checklistsection",
+            constraint=models.UniqueConstraint(
+                fields=("checklist_version", "display_order"),
+                name="unique_iig_section_display_order_per_version",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='applicabilityrule',
-            constraint=models.UniqueConstraint(fields=('checklist_version', 'code', 'rule_version'), name='unique_applicability_rule_code_version_per_checklist_version'),
+            model_name="applicabilityrule",
+            constraint=models.UniqueConstraint(
+                fields=("checklist_version", "code", "rule_version"),
+                name="unique_applicability_rule_code_version_per_checklist_version",
+            ),
         ),
     ]

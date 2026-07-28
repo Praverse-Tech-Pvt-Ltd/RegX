@@ -21,7 +21,9 @@ def _normalize_code_field(value):
     try:
         return normalize_code(value)
     except CodeValidationError as exc:
-        raise serializers.ValidationError({"error_code": exc.error_code, "detail": str(exc)}) from exc
+        raise serializers.ValidationError(
+            {"error_code": exc.error_code, "detail": str(exc)}
+        ) from exc
 
 
 class ChecklistDefinitionSerializer(serializers.ModelSerializer):

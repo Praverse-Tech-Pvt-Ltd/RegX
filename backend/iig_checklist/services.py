@@ -44,12 +44,10 @@ def create_next_version(*, definition: ChecklistDefinition, actor) -> ChecklistV
     version_number, mirroring the exact fix already proven in
     templates_registry/importer.py for this defect class."""
     with transaction.atomic():
-        locked_definition = ChecklistDefinition.objects.select_for_update().get(
-            pk=definition.pk
-        )
-        max_number = ChecklistVersion.objects.filter(
-            definition=locked_definition
-        ).aggregate(Max("version_number"))["version_number__max"]
+        locked_definition = ChecklistDefinition.objects.select_for_update().get(pk=definition.pk)
+        max_number = ChecklistVersion.objects.filter(definition=locked_definition).aggregate(
+            Max("version_number")
+        )["version_number__max"]
         next_number = (max_number or 0) + 1
 
         try:
@@ -61,9 +59,7 @@ def create_next_version(*, definition: ChecklistDefinition, actor) -> ChecklistV
                 created_by=actor,
             )
         except IntegrityError as exc:
-            raise VersionAllocationConflict(
-                "Version allocation conflict -- please retry."
-            ) from exc
+            raise VersionAllocationConflict("Version allocation conflict -- please retry.") from exc
 
         emit(
             event_type=IigChecklistEvent.VERSION_CREATED,
@@ -132,7 +128,7 @@ def clone_definition(request: CloneRequest) -> CloneResult:
             created_by=request.actor,
         )
         new_version = _create_validated(
-                ChecklistVersion,
+            ChecklistVersion,
             definition=new_definition,
             version_number=1,
             status=ChecklistVersionStatus.DRAFT,
@@ -159,9 +155,7 @@ def clone_definition(request: CloneRequest) -> CloneResult:
                     criticality=source_section.criticality,
                 )
                 if request.clone_questions:
-                    for source_question in source_section.questions.all().order_by(
-                        "display_order"
-                    ):
+                    for source_question in source_section.questions.all().order_by("display_order"):
                         question_rule = None
                         if (
                             request.clone_applicability_rules

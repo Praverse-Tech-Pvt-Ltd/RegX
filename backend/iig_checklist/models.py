@@ -52,9 +52,7 @@ class ChecklistDefinition(PublicIDModel, TimeStampedModel):
         blank=True,
         related_name="checklist_definitions",
     )
-    created_by = models.ForeignKey(
-        "identity.User", on_delete=models.PROTECT, related_name="+"
-    )
+    created_by = models.ForeignKey("identity.User", on_delete=models.PROTECT, related_name="+")
 
     objects = ChecklistDefinitionManager()
 
@@ -290,17 +288,21 @@ class ChecklistSection(PublicIDModel, TimeStampedModel):
 
     def clean(self):
         super().clean()
-        if self.applicability_rule_id and self.applicability_rule.checklist_version_id != self.checklist_version_id:
+        if (
+            self.applicability_rule_id
+            and self.applicability_rule.checklist_version_id != self.checklist_version_id
+        ):
             raise ValidationError("applicability_rule must belong to the same checklist_version.")
         if not self.checklist_version.is_editable() and self.pk:
             raise ValidationError(
-                "Cannot modify a ChecklistSection once its ChecklistVersion "
-                "leaves draft/returned."
+                "Cannot modify a ChecklistSection once its ChecklistVersion leaves draft/returned."
             )
 
 
 class ChecklistQuestion(PublicIDModel, TimeStampedModel):
-    section = models.ForeignKey(ChecklistSection, on_delete=models.CASCADE, related_name="questions")
+    section = models.ForeignKey(
+        ChecklistSection, on_delete=models.CASCADE, related_name="questions"
+    )
     code = models.CharField(max_length=100)
     question_text = models.TextField()
     help_text = models.TextField(blank=True)
@@ -390,6 +392,5 @@ class ChecklistQuestion(PublicIDModel, TimeStampedModel):
             raise ValidationError("applicability_rule must belong to the same checklist_version.")
         if not self.section.checklist_version.is_editable() and self.pk:
             raise ValidationError(
-                "Cannot modify a ChecklistQuestion once its ChecklistVersion "
-                "leaves draft/returned."
+                "Cannot modify a ChecklistQuestion once its ChecklistVersion leaves draft/returned."
             )
