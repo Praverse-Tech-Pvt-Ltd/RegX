@@ -328,9 +328,22 @@ class ChecklistDefinitionCloneView(APIView):
 
 class ChecklistVersionCreateView(APIView):
     required_permission = CanCreateChecklistDefinition
+    pagination_class = _Pagination
 
     def get_permissions(self):
+        if self.request.method == "GET":
+            return [CanViewChecklistDefinition()]
         return [self.required_permission()]
+
+    def get(self, request, public_id):
+        tenant = _require_tenant()
+        definition = _get_definition_or_404(public_id, tenant)
+        queryset = definition.versions.order_by("-version_number")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        return paginator.get_paginated_response(
+            ChecklistVersionSerializer(page, many=True).data
+        )
 
     def post(self, request, public_id):
         tenant = _require_tenant()

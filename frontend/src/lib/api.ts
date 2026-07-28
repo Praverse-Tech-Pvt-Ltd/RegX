@@ -1220,6 +1220,188 @@ export interface AssessmentSnapshotDetail {
   created_at: string;
 }
 
+export type ChecklistVersionStatus =
+  | "draft"
+  | "under_review"
+  | "returned"
+  | "approved"
+  | "active"
+  | "superseded"
+  | "rejected"
+  | "retired";
+
+export interface ChecklistDefinition {
+  public_id: string;
+  code: string;
+  title: string;
+  description: string;
+  scope_type: "platform_master" | "tenant";
+  tenant_public_id: string | null;
+  created_at: string;
+}
+
+export interface ChecklistVersion {
+  public_id: string;
+  definition_public_id: string;
+  version_number: number;
+  status: ChecklistVersionStatus;
+  effective_date: string | null;
+  expiry_date: string | null;
+  regulatory_basis: string;
+  change_summary: string;
+  cloned_from_version_public_id: string | null;
+  return_reason: string;
+  submitted_by_email: string | null;
+  reviewed_by_email: string | null;
+  approved_by_email: string | null;
+  activated_by_email: string | null;
+  returned_at: string | null;
+  rejected_at: string | null;
+  retired_at: string | null;
+  sections?: ChecklistSection[];
+  created_at: string;
+}
+
+export interface ChecklistSection {
+  public_id: string;
+  code: string;
+  title: string;
+  description: string;
+  display_order: number;
+  criticality: string;
+  questions?: ChecklistQuestion[];
+}
+
+export interface ChecklistQuestion {
+  public_id: string;
+  code: string;
+  question_text: string;
+  display_order: number;
+  answer_type: string;
+  data_source_classification: string;
+  criticality: string;
+  required: boolean;
+}
+
+export const iigChecklists = {
+  definitions: {
+    list: (tenantSlug: string, params?: { page?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set("page", String(params.page));
+      const query = qs.toString() ? `?${qs}` : "";
+      return apiRequest<PaginatedResponse<ChecklistDefinition>>(
+        `/api/regx/v1/iig-checklists/definitions/${query}`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
+      );
+    },
+
+    get: (tenantSlug: string, publicId: string) =>
+      apiRequest<ChecklistDefinition>(`/api/regx/v1/iig-checklists/definitions/${publicId}/`, {
+        headers: { "X-Tenant-Slug": tenantSlug },
+      }),
+
+    create: (
+      tenantSlug: string,
+      data: { code: string; title: string; description?: string; scope_type: string }
+    ) =>
+      apiRequest<ChecklistDefinition>("/api/regx/v1/iig-checklists/definitions/", {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: data,
+      }),
+
+    remove: (tenantSlug: string, publicId: string) =>
+      apiRequest<void>(`/api/regx/v1/iig-checklists/definitions/${publicId}/`, {
+        method: "DELETE",
+        headers: { "X-Tenant-Slug": tenantSlug },
+      }),
+
+    clone: (
+      tenantSlug: string,
+      publicId: string,
+      data: {
+        source_version_public_id: string;
+        target_scope_type: string;
+        target_tenant_public_id?: string;
+        new_code: string;
+        new_title: string;
+        reason?: string;
+      }
+    ) =>
+      apiRequest<{ definition: ChecklistDefinition; current_version: ChecklistVersion }>(
+        `/api/regx/v1/iig-checklists/definitions/${publicId}/clone/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+      ),
+  },
+
+  versions: {
+    listForDefinition: (tenantSlug: string, definitionPublicId: string) =>
+      apiRequest<PaginatedResponse<ChecklistVersion>>(
+        `/api/regx/v1/iig-checklists/definitions/${definitionPublicId}/versions/`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
+      ),
+
+    create: (tenantSlug: string, definitionPublicId: string) =>
+      apiRequest<ChecklistVersion>(
+        `/api/regx/v1/iig-checklists/definitions/${definitionPublicId}/versions/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug } }
+      ),
+
+    get: (tenantSlug: string, publicId: string) =>
+      apiRequest<ChecklistVersion>(`/api/regx/v1/iig-checklists/versions/${publicId}/`, {
+        headers: { "X-Tenant-Slug": tenantSlug },
+      }),
+
+    submitReview: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<ChecklistVersion>(
+        `/api/regx/v1/iig-checklists/versions/${publicId}/submit-review/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { reason } }
+      ),
+
+    approve: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<ChecklistVersion>(`/api/regx/v1/iig-checklists/versions/${publicId}/approve/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+
+    return: (tenantSlug: string, publicId: string, reason: string) =>
+      apiRequest<ChecklistVersion>(`/api/regx/v1/iig-checklists/versions/${publicId}/return/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+
+    reject: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<ChecklistVersion>(`/api/regx/v1/iig-checklists/versions/${publicId}/reject/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+
+    activate: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<ChecklistVersion>(`/api/regx/v1/iig-checklists/versions/${publicId}/activate/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+
+    supersede: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<ChecklistVersion>(`/api/regx/v1/iig-checklists/versions/${publicId}/supersede/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+
+    retire: (tenantSlug: string, publicId: string, reason?: string) =>
+      apiRequest<ChecklistVersion>(`/api/regx/v1/iig-checklists/versions/${publicId}/retire/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+  },
+};
+
 export const mfa = {
   setup: () => apiRequest<{ totp_uri: string; recovery_codes: string[] }>("/api/regx/v1/mfa/setup/", { method: "POST" }),
 
