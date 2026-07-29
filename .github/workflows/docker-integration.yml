@@ -421,7 +421,7 @@ jobs:
           }
           check "iig-checklists definitions" http://localhost:8000/api/regx/v1/iig-checklists/definitions/
 
-      - name: "IIG checklist definition-governance production API flow (19 steps, no execution, no real regulatory content)"
+      - name: "IIG checklist definition-governance production API flow (22 steps, no execution, no real regulatory content)"
         run: |
           set -euo pipefail
           docker compose -p regx-ci exec -T backend python manage.py shell -c "
@@ -550,6 +550,38 @@ jobs:
 
           assert 'checklist_response' not in body_text.lower() and 'calculation_outcome' not in body_text.lower(), 'STEP 19 FAIL: execution-domain fields leaked into a governance response'
           print('STEP 19 no checklist-execution fields present anywhere in this flow: OK')
+
+          # STEP 20-22: platform-master authorization (remediation for the
+          # confirmed Major finding -- an ordinary Doer must never be able
+          # to create or clone into platform_master scope). Uses the real
+          # production API, never an ORM shortcut, so a regression in the
+          # centralized can_create_definition_for_scope() check is caught
+          # here even if it somehow passed pytest.
+          resp = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-PLATFORM-DENIED', 'title': 'x', 'scope_type': 'platform_master'}), **H)
+          assert resp.status_code == 403, 'STEP 20 FAIL: ordinary Doer platform-master create should be forbidden, got %s' % resp.status_code
+          from iig_checklist.models import ChecklistDefinition as _CD
+          assert not _CD.objects.filter(code='CI-IIG-PLATFORM-DENIED').exists(), 'STEP 20 FAIL: platform-master definition was created despite 403'
+          print('STEP 20 ordinary Doer cannot create platform-master content: OK')
+
+          platform_actor, _ = User.objects.get_or_create(email='ci-iig-platform-actor@example.com', defaults={'full_name': 'CI IIG Platform Actor', 'is_superuser': True, 'is_staff': True})
+          if not platform_actor.is_superuser:
+              platform_actor.is_superuser = True
+              platform_actor.is_staff = True
+              platform_actor.save(update_fields=['is_superuser', 'is_staff'])
+          make_actor('ci-iig-platform-actor@example.com', 'CI IIG Platform Actor', 'doer')
+          platform_client = api_client(platform_actor)
+          resp = platform_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-PLATFORM-OK', 'title': 'x', 'scope_type': 'platform_master'}), **H)
+          assert resp.status_code == 201, 'STEP 21 FAIL: authorized platform actor create returned %s' % resp.status_code
+          assert resp.json().get('tenant_public_id') is None, 'STEP 21 FAIL: platform-master definition unexpectedly has a tenant'
+          print('STEP 21 authorized platform actor can create platform-master content: OK')
+
+          resp = doer_client.post(BASE + '/definitions/%s/clone/' % definition['public_id'], data=json.dumps({
+              'source_version_public_id': vpub, 'target_scope_type': 'platform_master',
+              'new_code': 'CI-IIG-CLONE-PLATFORM-DENIED', 'new_title': 'x',
+          }), **H)
+          assert resp.status_code == 403, 'STEP 22 FAIL: ordinary Doer clone-to-platform-master should be forbidden, got %s' % resp.status_code
+          assert not _CD.objects.filter(code='CI-IIG-CLONE-PLATFORM-DENIED').exists(), 'STEP 22 FAIL: partial clone created despite 403'
+          print('STEP 22 ordinary Doer cannot clone into platform-master scope: OK')
 
           print('IIG CHECKLIST DEFINITION GOVERNANCE FLOW: PASS')
           "

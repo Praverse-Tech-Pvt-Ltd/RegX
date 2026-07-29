@@ -113,6 +113,42 @@ test.describe("Checklist definition inventory", () => {
 
     await expect(page).toHaveURL(/\/iig-checklists\/def-e2e-new/);
   });
+
+  test("an ordinary Doer's attempt to create platform-master content is denied with a clear message, not a signin redirect", async ({
+    page,
+  }) => {
+    await mockCsrf(page);
+    await page.route(
+      `${API}/api/regx/v1/iig-checklists/definitions/`,
+      (route) =>
+        route.fulfill({
+          status: 403,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: {
+              status: 403,
+              detail:
+                "Creating platform-master content requires a separate, explicit platform-level authorization -- ordinary create-definition permission does not imply it.",
+            },
+          }),
+        }),
+    );
+
+    await page.goto(`/iig-checklists/new?tenant=${TENANT}`);
+    await page.getByLabel("Code").fill("SHOULD-FAIL");
+    await page.getByLabel("Title").fill("Should fail");
+    await page.getByLabel("Scope").selectOption("platform_master");
+    await expect(
+      page.getByText(/requires a separate, explicit platform-level authorization/i),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Create" }).click();
+
+    await expect(
+      page.getByText(/requires a separate, explicit platform-level authorization/i),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/iig-checklists\/new/);
+    await expect(page).not.toHaveURL(/\/signin/);
+  });
 });
 
 test.describe("Checklist version lifecycle", () => {

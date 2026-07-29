@@ -154,6 +154,41 @@ describe("NewDefinitionPage — create", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Code already exists/i);
   });
+
+  it("shows a warning that platform-master scope requires special authorization", async () => {
+    const user = userEvent.setup();
+    render(<NewDefinitionPage />);
+    await user.selectOptions(screen.getByLabelText(/^Scope$/i), "platform_master");
+    expect(screen.getByText(/requires a separate, explicit platform-level authorization/i)).toBeInTheDocument();
+  });
+
+  it("shows a clear denial message (not a signin redirect) when platform-master creation is denied", async () => {
+    const user = userEvent.setup();
+    api.definitionsCreate.mockRejectedValue(new ApiError(403, "Forbidden"));
+    render(<NewDefinitionPage />);
+
+    await user.type(screen.getByLabelText(/^Code$/i), "PLATFORM-ATTEMPT");
+    await user.type(screen.getByLabelText(/^Title$/i), "Attempt");
+    await user.selectOptions(screen.getByLabelText(/^Scope$/i), "platform_master");
+    await user.click(screen.getByRole("button", { name: /create/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /requires a separate, explicit platform-level authorization/i
+    );
+    expect(nav.push).not.toHaveBeenCalledWith("/signin");
+  });
+
+  it("redirects to signin on 401 (unauthenticated), not on 403 (unauthorized)", async () => {
+    const user = userEvent.setup();
+    api.definitionsCreate.mockRejectedValue(new ApiError(401, "Unauthenticated"));
+    render(<NewDefinitionPage />);
+
+    await user.type(screen.getByLabelText(/^Code$/i), "X");
+    await user.type(screen.getByLabelText(/^Title$/i), "X");
+    await user.click(screen.getByRole("button", { name: /create/i }));
+
+    await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith("/signin"));
+  });
 });
 
 describe("DefinitionDetailPage — versions", () => {
