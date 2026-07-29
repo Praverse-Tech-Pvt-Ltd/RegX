@@ -186,3 +186,73 @@ def draft_version(db, tenant_definition, user_a):
         version_number=1,
         created_by=user_a,
     )
+
+
+@pytest.fixture
+def platform_definition(db, platform_actor_user):
+    from iig_checklist.models import ChecklistDefinition
+
+    return ChecklistDefinition.objects.create(
+        code="PLATFORM-ORAL-SOLID",
+        title="Platform Oral Solid (synthetic)",
+        scope_type="platform_master",
+        tenant=None,
+        created_by=platform_actor_user,
+    )
+
+
+@pytest.fixture
+def platform_draft_version(db, platform_definition, platform_actor_user):
+    from iig_checklist.models import ChecklistVersion
+
+    return ChecklistVersion.objects.create(
+        definition=platform_definition,
+        version_number=1,
+        created_by=platform_actor_user,
+    )
+
+
+@pytest.fixture
+def platform_section(db, platform_draft_version):
+    from iig_checklist.models import ChecklistSection
+
+    return ChecklistSection.objects.create(
+        checklist_version=platform_draft_version,
+        code="SEC-1",
+        title="Section 1",
+        display_order=1,
+        criticality="medium",
+    )
+
+
+@pytest.fixture
+def platform_question(db, platform_section):
+    from iig_checklist.models import ChecklistQuestion
+
+    return ChecklistQuestion.objects.create(
+        section=platform_section,
+        code="Q-1",
+        question_text="Is this synthetic?",
+        display_order=1,
+        answer_type="yes_no",
+        data_source_classification="user_required",
+        criticality="low",
+    )
+
+
+@pytest.fixture
+def api_client_platform_actor_full(platform_actor_user, tenant_a):
+    """The platform actor also holds Reviewer+VP roles in tenant_a, so
+    the same actor can exercise the full lifecycle (submit/return/
+    approve/activate/etc.) on platform-master content while proving the
+    platform grant -- not an ordinary role -- is what makes platform
+    mutation succeed."""
+    from rest_framework.test import APIClient
+
+    _membership_with_role(tenant_a, platform_actor_user, "doer")
+    _membership_with_role(tenant_a, platform_actor_user, "reviewer")
+    _membership_with_role(tenant_a, platform_actor_user, "vp")
+    client = APIClient()
+    client.force_authenticate(user=platform_actor_user)
+    client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
+    return client
