@@ -39,6 +39,28 @@ def vp_user(db):
     return _make_user("checklist-vp@example.com", "VP")
 
 
+@pytest.fixture
+def tenant_admin_user(db):
+    return _make_user("checklist-tenant-admin@example.com", "Tenant Admin")
+
+
+@pytest.fixture
+def platform_support_user(db):
+    return _make_user("checklist-platform-support@example.com", "Platform Support")
+
+
+@pytest.fixture
+def platform_actor_user(db):
+    """The only kind of user that satisfies can_author_platform_master():
+    Django's is_superuser flag, deliberately independent of tenant
+    membership/role."""
+    user = _make_user("checklist-platform-actor@example.com", "Platform Actor")
+    user.is_superuser = True
+    user.is_staff = True
+    user.save(update_fields=["is_superuser", "is_staff"])
+    return user
+
+
 def _membership_with_role(tenant, user, role_name):
     from authorization.models import MembershipRole, Role
     from tenancy.models import TenantMembership
@@ -92,6 +114,52 @@ def api_client_vp(vp_user, tenant_a, vp_membership):
 
     client = APIClient()
     client.force_authenticate(user=vp_user)
+    client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
+    return client
+
+
+@pytest.fixture
+def tenant_admin_membership(db, tenant_a, tenant_admin_user):
+    return _membership_with_role(tenant_a, tenant_admin_user, "tenant_admin")
+
+
+@pytest.fixture
+def platform_support_membership(db, tenant_a, platform_support_user):
+    return _membership_with_role(tenant_a, platform_support_user, "platform_support")
+
+
+@pytest.fixture
+def api_client_tenant_admin(tenant_admin_user, tenant_a, tenant_admin_membership):
+    from rest_framework.test import APIClient
+
+    client = APIClient()
+    client.force_authenticate(user=tenant_admin_user)
+    client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
+    return client
+
+
+@pytest.fixture
+def api_client_platform_support(platform_support_user, tenant_a, platform_support_membership):
+    from rest_framework.test import APIClient
+
+    client = APIClient()
+    client.force_authenticate(user=platform_support_user)
+    client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
+    return client
+
+
+@pytest.fixture
+def api_client_platform_actor(platform_actor_user, tenant_a):
+    """A platform-authorized actor still needs *some* tenant context to
+    pass through the tenant middleware/current_tenant() -- give them a
+    Doer membership too, so the test proves platform authority is what
+    grants platform_master creation, not the Doer role itself (which
+    api_client_doer already proves is insufficient on its own)."""
+    from rest_framework.test import APIClient
+
+    _membership_with_role(tenant_a, platform_actor_user, "doer")
+    client = APIClient()
+    client.force_authenticate(user=platform_actor_user)
     client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
     return client
 
