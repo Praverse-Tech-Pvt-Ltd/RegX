@@ -29,6 +29,9 @@ from .models import (
     ChecklistVersion,
 )
 from .permissions import (
+    PERM_CREATE_DEFINITION,
+    PERM_DELETE_DRAFT,
+    PERM_EDIT_DRAFT,
     CanActivateChecklist,
     CanApproveChecklist,
     CanCloneChecklist,
@@ -40,6 +43,7 @@ from .permissions import (
     CanSubmitChecklistReview,
     CanViewChecklistDefinition,
     can_create_definition_for_scope,
+    can_mutate_definition_scope,
 )
 from .serializers import (
     ApplicabilityRuleSerializer,
@@ -127,6 +131,26 @@ def _get_question_or_404(public_id, tenant):
 def _raise_django_validation_as_drf(exc: DjangoValidationError):
     detail = exc.message_dict if hasattr(exc, "message_dict") else {"detail": exc.messages}
     raise ValidationError(detail) from exc
+
+
+def _authorize_mutation(request, tenant, definition, required_codename):
+    """Object-scope mutation gate -- must be called after resolving the
+    target object's owning ChecklistDefinition and before any write or
+    audit emission. See permissions.py::can_mutate_definition_scope()
+    for what this actually checks; visibility (visible_to()) is never
+    sufficient authorization to mutate on its own."""
+    if not can_mutate_definition_scope(
+        actor=request.user,
+        definition=definition,
+        tenant=tenant,
+        required_permission=required_codename,
+    ):
+        if definition.scope_type == "platform_master":
+            raise PermissionDenied(
+                "Mutating platform-master content requires a separate, explicit "
+                "platform-level authorization -- ordinary permission does not imply it."
+            )
+        raise PermissionDenied("You do not have permission to modify this checklist content.")
 
 
 # --------------------------------------------------------------------------
@@ -227,6 +251,7 @@ class ChecklistDefinitionDetailView(APIView):
                 .select_for_update()
                 .get(public_id=public_id)
             )
+            _authorize_mutation(request, tenant, definition, PERM_DELETE_DRAFT)
             versions = list(definition.versions.all())
             if len(versions) != 1:
                 raise ValidationError("Only a definition with exactly one version may be deleted.")
@@ -373,6 +398,7 @@ class ChecklistVersionCreateView(APIView):
     def post(self, request, public_id):
         tenant = _require_tenant()
         definition = _get_definition_or_404(public_id, tenant)
+        _authorize_mutation(request, tenant, definition, PERM_CREATE_DEFINITION)
         try:
             version = create_next_version(definition=definition, actor=request.user)
         except VersionAllocationConflict as exc:
@@ -406,9 +432,11 @@ class ChecklistVersionDetailView(APIView):
         with transaction.atomic():
             version = (
                 ChecklistVersion.objects.visible_to(tenant)
+                .select_related("definition")
                 .select_for_update()
                 .get(public_id=public_id)
             )
+            _authorize_mutation(request, tenant, version.definition, PERM_EDIT_DRAFT)
             if not version.is_editable():
                 raise ValidationError(
                     {
@@ -452,11 +480,16 @@ class _ChecklistVersionActionViewBase(APIView):
             try:
                 version = (
                     ChecklistVersion.objects.visible_to(tenant)
+                    .select_related("definition")
                     .select_for_update()
                     .get(public_id=public_id)
                 )
             except ChecklistVersion.DoesNotExist as exc:
                 raise NotFound("Checklist version not found.") from exc
+
+            _authorize_mutation(
+                request, tenant, version.definition, self.required_permission.required_codename
+            )
 
             previous_status = version.status
             try:
@@ -598,6 +631,7 @@ class ChecklistSectionListCreateView(APIView):
     def post(self, request, public_id):
         tenant = _require_tenant()
         version = _get_version_or_404(public_id, tenant)
+        _authorize_mutation(request, tenant, version.definition, PERM_EDIT_DRAFT)
         _require_editable(version)
         serializer = ChecklistSectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -627,6 +661,7 @@ class ChecklistSectionDetailView(APIView):
     def patch(self, request, public_id):
         tenant = _require_tenant()
         section = _get_section_or_404(public_id, tenant)
+        _authorize_mutation(request, tenant, section.checklist_version.definition, PERM_EDIT_DRAFT)
         _require_editable(section.checklist_version)
         for field in ("title", "description", "display_order", "criticality"):
             if field in request.data:
@@ -649,6 +684,7 @@ class ChecklistSectionDetailView(APIView):
     def delete(self, request, public_id):
         tenant = _require_tenant()
         section = _get_section_or_404(public_id, tenant)
+        _authorize_mutation(request, tenant, section.checklist_version.definition, PERM_EDIT_DRAFT)
         _require_editable(section.checklist_version)
         section_public_id = str(section.public_id)
         section.delete()
@@ -672,6 +708,7 @@ class ChecklistQuestionListCreateView(APIView):
     def post(self, request, public_id):
         tenant = _require_tenant()
         section = _get_section_or_404(public_id, tenant)
+        _authorize_mutation(request, tenant, section.checklist_version.definition, PERM_EDIT_DRAFT)
         _require_editable(section.checklist_version)
         serializer = ChecklistQuestionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -701,6 +738,9 @@ class ChecklistQuestionDetailView(APIView):
     def patch(self, request, public_id):
         tenant = _require_tenant()
         question = _get_question_or_404(public_id, tenant)
+        _authorize_mutation(
+            request, tenant, question.section.checklist_version.definition, PERM_EDIT_DRAFT
+        )
         _require_editable(question.section.checklist_version)
         editable_fields = [
             "question_text",
@@ -741,6 +781,9 @@ class ChecklistQuestionDetailView(APIView):
     def delete(self, request, public_id):
         tenant = _require_tenant()
         question = _get_question_or_404(public_id, tenant)
+        _authorize_mutation(
+            request, tenant, question.section.checklist_version.definition, PERM_EDIT_DRAFT
+        )
         _require_editable(question.section.checklist_version)
         question_public_id = str(question.public_id)
         question.delete()
@@ -773,11 +816,14 @@ class ApplicabilityRuleListCreateView(APIView):
     def post(self, request, public_id):
         tenant = _require_tenant()
         version = _get_version_or_404(public_id, tenant)
+        _authorize_mutation(request, tenant, version.definition, PERM_EDIT_DRAFT)
         _require_editable(version)
         serializer = ApplicabilityRuleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            rule = ApplicabilityRule(checklist_version=version, **serializer.validated_data)
+            rule = ApplicabilityRule(
+                checklist_version=version, created_by=request.user, **serializer.validated_data
+            )
             rule.full_clean()
             rule.save()
         except DjangoValidationError as exc:

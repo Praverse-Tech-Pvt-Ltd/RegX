@@ -107,6 +107,46 @@ def can_create_definition_for_scope(*, actor, scope_type: str) -> bool:
     return True
 
 
+def can_mutate_definition_scope(*, actor, definition, tenant, required_permission: str) -> bool:
+    """Single authoritative object-scope mutation check for every
+    governed checklist object (definition, version, section, question,
+    applicability rule) that resolves to a ChecklistDefinition.
+
+    Visibility (ChecklistDefinitionManager.visible_to() and the related
+    managers built on it) deliberately exposes platform_master rows to
+    every tenant so they can be *read* -- that visibility must never be
+    mistaken for mutation authority. This function is the one place that
+    makes the distinction:
+
+    - the actor must hold the ordinary action permission (edit_draft,
+      create_definition, submit_review, review, approve, activate,
+      retire, delete_draft, ...) in their current tenant context, same
+      as before this function existed;
+    - if the resolved definition is platform_master, the actor must
+      ALSO satisfy can_author_platform_master() -- the same platform
+      grant required to create/clone platform_master content in the
+      first place. Neither Reviewer/VP/Tenant Admin/Platform Support
+      role membership nor an unrelated action permission ever implies
+      platform authority;
+    - if the resolved definition is tenant-scoped, the actor's current
+      tenant context must match the definition's own tenant (defense in
+      depth -- the visible_to()-based object lookups already guarantee
+      this by construction, since a tenant-scoped row from a different
+      tenant is never returned in the first place).
+
+    No database writes happen here; this is a pure authorization
+    decision, always evaluated before entering the mutation's
+    transaction and before any audit event is emitted.
+    """
+    from .enums import ChecklistScopeType
+
+    if not has_iig_checklist_permission(actor, tenant, required_permission):
+        return False
+    if definition.scope_type == ChecklistScopeType.PLATFORM_MASTER:
+        return can_author_platform_master(actor)
+    return definition.tenant_id == getattr(tenant, "id", None)
+
+
 class _IigChecklistPermissionBase(BasePermission):
     required_codename: str = ""
 

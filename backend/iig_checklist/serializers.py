@@ -47,12 +47,14 @@ class ChecklistDefinitionSerializer(serializers.ModelSerializer):
 
 class ChecklistVersionSerializer(serializers.ModelSerializer):
     definition_public_id = serializers.UUIDField(source="definition.public_id", read_only=True)
+    scope_type = serializers.CharField(source="definition.scope_type", read_only=True)
 
     class Meta:
         model = ChecklistVersion
         fields = [
             "public_id",
             "definition_public_id",
+            "scope_type",
             "version_number",
             "status",
             "effective_date",
