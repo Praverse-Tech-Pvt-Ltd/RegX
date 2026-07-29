@@ -1243,6 +1243,7 @@ export interface ChecklistDefinition {
 export interface ChecklistVersion {
   public_id: string;
   definition_public_id: string;
+  scope_type: "platform_master" | "tenant";
   version_number: number;
   status: ChecklistVersionStatus;
   effective_date: string | null;

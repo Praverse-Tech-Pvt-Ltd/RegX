@@ -93,6 +93,15 @@ function VersionDetailInner() {
     <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
       <h1 style={{ margin: "0 0 0.25rem" }}>Checklist version {version.version_number}</h1>
 
+      {version.scope_type === "platform_master" && (
+        <p style={{ fontSize: 12, color: "#92400e", background: "#fffbeb", padding: "6px 10px", borderRadius: 4, marginTop: 0 }}>
+          This is platform-master content, visible to every tenant. Modifying it
+          (lifecycle actions, sections, questions, applicability rules) requires a
+          separate, explicit platform-level authorization beyond ordinary permissions
+          — the server will reject any action below that you are not authorized for.
+        </p>
+      )}
+
       <dl style={{ display: "grid", gridTemplateColumns: "220px 1fr", rowGap: 10, fontSize: 14 }}>
         <dt style={{ color: "#6b7280" }}>Status</dt>
         <dd style={{ margin: 0, fontWeight: 600 }}>{version.status.replace(/_/g, " ")}</dd>
