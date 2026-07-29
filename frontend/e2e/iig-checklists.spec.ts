@@ -294,6 +294,31 @@ test.describe("Checklist version lifecycle", () => {
     await expect(page.getByRole("button", { name: /submit response/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /run calculation/i })).toHaveCount(0);
   });
+
+  test("platform-master content shows an authorization notice, and a denied lifecycle action is handled safely", async ({
+    page,
+  }) => {
+    await mockCsrf(page);
+    await page.route(
+      `${API}/api/regx/v1/iig-checklists/versions/ver-e2e-1/`,
+      jsonRoute(versionFixture({ scope_type: "platform_master", status: "draft" })),
+    );
+    await page.goto(`/iig-checklists/versions/ver-e2e-1?tenant=${TENANT}`);
+    await expect(
+      page.getByText(/requires a separate, explicit platform-level authorization/i),
+    ).toBeVisible();
+
+    await page.route(
+      `${API}/api/regx/v1/iig-checklists/versions/ver-e2e-1/submit-review/`,
+      jsonRoute(
+        { error: { status: 403, detail: "Mutating platform-master content requires a separate, explicit platform-level authorization -- ordinary permission does not imply it." } },
+        403,
+      ),
+    );
+    await page.getByRole("button", { name: "Submit for review" }).click();
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page).not.toHaveURL(/\/signin/);
+  });
 });
 
 test.describe("Clone", () => {

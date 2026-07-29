@@ -425,6 +425,7 @@ export function makeChecklistVersion(
   return {
     public_id: "checklist-version-public-0001",
     definition_public_id: "checklist-def-public-0001",
+    scope_type: "tenant",
     version_number: 1,
     status: "draft",
     effective_date: null,

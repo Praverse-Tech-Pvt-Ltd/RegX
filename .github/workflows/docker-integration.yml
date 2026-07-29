@@ -421,7 +421,7 @@ jobs:
           }
           check "iig-checklists definitions" http://localhost:8000/api/regx/v1/iig-checklists/definitions/
 
-      - name: "IIG checklist definition-governance production API flow (22 steps, no execution, no real regulatory content)"
+      - name: "IIG checklist definition-governance production API flow (27 steps, no execution, no real regulatory content)"
         run: |
           set -euo pipefail
           docker compose -p regx-ci exec -T backend python manage.py shell -c "
@@ -572,7 +572,8 @@ jobs:
           platform_client = api_client(platform_actor)
           resp = platform_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-PLATFORM-OK', 'title': 'x', 'scope_type': 'platform_master'}), **H)
           assert resp.status_code == 201, 'STEP 21 FAIL: authorized platform actor create returned %s' % resp.status_code
-          assert resp.json().get('tenant_public_id') is None, 'STEP 21 FAIL: platform-master definition unexpectedly has a tenant'
+          platform_def = resp.json()
+          assert platform_def.get('tenant_public_id') is None, 'STEP 21 FAIL: platform-master definition unexpectedly has a tenant'
           print('STEP 21 authorized platform actor can create platform-master content: OK')
 
           resp = doer_client.post(BASE + '/definitions/%s/clone/' % definition['public_id'], data=json.dumps({
@@ -582,6 +583,40 @@ jobs:
           assert resp.status_code == 403, 'STEP 22 FAIL: ordinary Doer clone-to-platform-master should be forbidden, got %s' % resp.status_code
           assert not _CD.objects.filter(code='CI-IIG-CLONE-PLATFORM-DENIED').exists(), 'STEP 22 FAIL: partial clone created despite 403'
           print('STEP 22 ordinary Doer cannot clone into platform-master scope: OK')
+
+          # STEP 23-27: platform-master CONTENT-MUTATION authorization
+          # (remediation for the second confirmed defect -- visibility of
+          # platform-master content via visible_to() was being conflated
+          # with mutation authority on every content-mutation endpoint,
+          # not just definition create/clone). Representative production-
+          # API checks only -- the full endpoint matrix is covered by
+          # backend/iig_checklist/tests/test_platform_mutation_authorization.py.
+          resp = platform_client.post(BASE + '/definitions/%s/versions/' % platform_def['public_id'], **H)
+          assert resp.status_code == 201, 'STEP 23 FAIL: authorized platform actor version-create returned %s' % resp.status_code
+          platform_vpub = resp.json()['public_id']
+          print('STEP 23 authorized platform actor created a version on platform-master content: OK')
+
+          resp = doer_client.patch(BASE + '/versions/%s/' % platform_vpub, data=json.dumps({'regulatory_basis': 'hijacked'}), **H)
+          assert resp.status_code == 403, 'STEP 24 FAIL: ordinary Doer platform-master version PATCH should be forbidden, got %s' % resp.status_code
+          print('STEP 24 ordinary Doer cannot PATCH platform-master version metadata: OK')
+
+          resp = doer_client.post(BASE + '/versions/%s/sections/' % platform_vpub, data=json.dumps({
+              'code': 'SEC-HACK', 'title': 'x', 'display_order': 1, 'criticality': 'low',
+          }), **H)
+          assert resp.status_code == 403, 'STEP 25 FAIL: ordinary Doer platform-master section-create should be forbidden, got %s' % resp.status_code
+          from iig_checklist.models import ChecklistSection as _CS
+          assert not _CS.objects.filter(code='SEC-HACK').exists(), 'STEP 25 FAIL: section created despite 403'
+          print('STEP 25 ordinary Doer cannot create sections on platform-master content: OK')
+
+          resp = doer_client.post(BASE + '/versions/%s/submit-review/' % platform_vpub, **H)
+          assert resp.status_code == 403, 'STEP 26 FAIL: ordinary Doer platform-master submit-review should be forbidden, got %s' % resp.status_code
+          print('STEP 26 ordinary Doer cannot submit-review platform-master content: OK')
+
+          resp = platform_client.post(BASE + '/versions/%s/sections/' % platform_vpub, data=json.dumps({
+              'code': 'SEC-OK', 'title': 'x', 'display_order': 1, 'criticality': 'low',
+          }), **H)
+          assert resp.status_code == 201, 'STEP 27 FAIL: authorized platform actor section-create returned %s' % resp.status_code
+          print('STEP 27 authorized platform actor can create a section on platform-master content: OK')
 
           print('IIG CHECKLIST DEFINITION GOVERNANCE FLOW: PASS')
           "

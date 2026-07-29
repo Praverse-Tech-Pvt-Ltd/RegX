@@ -280,4 +280,37 @@ describe("VersionDetailPage — lifecycle actions", () => {
     render(<VersionDetailPage />);
     expect(await screen.findByRole("button", { name: /^activate$/i })).toBeInTheDocument();
   });
+
+  it("shows a platform-master mutation-authorization notice for platform-master content", async () => {
+    api.versionsGet.mockResolvedValue(
+      makeChecklistVersion({ status: "draft", scope_type: "platform_master" })
+    );
+    render(<VersionDetailPage />);
+    expect(
+      await screen.findByText(/requires a separate, explicit platform-level authorization/i)
+    ).toBeInTheDocument();
+  });
+
+  it("does not show the platform-master notice for tenant-scoped content", async () => {
+    api.versionsGet.mockResolvedValue(
+      makeChecklistVersion({ status: "draft", scope_type: "tenant" })
+    );
+    render(<VersionDetailPage />);
+    await screen.findByRole("button", { name: /submit for review/i });
+    expect(
+      screen.queryByText(/requires a separate, explicit platform-level authorization/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a lifecycle-action denial inline (not a signin redirect) when mutation is denied", async () => {
+    const user = userEvent.setup();
+    api.versionsGet.mockResolvedValue(
+      makeChecklistVersion({ status: "draft", scope_type: "platform_master" })
+    );
+    api.versionsSubmitReview.mockRejectedValue(new ApiError(403, "Forbidden"));
+    render(<VersionDetailPage />);
+    await user.click(await screen.findByRole("button", { name: /submit for review/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/failed|permission|forbidden/i);
+    expect(nav.push).not.toHaveBeenCalledWith("/signin");
+  });
 });
