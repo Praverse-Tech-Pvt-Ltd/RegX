@@ -128,6 +128,58 @@ again (which is exactly how the original defect happened — the clone path
 had its own ad hoc, narrower guard that the direct-create path never
 received).
 
+#### Platform-master content-MUTATION authorization (second post-review remediation)
+
+An independent adversarial re-review, performed specifically before merge,
+found a second, related defect: the first fix only closed the *creation*
+boundary. `ChecklistDefinitionManager.visible_to()` (and every manager built
+on it) deliberately exposes `platform_master` rows to **every** tenant so
+they can be read — that is correct and unchanged. But every endpoint that
+mutates content on an *already-existing* platform-master version —
+`ChecklistVersionCreateView.post` (new version), `ChecklistVersionDetailView.patch`,
+every lifecycle action (submit-review/approve/return/reject/activate/
+supersede/retire), section/question/applicability-rule create/update/
+delete — was still gated only by the ordinary, object-agnostic tenant-
+membership permission classes (`CanEditChecklistDraft`, `CanCreateChecklistDefinition`,
+etc.). None of them re-checked that the specific object's scope matched
+the actor's authorization. Net effect: any ordinary Doer in any unrelated
+tenant could mutate someone else's platform-master content once they had
+its public_id (discoverable through the same universally-visible read
+endpoints).
+
+**Root cause:** visibility and mutation authority were never distinguished
+at the object level — only at the two definition/clone entry points.
+
+**Correction:** `permissions.py::can_mutate_definition_scope(*, actor,
+definition, tenant, required_permission)` is now the single authoritative
+object-scope mutation check. It:
+- requires the ordinary action permission (`edit_draft`, `create_definition`,
+  `submit_review`, `review`, `approve`, `activate`, `retire`, `delete_draft`)
+  in the actor's current tenant context, exactly as before;
+- **additionally** requires `can_author_platform_master()` when the
+  resolved definition is `platform_master` — the same platform grant
+  required to create/clone platform-master content in the first place;
+  neither Reviewer, VP, Tenant Admin, nor Platform Support role membership
+  ever substitutes for it, and the platform grant never substitutes for
+  the ordinary action permission either (additive, not either/or);
+- validates tenant ownership for `tenant`-scoped objects as defense in
+  depth (already guaranteed structurally by `visible_to()`, which never
+  returns a different tenant's row in the first place).
+
+Every mutating endpoint in `views.py` calls this through one helper,
+`_authorize_mutation(request, tenant, definition, required_codename)`,
+immediately after resolving the target object and before any write or
+audit emission — applied uniformly to version create/patch/all seven
+lifecycle actions, section create/update/delete, question create/update/
+delete, applicability-rule create, and definition deletion.
+
+A pre-existing, unrelated bug was also found and fixed while adding
+regression coverage for the applicability-rule endpoint:
+`ApplicabilityRuleListCreateView.post` never set `created_by`, a required
+field, so every rule-creation request — authorized or not — would have
+failed with a validation error regardless of this remediation. Fixed by
+passing `created_by=request.user` alongside the existing fields.
+
 ### Audit
 
 Twenty distinct event types (`iig_checklist.definition.created`,
@@ -173,6 +225,18 @@ no signal for `is_superuser` (exposing it would require changing the shared
 narrowly-scoped remediation), so the option is not hidden — the server
 remains the sole source of truth, and the denial is now surfaced clearly
 rather than concealed.
+
+The version-detail screen now also exposes `scope_type` on the version
+serializer (a small, in-domain, additive field — not a change to the
+shared `identity` app) and shows a passive notice when a version belongs
+to a `platform_master` definition: "requires a separate, explicit
+platform-level authorization." Since the frontend still cannot determine
+whether the *current* actor holds that grant without the same shared-
+identity change judged out of scope, the lifecycle/edit controls are not
+hidden — they remain visible for every actor, and a 403 from any of them
+is handled exactly like the create-form fix above: inline message, no
+signin redirect, no optimistic status change (the version is only
+reloaded after a real 2xx response).
 
 ## A real defect this milestone's own process caught
 

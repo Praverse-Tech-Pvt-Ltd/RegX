@@ -1,6 +1,6 @@
 # Milestone 4D-1: Test Strategy
 
-## Backend — `backend/iig_checklist/tests/` (224 tests)
+## Backend — `backend/iig_checklist/tests/` (259 tests)
 
 | File | Covers |
 |---|---|
@@ -12,7 +12,8 @@
 | `test_services.py` | Concurrent version-number allocation (real threads, distinct sequential numbers), version-number never client-supplied, clone eligibility/duplicate-code/atomicity/provenance-not-copied |
 | `test_api.py` | UUID-only responses, generic 404, tenant isolation, platform-master visibility, mass-assignment guard (status not patchable), PATCH blocked once under review, section deletion blocked once locked, the narrow empty-draft deletion exception (and its audit event) |
 | `test_clone_api.py` | Clone via the real endpoint, cross-tenant clone blocked, draft-source clone rejected |
-| `test_platform_authorization.py` (15 tests) | The post-review remediation for the confirmed Major platform-master finding: `can_author_platform_master()`/`can_create_definition_for_scope()` unit-level truth table; ordinary Doer blocked from direct-create and from clone into `platform_master` (403, no row created, no success audit event); an `is_superuser` actor succeeds on both paths; Tenant Admin and Platform Support also blocked; a source-inspection test pinning that both `ChecklistDefinitionListCreateView.post` and `ChecklistDefinitionCloneView.post` call the one centralized function, to catch future drift between the two paths |
+| `test_platform_authorization.py` (15 tests) | The post-review remediation for the confirmed Major platform-master **creation** finding: `can_author_platform_master()`/`can_create_definition_for_scope()` unit-level truth table; ordinary Doer blocked from direct-create and from clone into `platform_master` (403, no row created, no success audit event); an `is_superuser` actor succeeds on both paths; Tenant Admin and Platform Support also blocked; a source-inspection test pinning that both `ChecklistDefinitionListCreateView.post` and `ChecklistDefinitionCloneView.post` call the one centralized function |
+| `test_platform_mutation_authorization.py` (35 tests) | The remediation for the second, related finding (platform-master content-**mutation** authorization, caught by an independent adversarial re-review before merge): `can_mutate_definition_scope()` unit-level truth table (tenant object + own-tenant actor, tenant object + other-tenant actor, platform object + ordinary Doer, platform object + platform actor missing the operation permission); the full endpoint matrix — version create, version PATCH, every one of the 7 lifecycle actions, section create/update/delete, question create/update/delete, applicability-rule create, empty-draft-definition delete — each denied (403, no row created/changed/deleted, no success audit event) for an ordinary Doer against platform-master content and allowed for the authorized platform actor; a no-success-audit-on-denial check; a check that tenant-scoped mutations and tenant isolation (Tenant A cannot reach Tenant B's tenant-scoped content — generic 404, not 403) are unaffected |
 
 Concurrency tests use `@pytest.mark.django_db(transaction=True)` with real
 `threading.Thread`s and separate DB connections — a plain
@@ -22,27 +23,32 @@ vacuously pass (or 404) instead of actually racing.
 
 ## Frontend
 
-- **Unit** (`frontend/tests/unit/iig-checklists.test.tsx`, 17 tests):
+- **Unit** (`frontend/tests/unit/iig-checklists.test.tsx`, 20 tests):
   definition list/loading/empty/redirect-on-403, create-definition
   success/error, definition-detail versions rendering and
   create-version-button visibility, version-detail lifecycle-action
   visibility per status, return-reason-required validation, read-only
-  section/question rendering, and (post-review remediation) the
-  platform-master scope warning text, a 403-on-platform-master-create
-  denial rendering inline (not a signin redirect), and 401 still correctly
-  redirecting to signin.
+  section/question rendering, the platform-master scope warning text on
+  the create form, a 403-on-platform-master-create denial rendering
+  inline (not a signin redirect), 401 still correctly redirecting to
+  signin, and (mutation-authorization remediation) the version-detail
+  page's platform-master notice appearing only for `scope_type ===
+  "platform_master"`, and a denied lifecycle action rendering inline
+  without a signin redirect.
 - **Accessibility** (3 tests appended to `accessibility.test.tsx`):
   axe-core scans of the definition list, definition detail, and version
   detail (with lifecycle buttons rendered) screens.
-- **Playwright** (`frontend/e2e/iig-checklists.spec.ts`, 9 scenarios):
+- **Playwright** (`frontend/e2e/iig-checklists.spec.ts`, 10 scenarios):
   list, create→navigate, create-version, submit→return→resubmit,
   approve→activate→second-activate-conflict-surfaced,
   approved/active-never-shows-execution-UI, clone→fresh-draft-v1,
-  empty-draft-delete, and an ordinary Doer's platform-master creation
+  empty-draft-delete, an ordinary Doer's platform-master creation
   attempt being denied with a clear inline message rather than a signin
-  redirect. Every backend response is a deterministic `page.route` mock —
-  server-side correctness is the backend suite's job; this suite proves
-  the frontend renders and reacts to the documented API contract correctly.
+  redirect, and platform-master content showing the authorization
+  notice plus a safely-handled denied lifecycle action. Every backend
+  response is a deterministic `page.route` mock — server-side
+  correctness is the backend suite's job; this suite proves the
+  frontend renders and reacts to the documented API contract correctly.
 
 ### Frontend platform-master handling (post-review remediation)
 
@@ -73,7 +79,7 @@ backend endpoints and their test coverage exist in full
 
 ## Docker integration (`docker-integration.yml`)
 
-A 22-step production-API flow, added alongside the existing
+A 27-step production-API flow, added alongside the existing
 FDA/formulation/IID and template-migration flows. Unlike the frontend's
 mocked tests, this step drives the real `iig_checklist` views through
 `django.test.Client` inside `manage.py shell` against the live Docker
@@ -86,15 +92,26 @@ while draft → submit → Doer-cannot-approve → return → resubmit → appro
 clone → active definition still readable → non-empty-draft deletion
 blocked → empty draft created → empty draft deleted → audit events
 present for both delete and activate → no execution-domain fields appear
-anywhere in the flow's responses. Steps 20-22 (added for the platform-
-master remediation): an ordinary Doer's direct `platform_master` create
-is rejected with 403 and creates no row; an `is_superuser` actor's direct
-`platform_master` create succeeds with `tenant_public_id` null; the same
-ordinary Doer's attempt to clone into `platform_master` scope is rejected
-with 403 and creates no partial clone. All three go through the real
-production API (`doer_client`/`platform_client.post`), never an ORM
-shortcut, so a regression in `can_create_definition_for_scope()` would be
-caught here even in the hypothetical case it somehow passed pytest.
+anywhere in the flow's responses. Steps 20-22 (platform-master
+**creation** remediation): an ordinary Doer's direct `platform_master`
+create is rejected with 403 and creates no row; an `is_superuser` actor's
+direct `platform_master` create succeeds with `tenant_public_id` null;
+the same ordinary Doer's attempt to clone into `platform_master` scope is
+rejected with 403 and creates no partial clone. Steps 23-27 (platform-
+master content-**mutation** remediation, representative production-API
+coverage — the full endpoint matrix belongs in
+`test_platform_mutation_authorization.py`, not here, per the instruction
+not to make the Docker smoke brittle): the authorized platform actor
+creates a version on their platform-master definition; an ordinary Doer's
+attempt to PATCH that version's metadata is rejected with 403; the same
+Doer's attempt to create a section on it is rejected with 403 and creates
+no row; the same Doer's attempt to submit it for review is rejected with
+403; the authorized platform actor then successfully creates a section
+on it. All steps go through the real production API
+(`doer_client`/`platform_client.post`), never an ORM shortcut, so a
+regression in `can_create_definition_for_scope()` or
+`can_mutate_definition_scope()` would be caught here even in the
+hypothetical case it somehow passed pytest.
 
 ## What this milestone deliberately does not test
 
