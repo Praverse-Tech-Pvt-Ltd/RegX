@@ -17,6 +17,16 @@ PERM_CLONE = "iig_checklist.clone"
 PERM_DELETE_DRAFT = "iig_checklist.delete_draft"
 PERM_VIEW_AUDIT = "iig_checklist.view_audit"
 
+# Deliberately NOT granted to any built-in role below. Platform-master
+# checklist definitions are globally visible to every tenant, so
+# authoring them requires a distinct, explicit platform-level grant --
+# never inferred from ordinary Doer/Reviewer/VP/Tenant Admin/Platform
+# Support role membership, and never from PERM_CREATE_DEFINITION or
+# PERM_CLONE alone. See can_author_platform_master() below, which is the
+# single authoritative check for this action (used by both the direct-
+# create and clone code paths -- see views.py).
+PERM_CREATE_PLATFORM_DEFINITION = "iig_checklist.create_platform_definition"
+
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     Role.BuiltIn.DOER: [
         PERM_VIEW_DEFINITION,
@@ -61,6 +71,40 @@ def has_iig_checklist_permission(user, tenant, codename: str) -> bool:
         if codename in ROLE_PERMISSIONS.get(mr.role.name, []):
             return True
     return False
+
+
+def can_author_platform_master(user) -> bool:
+    """The single, authoritative platform-level authorization check.
+
+    Fail-closed and deliberately independent of tenant membership and of
+    every ROLE_PERMISSIONS entry above: an ordinary Doer, Reviewer, VP,
+    Tenant Admin, or Platform Support role -- in any tenant -- never
+    satisfies this, no matter what other iig_checklist permission they
+    hold. Platform-level authority is represented the same way the rest
+    of this codebase represents authority that is not tenant-scoped
+    (see identity/managers.py's superuser flag), rather than by
+    inventing a parallel, tenant-role-shaped concept of "platform role."
+
+    A future migration MAY additionally grant PERM_CREATE_PLATFORM_DEFINITION
+    to a specific custom Role and have this function also consult
+    has_iig_checklist_permission() for it -- today, no such grant exists,
+    so this function is the whole story.
+    """
+    return bool(user and getattr(user, "is_authenticated", False) and user.is_superuser)
+
+
+def can_create_definition_for_scope(*, actor, scope_type: str) -> bool:
+    """Centralized scope-authorization rule for both the direct-create
+    and clone code paths (views.py) -- the only place either path may
+    decide whether an actor may author a definition in the given scope.
+    Ordinary tenant-scoped authoring is governed by the caller's own
+    PERM_CREATE_DEFINITION/PERM_CLONE check plus tenant-context scoping;
+    this function governs platform_master authoring only."""
+    from .enums import ChecklistScopeType
+
+    if scope_type == ChecklistScopeType.PLATFORM_MASTER:
+        return can_author_platform_master(actor)
+    return True
 
 
 class _IigChecklistPermissionBase(BasePermission):

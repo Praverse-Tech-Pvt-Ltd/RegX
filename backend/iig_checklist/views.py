@@ -39,6 +39,7 @@ from .permissions import (
     CanReviewChecklist,
     CanSubmitChecklistReview,
     CanViewChecklistDefinition,
+    can_create_definition_for_scope,
 )
 from .serializers import (
     ApplicabilityRuleSerializer,
@@ -161,6 +162,18 @@ class ChecklistDefinitionListCreateView(APIView):
         scope_type = serializer.validated_data["scope_type"]
         definition_tenant = tenant if scope_type == "tenant" else None
 
+        # Centralized platform-master authorization check -- must run
+        # before anything is created, and before the transaction even
+        # opens, so a denied request never creates a definition/version
+        # and never emits a success audit event. Same rule the clone
+        # endpoint uses (see ChecklistDefinitionCloneView.post).
+        if not can_create_definition_for_scope(actor=request.user, scope_type=scope_type):
+            raise PermissionDenied(
+                "Creating platform-master content requires a separate, explicit "
+                "platform-level authorization -- ordinary create-definition "
+                "permission does not imply it."
+            )
+
         with transaction.atomic():
             try:
                 definition = ChecklistDefinition(
@@ -278,8 +291,20 @@ class ChecklistDefinitionCloneView(APIView):
                 raise PermissionDenied(
                     "Cloning into a different tenant requires a separate authorization."
                 )
-        elif definition.scope_type != "platform_master" and definition.tenant_id != tenant.id:
-            raise PermissionDenied("Cannot clone another tenant's content to platform-master.")
+        else:
+            # target_scope_type == "platform_master" -- same centralized
+            # authorization rule as the direct-create endpoint. Cloning
+            # is not a separate way to acquire platform authority: an
+            # ordinary CanCloneChecklist grant never implies it,
+            # regardless of who owns the source content.
+            if not can_create_definition_for_scope(
+                actor=request.user, scope_type=target_scope_type
+            ):
+                raise PermissionDenied(
+                    "Cloning into platform-master scope requires a separate, "
+                    "explicit platform-level authorization -- ordinary clone "
+                    "permission does not imply it."
+                )
 
         try:
             result = clone_definition(

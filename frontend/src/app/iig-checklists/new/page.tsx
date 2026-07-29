@@ -30,8 +30,16 @@ function NewDefinitionPageInner() {
       });
       router.push(`/iig-checklists/${definition.public_id}?tenant=${tenantSlug}`);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+      if (err instanceof ApiError && err.status === 401) {
         router.push("/signin");
+        return;
+      }
+      if (err instanceof ApiError && err.status === 403) {
+        setFormError(
+          scopeType === "platform_master"
+            ? "Creating platform-master content requires a separate, explicit platform-level authorization. Your ordinary create-definition permission does not grant it."
+            : err.message || "You do not have permission to perform this action."
+        );
         return;
       }
       setFormError(err instanceof ApiError ? err.message : "Creation failed.");
@@ -103,6 +111,14 @@ function NewDefinitionPageInner() {
             <option value="platform_master">Platform master</option>
           </select>
         </label>
+        {scopeType === "platform_master" && (
+          <p style={{ fontSize: 12, color: "#92400e", marginTop: -4, marginBottom: "1rem" }}>
+            Platform-master content is visible to every tenant and requires a separate,
+            explicit platform-level authorization. An ordinary create-definition
+            permission does not grant it — the server will reject this request unless
+            you hold that authorization.
+          </p>
+        )}
         {formError && (
           <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
             {formError}
