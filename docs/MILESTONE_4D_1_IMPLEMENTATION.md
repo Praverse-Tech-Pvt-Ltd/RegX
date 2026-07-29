@@ -93,12 +93,40 @@ stores denormalized string/UUID metadata, not live foreign keys).
 
 ### Permissions
 
-Eleven codenames (`iig_checklist.view_definition`, `create_definition`,
+Eleven ordinary codenames (`iig_checklist.view_definition`, `create_definition`,
 `edit_draft`, `submit_review`, `review`, `approve`, `activate`, `retire`,
 `clone`, `delete_draft`, `view_audit`), mapped to the platform's five
 built-in roles the same way `fda_data` does it — fail-closed, tenant-
 membership-based lookup, server-side authoritative (never trust a client-
 supplied role).
+
+#### Platform-master authorization (post-review remediation)
+
+A human review of the initial implementation found a Major defect: creating
+a `platform_master`-scoped definition (globally visible to every tenant)
+required only ordinary `create_definition`/`clone` permission — held by any
+Doer, in any tenant. Nothing distinguished "author tenant-scoped content"
+from "author platform-wide content."
+
+The fix adds a twelfth codename, `iig_checklist.create_platform_definition`,
+that is **deliberately absent from every built-in role's `ROLE_PERMISSIONS`
+entry** — Doer, Reviewer, VP, Tenant Admin, and Platform Support all fail
+this check regardless of what else they hold. The actual grant is
+represented by Django's `is_superuser` flag (`can_author_platform_master()`
+in `permissions.py`) — the same mechanism already used elsewhere in this
+codebase (`identity/managers.py`) to represent authority that is not
+tenant-scoped, rather than inventing a parallel "platform role" concept.
+
+Both code paths that can produce a `platform_master` definition —
+`ChecklistDefinitionListCreateView.post` (direct create) and
+`ChecklistDefinitionCloneView.post` (clone) — call the same single function,
+`can_create_definition_for_scope(actor=..., scope_type=...)`, before any
+database write and before the transaction opens, so a denied request never
+creates a definition/version and never emits a success audit event. This
+was a deliberate design choice to prevent the two paths drifting apart
+again (which is exactly how the original defect happened — the clone path
+had its own ad hoc, narrower guard that the direct-create path never
+received).
 
 ### Audit
 
@@ -131,6 +159,20 @@ conventions already established by the `fda-data`/`formulations` screens
   by current status (never rendering an execution-domain control).
 
 No checklist-execution UI exists anywhere in this milestone's frontend.
+
+The create-definition form distinguishes a 401 (unauthenticated → redirect
+to sign-in) from a 403 (authorized-but-denied → inline message, no
+redirect) — selecting "Platform master" also shows an inline notice that it
+requires a separate, explicit platform-level authorization before the form
+is even submitted. This was itself a small defect found while implementing
+the platform-master remediation: the form previously treated every 403 the
+same as a 401 and silently redirected to `/signin`, which would have hidden
+a legitimate platform-authorization denial from the user. The frontend has
+no signal for `is_superuser` (exposing it would require changing the shared
+`identity` app's user-profile serializer, judged out of scope for this
+narrowly-scoped remediation), so the option is not hidden — the server
+remains the sole source of truth, and the denial is now surfaced clearly
+rather than concealed.
 
 ## A real defect this milestone's own process caught
 

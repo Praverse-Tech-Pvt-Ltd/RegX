@@ -1,6 +1,6 @@
 # Milestone 4D-1: Test Strategy
 
-## Backend — `backend/iig_checklist/tests/` (209 tests)
+## Backend — `backend/iig_checklist/tests/` (224 tests)
 
 | File | Covers |
 |---|---|
@@ -12,6 +12,7 @@
 | `test_services.py` | Concurrent version-number allocation (real threads, distinct sequential numbers), version-number never client-supplied, clone eligibility/duplicate-code/atomicity/provenance-not-copied |
 | `test_api.py` | UUID-only responses, generic 404, tenant isolation, platform-master visibility, mass-assignment guard (status not patchable), PATCH blocked once under review, section deletion blocked once locked, the narrow empty-draft deletion exception (and its audit event) |
 | `test_clone_api.py` | Clone via the real endpoint, cross-tenant clone blocked, draft-source clone rejected |
+| `test_platform_authorization.py` (15 tests) | The post-review remediation for the confirmed Major platform-master finding: `can_author_platform_master()`/`can_create_definition_for_scope()` unit-level truth table; ordinary Doer blocked from direct-create and from clone into `platform_master` (403, no row created, no success audit event); an `is_superuser` actor succeeds on both paths; Tenant Admin and Platform Support also blocked; a source-inspection test pinning that both `ChecklistDefinitionListCreateView.post` and `ChecklistDefinitionCloneView.post` call the one centralized function, to catch future drift between the two paths |
 
 Concurrency tests use `@pytest.mark.django_db(transaction=True)` with real
 `threading.Thread`s and separate DB connections — a plain
@@ -21,23 +22,42 @@ vacuously pass (or 404) instead of actually racing.
 
 ## Frontend
 
-- **Unit** (`frontend/tests/unit/iig-checklists.test.tsx`, 14 tests):
+- **Unit** (`frontend/tests/unit/iig-checklists.test.tsx`, 17 tests):
   definition list/loading/empty/redirect-on-403, create-definition
   success/error, definition-detail versions rendering and
   create-version-button visibility, version-detail lifecycle-action
   visibility per status, return-reason-required validation, read-only
-  section/question rendering.
+  section/question rendering, and (post-review remediation) the
+  platform-master scope warning text, a 403-on-platform-master-create
+  denial rendering inline (not a signin redirect), and 401 still correctly
+  redirecting to signin.
 - **Accessibility** (3 tests appended to `accessibility.test.tsx`):
   axe-core scans of the definition list, definition detail, and version
   detail (with lifecycle buttons rendered) screens.
-- **Playwright** (`frontend/e2e/iig-checklists.spec.ts`, 8 scenarios):
+- **Playwright** (`frontend/e2e/iig-checklists.spec.ts`, 9 scenarios):
   list, create→navigate, create-version, submit→return→resubmit,
   approve→activate→second-activate-conflict-surfaced,
   approved/active-never-shows-execution-UI, clone→fresh-draft-v1,
-  empty-draft-delete. Every backend response is a deterministic
-  `page.route` mock — server-side correctness is the backend suite's job;
-  this suite proves the frontend renders and reacts to the documented API
-  contract correctly.
+  empty-draft-delete, and an ordinary Doer's platform-master creation
+  attempt being denied with a clear inline message rather than a signin
+  redirect. Every backend response is a deterministic `page.route` mock —
+  server-side correctness is the backend suite's job; this suite proves
+  the frontend renders and reacts to the documented API contract correctly.
+
+### Frontend platform-master handling (post-review remediation)
+
+While implementing the platform-master fix, the create-definition form was
+found to redirect *any* 403 to `/signin`, indistinguishable from a real
+401 (unauthenticated). That would have hidden a legitimate platform-
+authorization denial behind a confusing "please sign in" redirect. The fix
+separates 401 (→ signin) from 403 (→ inline, specific message), and shows
+a warning as soon as "Platform master" is selected, before submission.
+Determining the actor's actual platform grant client-side (to hide/disable
+the option entirely) would require exposing `is_superuser` on the shared
+`identity` app's user-profile endpoint — judged out of scope for this
+narrowly-scoped remediation, so the option remains selectable and the
+server remains the sole authority; the user simply now gets a clear,
+correct answer instead of a misleading one.
 
 ### A known gap, disclosed rather than hidden
 
@@ -53,20 +73,28 @@ backend endpoints and their test coverage exist in full
 
 ## Docker integration (`docker-integration.yml`)
 
-A 19-step production-API flow, added alongside the existing
+A 22-step production-API flow, added alongside the existing
 FDA/formulation/IID and template-migration flows. Unlike the frontend's
 mocked tests, this step drives the real `iig_checklist` views through
 `django.test.Client` inside `manage.py shell` against the live Docker
 Postgres/Redis stack — it is what actually caught the clone
 response-shape mismatch described in
-`docs/MILESTONE_4D_1_IMPLEMENTATION.md`. Steps: create definition →
+`docs/MILESTONE_4D_1_IMPLEMENTATION.md`. Steps 1-19: create definition →
 create version → illegal direct-approve blocked → set effective_date
 while draft → submit → Doer-cannot-approve → return → resubmit → approve
 → activate → re-activation-of-active-blocked → UUID-only version list →
 clone → active definition still readable → non-empty-draft deletion
 blocked → empty draft created → empty draft deleted → audit events
 present for both delete and activate → no execution-domain fields appear
-anywhere in the flow's responses.
+anywhere in the flow's responses. Steps 20-22 (added for the platform-
+master remediation): an ordinary Doer's direct `platform_master` create
+is rejected with 403 and creates no row; an `is_superuser` actor's direct
+`platform_master` create succeeds with `tenant_public_id` null; the same
+ordinary Doer's attempt to clone into `platform_master` scope is rejected
+with 403 and creates no partial clone. All three go through the real
+production API (`doer_client`/`platform_client.post`), never an ORM
+shortcut, so a regression in `can_create_definition_for_scope()` would be
+caught here even in the hypothetical case it somehow passed pytest.
 
 ## What this milestone deliberately does not test
 
