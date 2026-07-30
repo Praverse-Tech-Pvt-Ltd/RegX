@@ -123,9 +123,9 @@ in `regx-main`:
   implicitly tenant-scoped by every view's tenant-context lookup.
 
 **4D-2 dependency:** `ChecklistExecution` FKs to `FormulationVersion`
-via its `public_id` (UUID field, not a live FK, following the
-`AssessmentSnapshot` pattern) or a live FK with `on_delete=PROTECT`.
-This is the primary **open design question** — see §12.
+via a live Django FK with `on_delete=PROTECT` (Q1 resolved by DR-2-03;
+see §7 and §12). The API exposes only `formulation_version.public_id`
+(UUID); no internal numeric PK is serialized.
 
 ### 3c. `iid_assessment`
 
@@ -208,7 +208,7 @@ ChecklistExecution
   public_id               UUID
   tenant                  FK → tenancy.Tenant (on_delete=PROTECT)
   checklist_version       FK → ChecklistVersion (on_delete=PROTECT)
-  formulation_version_public_id   UUID (not a live FK — see §12 open Q1)
+  formulation_version     FK → formulations.FormulationVersion (on_delete=PROTECT)
   status                  draft | submitted_for_review | returned |
                           approved | rejected | cancelled | superseded
   created_by              FK → identity.User (on_delete=PROTECT)
@@ -396,37 +396,64 @@ before writing the FK. Violation returns
 
 ## 8. Response storage options
 
-**`raw_value` as `JSONField` — RESOLVED (DR-2-12):**
+**`raw_value` as `JSONField` — RESOLVED (DR-2-12, DR-2-17):**
 
 Single JSONField with strict serializer-level validation against
-`answer_type`. Canonical shapes:
+`answer_type`. The prior DR-2-12 table used names that do not match the
+implemented `AnswerType` enum (`boolean`, `text`, `system_calculated` as
+an answer type). DR-2-17 replaces it with the definitive table keyed by
+the exact DB values in `backend/iig_checklist/enums.py`.
 
-| answer_type | `raw_value` shape |
-|---|---|
-| `boolean` | `{"value": true\|false}` |
-| `decimal` | `{"value": "123.456", "unit": "mg/day"}` (string for precision) |
-| `integer` | `{"value": 42}` |
-| `text` | `{"value": "..."}` (max `MAX_FREE_TEXT_CHARS` chars) |
-| `date` | `{"value": "YYYY-MM-DD"}` |
-| `single_select` | `{"selected": "option_code"}` |
-| `multi_select` | `{"selected": ["code_a", "code_b"]}` (max `MAX_SELECT_OPTIONS`) |
-| `attachment_reference` | `{"document_version_public_id": "<uuid>"}` |
-| `fda_record_reference` | `{"fda_record_public_id": "<uuid>", "fda_record_type": "substance"}` |
-| `formulation_component_reference` | `{"formulation_component_public_id": "<uuid>"}` |
-| `system_calculated` | `null` always — value lives in `CalculationOutcome` |
+**Important distinction:** `system_calculated` is a
+`DataSourceClassification` value, **not** an `AnswerType`. A question
+whose `data_source_classification == DataSourceClassification.SYSTEM_CALCULATED`
+may have `answer_type` of `calculated_value`, `calculated_status`,
+`yes_no_na`, or `percentage` (per the compatibility matrix in
+`MILESTONE_4D_1_IMPLEMENTATION_SPEC.md §3d-i`). `CalculationOutcome`
+placeholder creation is triggered by the classification, not by any
+answer type named "system_calculated".
 
-`NOT_APPLICABLE` state: `raw_value = null`, `is_not_applicable = True`,
-`not_applicable_reason` set (structured rule ID, max `MAX_NOT_APPLICABLE_REASON_CHARS`).
+**Canonical `raw_value` shapes — DR-2-17 (all 18 `AnswerType` DB values):**
 
-Unanswered state (eager creation): `raw_value = null`, `is_not_applicable = False`,
-`entered_by = null`. Distinguishable from NOT_APPLICABLE by the `is_not_applicable` flag.
+| `answer_type` DB value | Client input | Canonical `raw_value` shape | Size limit | Notes |
+|---|---|---|---|---|
+| `short_text` | YES | `{"value": "..."}` | MAX_FREE_TEXT_CHARS | Non-empty string; floats/integers rejected |
+| `long_narrative` | YES | `{"value": "..."}` | MAX_FREE_TEXT_CHARS | Non-empty string |
+| `integer` | YES | `{"value": 42}` | — | JSON integer; floats and strings rejected |
+| `decimal` | YES | `{"value": "12.3400"}` | — | Decimal string; JSON float rejected |
+| `quantity_with_unit` | YES | `{"value": "12.3400", "unit": "mg"}` | — | Decimal string + one unit from `allowed_units`; empty unit rejected |
+| `percentage` | YES | `{"value": "12.3400"}` | — | Decimal string; range `0.0000`–`100.0000` inclusive |
+| `date` | YES | `{"value": "YYYY-MM-DD"}` | — | ISO 8601 date string only |
+| `yes_no` | YES | `{"value": true}` or `{"value": false}` | — | JSON boolean only; strings rejected |
+| `yes_no_na` | YES | `{"value": "yes"}` or `{"value": "no"}` or `{"value": "not_applicable"}` | — | Controlled string enum; JSON boolean rejected |
+| `single_select` | YES | `{"option": "OPTION_CODE"}` | — | Must be a valid `QuestionOption.code` in the pinned `ChecklistVersion` |
+| `multi_select` | YES | `{"options": ["CODE_A", "CODE_B"]}` | MAX_SELECT_OPTIONS items | Sorted ascending; duplicate codes rejected; each code must be a valid `QuestionOption.code` |
+| `fda_record_reference` | YES | `{"public_id": "<uuid>", "record_type": "<controlled-type>"}` | — | Source validated against FDA record; `record_type` from closed enum |
+| `formulation_component_reference` | YES | `{"public_id": "<uuid>"}` | — | Must belong to the execution's linked `FormulationVersion` |
+| `attachment_reference` | YES | `{"document_version_public_id": "<uuid>"}` | — | Must belong to same tenant; DR-2-06 deletion protection applies |
+| `calculated_value` | NO | `null` always | — | Value in `CalculationOutcome`; client-supplied `raw_value` rejected with `invalid_raw_value_shape` |
+| `calculated_status` | NO | `null` always | — | Status/value in `CalculationOutcome`; client-supplied `raw_value` rejected |
+| `reviewer_conclusion` | CONDITIONAL | `{"value": "..."}` | MAX_FREE_TEXT_CHARS | Only actor with `PERM_REVIEW_EXECUTION`; only while execution is `submitted_for_review`; provenance via `entered_by`/`entered_at` |
+| `approval_metadata` | NO | `null` in 4D-2 | — | Populated by lifecycle infrastructure; client input prohibited; shape defined in 4D-4 |
 
-Size limits — RESOLVED (DR-2-01):
+**`NOT_APPLICABLE` state (any type):** `raw_value = null`,
+`is_not_applicable = True`, `not_applicable_reason` set (structured rule
+ID, max `MAX_NOT_APPLICABLE_REASON_CHARS`). `is_not_applicable` is
+supported on all 18 types except `calculated_value`, `calculated_status`,
+and `approval_metadata`, which always have `raw_value = null` by design
+and must not be marked `not_applicable` through the client.
+
+**Unanswered state (eager creation):** `raw_value = null`,
+`is_not_applicable = False`, `entered_by = null`. Distinguishable from
+`NOT_APPLICABLE` by the `is_not_applicable` flag.
+
+**Size limits — RESOLVED (DR-2-01):**
 - `raw_value`: max `MAX_RAW_VALUE_BYTES = 16_384` bytes (serialized JSON)
 - `return_reason`: max `MAX_RETURN_REASON_CHARS = 2_000`
 - `reviewer_conclusion_note`: max `MAX_REVIEWER_CONCLUSION_CHARS = 4_000`
 - `not_applicable_reason`: max `MAX_NOT_APPLICABLE_REASON_CHARS = 200`
 - `multi_select` arrays: max `MAX_SELECT_OPTIONS = 64` items
+- `short_text`, `long_narrative`, `reviewer_conclusion` `value`: max `MAX_FREE_TEXT_CHARS = 4_000` chars
 
 All limits validated at the serializer layer; `error_code = "payload_too_large"`
 / 400 on violation. No silent truncation.
@@ -806,9 +833,11 @@ in any 4D-2 implementation branch:
 - `FDA_DERIVED_DEFAULT` auto-population (4D-3).
 - `SYSTEM_CALCULATED` computation and recalculation (4D-3).
 - Override/deviation workflow (4D-4).
-- Reviewer conclusion required at `approve` — the note field exists in
-  4D-2 but the enforcement is 4D-4 scope unless Q5 is resolved as
-  4D-2.
+- Reviewer conclusion enforcement is **included in 4D-2 scope** (Q5
+  resolved by DR-2-07): `reviewer_conclusion_note` is required in the
+  `approve` request body, validated by `ApproveSerializer`, and stored
+  atomically with the status transition. Override/deviation workflow and
+  final regulatory-conclusion automation remain deferred to 4D-4.
 - Controlled JSON/CSV export (4D-4).
 - PDF/Word export (explicitly deferred beyond 4D per approved design).
 - Real regulatory checklist content.

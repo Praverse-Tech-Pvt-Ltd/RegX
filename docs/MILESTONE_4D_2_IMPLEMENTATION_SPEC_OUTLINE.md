@@ -48,8 +48,9 @@ design-review comments.
 - `SYSTEM_CALCULATED` computation and recalculation (4D-3).
 - Override/deviation workflow (4D-4).
 - Controlled exports — JSON, CSV, SHA-256 checksum (4D-4).
-- Reviewer conclusion enforcement beyond the field itself (4D-4 unless
-  Q5 is resolved as 4D-2).
+- Reviewer conclusion enforcement IS included in 4D-2 scope (Q5
+  resolved by DR-2-07). Override/deviation workflow and regulatory
+  conclusion automation remain deferred to 4D-4.
 - Real regulatory checklist content.
 - PDF/Word export (deferred beyond 4D per approved design).
 - Any modification to 4D-1 definition-governance models or migrations.
@@ -187,7 +188,7 @@ _EXECUTION_TRANSITIONS = {
     "submit_review": (frozenset({"draft", "returned"}), "submitted_for_review"),
     "approve":       (frozenset({"submitted_for_review"}),  "approved"),
     "return":        (frozenset({"submitted_for_review"}),  "returned"),
-    "reject":        (frozenset({"submitted_for_review"}),  "rejected"),
+    "reject":        (frozenset({"draft", "submitted_for_review"}), "rejected"),
     "cancel":        (frozenset({"draft", "returned"}),     "cancelled"),
     "supersede":     (frozenset({"approved"}),              "superseded"),
 }
@@ -316,7 +317,7 @@ to reach another tenant's execution. Same convention as 4D-1.
       - Create ChecklistResponse(execution=exec, question=q,
           data_source_type_snapshot=q.data_source_classification,
           raw_value=null, is_not_applicable=False, entered_by=null).
-      - If q.answer_type == "system_calculated": create
+      - If q.data_source_classification == DataSourceClassification.SYSTEM_CALCULATED: create
         CalculationOutcome(response=r, status="DATA_REQUIRED",
           calculation_name=q.bound_calculation_name, ...) (DR-2-09).
    e. Catch IntegrityError → structured 409 (uniqueness race).
@@ -424,7 +425,7 @@ Read-only representation:
 ```
 public_id, status, created_at, updated_at,
 checklist_version: {public_id, version_number, status},
-formulation_version_public_id (or nested, per Q1),
+formulation_version_public_id (UUID only — from the live FK on the model; Q1 resolved by DR-2-03),
 created_by_email, submitted_by_email, submitted_at,
 returned_by_email, returned_at, return_reason,
 approved_by_email, approved_at,
@@ -475,6 +476,24 @@ all set by the service layer only.
 
 Mass-assignment guard: any unknown field in the request body returns a
 structured 400, not silent acceptance.
+
+**`raw_value` shape validation (DR-2-17):** the serializer validates
+`raw_value` against the canonical shape for the question's `answer_type`
+(all 18 DB values from `enums.py`). Validation rejects:
+- a non-null `raw_value` for `calculated_value`, `calculated_status`,
+  or `approval_metadata` (client input prohibited);
+- a JSON float where a decimal string is required (`decimal`,
+  `quantity_with_unit`, `percentage`);
+- a string `"true"`/`"false"` where a JSON boolean is required (`yes_no`);
+- a boolean where a controlled string enum is required (`yes_no_na`);
+- any `yes_no_na` value outside `{"value": "yes"}`, `{"value": "no"}`,
+  `{"value": "not_applicable"}`;
+- duplicate option codes in `multi_select`;
+- a `reviewer_conclusion` `raw_value` submitted by an actor without
+  `PERM_REVIEW_EXECUTION`.
+
+All validation failures return `error_code = "invalid_raw_value_shape"` /
+400 before any DB write.
 
 ### 8.5 Lifecycle action serializers
 
@@ -556,7 +575,7 @@ Migration safety:
 ## Section 11 — Import linter
 
 Add `iig_checklist` → `formulations` to the allowed-imports contract
-in `backend/pyproject.toml` if Q1 resolves to a live FK:
+in `backend/pyproject.toml` (Q1 resolved to live FK by DR-2-03):
 
 ```toml
 [[tool.importlinter.contracts]]
@@ -663,19 +682,29 @@ export const iigChecklists = {
   accepted and exactly-over-limit rejected with `payload_too_large` (not
   a raw Django ValidationError). Test targets: `raw_value`, `return_reason`,
   `reviewer_conclusion_note`, `not_applicable_reason`.
-- `raw_value` shapes (DR-2-12): one test per `answer_type` (11 total)
-  verifying canonical shape accepted and at least one malformed shape
-  rejected with `invalid_raw_value_shape`.
+- `raw_value` shapes (DR-2-17): one test per `answer_type` (all 18
+  DB values from `enums.py`) verifying: canonical shape accepted;
+  at least one malformed shape rejected with `invalid_raw_value_shape`;
+  `calculated_value` and `calculated_status` reject any client-supplied
+  `raw_value`; `approval_metadata` rejects client input; `decimal` and
+  `percentage` reject JSON floats; `yes_no` rejects strings; `yes_no_na`
+  rejects booleans and any string outside the three controlled values;
+  `multi_select` rejects duplicate option codes.
 - FormulationVersion status gate (DR-2-10): `create_execution()` rejects
   `draft` and `under_review` formulation versions with
   `formulation_version_not_approved`.
 - Cross-tenant formulation version gate (DR-2-03): `create_execution()`
   rejects a formulation version belonging to a different tenant with
   `formulation_version_tenant_mismatch`.
-- CalculationOutcome DATA_REQUIRED placeholders (DR-2-09): execution
-  creation for a version with `SYSTEM_CALCULATED` questions creates
-  `CalculationOutcome` rows with `status=DATA_REQUIRED`; no other
-  `CalculationOutcome` creation occurs in 4D-2.
+- CalculationOutcome DATA_REQUIRED placeholders (DR-2-09, DR-2-18):
+  execution creation for a version with questions whose
+  `data_source_classification == SYSTEM_CALCULATED` creates
+  `CalculationOutcome` rows with `status=DATA_REQUIRED`. Covers both
+  `calculated_value` and `calculated_status` answer types. Questions
+  with `USER_REQUIRED`, `REVIEWER_CONFIRMED`, `FDA_DERIVED_DEFAULT`, or
+  `EVIDENCE_DERIVED` classification do NOT receive placeholders. No
+  calculation evaluation occurs in 4D-2; no other `CalculationOutcome`
+  creation path exists in this milestone.
 
 ### 13.2 Lifecycle tests
 
@@ -686,6 +715,10 @@ export const iigChecklists = {
 - Complete illegal transition coverage: every action attempted from
   every disallowed status — structured `IllegalExecutionTransition`
   raised, no DB write, no audit event.
+- `reject` from `draft` succeeds for an authorized actor (DR-2-19).
+- `reject` from `submitted_for_review` succeeds.
+- `reject` from `returned`, `approved`, `cancelled`, `rejected`,
+  `superseded` is blocked.
 - Terminal states cannot transition (3 tests: `rejected`, `cancelled`,
   `superseded`).
 - Self-approval guard: `submitted_by == actor` on `approve` → structured
@@ -707,7 +740,8 @@ export const iigChecklists = {
   execution.
 - `status` not patchable via PATCH on any endpoint.
 - Illegal transition via lifecycle action endpoint returns structured 400.
-- `reviewer_conclusion_note` required at `approve` (pending Q5).
+- `reviewer_conclusion_note` required at `approve` (DR-2-07); missing
+  note returns `reviewer_conclusion_required` / 400.
 - Bounded pagination on list endpoint.
 - 401/403 handling consistent with 4D-1 conventions.
 
@@ -715,8 +749,9 @@ export const iigChecklists = {
 
 `backend/iig_checklist/tests/test_response_api.py`:
 
-- `raw_value` accepted for each of the 11 `answer_type` shapes;
-  malformed shape rejected with structured 400.
+- `raw_value` accepted for each of the 18 `answer_type` shapes (all
+  DB values from `enums.py`); malformed shape rejected with structured
+  400 (`invalid_raw_value_shape`).
 - `is_not_applicable = True` + `raw_value = null` accepted.
 - `is_not_applicable = True` + non-null `raw_value` rejected.
 - `not_applicable_reason` required when `is_not_applicable = True`.
@@ -854,7 +889,7 @@ formally resolved. See `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md`.
 | Milestone | What it builds on from 4D-2 |
 |---|---|
 | 4D-3 | `ChecklistResponse` eager rows populated with `FDA_DERIVED_DEFAULT`; `CalculationOutcome` rows computed from 4D-2's `CalculationOutcome` model using `iid_assessment.calculations` services; recalculation on `USER_REQUIRED` change; `REVIEWER_CONFIRMED` auto-populated where confidence is high |
-| 4D-4 | Override/deviation workflow on `ChecklistResponse`; `reviewer_conclusion_note` enforcement (if deferred from 4D-2 per Q5); controlled JSON/CSV export with SHA-256 checksum; `_csv_safe_cell()` promotion from `templates_registry` to `common`; real regulatory checklist content loading |
+| 4D-4 | Override/deviation workflow on `ChecklistResponse`; controlled JSON/CSV export with SHA-256 checksum; `_csv_safe_cell()` promotion from `templates_registry` to `common`; real regulatory checklist content loading |
 
 4D-2 must not pre-implement any 4D-3 or 4D-4 feature, even partially.
 Partial implementations that "just need to be wired up" in a later
