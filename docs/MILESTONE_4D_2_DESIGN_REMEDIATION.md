@@ -533,6 +533,11 @@ question's `answer_type` is rejected with
 - `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8` — serializer
   section expanded with shapes reference.
 
+**Note:** This table used answer type names (`boolean`, `text`,
+`system_calculated`) that do not match the implemented `AnswerType` enum
+in `backend/iig_checklist/enums.py`. DR-2-17 supersedes this table with
+the definitive 18-type mapping keyed by exact DB values.
+
 ---
 
 ### DR-2-13 — NEW MINOR — Audit: response-entered vs response-updated distinction
@@ -652,6 +657,256 @@ ordering avoids the AB/BA deadlock pattern.
 
 ---
 
+---
+
+### DR-2-17 — CRITICAL — Answer type naming mismatch in response schema
+
+**Status: CLOSED**
+
+**Finding:** The DR-2-12 canonical `raw_value` shapes table and the
+discovery §8 table used answer type names that do not exist in the
+implemented `AnswerType` enum (`backend/iig_checklist/enums.py`):
+
+| Used in prior docs | Actual DB value | Notes |
+|---|---|---|
+| `boolean` | does not exist | actual: `yes_no`, `yes_no_na` |
+| `text` | does not exist | actual: `short_text`, `long_narrative` |
+| `system_calculated` | not an `AnswerType` | `system_calculated` is a `DataSourceClassification` |
+
+The prior table also covered only 11 types; the implemented enum has 18.
+Seven answer types present in the codebase were entirely unspecified:
+`quantity_with_unit`, `percentage`, `yes_no`, `reviewer_conclusion`,
+`approval_metadata`, and the `short_text`/`long_narrative` split.
+
+**Root cause:** The DR-2-12 table was authored against the approved 4D
+design document's terminology rather than verified against the 4D-1
+implemented `AnswerType` TextChoices in `enums.py`.
+
+**Resolution (APPROVED):**
+
+DR-2-17 supersedes DR-2-12's shapes table. The definitive table is keyed
+by exact DB values from `enums.py` and covers all 18 answer types. See
+the updated `MILESTONE_4D_2_DISCOVERY.md §8` for the authoritative table.
+
+Key corrections:
+- `boolean` → `yes_no` (JSON boolean) and `yes_no_na` (controlled string enum)
+- `text` → `short_text` and `long_narrative` (both `{"value": "..."}`)
+- `system_calculated` row removed — it is a `DataSourceClassification`, not
+  an `AnswerType`; `CalculationOutcome` creation is triggered by
+  classification, not answer type
+- `calculated_value` and `calculated_status` added: `raw_value = null` always
+- `quantity_with_unit` added: `{"value": "12.3400", "unit": "mg"}`
+- `percentage` added: `{"value": "12.3400"}`, range 0.0000–100.0000
+- `reviewer_conclusion` added: `{"value": "..."}`, PERM_REVIEW_EXECUTION only
+- `approval_metadata` added: `null` in 4D-2; populated by lifecycle infrastructure
+- `single_select` key: `"option"` (was `"selected"`)
+- `multi_select` key: `"options"` (was `"selected"`); duplicate codes rejected; sorted
+- `fda_record_reference` keys: `"public_id"`, `"record_type"` (were `fda_record_public_id`,
+  `fda_record_type`)
+- `formulation_component_reference` key: `"public_id"` (was `formulation_component_public_id`)
+
+**Implementation impact:** Serializer validation must cover all 18 types.
+`calculated_value`, `calculated_status`, and `approval_metadata` must
+reject any client-supplied `raw_value`. `decimal`, `quantity_with_unit`,
+and `percentage` must reject JSON floats. `yes_no` must reject strings.
+`yes_no_na` must accept only the three controlled string values.
+
+**Test impact:** One test per answer type (18 total) verifying canonical
+shape accepted and malformed shape rejected. Two additional tests:
+`calculated_value` and `calculated_status` reject non-null `raw_value`.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §8` — shapes table replaced with
+  DR-2-17 18-type normative table.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.4` — serializer
+  validation section expanded with DR-2-17 per-type rules.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.1` — answer-type
+  test count updated from 11 to 18.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.4` — response
+  test count updated from 11 to 18.
+
+---
+
+### DR-2-18 — MAJOR — Calculation placeholder predicate references non-existent answer type
+
+**Status: CLOSED**
+
+**Finding:** The spec outline §6.1 service pseudo-code used the condition:
+
+```python
+if q.answer_type == "system_calculated": create CalculationOutcome(...)
+```
+
+`"system_calculated"` is not a valid `AnswerType` DB value. This condition
+is always false, meaning `CalculationOutcome` DATA_REQUIRED placeholder
+rows would never be created, silently breaking the 4D-3 pipeline.
+
+**Root cause:** Conflation of `DataSourceClassification.SYSTEM_CALCULATED`
+(a classification value) with an answer type named `system_calculated` (which
+does not exist in the enum).
+
+**Resolution (APPROVED):**
+
+The correct predicate checks the data-source classification:
+
+```python
+if q.data_source_classification == DataSourceClassification.SYSTEM_CALCULATED:
+    create CalculationOutcome(...)
+```
+
+A `SYSTEM_CALCULATED` question may have answer type `calculated_value`,
+`calculated_status`, `yes_no_na`, or `percentage` (per the compatibility
+matrix). The `CalculationOutcome` is created based on classification, not
+answer type. No calculation evaluation occurs in 4D-2; all placeholders
+remain `status=DATA_REQUIRED` only.
+
+**Implementation impact:** The `create_execution()` service must import
+`DataSourceClassification` from `iig_checklist.enums` and check
+`q.data_source_classification` to decide whether to create a
+`CalculationOutcome` row.
+
+**Test impact:** Add test: a version with `SYSTEM_CALCULATED` questions
+of both `calculated_value` and `calculated_status` answer types both
+receive `DATA_REQUIRED` placeholders. A version with only `USER_REQUIRED`
+questions receives zero `CalculationOutcome` rows.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §6.1` — predicate
+  corrected from `q.answer_type == "system_calculated"` to
+  `q.data_source_classification == DataSourceClassification.SYSTEM_CALCULATED`.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.1` — test
+  requirements updated to reference DR-2-18.
+
+---
+
+### DR-2-19 — MAJOR — `reject` action missing `draft` source in spec outline
+
+**Status: CLOSED**
+
+**Finding:** The spec outline §4.1 `_EXECUTION_TRANSITIONS` dict showed:
+
+```python
+"reject": (frozenset({"submitted_for_review"}), "rejected"),
+```
+
+The approved 4D design and discovery §6a both specify:
+
+```
+reject | draft, submitted_for_review | rejected
+```
+
+DR-2-14 (an observation finding in this document) explicitly confirmed
+that `reject` from `draft` is correct. However DR-2-14 did not catch that
+the spec outline had already narrowed the source set, leaving a direct
+contradiction between the discovery document and the spec outline.
+
+**Impact:** An implementation built from the spec outline would raise
+`IllegalExecutionTransition` when a VP rejects a `draft` execution.
+
+**Resolution (APPROVED):**
+
+```python
+"reject": (frozenset({"draft", "submitted_for_review"}), "rejected"),
+```
+
+Rationale (from DR-2-14): a VP may reject a draft execution as a
+record-clearing workflow (e.g., an erroneous execution against the wrong
+formulation version that was never submitted). `rejected` is terminal;
+no resurrection; correction requires a new execution. `reject` remains
+permission-controlled (`PERM_APPROVE_EXECUTION`); no unauthorized reject;
+every rejection is audited; no direct status patching.
+
+**Test impact:** Add test: `reject` from `draft` succeeds for an actor
+with `PERM_APPROVE_EXECUTION`. Verify `reject` from `returned` is blocked
+(not an approved source for this action). Verify ordinary Doer without
+`PERM_APPROVE_EXECUTION` cannot reject.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §4.1` — `reject`
+  frozenset updated to include `"draft"`.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.2` — lifecycle
+  test requirements expanded with reject-from-draft tests.
+
+---
+
+### DR-2-20 — MAJOR — Discovery §5 model field block not corrected by DR-2-03
+
+**Status: CLOSED**
+
+**Finding:** The discovery document's §5 candidate model field block still
+read:
+
+```
+formulation_version_public_id   UUID (not a live FK — see §12 open Q1)
+```
+
+DR-2-03 claimed "MILESTONE_4D_2_DISCOVERY.md §5 — model field updated to
+live FK" but this correction was not applied. §7 and §12 correctly showed
+the live FK resolution, creating a direct contradiction within the discovery
+document. An implementer reading §5 as the authoritative model field list
+would implement a UUID field rather than a live FK.
+
+**Resolution (APPROVED):**
+
+§5 corrected to:
+
+```
+formulation_version     FK → formulations.FormulationVersion (on_delete=PROTECT)
+```
+
+Consistent with §7, §12, and the spec outline §3.1. The API serializer
+exposes `formulation_version_public_id` (UUID only — no internal PK);
+the database field is a live FK. Cross-tenant protection: `create_execution()`
+verifies tenant ownership before writing the FK (DR-2-03). `on_delete=PROTECT`
+prevents deletion of a `FormulationVersion` while executions reference it.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §5` — field corrected to live FK.
+
+---
+
+### DR-2-21 — MINOR — Stale open-question wording in discovery §3b
+
+**Status: CLOSED**
+
+**Finding:** The discovery §3b architecture section referred to the
+FormulationVersion linkage as "the primary **open design question**"
+even after Q1 was resolved by DR-2-03.
+
+**Resolution (APPROVED):** §3b updated to state that Q1 was resolved by
+DR-2-03; 4D-2 uses a live PROTECT FK; the API exposes UUID only.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §3b` — stale wording replaced with
+  resolved statement.
+
+---
+
+### DR-2-22 — MINOR — Stale conditional Q5 wording in discovery §20 and spec outline §1.2
+
+**Status: CLOSED**
+
+**Finding:** Both documents used the conditional phrasing "4D-4 scope
+unless Q5 is resolved as 4D-2." Q5 was resolved as 4D-2 scope by DR-2-07.
+An implementer might read the conditional as meaning the enforcement is
+still deferred.
+
+**Resolution (APPROVED):** Both sections updated to definitive statements:
+reviewer-conclusion enforcement IS included in 4D-2 scope per DR-2-07.
+Override/deviation workflow and regulatory-conclusion automation remain
+deferred to 4D-4.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §20` — conditional replaced with
+  definitive statement.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §1.2` — same.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.3` — pending-Q5
+  qualifier removed from API test.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §18` — stale
+  "if deferred from 4D-2 per Q5" clause removed from 4D-4 row.
+
+---
+
 ## Decision register
 
 | # | Question | Decision | Status |
@@ -683,11 +938,17 @@ ordering avoids the AB/BA deadlock pattern.
 | DR-2-09 | Major | Q7 — CalculationOutcome in scope | CLOSED |
 | DR-2-10 | Major | FormulationVersion status requirement | CLOSED |
 | DR-2-11 | Major | Applicability freeze mechanism | CLOSED |
-| DR-2-12 | Minor | raw_value shapes not fully specified | CLOSED |
+| DR-2-12 | Minor | raw_value shapes — initial table (superseded by DR-2-17) | CLOSED |
 | DR-2-13 | Minor | response.entered vs .updated distinction | CLOSED |
 | DR-2-14 | Observation | reject from draft semantics | CLOSED |
 | DR-2-15 | Observation | Frontend response UI deferral | CLOSED |
 | DR-2-16 | Minor | select_for_update() scope at creation | CLOSED |
+| DR-2-17 | Critical | Answer type naming mismatch — 18-type schema (from independent review) | CLOSED |
+| DR-2-18 | Major | Calculation placeholder predicate (from independent review) | CLOSED |
+| DR-2-19 | Major | reject-from-draft missing from spec outline (from independent review) | CLOSED |
+| DR-2-20 | Major | Discovery §5 model field not corrected (from independent review) | CLOSED |
+| DR-2-21 | Minor | Stale open-Q1 wording in discovery §3b (from independent review) | CLOSED |
+| DR-2-22 | Minor | Stale conditional Q5 wording (from independent review) | CLOSED |
 
 **Critical remaining: 0**
 **Major remaining: 0**
@@ -704,23 +965,27 @@ ordering avoids the AB/BA deadlock pattern.
 | All new design questions resolved | YES |
 | No Critical findings remaining | YES |
 | No Major findings remaining | YES |
-| payload limits defined | YES |
-| Canonical response shapes defined | YES |
+| Payload limits defined | YES |
+| Canonical response shapes defined for all 18 AnswerType values (DR-2-17) | YES |
 | Retention semantics explicit | YES |
 | Lock ordering specified | YES |
 | FormulationVersion status requirement added | YES |
 | Applicability freeze clarified | YES |
+| Calculation placeholder predicate uses DataSourceClassification (DR-2-18) | YES |
+| reject-from-draft aligned in spec outline (DR-2-19) | YES |
+| Discovery §5 model field corrected to live FK (DR-2-20) | YES |
+| Stale open-Q1 wording removed (DR-2-21) | YES |
+| Q5 reviewer-conclusion scope finalized (DR-2-22) | YES |
 | Product code changed | NO |
 | Migrations added | NO |
 | Backend code changed | NO |
 | Frontend code changed | NO |
 | Docker / CI changed | NO |
 
-**Ready for independent design review:** YES
+**Ready for second independent design review:** YES
 
 **Ready to finalize 4D-2 implementation specification:** YES — pending
-one final human review of `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md`
-with all DR corrections applied.
+second independent design review PASS and formal human approval.
 
 **Ready to implement 4D-2:** NO — implementation specification must be
 formally approved by a human reviewer with domain authority before a
