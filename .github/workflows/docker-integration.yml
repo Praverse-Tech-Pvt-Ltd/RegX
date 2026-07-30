@@ -408,6 +408,219 @@ jobs:
           print('APPROVED SYNONYM IID SMOKE FLOW: PASS')
           "
 
+      - name: Verify IIG checklist frontend routes return HTTP 200
+        run: |
+          curl -sf -o /dev/null -w "iig-checklists: %{http_code}\n" "http://localhost:3000/iig-checklists?tenant=x"
+
+      - name: Verify IIG checklist API routes are wired (401/403, never 404)
+        run: |
+          check() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$2" ${3:+-X "$3"})
+            echo "$1: $code"
+            [ "$code" = "401" ] || [ "$code" = "403" ] || { echo "$1 unexpectedly returned $code (route may be unwired)"; exit 1; }
+          }
+          check "iig-checklists definitions" http://localhost:8000/api/regx/v1/iig-checklists/definitions/
+
+      - name: "IIG checklist definition-governance production API flow (27 steps, no execution, no real regulatory content)"
+        run: |
+          set -euo pipefail
+          docker compose -p regx-ci exec -T backend python manage.py shell -c "
+          import json
+
+          from django.contrib.auth import get_user_model
+          from django.test import Client
+
+          from authorization.models import MembershipRole, Role
+          from tenancy.models import Tenant, TenantMembership
+
+          User = get_user_model()
+          BASE = '/api/regx/v1/iig-checklists'
+
+          tenant, _ = Tenant.objects.get_or_create(slug='docker-ci-iig-checklist', defaults={'name': 'Docker CI IIG Checklist'})
+
+          def make_actor(email, full_name, role_name):
+              user, _ = User.objects.get_or_create(email=email, defaults={'full_name': full_name})
+              membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
+              role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
+              MembershipRole.objects.get_or_create(membership=membership, role=role)
+              return user
+
+          def api_client(user):
+              c = Client(SERVER_NAME='localhost')
+              c.force_login(user)
+              return c
+
+          doer = make_actor('ci-iig-doer@example.com', 'CI IIG Doer', 'doer')
+          reviewer = make_actor('ci-iig-reviewer@example.com', 'CI IIG Reviewer', 'reviewer')
+          vp = make_actor('ci-iig-vp@example.com', 'CI IIG VP', 'vp')
+          doer_client = api_client(doer)
+          reviewer_client = api_client(reviewer)
+          vp_client = api_client(vp)
+          H = {'HTTP_X_TENANT_SLUG': tenant.slug, 'content_type': 'application/json'}
+
+          resp = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-SMOKE', 'title': 'CI IIG Smoke (synthetic)', 'scope_type': 'tenant'}), **H)
+          assert resp.status_code == 201, 'STEP 1 FAIL: definition create returned %s' % resp.status_code
+          definition = resp.json()
+          assert 'id' not in definition and 'pk' not in definition, 'STEP 1 FAIL: numeric id leaked'
+          print('STEP 1 definition created (UUID-only response): OK')
+
+          resp = doer_client.post(BASE + '/definitions/%s/versions/' % definition['public_id'], **H)
+          assert resp.status_code == 201, 'STEP 2 FAIL: version create returned %s' % resp.status_code
+          version = resp.json()
+          assert version['version_number'] == 1 and version['status'] == 'draft', 'STEP 2 FAIL: unexpected initial version state %s' % version
+          print('STEP 2 version 1 created in draft: OK')
+
+          vpub = version['public_id']
+          resp = vp_client.post(BASE + '/versions/%s/approve/' % vpub, **H)
+          assert resp.status_code == 400, 'STEP 3 FAIL: direct draft->approve should be illegal, got %s' % resp.status_code
+          print('STEP 3 direct draft-to-approve blocked: OK')
+
+          # effective_date must be set while the version is still editable
+          # (draft/returned) -- the model blocks mutating it once approved.
+          resp = doer_client.patch(BASE + '/versions/%s/' % vpub, data=json.dumps({'effective_date': '2026-01-01'}), **H)
+          assert resp.status_code == 200, 'STEP 4 FAIL: setting effective_date returned %s' % resp.status_code
+          print('STEP 4 effective date set while draft: OK')
+
+          resp = doer_client.post(BASE + '/versions/%s/submit-review/' % vpub, **H)
+          assert resp.status_code == 200 and resp.json()['status'] == 'under_review', 'STEP 5 FAIL: submit-review returned %s' % resp.status_code
+          print('STEP 5 submitted for review: OK')
+
+          resp = doer_client.post(BASE + '/versions/%s/approve/' % vpub, **H)
+          assert resp.status_code == 403, 'STEP 6 FAIL: Doer approve should be forbidden, got %s' % resp.status_code
+          print('STEP 6 Doer cannot approve (segregation of duties): OK')
+
+          resp = reviewer_client.post(BASE + '/versions/%s/return/' % vpub, data=json.dumps({'reason': 'CI smoke: fix section order'}), **H)
+          assert resp.status_code == 200 and resp.json()['status'] == 'returned', 'STEP 7 FAIL: return returned %s' % resp.status_code
+          print('STEP 7 returned with reason: OK')
+
+          resp = doer_client.post(BASE + '/versions/%s/submit-review/' % vpub, **H)
+          assert resp.status_code == 200 and resp.json()['status'] == 'under_review', 'STEP 8 FAIL: resubmit returned %s' % resp.status_code
+          print('STEP 8 resubmitted after return: OK')
+
+          resp = vp_client.post(BASE + '/versions/%s/approve/' % vpub, **H)
+          assert resp.status_code == 200 and resp.json()['status'] == 'approved', 'STEP 9 FAIL: approve returned %s' % resp.status_code
+          print('STEP 9 approved: OK')
+
+          resp = vp_client.post(BASE + '/versions/%s/activate/' % vpub, **H)
+          assert resp.status_code == 200 and resp.json()['status'] == 'active', 'STEP 10 FAIL: activate returned %s' % resp.status_code
+          print('STEP 10 activated (effective_date carried through from draft): OK')
+
+          resp = vp_client.post(BASE + '/versions/%s/activate/' % vpub, **H)
+          assert resp.status_code == 400, 'STEP 11 FAIL: re-activating an already-active version should be illegal, got %s' % resp.status_code
+          print('STEP 11 re-activation of an already-active version blocked: OK')
+
+          resp = doer_client.get(BASE + '/definitions/%s/versions/' % definition['public_id'], **{'HTTP_X_TENANT_SLUG': tenant.slug})
+          assert resp.status_code == 200, 'STEP 12 FAIL: version list returned %s' % resp.status_code
+          body_text = json.dumps(resp.json())
+          assert '\"id\":' not in body_text and '\"pk\":' not in body_text, 'STEP 12 FAIL: numeric id/pk leaked in version list'
+          print('STEP 12 version list is UUID-only: OK')
+
+          resp = doer_client.post(BASE + '/definitions/%s/clone/' % definition['public_id'], data=json.dumps({
+              'source_version_public_id': vpub, 'target_scope_type': 'tenant',
+              'target_tenant_public_id': str(tenant.public_id), 'new_code': 'CI-IIG-SMOKE-CLONE', 'new_title': 'CI IIG Smoke Clone',
+          }), **H)
+          assert resp.status_code == 201, 'STEP 13 FAIL: clone returned %s' % resp.status_code
+          clone_body = resp.json()
+          assert clone_body['current_version']['status'] == 'draft' and clone_body['current_version']['version_number'] == 1, 'STEP 13 FAIL: clone did not produce a fresh draft v1'
+          assert clone_body['public_id'] != definition['public_id'], 'STEP 13 FAIL: clone reused the source definition'
+          print('STEP 13 clone produced an independent draft v1, no history copied: OK')
+
+          resp = doer_client.get(BASE + '/definitions/%s/' % definition['public_id'], **{'HTTP_X_TENANT_SLUG': tenant.slug})
+          assert resp.status_code == 200, 'STEP 14 FAIL: definition detail returned %s' % resp.status_code
+          print('STEP 14 active definition still readable: OK')
+
+          resp = doer_client.delete(BASE + '/definitions/%s/' % definition['public_id'], **{'HTTP_X_TENANT_SLUG': tenant.slug})
+          assert resp.status_code == 400, 'STEP 15 FAIL: deletion of a definition whose version was submitted/activated should be blocked, got %s' % resp.status_code
+          print('STEP 15 non-empty-draft (submitted/active) definition delete blocked: OK')
+
+          resp2 = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-EMPTY-DRAFT', 'title': 'CI IIG Empty Draft', 'scope_type': 'tenant'}), **H)
+          empty_def = resp2.json()
+          resp3 = doer_client.post(BASE + '/definitions/%s/versions/' % empty_def['public_id'], **H)
+          assert resp3.status_code == 201, 'STEP 16 FAIL: empty-draft version create returned %s' % resp3.status_code
+          print('STEP 16 empty draft definition + version 1 created: OK')
+
+          resp4 = doer_client.delete(BASE + '/definitions/%s/' % empty_def['public_id'], **{'HTTP_X_TENANT_SLUG': tenant.slug})
+          assert resp4.status_code == 204, 'STEP 17 FAIL: empty never-submitted draft delete returned %s' % resp4.status_code
+          print('STEP 17 empty never-submitted draft deleted: OK')
+
+          from audit.models import AuditEvent
+          assert AuditEvent.objects.filter(resource_id=empty_def['public_id'], event_type='iig_checklist.definition.deleted').exists(), 'STEP 18 FAIL: deletion audit event missing'
+          assert AuditEvent.objects.filter(resource_id=vpub, event_type='iig_checklist.version.activated').exists(), 'STEP 18 FAIL: activation audit event missing'
+          print('STEP 18 audit events recorded for delete and activate: OK')
+
+          assert 'checklist_response' not in body_text.lower() and 'calculation_outcome' not in body_text.lower(), 'STEP 19 FAIL: execution-domain fields leaked into a governance response'
+          print('STEP 19 no checklist-execution fields present anywhere in this flow: OK')
+
+          # STEP 20-22: platform-master authorization (remediation for the
+          # confirmed Major finding -- an ordinary Doer must never be able
+          # to create or clone into platform_master scope). Uses the real
+          # production API, never an ORM shortcut, so a regression in the
+          # centralized can_create_definition_for_scope() check is caught
+          # here even if it somehow passed pytest.
+          resp = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-PLATFORM-DENIED', 'title': 'x', 'scope_type': 'platform_master'}), **H)
+          assert resp.status_code == 403, 'STEP 20 FAIL: ordinary Doer platform-master create should be forbidden, got %s' % resp.status_code
+          from iig_checklist.models import ChecklistDefinition as _CD
+          assert not _CD.objects.filter(code='CI-IIG-PLATFORM-DENIED').exists(), 'STEP 20 FAIL: platform-master definition was created despite 403'
+          print('STEP 20 ordinary Doer cannot create platform-master content: OK')
+
+          platform_actor, _ = User.objects.get_or_create(email='ci-iig-platform-actor@example.com', defaults={'full_name': 'CI IIG Platform Actor', 'is_superuser': True, 'is_staff': True})
+          if not platform_actor.is_superuser:
+              platform_actor.is_superuser = True
+              platform_actor.is_staff = True
+              platform_actor.save(update_fields=['is_superuser', 'is_staff'])
+          make_actor('ci-iig-platform-actor@example.com', 'CI IIG Platform Actor', 'doer')
+          platform_client = api_client(platform_actor)
+          resp = platform_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-PLATFORM-OK', 'title': 'x', 'scope_type': 'platform_master'}), **H)
+          assert resp.status_code == 201, 'STEP 21 FAIL: authorized platform actor create returned %s' % resp.status_code
+          platform_def = resp.json()
+          assert platform_def.get('tenant_public_id') is None, 'STEP 21 FAIL: platform-master definition unexpectedly has a tenant'
+          print('STEP 21 authorized platform actor can create platform-master content: OK')
+
+          resp = doer_client.post(BASE + '/definitions/%s/clone/' % definition['public_id'], data=json.dumps({
+              'source_version_public_id': vpub, 'target_scope_type': 'platform_master',
+              'new_code': 'CI-IIG-CLONE-PLATFORM-DENIED', 'new_title': 'x',
+          }), **H)
+          assert resp.status_code == 403, 'STEP 22 FAIL: ordinary Doer clone-to-platform-master should be forbidden, got %s' % resp.status_code
+          assert not _CD.objects.filter(code='CI-IIG-CLONE-PLATFORM-DENIED').exists(), 'STEP 22 FAIL: partial clone created despite 403'
+          print('STEP 22 ordinary Doer cannot clone into platform-master scope: OK')
+
+          # STEP 23-27: platform-master CONTENT-MUTATION authorization
+          # (remediation for the second confirmed defect -- visibility of
+          # platform-master content via visible_to() was being conflated
+          # with mutation authority on every content-mutation endpoint,
+          # not just definition create/clone). Representative production-
+          # API checks only -- the full endpoint matrix is covered by
+          # backend/iig_checklist/tests/test_platform_mutation_authorization.py.
+          resp = platform_client.post(BASE + '/definitions/%s/versions/' % platform_def['public_id'], **H)
+          assert resp.status_code == 201, 'STEP 23 FAIL: authorized platform actor version-create returned %s' % resp.status_code
+          platform_vpub = resp.json()['public_id']
+          print('STEP 23 authorized platform actor created a version on platform-master content: OK')
+
+          resp = doer_client.patch(BASE + '/versions/%s/' % platform_vpub, data=json.dumps({'regulatory_basis': 'hijacked'}), **H)
+          assert resp.status_code == 403, 'STEP 24 FAIL: ordinary Doer platform-master version PATCH should be forbidden, got %s' % resp.status_code
+          print('STEP 24 ordinary Doer cannot PATCH platform-master version metadata: OK')
+
+          resp = doer_client.post(BASE + '/versions/%s/sections/' % platform_vpub, data=json.dumps({
+              'code': 'SEC-HACK', 'title': 'x', 'display_order': 1, 'criticality': 'low',
+          }), **H)
+          assert resp.status_code == 403, 'STEP 25 FAIL: ordinary Doer platform-master section-create should be forbidden, got %s' % resp.status_code
+          from iig_checklist.models import ChecklistSection as _CS
+          assert not _CS.objects.filter(code='SEC-HACK').exists(), 'STEP 25 FAIL: section created despite 403'
+          print('STEP 25 ordinary Doer cannot create sections on platform-master content: OK')
+
+          resp = doer_client.post(BASE + '/versions/%s/submit-review/' % platform_vpub, **H)
+          assert resp.status_code == 403, 'STEP 26 FAIL: ordinary Doer platform-master submit-review should be forbidden, got %s' % resp.status_code
+          print('STEP 26 ordinary Doer cannot submit-review platform-master content: OK')
+
+          resp = platform_client.post(BASE + '/versions/%s/sections/' % platform_vpub, data=json.dumps({
+              'code': 'SEC-OK', 'title': 'x', 'display_order': 1, 'criticality': 'low',
+          }), **H)
+          assert resp.status_code == 201, 'STEP 27 FAIL: authorized platform actor section-create returned %s' % resp.status_code
+          print('STEP 27 authorized platform actor can create a section on platform-master content: OK')
+
+          print('IIG CHECKLIST DEFINITION GOVERNANCE FLOW: PASS')
+          "
+
       - name: Verify production CSP header is present
         run: |
           curl -sD - -o /dev/null http://localhost:3000/signin | grep -i "content-security-policy" || { echo "CSP header missing"; exit 1; }

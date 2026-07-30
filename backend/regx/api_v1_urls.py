@@ -13,4 +13,5 @@ urlpatterns = [
     path("", include("fda_data.urls")),
     path("", include("formulations.urls")),
     path("", include("iid_assessment.urls")),
+    path("", include("iig_checklist.urls")),
 ]

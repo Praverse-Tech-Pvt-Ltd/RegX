@@ -13,6 +13,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   makeAssessmentPreview,
+  makeChecklistDefinition,
+  makeChecklistVersion,
   makeDocument,
   makeFdaRelease,
   makeFormulationComponent,
@@ -83,6 +85,13 @@ const fdaApi = vi.hoisted(() => ({
   preview: vi.fn(),
 }));
 
+const checklistApi = vi.hoisted(() => ({
+  definitionsList: vi.fn(),
+  definitionsGet: vi.fn(),
+  versionsListForDefinition: vi.fn(),
+  versionsGet: vi.fn(),
+}));
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
@@ -115,6 +124,18 @@ vi.mock("@/lib/api", async (importOriginal) => {
       dosingRegimens: { ...actual.formulations.dosingRegimens, list: fdaApi.dosingRegimensList },
     },
     iidAssessments: { ...actual.iidAssessments, preview: fdaApi.preview },
+    iigChecklists: {
+      definitions: {
+        ...actual.iigChecklists.definitions,
+        list: checklistApi.definitionsList,
+        get: checklistApi.definitionsGet,
+      },
+      versions: {
+        ...actual.iigChecklists.versions,
+        listForDefinition: checklistApi.versionsListForDefinition,
+        get: checklistApi.versionsGet,
+      },
+    },
   };
 });
 
@@ -131,13 +152,18 @@ import OrangeBookSearchPage from "@/app/fda-data/orange-book/page";
 import FormulationDetailPage from "@/app/formulations/[publicId]/page";
 import VersionDetailPage from "@/app/formulations/[publicId]/versions/[versionPublicId]/page";
 import IidPreviewPage from "@/app/iid-assessments/preview/page";
+import ChecklistDefinitionsPage from "@/app/iig-checklists/page";
+import ChecklistDefinitionDetailPage from "@/app/iig-checklists/[publicId]/page";
+import ChecklistVersionDetailPage from "@/app/iig-checklists/versions/[versionPublicId]/page";
 
 beforeEach(() => {
   nav.push.mockReset();
   nav.tenant = "alpha";
   nav.publicId = "doc-public-0001";
+  nav.versionPublicId = "version-public-0001";
   Object.values(api).forEach((fn) => fn.mockReset());
   Object.values(fdaApi).forEach((fn) => fn.mockReset());
+  Object.values(checklistApi).forEach((fn) => fn.mockReset());
   api.versionStatus.mockResolvedValue({ scan_status: "clean", processing_status: "complete" });
   fdaApi.versionsList.mockResolvedValue(paginate([]));
   fdaApi.componentsList.mockResolvedValue([]);
@@ -476,5 +502,41 @@ describe("Accessibility — /formulations/{public_id}/versions/{version_public_i
     expect(link).toHaveAccessibleName();
     link.focus();
     expect(link).toHaveFocus();
+  });
+});
+
+describe("Accessibility — /iig-checklists", () => {
+  it("has no serious or critical automated violations in the definition list", async () => {
+    checklistApi.definitionsList.mockResolvedValue(paginate([makeChecklistDefinition()]));
+    const { container } = render(<ChecklistDefinitionsPage />);
+    await screen.findByRole("link", { name: "IIG-ORAL-SOLID" });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /iig-checklists/{public_id}", () => {
+  it("has no serious or critical automated violations in the version list", async () => {
+    nav.publicId = "checklist-def-public-0001";
+    checklistApi.definitionsGet.mockResolvedValue(makeChecklistDefinition());
+    checklistApi.versionsListForDefinition.mockResolvedValue(
+      paginate([makeChecklistVersion()]),
+    );
+    const { container } = render(<ChecklistDefinitionDetailPage />);
+    await screen.findByText("IIG Oral Solid (synthetic)");
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility — /iig-checklists/versions/{version_public_id}", () => {
+  it("has no serious or critical automated violations with lifecycle action buttons shown", async () => {
+    checklistApi.versionsGet.mockResolvedValue(
+      makeChecklistVersion({ status: "under_review" }),
+    );
+    const { container } = render(<ChecklistVersionDetailPage />);
+    await screen.findByRole("button", { name: /^approve$/i });
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
