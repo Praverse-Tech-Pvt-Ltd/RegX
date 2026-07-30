@@ -1,9 +1,10 @@
 # Milestone 4D-2 Discovery — Checklist Execution, Response and Immutable Snapshot Foundation
 
-**Status: DISCOVERY ONLY. No product code. Not approved for implementation.**
+**Status: DESIGN REVIEW COMPLETE. All open questions resolved. Not approved for implementation.**
 
 **Branch:** `regx/design/milestone-4d-2-discovery`
 **Base SHA:** `453974a4cd40501479730a524fd1b6671a96d6fc` (Milestone 4D-1 merge)
+**Remediation:** `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md` — all findings CLOSED
 
 This document is the discovery gate for Milestone 4D-2. It proposes a
 domain boundary, model relationships, lifecycle, snapshot semantics,
@@ -302,16 +303,30 @@ Views call `validate_execution_transition()` before any mutation;
 illegal transitions return structured 400 with no DB write and no
 audit event.
 
-### 6b. `approve` pre-conditions (open)
+### 6b. `approve` pre-conditions — RESOLVED (DR-2-05)
 
-The approved design states that `approve` requires every `required`
-question to have a non-null response or a valid `NOT_APPLICABLE`
-resolution, and every `REVIEWER_CONFIRMED` question to have
-`confirmed_by` set. Whether completeness is enforced as a pre-condition
-to `submit_review` (strict gate), to `approve` only (permissive draft),
-or as both (redundant safety net) is an **OPEN QUESTION** — see §12 Q3.
+Completeness is enforced at **both** `submit_review` and `approve`.
 
-### 6c. Recalculation semantics (approved)
+`submit_review` pre-condition (structured 400):
+- Every `required=True` question has a response with non-null `raw_value`
+  OR `is_not_applicable=True` with `not_applicable_reason` set.
+- Every `REVIEWER_CONFIRMED` question has `confirmed_by` set.
+
+`approve` pre-condition (redundant safety re-check, structured 400):
+- Same completeness check. If responses were modified between `return`
+  and resubmission, this catches any gap introduced in the interim.
+
+`submit_review` prevents empty executions entering the review queue (UX
+protection). `approve` is the regulatory integrity check. Both gates
+serve distinct purposes; both are mandatory.
+
+### 6c. FormulationVersion status at execution creation — RESOLVED (DR-2-10)
+
+`create_execution()` requires `FormulationVersion.status == "approved"`.
+Error: `error_code = "formulation_version_not_approved"` / 400.
+See DR-2-10 for rationale.
+
+### 6d. Recalculation semantics (approved)
 
 Per 4D design §8b: while `status = draft`, editing a `USER_REQUIRED`
 or `EVIDENCE_DERIVED` response re-triggers recomputation of every
@@ -347,58 +362,74 @@ population yet).
 revision that produces a new version has no effect on existing
 executions.
 
-**Snapshot option A (UUID-reference pattern):**
-`formulation_version_public_id` stored as a UUID field (not a live FK),
-following `AssessmentSnapshot`'s own pattern. This means a formulation
-version deletion cannot cascade into executions, but the reference
-becomes a dangling UUID if the formulation version is deleted. Given
-`FormulationVersion` is `on_delete=PROTECT` everywhere a child model
-references it, this is a theoretical risk not a practical one.
+**`ApplicabilityRule` implicit freeze:** `ApplicabilityRule` rows are
+immutable once their `ChecklistVersion` leaves `draft`/`returned`
+(4D-1 enforcement). Since executions can only be created against
+`active` versions, all applicability rules are already stable when
+execution creation runs. The `ChecklistResponse` rows created at
+execution creation implicitly capture the applicability evaluation
+result: a question has a response row if and only if it was applicable
+at creation time. No additional snapshot field is needed (DR-2-11).
 
-**Snapshot option B (live FK + PROTECT):**
-`formulation_version` as a live `FK(on_delete=PROTECT)`. Deletion
-blocked. Simpler to query. Import linter allows `iig_checklist` to
-import from `formulations`.
+**Formulation version linkage — RESOLVED (DR-2-03):**
+`ChecklistExecution.formulation_version` is a live Django FK to
+`formulations.FormulationVersion` with `on_delete=PROTECT`.
 
-Recommendation: **Option B** (live FK). The `PROTECT` constraint is
-consistent with how `ChecklistVersion.definition` is structured, and it
-is cleaner than a dangling UUID. The `AssessmentSnapshot` UUID-reference
-pattern was chosen to avoid a Django cross-app FK at a time when
-`iid_assessment` and `formulations` import boundaries were less settled;
-`iig_checklist` → `formulations` is already an approved import-linter
-direction.
+Rationale: `PROTECT` is consistent with every other governed FK in
+this codebase. `iig_checklist → formulations` is already permitted by
+the import-linter contract. Live FK enables ORM joins and
+`select_related()`. `FormulationVersion` is immutable once `approved`,
+guaranteeing the linked rows never change content after linkage.
+
+**FormulationVersion status requirement — RESOLVED (DR-2-10):**
+Execution creation requires `FormulationVersion.status == "approved"`.
+A `draft` or `under_review` version can change its components,
+invalidating applicability evaluation. `superseded` or `retired` versions
+are blocked with `error_code = "formulation_version_not_approved"`.
+
+Cross-tenant protection: `create_execution()` verifies
+`formulation_version.product_development_record.tenant == execution.tenant`
+before writing the FK. Violation returns
+`error_code = "formulation_version_tenant_mismatch"` / 400.
 
 ---
 
 ## 8. Response storage options
 
-**`raw_value` as `JSONField`** — typed by `answer_type` but stored as
-opaque JSON. The shape varies: `{"value": 500.0}` for `decimal`,
-`{"selected": ["option_a"]}` for `multi_select`, `{"document_version_public_id": "..."}` for `attachment_reference`.
+**`raw_value` as `JSONField` — RESOLVED (DR-2-12):**
 
-Option A: single `raw_value` JSONField with no server-side schema.
-Risk: no structural validation at the DB layer; downstream consumers
-must handle arbitrary shapes. Mitigated by serializer-level validation
-against the question's `answer_type`.
+Single JSONField with strict serializer-level validation against
+`answer_type`. Canonical shapes:
 
-Option B: separate typed columns (`decimal_value`, `text_value`,
-`boolean_value`, etc.). Guarantees DB-level type safety, but adds
-~10 nullable columns and complicates queries.
+| answer_type | `raw_value` shape |
+|---|---|
+| `boolean` | `{"value": true\|false}` |
+| `decimal` | `{"value": "123.456", "unit": "mg/day"}` (string for precision) |
+| `integer` | `{"value": 42}` |
+| `text` | `{"value": "..."}` (max `MAX_FREE_TEXT_CHARS` chars) |
+| `date` | `{"value": "YYYY-MM-DD"}` |
+| `single_select` | `{"selected": "option_code"}` |
+| `multi_select` | `{"selected": ["code_a", "code_b"]}` (max `MAX_SELECT_OPTIONS`) |
+| `attachment_reference` | `{"document_version_public_id": "<uuid>"}` |
+| `fda_record_reference` | `{"fda_record_public_id": "<uuid>", "fda_record_type": "substance"}` |
+| `formulation_component_reference` | `{"formulation_component_public_id": "<uuid>"}` |
+| `system_calculated` | `null` always — value lives in `CalculationOutcome` |
 
-Recommendation: **Option A** (single JSONField) with strict
-serializer-level validation against `answer_type`. This is the same
-approach `CalculationOutcome.inputs` / `input_provenance` already use,
-and it is consistent with `ApplicabilityRule.condition_json`. The
-open-schema risk is real but bounded: `answer_type` on the question
-definition is the schema, and the serializer enforces it at the API
-boundary.
+`NOT_APPLICABLE` state: `raw_value = null`, `is_not_applicable = True`,
+`not_applicable_reason` set (structured rule ID, max `MAX_NOT_APPLICABLE_REASON_CHARS`).
 
-The `NOT_APPLICABLE` case does not use `raw_value` at all:
-`is_not_applicable = True` and `not_applicable_reason` (a structured
-rule identifier, never free text) are the sole storage, leaving
-`raw_value` null. This prevents "not applicable" from being represented
-as an overloaded blank/null value that could be confused with "not yet
-answered."
+Unanswered state (eager creation): `raw_value = null`, `is_not_applicable = False`,
+`entered_by = null`. Distinguishable from NOT_APPLICABLE by the `is_not_applicable` flag.
+
+Size limits — RESOLVED (DR-2-01):
+- `raw_value`: max `MAX_RAW_VALUE_BYTES = 16_384` bytes (serialized JSON)
+- `return_reason`: max `MAX_RETURN_REASON_CHARS = 2_000`
+- `reviewer_conclusion_note`: max `MAX_REVIEWER_CONCLUSION_CHARS = 4_000`
+- `not_applicable_reason`: max `MAX_NOT_APPLICABLE_REASON_CHARS = 200`
+- `multi_select` arrays: max `MAX_SELECT_OPTIONS = 64` items
+
+All limits validated at the serializer layer; `error_code = "payload_too_large"`
+/ 400 on violation. No silent truncation.
 
 ---
 
@@ -421,14 +452,24 @@ into a separate, execution-scoped storage key. Guarantees true
 immutability independent of the `documents` app, but doubles storage
 and is architecturally non-trivial.
 
-Recommendation: **Option A** with UUID reference in `raw_value` and
-documented dependency on the `documents` app's own retention policy.
-Per the approved 4D design §15: "an attachment referenced by an
-`approved` `ChecklistExecution` is delete-blocked, following the same
-'cannot delete something a governed conclusion depends on' pattern
-already enforced for approved `SubstanceSynonymMapping` rows." This
-means the `documents` app must expose a deletion-protection hook that
-`iig_checklist` registers — an open integration point, see §12 Q4.
+**RESOLVED (DR-2-06) — Option B (DeletionProtectionRegistry hook):**
+
+Evidence references are stored as `{"document_version_public_id": "<uuid>"}` in
+`raw_value`. A live FK in `ChecklistResponse` to `DocumentVersion` would
+require a nullable FK on every response row regardless of question type.
+
+Deletion protection: the `documents` app exposes a
+`DeletionProtectionRegistry`. `IigChecklistConfig.ready()` registers
+a callable that checks whether any `ChecklistResponse` belonging to an
+`approved` execution references the given `document_version_public_id`.
+If yes, the callable returns `True` (protected) and the `documents` app
+raises `DocumentVersionDeleteForbidden` before any DB deletion. The
+import direction stays clean: `iig_checklist` registers its hook into
+`documents`; `documents` never imports `iig_checklist`.
+
+Tenant ownership check: the `enter_response()` service must verify that
+the referenced `document_version_public_id` belongs to a `Document`
+owned by the same tenant as the execution before accepting it.
 
 ---
 
@@ -494,97 +535,26 @@ operations. The boundary from 4D-1 is unchanged.
 
 ---
 
-## 12. Open design questions requiring a decision before implementation
+## 12. Design decisions — all resolved
 
-The following questions are genuinely unresolved. None is decided
-here; each is recorded with competing options and the information
-needed to close it. A human decision is required before the
-implementation specification can be finalized.
+All nine design questions (7 original + 2 new from design review) are
+formally resolved. See `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md`
+for full rationale and corrections.
 
-**Q1 — FormulationVersion reference: live FK vs. UUID field?**
-Options: live `FK(on_delete=PROTECT)` (simpler, consistent with 4D-1
-pattern) or UUID field following `AssessmentSnapshot` (looser coupling).
-Recommendation in §7: live FK. Requires confirmation.
+| # | Question | Decision | DR ref |
+|---|---|---|---|
+| Q1 | FormulationVersion: live FK vs. UUID | **Live FK with PROTECT** | DR-2-03 |
+| Q2 | Execution uniqueness constraint | **One non-terminal per (tenant, version, formulation)** | DR-2-04 |
+| Q3 | Completeness gate timing | **Both submit_review AND approve** | DR-2-05 |
+| Q4 | Document deletion protection | **DeletionProtectionRegistry hook (Option B)** | DR-2-06 |
+| Q5 | reviewer_conclusion_note timing | **Required in approve request body** | DR-2-07 |
+| Q6 | Response pre-creation | **Eager, applicability-filtered** | DR-2-08 |
+| Q7 | CalculationOutcome in 4D-2 | **Model + DATA_REQUIRED placeholders** | DR-2-09 |
+| Q8 | FormulationVersion status requirement | **Must be approved** | DR-2-10 |
+| Q9 | Applicability freeze mechanism | **Implicit via 4D-1 immutability** | DR-2-11 |
 
-**Q2 — Execution uniqueness constraint: how many executions per
-(tenant, checklist_version, formulation_version)?**
-Option A: unlimited (no constraint). A tenant may run the same
-checklist against the same formulation version multiple times, e.g.
-to supersede a prior approved execution with an updated one.
-Option B: unique non-terminal execution per (tenant, checklist_version,
-formulation_version) — only one `draft`/`submitted_for_review`/
-`returned` execution at a time; `approved`/`rejected`/`cancelled`/
-`superseded` are terminal and exempt. Prevents accidental parallel
-drafts but complicates UI if a tenant needs to start a fresh draft
-before the prior one reaches a terminal state.
-Option C: fully unique — only one execution ever, regardless of
-status. Too restrictive; breaks the approved "corrected assessment
-always starts a new execution" semantics.
-Recommendation: **Option B** — one active (non-terminal) execution
-at a time per (tenant, version, formulation_version). Requires a
-partial unique constraint. Needs confirmation.
-
-**Q3 — Completeness pre-condition: enforced at `submit_review`, at
-`approve`, or both?**
-The approved design says `approve` requires completeness. Whether
-`submit_review` also requires it (strict — prevents trivially
-incomplete drafts from entering the review queue) or allows incomplete
-submissions (permissive — lets a reviewer see in-progress work before
-all required questions are answered, possibly for an early return) is
-unresolved. Recommendation: enforce at `submit_review` only (partial
-completeness gates review entry); approval adds a second, final check.
-Needs confirmation.
-
-**Q4 — Document deletion protection: how does `iig_checklist` prevent
-deletion of a `DocumentVersion` referenced by an approved execution?**
-Option A: `iig_checklist` registers a pre-delete signal on
-`DocumentVersion` and raises `ProtectedError` if any approved
-execution references it. This couples `documents` to `iig_checklist`
-via Django signals — an inbound dependency direction the import linter
-currently forbids.
-Option B: `documents` exposes a deletion-protection hook/registry
-that `iig_checklist` registers into, keeping the dependency direction
-clean (`iig_checklist` → `documents`, not `documents` → `iig_checklist`).
-Option C: `DocumentVersion` live FK with `on_delete=PROTECT` on
-`ChecklistResponse`. Requires an explicit FK (not UUID in raw_value).
-Recommendation: **Option C** if evidence references are stored as a
-structured FK field rather than inside `raw_value`; or **Option B**
-if `raw_value` UUID approach is kept. This decision is coupled to the
-`raw_value` shape decision (§8). Needs confirmation.
-
-**Q5 — `reviewer_conclusion_note` enforcement: at `submit_review` or
-at `approve`?**
-The approved design (§13) says it is required at `approve`. Whether
-the reviewer who calls `approve` supplies it in the same API call
-(field on the action request body) or it must already be set on the
-execution record before `approve` is callable, determines the API
-shape. Recommendation: supplied in the `approve` action request body
-(same pattern as `return` requiring `reason` in the request body),
-stored on `ChecklistExecution`. Needs confirmation.
-
-**Q6 — `ChecklistResponse` pre-creation: one row per question created
-eagerly at execution creation, or created lazily as answers are
-entered?**
-Option A (eager): at execution creation, a `ChecklistResponse` row
-is created for every question in the pinned `ChecklistVersion`, with
-`raw_value = null`. Makes "question not yet answered" explicit and
-queryable; simplifies completeness checks.
-Option B (lazy): rows are created only when an answer is entered.
-"Not yet answered" is inferred by absence. Simpler to write, harder
-to query for completeness.
-This is a 4D-2 structural choice because it affects the migration
-and the API shape even before 4D-3's auto-population pass. Recommendation:
-**Option A** (eager). Needs confirmation.
-
-**Q7 — `CalculationOutcome` in 4D-2 scope?**
-The model must exist for 4D-3 (calculation population) to build on.
-If 4D-2 creates `ChecklistResponse` rows eagerly (Q6 Option A), it
-must also create `CalculationOutcome` rows for `SYSTEM_CALCULATED`
-questions — but with `status = DATA_REQUIRED` (no inputs yet). If
-responses are created lazily, `CalculationOutcome` rows are not created
-until 4D-3. Recommendation: include `CalculationOutcome` model and
-migration in 4D-2 but leave all rows unpopulated until 4D-3.
-Needs confirmation.
+**No open questions remain. Implementation specification may be finalized
+after independent human review.**
 
 ---
 
@@ -604,11 +574,20 @@ iig_checklist.response.entered
 iig_checklist.response.updated
 ```
 
-Every event payload: execution `public_id`, actor, before/after status
-(lifecycle events), `tenant_id`. Never: formulation content, question
-text, raw answer values, numeric PKs, storage paths, or proprietary
-regulatory content. Consistent with the audit safety bar established
-in 4D-1.
+Payload for lifecycle events: execution `public_id`, actor, before/after
+status, `tenant_id`. Never: formulation content, question text, raw
+answer values, numeric PKs, storage paths, or proprietary regulatory content.
+
+**response.entered vs response.updated distinction — RESOLVED (DR-2-13):**
+- `iig_checklist.response.entered`: emitted when a null/unanswered response
+  (`entered_by` was previously null) receives a value for the first time.
+- `iig_checklist.response.updated`: emitted when an already-answered response
+  (non-null `raw_value` or `is_not_applicable=True` already set) has its
+  value changed.
+
+Payload for both response events: `execution_public_id`, `response_public_id`,
+`question_public_id`, `data_source_type_snapshot`. Never: `raw_value`,
+question text, formulation data, numeric PKs.
 
 No success event is emitted on a denied, illegal-transition, or
 validation-failed operation — same rule enforced throughout 4D-1.
@@ -693,29 +672,42 @@ is authoritative).
 
 ## 17. Concurrency risks
 
+**Lock ordering at execution creation — RESOLVED (DR-2-16):**
+To prevent deadlocks, `create_execution()` acquires locks in this order:
+
+```
+transaction.atomic():
+  1. select_for_update() on ChecklistVersion — confirms status == active
+  2. select_for_update() on any existing non-terminal execution for this
+     (tenant, version, formulation) combination
+  3. Create execution + eager responses + DATA_REQUIRED CalculationOutcome rows
+```
+
+Taking the `ChecklistVersion` lock first is safe: no other operation
+holds an execution lock then a version lock. This ordering avoids the
+AB/BA deadlock pattern.
+
 **Concurrent `approve` on the same execution:** two actors attempt
 `approve` simultaneously. Mitigation: `select_for_update()` on
 `ChecklistExecution` inside `transaction.atomic()` before reading and
 writing status — same pattern as 4D-1's `_ChecklistVersionActionViewBase`.
 
-**Concurrent response creation (eager Q6 Option A):** two actors both
-try to create the initial response for the same question.
-`unique_response_per_question_per_execution` `UniqueConstraint` is the
-backstop; the service must catch `IntegrityError` and return a
-structured 409, never a raw DB exception.
-
-**`ChecklistVersion` activation while an execution is being created:**
-the execution creation service must hold a `select_for_update()` on
-the `ChecklistVersion` row while verifying `status == active` and
-creating the execution, or accept a TOCTOU window where the version
-is superseded between the check and the FK write. Given version
-supersession is a rare, deliberate human action, a TOCTOU window is
-acceptable; the `ChecklistVersion.status == active` check is advisory,
-not a hard DB constraint on `ChecklistExecution`.
+**Concurrent response creation (eager rows):** with eager pre-creation,
+all response rows exist before any user can enter a value. "First
+answer" is a single-row update, not an insert — no concurrent
+create race for the same row. The `unique_response_per_question_per_execution`
+constraint remains a backstop for any gap in that reasoning; catch
+`IntegrityError` → structured 409.
 
 ---
 
 ## 18. Security and data-integrity risks
+
+**Unbounded payload fields — RESOLVED (DR-2-01).** All four
+previously-unbounded fields now have explicit limits defined in
+`execution_constants.py`. Serializer validates before any DB write;
+model `clean()` validates as a second layer. `error_code =
+"payload_too_large"` on violation. No silent truncation.
 
 **Mass-assignment of status fields.** Mitigated by never including
 `status`, `approved_by`, or any provenance field in any serializer's
@@ -738,11 +730,19 @@ validates shape against `answer_type`; export (4D-4) must pass values
 through the CSV-safety helper already in `common`.
 
 **`CalculationOutcome` forgery.** A client cannot submit a
-`CalculationOutcome` directly — the model exists in 4D-2 but is only
-populated by the server-side calculation service (4D-3). In 4D-2,
-`CalculationOutcome` rows are either absent (lazy Q6 option) or
-server-created with `status = DATA_REQUIRED` (eager option). No client-
-facing endpoint accepts `CalculationOutcome` input.
+`CalculationOutcome` directly — the model exists in 4D-2 and is
+populated server-side at execution creation with `status = DATA_REQUIRED`.
+4D-3 populates actual values. No client-facing endpoint accepts
+`CalculationOutcome` input.
+
+**`CalculationOutcome` cascade and retention — RESOLVED (DR-2-02).**
+`CalculationOutcome.response` uses `on_delete=CASCADE` because an
+orphaned outcome (from a deleted response) would be meaningless. However,
+`ChecklistResponse` has **no delete endpoint** — deletion is impossible
+via the API. Once an execution leaves `draft` (after `submit_review`),
+service-layer enforcement blocks any response deletion attempt with
+`error_code = "response_delete_forbidden"`. Abandoned `draft` executions
+may be `cancelled` (lifecycle action); this does not delete any rows.
 
 **`DocumentVersion` reference validation.** If `raw_value` stores a
 `document_version_public_id`, the serializer must verify the referenced
@@ -826,21 +826,28 @@ in any 4D-2 implementation branch:
 
 ---
 
-## 21. Recommendation
+## 21. Gate status
+
+**Design review: COMPLETE. All findings CLOSED. No Critical or Major findings remain.**
 
 4D-2 is structurally well-contained: three new models in an existing
 app, one new migration, one new transition table, a small set of new
-API endpoints, a minimal frontend, and a focused test suite. The
-primary risk is not scope but **design ambiguity in the seven open
-questions** — particularly Q2 (uniqueness constraint shape) and Q4
-(document deletion protection), which affect the migration schema and
-the import boundary respectively. These must be decided before the
-implementation specification is finalized.
+API endpoints, a minimal frontend, and a focused test suite.
+
+All nine design questions are formally resolved (§12). Payload limits
+are defined. Canonical response shapes are specified. Retention and
+deletion semantics are explicit. Lock ordering is specified. FormulationVersion
+status requirement is documented. Applicability freeze is confirmed as
+implicit.
 
 The implementation specification outline (`MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md`)
-should not be treated as authorization for implementation until:
-1. All seven open questions in §12 are resolved with explicit decisions.
-2. This discovery document passes an independent design review with no
-   Critical or Major findings.
-3. A focused specification-review pass (equivalent to the one performed
-   for 4D-1) confirms the implementation spec is sufficient.
+may be promoted to a final implementation specification after:
+1. A human reviewer with domain authority reviews both this document
+   and the spec outline with all DR corrections applied.
+2. The final specification is formally approved.
+3. A 4D-2 feature branch (`regx/feat/milestone-4d-2-execution-foundation`)
+   is created from `regx-main`.
+
+**Ready for independent design review: YES**
+**Ready to finalize implementation specification: YES (pending human review)**
+**Ready to implement: NO**

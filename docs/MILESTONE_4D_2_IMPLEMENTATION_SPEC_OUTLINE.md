@@ -1,9 +1,10 @@
 # Milestone 4D-2 Implementation Specification Outline
 
-**Status: OUTLINE ONLY. Not authorized for implementation.**
-**Prerequisite:** All seven open questions in `MILESTONE_4D_2_DISCOVERY.md §12` must be
-resolved and an independent design review must pass before this outline
-is promoted to a final implementation specification.
+**Status: OUTLINE WITH RESOLVED DESIGN. Not authorized for implementation.**
+**Prerequisite:** Independent human review and formal approval required before
+this outline is promoted to a final implementation specification and an
+implementation branch opens.
+**Design review:** `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md` — all findings CLOSED.
 
 **Branch:** `regx/design/milestone-4d-2-discovery`
 **Inputs:** `docs/MILESTONE_4D_2_DISCOVERY.md`, `docs/MILESTONE_4D_DISCOVERY.md`,
@@ -20,10 +21,13 @@ design-review comments.
 ### 1.1 In scope for 4D-2
 
 - `ChecklistExecution` model, manager, and migration.
-- `ChecklistResponse` model and per-question eager-creation (pending Q6
-  resolution).
-- `CalculationOutcome` model (structure only; no calculation population
-  until 4D-3).
+- `ChecklistResponse` model with applicability-filtered eager pre-creation
+  (DR-2-08: one row per applicable question at execution creation).
+- `CalculationOutcome` model with `DATA_REQUIRED` placeholder rows at
+  creation (DR-2-09); no calculation population until 4D-3.
+- `execution_constants.py` — payload limit constants (DR-2-01).
+- `DeletionProtectionRegistry` hook in `documents` app + registration in
+  `IigChecklistConfig.ready()` (DR-2-06).
 - Execution lifecycle: `execution_transitions.py`, 6 actions, 7 statuses.
 - Execution-level permissions (8 new codenames), role assignment,
   `ROLE_PERMISSIONS` extension.
@@ -32,11 +36,10 @@ design-review comments.
 - Execution and response views, serializers, URL routing.
 - Audit: 9 new `IigChecklistEvent` types, `emit()` integration.
 - Tenant isolation: `ChecklistExecutionManager.visible_to(tenant)`.
-- Import-linter extension for `iig_checklist → formulations` FK (pending
-  Q1 resolution).
+- Import-linter: confirm `formulations` does not import `iig_checklist`.
 - Minimal frontend: execution list, create, detail, lifecycle actions.
 - Docker integration test step: "IIG checklist execution foundation flow."
-- Unit, lifecycle, API, response, and tenant-isolation tests.
+- Unit, lifecycle, API, response, tenant-isolation, and payload-limit tests.
 - Migration `0002_execution.py` with all constraints.
 
 ### 1.2 Out of scope for 4D-2
@@ -81,7 +84,7 @@ outside its designated service call):
 ```
 tenant                  FK(Tenant, on_delete=PROTECT)
 checklist_version       FK(ChecklistVersion, on_delete=PROTECT)
-formulation_version     FK(FormulationVersion, on_delete=PROTECT) [Q1]
+formulation_version     FK(FormulationVersion, on_delete=PROTECT)  # DR-2-03: live FK confirmed
 status                  CharField, choices=ExecutionStatus, default=DRAFT
 created_by              FK(User, on_delete=PROTECT)
 submitted_by            FK(User, SET_NULL, null=True)
@@ -89,22 +92,22 @@ submitted_at            DateTimeField(null=True)
 reviewed_by             FK(User, SET_NULL, null=True)
 returned_by             FK(User, SET_NULL, null=True)
 returned_at             DateTimeField(null=True)
-return_reason           TextField(blank=True)
+return_reason           TextField(blank=True, max_length=2000)      # DR-2-01
 approved_by             FK(User, SET_NULL, null=True)
 approved_at             DateTimeField(null=True)
 rejected_by             FK(User, SET_NULL, null=True)
 rejected_at             DateTimeField(null=True)
 cancelled_by            FK(User, SET_NULL, null=True)
 cancelled_at            DateTimeField(null=True)
-superseded_by           FK("self", SET_NULL, null=True) [optional]
-reviewer_conclusion_note  TextField(blank=True)
+superseded_by           FK("self", SET_NULL, null=True)
+reviewer_conclusion_note  TextField(blank=True, max_length=4000)   # DR-2-01; set via approve body
 ```
 
 DB constraints:
 - `unique_active_execution_per_version_formulation`: `UniqueConstraint`
   on `(tenant, checklist_version, formulation_version)` with
-  `condition=~Q(status__in=TERMINAL_STATUSES)` — partial unique index
-  on non-terminal rows (pending Q2 resolution).
+  `condition=~Q(status__in=["rejected","cancelled","superseded"])` —
+  partial unique index on non-terminal rows (DR-2-04).
 
 ### 3.2 `ChecklistResponse`
 
@@ -114,9 +117,11 @@ Inherits `PublicIDModel`, `TimeStampedModel`.
 execution               FK(ChecklistExecution, on_delete=PROTECT)
 question                FK(ChecklistQuestion, on_delete=PROTECT)
 data_source_type_snapshot  CharField — frozen copy at creation time
+                           (implicit freeze: version already immutable, DR-2-11)
 raw_value               JSONField(null=True) — shape varies by answer_type
+                         max 16384 bytes serialized (DR-2-01)
 is_not_applicable       BooleanField(default=False)
-not_applicable_reason   CharField(null=True, blank=True)
+not_applicable_reason   CharField(null=True, blank=True, max_length=200)  # DR-2-01
 entered_by              FK(User, SET_NULL, null=True)
 entered_at              DateTimeField(null=True)
 confirmed_by            FK(User, SET_NULL, null=True)
@@ -134,10 +139,16 @@ DB constraints:
 - `is_not_applicable = True` implies `raw_value` is null.
 - `not_applicable_reason` is required when `is_not_applicable = True`.
 - `override_reason` is non-empty whenever `system_derived_value` is set.
+- `len(json.dumps(self.raw_value)) <= MAX_RAW_VALUE_BYTES` when raw_value
+  is not null. (DR-2-01 second-layer enforcement.)
 
 `clean()` must be called via `full_clean()` at every save path.
 This is a mandatory acceptance criterion: the `AssessmentSnapshot`
 defect (clean() unreachable) must not be repeated.
+
+No delete endpoint is exposed. Once an execution leaves `draft`, the
+service layer raises `ResponseDeleteForbidden` on any deletion attempt
+(DR-2-02).
 
 ### 3.3 `CalculationOutcome`
 
@@ -205,26 +216,31 @@ class ExecutionStatus(models.TextChoices):
 
 ### 4.3 Pre-condition checks (per action)
 
-`submit_review`:
-- All required questions have a response with `raw_value` not null OR
-  `is_not_applicable = True` with `not_applicable_reason` set. (Pending Q3.)
-- All `REVIEWER_CONFIRMED` questions have `confirmed_by` set.
+`submit_review` (DR-2-05):
+- Every `required=True` question applicable to this execution has a
+  response with `raw_value` not null OR `is_not_applicable=True` with
+  `not_applicable_reason` set.
+- Every `REVIEWER_CONFIRMED` question applicable to this execution has
+  `confirmed_by` set.
+- Error: `error_code = "incomplete_execution"` / 400.
 
-`approve`:
-- All of the above (same completeness check as `submit_review`, or a
-  final re-check, per Q3 resolution).
-- `reviewer_conclusion_note` non-empty (pending Q5 resolution on whether
-  this is provided in the request body or pre-set on the model).
+`approve` (DR-2-05 — redundant safety re-check):
+- Same completeness check as `submit_review`.
+- `reviewer_conclusion_note` non-empty, provided in the request body
+  (DR-2-07: `ApproveSerializer` accepts this field; service stores it on
+  `ChecklistExecution` atomically with the status transition).
+- Error for completeness: `error_code = "incomplete_execution"` / 400.
+- Error for missing note: `error_code = "reviewer_conclusion_required"` / 400.
 
 `return`:
-- `return_reason` must be non-empty, provided in the request body.
+- `return_reason` must be non-empty, provided in the request body,
+  max `MAX_RETURN_REASON_CHARS` (DR-2-01).
+- Error: `error_code = "missing_return_reason"` / 400.
 
-`supersede`:
-- `submitted_by` cannot be the same user as the actor (self-approval
-  blocked). This check is on `approved` → `superseded` transition, not
-  `submitted_for_review` → `approved`. The self-approval guard is:
-  actor who called `submit_review` cannot be the actor who calls
-  `approve`.
+`approve` self-approval guard:
+- Actor who called `submit_review` (i.e., `execution.submitted_by`)
+  cannot be the actor who calls `approve`.
+- Error: `error_code = "self_approval_forbidden"` / 403.
 
 ---
 
@@ -281,19 +297,29 @@ to reach another tenant's execution. Same convention as 4D-1.
 ### 6.1 `create_execution(tenant, checklist_version_public_id, formulation_version_public_id, actor)`
 
 ```
-1. Resolve ChecklistVersion from public_id, verify status == active.
-   If status != active → raise ChecklistVersionNotActive (structured 400).
-2. Resolve FormulationVersion, verify tenant ownership.
+1. Resolve ChecklistVersion from public_id.
+   Verify status == "active" → else raise ChecklistVersionNotActive / 400.
+2. Resolve FormulationVersion, verify status == "approved" (DR-2-10)
+   → else raise FormulationVersionNotApproved / 400.
+   Verify formulation_version.product_development_record.tenant == tenant
+   → else raise FormulationVersionTenantMismatch / 400.
 3. Check actor has PERM_CREATE_EXECUTION.
-4. Inside transaction.atomic() + select_for_update() on ChecklistVersion:
-   a. Check uniqueness constraint (non-terminal execution for this
-      version+formulation combination) — catch IntegrityError →
-      ExecutionAlreadyActive (structured 409).
-   b. Create ChecklistExecution(status=DRAFT, created_by=actor, ...).
-   c. If Q6 Option A (eager): create one ChecklistResponse row per
-      active question in the pinned ChecklistVersion, with raw_value=null.
-      If Q7 (CalculationOutcome in 4D-2): create one CalculationOutcome
-      per SYSTEM_CALCULATED question with status=DATA_REQUIRED.
+4. Inside transaction.atomic():
+   a. select_for_update() on ChecklistVersion (DR-2-16, lock 1).
+   b. select_for_update() on any existing non-terminal execution for
+      this (tenant, checklist_version, formulation_version) (DR-2-16,
+      lock 2). If found → raise ExecutionAlreadyActive / 409.
+   c. Create ChecklistExecution(status=DRAFT, created_by=actor, tenant=tenant,
+      checklist_version=version, formulation_version=fv).
+   d. Evaluate applicability rules for each question in the pinned version
+      against the formulation_version (DR-2-08). For applicable questions:
+      - Create ChecklistResponse(execution=exec, question=q,
+          data_source_type_snapshot=q.data_source_classification,
+          raw_value=null, is_not_applicable=False, entered_by=null).
+      - If q.answer_type == "system_calculated": create
+        CalculationOutcome(response=r, status="DATA_REQUIRED",
+          calculation_name=q.bound_calculation_name, ...) (DR-2-09).
+   e. Catch IntegrityError → structured 409 (uniqueness race).
 5. Emit iig_checklist.execution.created audit event.
 6. Return execution.
 ```
@@ -454,9 +480,18 @@ structured 400, not silent acceptance.
 
 Each action has a minimal request-body serializer:
 
-- `ReturnSerializer`: `{return_reason: str}` — required, non-empty.
-- `ApproveSerializer`: `{reviewer_conclusion_note: str}` (pending Q5).
+- `ReturnSerializer`: `{return_reason: str}` — required, non-empty,
+  max `MAX_RETURN_REASON_CHARS` (DR-2-01).
+- `ApproveSerializer`: `{reviewer_conclusion_note: str}` — required,
+  non-empty, max `MAX_REVIEWER_CONCLUSION_CHARS` (DR-2-07, DR-2-01).
+  Field stored on `ChecklistExecution` atomically with status transition.
 - All other actions: empty body accepted; extra fields rejected with 400.
+
+Payload limit serializer validation (DR-2-01): any serializer that
+accepts free-text or JSON fields must validate against the constants
+in `execution_constants.py` before calling the service layer.
+`error_code = "payload_too_large"` / 400 on violation. No silent
+truncation at any layer.
 
 ---
 
@@ -624,6 +659,23 @@ export const iigChecklists = {
   duplicate `(execution, question)`.
 - `unique_active_execution_per_version_formulation`: `IntegrityError`
   when two non-terminal executions share `(tenant, version, formulation)`.
+- Payload limits (DR-2-01): one test per limit verifying exactly-at-limit
+  accepted and exactly-over-limit rejected with `payload_too_large` (not
+  a raw Django ValidationError). Test targets: `raw_value`, `return_reason`,
+  `reviewer_conclusion_note`, `not_applicable_reason`.
+- `raw_value` shapes (DR-2-12): one test per `answer_type` (11 total)
+  verifying canonical shape accepted and at least one malformed shape
+  rejected with `invalid_raw_value_shape`.
+- FormulationVersion status gate (DR-2-10): `create_execution()` rejects
+  `draft` and `under_review` formulation versions with
+  `formulation_version_not_approved`.
+- Cross-tenant formulation version gate (DR-2-03): `create_execution()`
+  rejects a formulation version belonging to a different tenant with
+  `formulation_version_tenant_mismatch`.
+- CalculationOutcome DATA_REQUIRED placeholders (DR-2-09): execution
+  creation for a version with `SYSTEM_CALCULATED` questions creates
+  `CalculationOutcome` rows with `status=DATA_REQUIRED`; no other
+  `CalculationOutcome` creation occurs in 4D-2.
 
 ### 13.2 Lifecycle tests
 
@@ -711,15 +763,20 @@ Structured errors returned by 4D-2 endpoints:
 | `error_code` | HTTP | Trigger |
 |---|---|---|
 | `illegal_execution_transition` | 400 | `validate_execution_transition()` raises |
-| `execution_already_active` | 409 | Uniqueness violation on non-terminal executions |
+| `execution_already_active` | 409 | Uniqueness violation on non-terminal executions (DR-2-04) |
 | `checklist_version_not_active` | 400 | `create_execution()` — version not `active` |
-| `incomplete_execution` | 400 | `submit_review` or `approve` completeness check fails |
+| `formulation_version_not_approved` | 400 | `create_execution()` — FV not `approved` (DR-2-10) |
+| `formulation_version_tenant_mismatch` | 400 | FV belongs to different tenant (DR-2-03) |
+| `incomplete_execution` | 400 | `submit_review` or `approve` completeness check (DR-2-05) |
 | `missing_return_reason` | 400 | `return` action with empty `return_reason` |
+| `reviewer_conclusion_required` | 400 | `approve` body missing `reviewer_conclusion_note` (DR-2-07) |
 | `self_approval_forbidden` | 403 | `approve` actor is same as `submitted_by` |
 | `response_immutable` | 400 | `enter_response` on approved execution |
-| `invalid_raw_value_shape` | 400 | `raw_value` does not match `answer_type` |
+| `response_delete_forbidden` | 400 | Deletion attempt on non-draft execution response (DR-2-02) |
+| `invalid_raw_value_shape` | 400 | `raw_value` does not match `answer_type` canonical shape (DR-2-12) |
+| `payload_too_large` | 400 | Any field exceeds its limit constant (DR-2-01) |
 | `not_applicable_requires_reason` | 400 | `is_not_applicable=True` without reason |
-| `document_version_not_found` | 400 | `raw_value.document_version_public_id` not in tenant |
+| `document_version_not_found` | 400 | `raw_value.document_version_public_id` not in tenant (DR-2-06) |
 
 Format (identical to 4D-1):
 ```json
@@ -741,40 +798,54 @@ affect 4D-1 pages. No 4D-1 migration or model is modified.
 
 4D-2 is considered complete when:
 
-1. All unit, lifecycle, API, and response tests pass.
+1. All unit, lifecycle, API, response, and payload-limit tests pass.
 2. Docker integration test "IIG checklist execution foundation flow"
    passes.
 3. `migrate --check` passes with `0002_execution.py` applied.
-4. Import-linter contracts all pass (including the new
-   `iig_checklist → formulations` direction if Q1 resolves to live FK).
+4. Import-linter contracts all pass (`formulations` does not import
+   `iig_checklist`; `iig_checklist` → `formulations` permitted).
 5. Frontend execution list, create, and detail pages render without
    console errors; lifecycle actions update status correctly; mutation
    403 shows inline error.
 6. `ChecklistResponse.clean()` is provably called on every `save()` path
    (a test that calls `save()` directly without `full_clean()` on an
-   approved execution must fail — this pins the acceptance criterion
-   against the `AssessmentSnapshot` defect pattern).
-7. No Critical or Major findings in the independent implementation
-   review (equivalent standard to the 4D-1 post-implementation review).
-8. All seven open design questions from `MILESTONE_4D_2_DISCOVERY.md §12`
-   are formally resolved and recorded in the implementation PR description.
+   approved execution must fail — pins acceptance criterion against the
+   `AssessmentSnapshot` defect pattern).
+7. Payload-limit tests pass: at-limit accepted, over-limit returns
+   `payload_too_large` / 400 with no DB write for all four bounded fields
+   (DR-2-01).
+8. `create_execution()` rejects non-approved `FormulationVersion` with
+   `formulation_version_not_approved` (DR-2-10).
+9. Cross-tenant formulation version reference rejected with
+   `formulation_version_tenant_mismatch` (DR-2-03).
+10. `DeletionProtectionRegistry` hook registered in `IigChecklistConfig.ready()`;
+    test verifies that attempting to delete a `DocumentVersion` referenced by an
+    approved execution raises `DocumentVersionDeleteForbidden` (DR-2-06).
+11. No Critical or Major findings in the independent implementation review
+    (equivalent standard to the 4D-1 post-implementation review).
+12. All nine design decisions from `MILESTONE_4D_2_DESIGN_REMEDIATION.md`
+    are referenced in the implementation PR description.
 
 ---
 
-## Section 17 — Open questions that block finalization of this outline
+## Section 17 — Design decisions — all resolved
 
-See `docs/MILESTONE_4D_2_DISCOVERY.md §12`. None are resolved here.
-This section is a reference index only.
+All nine design questions (7 original + 2 from design review) are
+formally resolved. See `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md`.
 
-| Question | Blocker for |
-|---|---|
-| Q1 — live FK vs. UUID field | §3.1 schema, §6.1 service, §11 import linter |
-| Q2 — uniqueness constraint shape | §3.1 constraints, §10 migration |
-| Q3 — completeness gate at submit vs. approve | §4.3, §6.2, §13.2 |
-| Q4 — document deletion protection | §3.2 raw_value shape, §6.3 |
-| Q5 — reviewer_conclusion_note at approve | §4.3, §6.2, §8.5, §13.3 |
-| Q6 — eager vs. lazy response creation | §3.2, §6.1, §7.2, §12.3 |
-| Q7 — CalculationOutcome in 4D-2 scope | §3.3, §6.1, §10 |
+| Question | Resolution | DR ref | Impact sections |
+|---|---|---|---|
+| Q1 — live FK vs. UUID | Live FK with PROTECT | DR-2-03 | §3.1, §6.1, §11 |
+| Q2 — uniqueness constraint | One non-terminal per combination | DR-2-04 | §3.1, §10 |
+| Q3 — completeness gate | Both submit_review AND approve | DR-2-05 | §4.3, §6.2, §13.2 |
+| Q4 — document deletion | DeletionProtectionRegistry hook | DR-2-06 | §1.1, §3.2, §6.3 |
+| Q5 — reviewer_conclusion_note | Required in approve request body | DR-2-07 | §4.3, §8.5 |
+| Q6 — eager vs. lazy | Eager, applicability-filtered | DR-2-08 | §3.2, §6.1 |
+| Q7 — CalculationOutcome scope | Model + DATA_REQUIRED placeholders | DR-2-09 | §3.3, §6.1 |
+| Q8 — FV status requirement | Must be approved | DR-2-10 | §6.1, §14 |
+| Q9 — applicability freeze | Implicit via 4D-1 immutability | DR-2-11 | §3.2 |
+
+**No open questions remain.**
 
 ---
 
