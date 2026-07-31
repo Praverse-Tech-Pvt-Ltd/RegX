@@ -1,16 +1,18 @@
 # Milestone 4D-2 Implementation Specification
 ## Checklist Execution, Response, and Immutable Snapshot Foundation
 
-**Status: FINAL — Authorized for implementation.**
-**Authorization date:** 2026-07-31
-**Authorized by:** Human reviewer (formal approval recorded in PR description)
+**Status: DRAFT FINAL SPECIFICATION. Not yet authorized for implementation.**
+**Fourth independent design review:** PASS (R4-M-1 through R4-M-4 closed in this spec).
+**Fifth independent specification review:** FAIL → remediated (F5-F-1, F5-M-1 closed;
+see DR-2-34, DR-2-35). Re-review required before this document may be marked approved.
 
 **Branch:** `regx/design/milestone-4d-2-discovery`
 **Base milestone:** Milestone 4D-1 (CLOSED) — SHA `453974a4cd40501479730a524fd1b6671a96d6fc`
 **Design inputs:**
 - `docs/MILESTONE_4D_2_DISCOVERY.md` — discovery document, all open questions resolved
-- `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md` — DR-2-01 through DR-2-33, all CLOSED
+- `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md` — DR-2-01 through DR-2-35, all CLOSED
 - Fourth independent design review — PASS; R4-M-1 through R4-M-4 closed in this spec
+- Fifth independent specification review — FAIL, remediated; F5-F-1, F5-M-1 closed
 
 **Implementation branch to open:** `regx/feat/milestone-4d-2-execution-foundation`
 (Created from `regx-main` after this spec is approved. **Do not implement on the discovery branch.**)
@@ -26,7 +28,7 @@
 - `ChecklistResponseHistory` model — append-only governed amendment audit for reviewer-conclusion amendments (DR-2-27, DR-2-30).
 - `CalculationOutcome` model — `DATA_REQUIRED` placeholder rows at creation (DR-2-09); no calculation population until 4D-3.
 - `execution_constants.py` — payload-limit constants (DR-2-01).
-- `DeletionProtectionRegistry` hook in `documents` app, registered in `IigChecklistConfig.ready()` (DR-2-06).
+- `DeletionProtectionRegistry` — **new class to be implemented in the `documents` app** at `backend/documents/deletion_protection.py` (it does not exist today — DR-2-35); `iig_checklist` registers its evidence-reference checker into it from `IigChecklistConfig.ready()` (DR-2-06). See §9a for the full interface.
 - Execution lifecycle: `execution_transitions.py`, 6 actions, 7 statuses.
 - Execution-level permissions: 8 new codenames, `ROLE_PERMISSIONS` extension.
 - `GovernedHistoryMutationForbidden` exception and `ChecklistResponseHistoryManager` (R4-M-1).
@@ -310,6 +312,139 @@ No client-facing write endpoint. 4D-2 creates the model and migration; rows are 
 `calculate_difference_from_potency`, `calculate_percentage_of_mde`, `calculate_difference_from_mde`.
 Validated at model level via `clean()`.
 
+### §9a — `DeletionProtectionRegistry` (new 4D-2 infrastructure, DR-2-35)
+
+**This class does not exist in the current codebase.** A repository-wide
+search (`grep -rn "DeletionProtectionRegistry" backend/`) returns zero
+hits. It is **new Milestone 4D-2 infrastructure to be implemented in the
+`documents` app**, not existing infrastructure that app already exposes.
+Any prior documentation wording describing it as already-present is
+corrected by this section and by DR-2-35 (fifth independent review).
+
+**Purpose:** allow dependent apps (`iig_checklist`) to register deletion
+blockers for `DocumentVersion` rows without the `documents` app importing
+those dependent apps. This preserves the existing import-linter direction
+(`iig_checklist` may import `documents`; `documents` must never import
+`iig_checklist`).
+
+**Proposed location:** `backend/documents/deletion_protection.py`
+
+**Interface:**
+
+```python
+class DeletionProtectionRegistry:
+    """Process-wide registry of deletion-blocker checkers for DocumentVersion.
+
+    Dependent apps register a checker callable from their AppConfig.ready();
+    the documents app consults every registered checker before permitting
+    a DocumentVersion delete. This keeps the dependency direction one-way:
+    documents never imports iig_checklist or any other dependent app.
+    """
+
+    _checkers: dict[str, Callable[["DocumentVersion"], bool]] = {}
+
+    @classmethod
+    def register(cls, key: str, checker: Callable[["DocumentVersion"], bool]) -> None:
+        """Idempotent: registering the same key again replaces the prior
+        checker rather than accumulating duplicates. Called from
+        AppConfig.ready(), which Django may invoke more than once in a
+        single process under some test-runner and autoreload configurations
+        -- repeated registration with the same key must be a no-op in
+        effect, never a growing list of duplicate checkers."""
+        cls._checkers[key] = checker
+
+    @classmethod
+    def unregister(cls, key: str) -> None:
+        cls._checkers.pop(key, None)
+
+    @classmethod
+    def check(cls, document_version: "DocumentVersion") -> list[str]:
+        """Returns a list of blocking reason keys (empty if unblocked).
+        Never raises for a checker that returns cleanly. See fail-closed
+        rule below for a checker that raises."""
+        blocking_reasons = []
+        for key, checker in cls._checkers.items():
+            try:
+                if checker(document_version):
+                    blocking_reasons.append(key)
+            except Exception:
+                # Fail-closed (approved rule): a checker that raises is
+                # treated as blocking, not as unblocked. A silent
+                # exception must never result in a deletion that a
+                # correctly-functioning checker would have prevented.
+                blocking_reasons.append(f"{key}_check_failed")
+        return blocking_reasons
+```
+
+**Registration behavior:**
+- `IigChecklistConfig.ready()` calls
+  `DeletionProtectionRegistry.register("iig_checklist_response_evidence", _check_iig_checklist_evidence_reference)`
+  where `_check_iig_checklist_evidence_reference(document_version)` returns
+  `True` if any `ChecklistResponse` belonging to an `approved` execution
+  references `document_version.public_id` in its `raw_value`.
+- Repeated `ready()` invocations (Django autoreload, some test runners)
+  re-register the same key — idempotent by construction, since `register()`
+  replaces rather than appends.
+- Duplicate registration under the same key is deterministic: the most
+  recent registration wins; there is never more than one active checker
+  per key.
+
+**Deletion-check integration in `documents` app:**
+- Before any `DocumentVersion.delete()` (model-level or queryset-level),
+  the `documents` app calls `DeletionProtectionRegistry.check(document_version)`.
+- If the returned list is non-empty, the `documents` app raises
+  `DocumentVersionDeleteForbidden` with a structured, safe message —
+  **never** the raw storage key, **never** cross-tenant metadata, and
+  **never** internal PKs. The message identifies only that the document
+  version is referenced by governed content (e.g. "This document version
+  is referenced by an approved checklist execution and cannot be deleted."),
+  not which tenant's execution.
+- This check runs **before** any destructive mutation — no partial delete,
+  no orphaned storage reference.
+
+**Deletion-protection scope (§6 of this Part):**
+- The protected object is `DocumentVersion`, not `Document` identity —
+  a `Document` may have multiple versions; only the specific version
+  referenced by a frozen `ChecklistResponse.raw_value` is protected.
+  Uploading a new `DocumentVersion` to the same `Document` does not
+  retroactively protect or unprotect prior versions; historical
+  `raw_value` references always point at a specific version's UUID and
+  remain reproducible regardless of later uploads.
+- Evidence references use the `document_version_public_id` UUID stored in
+  `raw_value` — no live FK from `ChecklistResponse` to `DocumentVersion`.
+- The blocker lookup is tenant-safe: `_check_iig_checklist_evidence_reference()`
+  queries `ChecklistResponse` rows without needing to know or expose the
+  document's tenant; it only needs to know whether *any* approved
+  execution references this UUID, which is sufficient to block deletion
+  regardless of tenant.
+- No file copy is required — the registry blocks deletion of the existing
+  storage-backed row; it does not duplicate content.
+- No direct import from `documents` to `iig_checklist` exists anywhere in
+  this design — verified by the registration pattern above (the callable
+  is handed to `documents` by `iig_checklist`, not looked up by `documents`).
+
+**Direct tests (`backend/documents/tests/test_deletion_protection.py`):**
+- `DeletionProtectionRegistry._checkers` contains no `iig_checklist_*` key
+  before `IigChecklistConfig.ready()` runs (fresh registry state).
+- After `IigChecklistConfig.ready()` runs once, exactly one
+  `iig_checklist_response_evidence` checker is registered.
+- Calling `ready()` a second time leaves exactly one checker registered
+  under that key (idempotent — no duplicate accumulation).
+- A `DocumentVersion` referenced by no `ChecklistResponse` may be deleted
+  under existing `documents` app policy (unaffected by this registry).
+- A `DocumentVersion` referenced by a `ChecklistResponse` belonging to an
+  `approved` `ChecklistExecution` cannot be deleted —
+  `DocumentVersionDeleteForbidden` is raised.
+- A different `DocumentVersion` of the same `Document` that is *not*
+  referenced remains deletable even when a sibling version is protected.
+- The `DocumentVersionDeleteForbidden` message contains no storage path,
+  no tenant identifier, no internal numeric PK, and no cross-tenant detail.
+- A checker that raises an exception during `check()` results in the
+  deletion being blocked (fail-closed), not silently permitted.
+- `backend/documents/` contains no `import iig_checklist` statement
+  anywhere (import-linter regression guard, verified independently of the
+  `formulations` contract in §11).
+
 ### §10 — `allowed_units` enforcement at execution creation (R4-M-2)
 
 `create_execution()` validates every applicable `quantity_with_unit` question in the pinned `ChecklistVersion` before writing any rows. If any such question has `allowed_units = []` (empty list), execution creation fails with:
@@ -449,12 +584,32 @@ Generic 404 (never 403) when a tenant attempts to reach another tenant's executi
    Verify status == "active" → else raise ChecklistVersionNotActive /
    error_code = "checklist_version_not_active" / 400.
 
-2. Resolve FormulationVersion by public_id.
-   Verify status == "approved" (DR-2-10) → else raise FormulationVersionNotApproved /
-   error_code = "formulation_version_not_approved" / 400.
-   Verify formulation_version.product_development_record.tenant == tenant (DR-2-03)
-   → else raise FormulationVersionTenantMismatch /
+2. Resolve FormulationVersion by public_id (object-level lookup; not yet
+   tenant-filtered, since FormulationVersion carries no direct tenant FK —
+   ownership is derived through .product).
+   Not found → generic 404; does not reveal whether the UUID exists for
+   another tenant.
+   Verify formulation_version.product.tenant == tenant (DR-2-03) FIRST,
+   before evaluating status → else raise FormulationVersionTenantMismatch /
    error_code = "formulation_version_tenant_mismatch" / 400.
+   (`FormulationVersion.product` is the actual FK to
+   `formulations.ProductDevelopmentRecord` — confirmed against
+   `backend/formulations/models.py`. There is no `product_development_record`
+   field on this model; DR-2-34, fifth independent review, corrects this
+   path across all 4D-2 documents.)
+   Only after the tenant check passes, verify status == "approved" (DR-2-10)
+   → else raise FormulationVersionNotApproved /
+   error_code = "formulation_version_not_approved" / 400.
+   This ordering is deliberate: a cross-tenant caller always receives
+   `formulation_version_tenant_mismatch` and never learns another tenant's
+   formulation version's lifecycle status — the tenant check is evaluated
+   before any status-dependent branch, so no response distinguishes
+   "wrong tenant, would have been approved" from "wrong tenant, not
+   approved."
+   Both checks in this step run strictly before step 5 (the transaction) —
+   on either failure: no ChecklistExecution row is created, no
+   ChecklistResponse rows are created, no CalculationOutcome rows are
+   created, no snapshot is taken, and no audit success event is emitted.
 
 3. Verify actor has PERM_CREATE_EXECUTION.
 
@@ -1086,7 +1241,30 @@ Response methods:
 
 **FormulationVersion status gate (DR-2-10):** `create_execution()` rejects `draft`/`under_review`/`superseded`/`retired` FV with `formulation_version_not_approved`.
 
-**Cross-tenant FV gate (DR-2-03):** `create_execution()` rejects FV from different tenant.
+**Cross-tenant FV gate (DR-2-03, DR-2-34):** direct tests using the actual
+`FormulationVersion.product.tenant` relationship (not the nonexistent
+`product_development_record` path):
+- `create_execution()` with a `FormulationVersion` whose `product.tenant`
+  equals the acting tenant → accepted (same-tenant case).
+- `create_execution()` with a `FormulationVersion` whose `product.tenant`
+  differs from the acting tenant → rejected with
+  `formulation_version_tenant_mismatch` / 400; no `ChecklistExecution` row
+  written; no `ChecklistResponse` rows written; no `CalculationOutcome`
+  rows written; no audit success event emitted.
+- `create_execution()` with a nonexistent `formulation_version_public_id`
+  → generic 404; no `AttributeError` or unhandled exception; no DB write.
+- The service call itself must not raise `AttributeError` — a test
+  instantiates a real `FormulationVersion` fixture and asserts
+  `formulation_version.product.tenant` resolves without error (regression
+  guard against the `product_development_record` defect corrected by
+  DR-2-34).
+- A cross-tenant `FormulationVersion` that is also unapproved returns
+  `formulation_version_tenant_mismatch`, never `formulation_version_not_approved`
+  — the tenant check runs first and its response never discloses another
+  tenant's formulation version's lifecycle status.
+- Only the `formulation_version_public_id` (UUID) appears in the response
+  body of any error in this test group — no internal PK, no `product` PK,
+  no `ProductDevelopmentRecord` identifying detail.
 
 **CalculationOutcome placeholders (DR-2-09):** `SYSTEM_CALCULATED` questions get `status=DATA_REQUIRED` rows; `USER_REQUIRED`/`REVIEWER_CONFIRMED`/`FDA_DERIVED_DEFAULT`/`EVIDENCE_DERIVED` do not.
 
@@ -1249,10 +1427,10 @@ No raw exception text. No Python tracebacks. No internal IDs. No storage keys.
 6. `ChecklistResponse.clean()` is provably called on every `save()` path — a test that calls `save()` directly without `full_clean()` on an approved execution must fail. Pins acceptance criterion against the `AssessmentSnapshot` defect pattern.
 7. Payload-limit tests pass: at-limit accepted, over-limit returns `payload_too_large` / 400 with no DB write (DR-2-01).
 8. `create_execution()` rejects non-approved `FormulationVersion` with `formulation_version_not_approved` (DR-2-10).
-9. Cross-tenant formulation version reference rejected with `formulation_version_tenant_mismatch` (DR-2-03).
-10. `DeletionProtectionRegistry` hook registered; test verifies that attempting to delete a `DocumentVersion` referenced by an approved execution raises `DocumentVersionDeleteForbidden` (DR-2-06).
+9. Cross-tenant formulation version reference rejected with `formulation_version_tenant_mismatch`, verified against the actual `formulation_version.product.tenant` relationship — no `AttributeError`, no reliance on a nonexistent `product_development_record` field (DR-2-03, DR-2-34).
+10. `DeletionProtectionRegistry` is implemented as new code in `backend/documents/deletion_protection.py` (it does not exist prior to 4D-2); `iig_checklist` registers its evidence-reference checker into it from `IigChecklistConfig.ready()`; registration is idempotent; a test verifies that attempting to delete a `DocumentVersion` referenced by an approved execution raises `DocumentVersionDeleteForbidden`; `backend/documents/` contains no import of `iig_checklist` (DR-2-06, DR-2-35).
 11. No Critical or Major findings in the independent implementation review.
-12. All 33 design decisions from `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md` referenced in the implementation PR description.
+12. All 35 design decisions from `docs/MILESTONE_4D_2_DESIGN_REMEDIATION.md` referenced in the implementation PR description.
 13. `enter_reviewer_conclusion()` callable only when `execution.status=submitted_for_review`; all other states return appropriate structured error (DR-2-23).
 14. `enter_response()` and `ChecklistResponseUpdateView` reject `reviewer_conclusion` raw values with `reviewer_conclusion_wrong_answer_type` / 400 (DR-2-23).
 15. Integer `true`/`false` is rejected with `invalid_raw_value_shape`; integers 0 and 1 are accepted (DR-2-24).
@@ -1265,6 +1443,8 @@ No raw exception text. No Python tracebacks. No internal IDs. No storage keys.
 22. Failed stale-version amendment creates zero `ChecklistResponseHistory` rows and emits zero audit success events (DR-2-27).
 23. Direct tests confirm: `reject` from `draft` succeeds; `cancel` from `draft` succeeds; `supersede` from `approved` succeeds; terminal states (`rejected`, `cancelled`, `superseded`) cannot transition (R4-M-3).
 24. `ChecklistResponseHistory` rows accurately capture `prior_is_not_applicable`, `new_is_not_applicable`, `prior_not_applicable_reason`, `new_not_applicable_reason` in amendment tests (R4-M-4).
+25. `formulation_version.product.tenant` is the relationship used everywhere a formulation-version tenant check occurs — service, tests, and documentation examples all use this exact path; no normative reference to `product_development_record` remains anywhere in the 4D-2 documentation set (DR-2-34).
+26. `DeletionProtectionRegistry` (`backend/documents/deletion_protection.py`) exists as a class with `register()`, `unregister()`, and `check()` classmethods; `IigChecklistConfig.ready()` registers exactly one checker under a stable key; calling `ready()` twice leaves exactly one checker registered under that key (DR-2-35).
 
 ---
 
@@ -1278,7 +1458,7 @@ No raw exception text. No Python tracebacks. No internal IDs. No storage keys.
 4. Models: `ChecklistExecution`, `ChecklistResponse`, `ChecklistResponseHistory`, `CalculationOutcome`.
 5. `ChecklistExecutionManager.visible_to(tenant)`.
 6. Migration `0002_execution.py`.
-7. `DeletionProtectionRegistry` hook registration in `IigChecklistConfig.ready()`.
+7. `DeletionProtectionRegistry` — new class implemented at `backend/documents/deletion_protection.py` (§9a), then `iig_checklist`'s checker registered into it from `IigChecklistConfig.ready()`.
 8. Permissions — 8 new codenames, `ROLE_PERMISSIONS` extension.
 9. Exception classes: `ChecklistVersionNotActive`, `FormulationVersionNotApproved`, `FormulationVersionTenantMismatch`, `ExecutionAlreadyActive`, `ResponseDeleteForbidden`, `ExecutionAlreadyActive`.
 10. Service: `create_execution()` (with R4-M-2 validation).
@@ -1305,10 +1485,10 @@ No raw exception text. No Python tracebacks. No internal IDs. No storage keys.
 |---|---|---|---|
 | DR-2-01 | Unbounded payload fields | §4, §26, §32, §48 AC7 | CLOSED |
 | DR-2-02 | CalculationOutcome cascade and response deletion | §7, §9, §32 | CLOSED |
-| DR-2-03 | Live FK to FormulationVersion with PROTECT | §5, §16, §32, §34 | CLOSED |
+| DR-2-03 | Live FK to FormulationVersion with PROTECT | §5, §16, §32, §34, §39 | CLOSED |
 | DR-2-04 | Non-terminal uniqueness constraint | §5, §33 | CLOSED |
 | DR-2-05 | Completeness gate at both submit_review and approve | §12, §40 | CLOSED |
-| DR-2-06 | DeletionProtectionRegistry hook | §1, §7, §32, §45, §48 AC10 | CLOSED |
+| DR-2-06 | DeletionProtectionRegistry hook | §1, §7, §9a, §32, §45, §48 AC10 | CLOSED |
 | DR-2-07 | reviewer_conclusion_note required at approve | §12, §26, §40, §41, §48 AC13 | CLOSED |
 | DR-2-08 | Eager, applicability-filtered response creation | §1, §16 | CLOSED |
 | DR-2-09 | CalculationOutcome DATA_REQUIRED placeholders | §9, §16, §39 | CLOSED |
@@ -1336,6 +1516,8 @@ No raw exception text. No Python tracebacks. No internal IDs. No storage keys.
 | DR-2-31 | Migration plan for four models | §33 | CLOSED |
 | DR-2-32 | Empty allowed_units strictly invalid for quantity_with_unit | §10, §23, §24, §48 AC21 | CLOSED |
 | DR-2-33 | Reviewer-conclusion lifecycle: returned/resubmitted/superseded | §43, §48 AC17 | CLOSED |
+| DR-2-34 | Correct FormulationVersion tenant relationship path (fifth independent review) | §16, §39, §48 AC9, §48 AC25 | CLOSED |
+| DR-2-35 | Define DeletionProtectionRegistry as new 4D-2 infrastructure (fifth independent review) | §1, §9a, §48 AC10, §48 AC26, §49 step 7 | CLOSED |
 
 ### §51 — Fourth-review minor findings traceability (R4-M-1 through R4-M-4)
 
@@ -1345,6 +1527,13 @@ No raw exception text. No Python tracebacks. No internal IDs. No storage keys.
 | R4-M-2 | `allowed_units` enforcement scope for `create_execution()` not specified | §10, §16 step 4, §39, §48 AC21 | CLOSED |
 | R4-M-3 | No direct tests for `rejected`, `cancelled`, `approved`, `superseded` states | §40, §48 AC23 | CLOSED |
 | R4-M-4 | No direct tests for `prior_is_not_applicable`, `new_is_not_applicable`, `prior_not_applicable_reason`, `new_not_applicable_reason` | §8 (field list), §19 step 14, §43, §48 AC24 | CLOSED |
+
+### §52 — Fifth-review findings traceability (F5-F-1, F5-M-1)
+
+| Review finding | Description | Spec sections | Status |
+|---|---|---|---|
+| F5-F-1 | `formulation_version.product_development_record` does not exist; actual field is `product` | §16 step 2, §39, §48 AC9, §48 AC25 | CLOSED |
+| F5-M-1 | `DeletionProtectionRegistry` described as existing infrastructure; does not exist in codebase | §1, §9a, §48 AC10, §48 AC26 | CLOSED |
 
 ---
 
@@ -1360,4 +1549,4 @@ No raw exception text. No Python tracebacks. No internal IDs. No storage keys.
 ---
 
 *End of Milestone 4D-2 Implementation Specification.*
-*All findings closed. All open questions resolved. Ready for implementation branch.*
+*All findings closed (DR-2-01 through DR-2-35; R4-M-1 through R4-M-4; F5-F-1, F5-M-1). All open questions resolved. Pending final re-review and formal human authorization before an implementation branch opens.*
