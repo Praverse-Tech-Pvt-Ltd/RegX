@@ -155,10 +155,14 @@ Rationale:
   that get linked to an execution are guaranteed never to change their
   content after linkage.
 - Cross-tenant protection: `ChecklistExecution.tenant ==
-  formulation_version.product_development_record.tenant` must be
+  formulation_version.product.tenant` must be
   verified in `create_execution()` before the FK is set (not a DB
   constraint — a service-layer guard returning structured 400 with
   `error_code = "formulation_version_tenant_mismatch"` if violated).
+  `FormulationVersion.product` is the actual FK to
+  `ProductDevelopmentRecord` (see `backend/formulations/models.py`);
+  there is no `product_development_record` field on this model
+  (corrected by DR-2-34, fifth independent review).
 
 Import-linter: add entry to `backend/pyproject.toml` `[forbidden]`
 contract confirming `formulations` may NOT import from `iig_checklist`.
@@ -268,8 +272,11 @@ inside `raw_value`. A live FK in `ChecklistResponse` to
 FK even when the question is not an attachment type — wasteful and
 semantically wrong.
 
-Deletion protection via Option B: the `documents` app exposes a
-`DeletionProtectionRegistry` (a simple module-level set of callables).
+Deletion protection via Option B: the `documents` app will expose a
+`DeletionProtectionRegistry` (a simple module-level set of callables) —
+this class is **new 4D-2 infrastructure that does not exist in the
+current codebase** (corrected by DR-2-35, fifth independent review; see
+that entry for the full interface).
 `iig_checklist.apps.IigChecklistConfig.ready()` registers a callable
 that checks whether any `ChecklistResponse` with
 `execution__status="approved"` contains the given
@@ -1400,6 +1407,120 @@ in §19 step 14 also explicitly list all four fields with the `R4-M-4` cross-ref
 
 ---
 
+### DR-2-34 — MAJOR — Incorrect FormulationVersion tenant relationship path (fifth independent review F5-F-1)
+
+**Status: CLOSED**
+
+**Finding:** All four 4D-2 documents specified the `create_execution()`
+cross-tenant guard, and the DR-2-03 rationale, using:
+
+```
+formulation_version.product_development_record.tenant == tenant
+```
+
+The actual model, confirmed by reading `backend/formulations/models.py`
+directly, is:
+
+```python
+class FormulationVersion(PublicIDModel, TimeStampedModel):
+    product = models.ForeignKey(
+        ProductDevelopmentRecord, on_delete=models.CASCADE, related_name="formulation_versions"
+    )
+```
+
+There is no `product_development_record` field or property on
+`FormulationVersion` anywhere in the codebase. The correct path is
+`formulation_version.product.tenant`. As specified, the mandatory
+cross-tenant safety guard in `create_execution()` would raise
+`AttributeError` at runtime instead of enforcing tenant isolation — a
+security-relevant control failure, not a cosmetic naming issue. This
+defect originated in the discovery document and survived unnoticed
+through the first four independent reviews (including the fourth
+review, which returned PASS) until it was caught in the fifth
+independent specification review.
+
+**Resolution (APPROVED):** Every normative reference to
+`formulation_version.product_development_record` is corrected to
+`formulation_version.product` across all four 4D-2 documents. The final
+specification additionally reorders the `create_execution()` checks so
+the tenant check runs strictly before the approved-status check —
+preventing a cross-tenant caller from ever learning another tenant's
+formulation version's lifecycle status via a different error code.
+Direct tests are added verifying: same-tenant acceptance; cross-tenant
+rejection with `formulation_version_tenant_mismatch`; no `AttributeError`
+against a real `FormulationVersion` fixture; and no information
+disclosure through error-code branching.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §7` — cross-tenant protection sentence
+  corrected to `formulation_version.product.tenant`.
+- `MILESTONE_4D_2_DESIGN_REMEDIATION.md` (DR-2-03 entry) — rationale
+  bullet corrected to `formulation_version.product.tenant`, with a note
+  that `FormulationVersion.product` is the actual FK.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §6.1` — service
+  pseudocode step 2 corrected.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §16` — `create_execution()`
+  step 2 corrected, reordered (tenant check before status check), and
+  annotated with the exact model field confirmed against source.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §39` — direct test block added
+  (same-tenant accepted; cross-tenant rejected; nonexistent UUID safe
+  404; no `AttributeError`; no execution/response/CalculationOutcome
+  rows on rejection; no success audit on rejection; error-code ordering
+  does not disclose another tenant's formulation status).
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §48` — acceptance criteria 9
+  and 25 updated/added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §50/§52` — traceability updated.
+
+---
+
+### DR-2-35 — MINOR — DeletionProtectionRegistry described as existing infrastructure (fifth independent review F5-M-1)
+
+**Status: CLOSED**
+
+**Finding:** `MILESTONE_4D_2_DISCOVERY.md` §9 and this remediation
+document's DR-2-06 entry both state, in present tense, that "the
+`documents` app exposes a `DeletionProtectionRegistry`." A repository-wide
+search (`grep -rn "DeletionProtectionRegistry" backend/`) confirms this
+class does not exist anywhere in the current codebase. The wording
+implies existing infrastructure that 4D-2 merely registers into, when in
+fact the class itself must be authored as part of 4D-2. An implementer
+following the discovery document's wording literally could search for
+nonexistent code instead of building it.
+
+**Resolution (APPROVED):** All four documents are corrected to state
+explicitly that `DeletionProtectionRegistry` is new Milestone 4D-2
+infrastructure to be implemented in the `documents` app, with:
+- proposed location `backend/documents/deletion_protection.py`;
+- an explicit class interface (`register()`, `unregister()`, `check()`);
+- an explicit dependency-direction rule (`iig_checklist` registers into
+  `documents`; `documents` never imports `iig_checklist`);
+- an explicit idempotent-registration requirement (repeated
+  `IigChecklistConfig.ready()` calls do not accumulate duplicate
+  checkers);
+- an explicit fail-closed rule for a checker that raises an exception;
+- an explicit rule that no storage path, tenant identifier, or internal
+  PK ever appears in a `DocumentVersionDeleteForbidden` message;
+- a direct test list covering registration, idempotency, protected vs.
+  unprotected `DocumentVersion` rows, sibling-version independence,
+  fail-closed behavior, and the import-direction guard.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §9` — "the documents app exposes a
+  DeletionProtectionRegistry" corrected to state it does not exist and
+  is new 4D-2 infrastructure.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §1` — scope entry corrected to
+  state explicitly that this is a new class to be implemented.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §9a` (new section) — full
+  interface, location, registration behavior, deletion-check
+  integration, and direct test list specified.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §48` — acceptance criterion 26
+  added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §49` — implementation sequence
+  step 7 corrected to reference the new class explicitly.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §50/§52` — traceability updated.
+
+---
+
 ## Decision register
 
 | # | Question | Decision | Status |
@@ -1457,8 +1578,10 @@ in §19 step 14 also explicitly list all four fields with the `R4-M-4` cross-ref
 | R4-M-2 | Minor | allowed_units enforcement scope for create_execution() not specified (from fourth independent review) | CLOSED |
 | R4-M-3 | Minor | No direct tests for rejected, cancelled, approved, superseded terminal states (from fourth independent review) | CLOSED |
 | R4-M-4 | Minor | No direct tests for prior/new not_applicable fields in ChecklistResponseHistory (from fourth independent review) | CLOSED |
+| DR-2-34 | Major | FormulationVersion.product_development_record does not exist; actual field is .product (from fifth independent review) | CLOSED |
+| DR-2-35 | Minor | DeletionProtectionRegistry described as existing infrastructure; does not exist in codebase (from fifth independent review) | CLOSED |
 
-**Total findings: 37**
+**Total findings: 39**
 **Critical remaining: 0**
 **Major remaining: 0**
 **Minor remaining: 0**
@@ -1500,6 +1623,8 @@ in §19 step 14 also explicitly list all four fields with the `R4-M-4` cross-ref
 | create_execution() allowed_units enforcement scope specified (R4-M-2) | YES |
 | Direct tests for rejected, cancelled, approved, superseded terminal states (R4-M-3) | YES |
 | Direct tests for prior/new not_applicable fields in history rows (R4-M-4) | YES |
+| formulation_version.product.tenant used everywhere (no product_development_record references remain) (DR-2-34) | YES |
+| DeletionProtectionRegistry specified as new 4D-2 infrastructure with full interface (DR-2-35) | YES |
 | Product code changed | NO |
 | Migrations added | NO |
 | Backend code changed | NO |
@@ -1512,9 +1637,17 @@ in §19 step 14 also explicitly list all four fields with the `R4-M-4` cross-ref
 
 **Ready for fourth independent design review:** YES (completed — PASS; 4 Minor findings R4-M-1 through R4-M-4 closed in final specification)
 
-**Ready to finalize 4D-2 implementation specification:** YES — fourth independent design review returned PASS. Final specification created at `docs/MILESTONE_4D_2_IMPLEMENTATION_SPEC.md`.
+**Ready for fifth independent specification review:** YES (completed — FAIL, remediated; F5-F-1 Major and F5-M-1 Minor closed as DR-2-34 and DR-2-35)
 
-**Ready to implement 4D-2:** YES — pending formal human approval of `docs/MILESTONE_4D_2_IMPLEMENTATION_SPEC.md` and opening of implementation branch `regx/feat/milestone-4d-2-execution-foundation` from `regx-main`.
+**Ready to finalize 4D-2 implementation specification:** NO — pending a sixth independent
+specification review confirming DR-2-34 and DR-2-35 remediation is complete and correct.
+The fifth review's FAIL must be followed by a fresh independent re-review before this
+document can be marked approved; a self-remediation is not a substitute for independent
+verification.
+
+**Ready to implement 4D-2:** NO — implementation authorization requires a passing
+independent re-review of this remediation and explicit formal human approval. Neither
+has occurred yet.
 
 ---
 
