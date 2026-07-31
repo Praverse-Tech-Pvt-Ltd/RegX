@@ -27,6 +27,18 @@ class IigChecklistEvent:
     APPLICABILITY_RULE_CREATED = "iig_checklist.applicability_rule.created"
     APPLICABILITY_RULE_UPDATED = "iig_checklist.applicability_rule.updated"
     APPLICABILITY_RULE_VALIDATED = "iig_checklist.applicability_rule.validated"
+    # 4D-2 execution events
+    EXECUTION_CREATED = "iig_checklist.execution.created"
+    EXECUTION_SUBMITTED = "iig_checklist.execution.submitted_for_review"
+    EXECUTION_RETURNED = "iig_checklist.execution.returned"
+    EXECUTION_APPROVED = "iig_checklist.execution.approved"
+    EXECUTION_REJECTED = "iig_checklist.execution.rejected"
+    EXECUTION_CANCELLED = "iig_checklist.execution.cancelled"
+    EXECUTION_SUPERSEDED = "iig_checklist.execution.superseded"
+    RESPONSE_ENTERED = "iig_checklist.response.entered"
+    RESPONSE_UPDATED = "iig_checklist.response.updated"
+    RESPONSE_REVIEWER_CONCLUSION_ENTERED = "checklist_response.reviewer_conclusion_entered"
+    RESPONSE_REVIEWER_CONCLUSION_UPDATED = "checklist_response.reviewer_conclusion_updated"
 
 
 def emit(
