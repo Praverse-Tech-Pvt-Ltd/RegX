@@ -153,14 +153,117 @@ class TestDocumentVersionDelete:
             with pytest.raises(DocumentVersionDeleteForbidden):
                 dv.delete()
 
-    def test_import_guard_no_circular_import(self):
-        """documents.deletion_protection must not import iig_checklist."""
-        import documents.deletion_protection as dp_module
-        import sys
 
-        # The module must be importable and iig_checklist must not appear
-        # in its direct imports (not in sys.modules at module level).
-        source = dp_module.__file__
-        with open(source, encoding="utf-8") as f:
-            content = f.read()
-        assert "iig_checklist" not in content
+# ---------------------------------------------------------------------------
+# QuerySet-level and bulk deletion (M4D2-F-3): DocumentVersion.delete() is an
+# instance-level override. Any of these paths must be equally protected:
+#   - DocumentVersion.objects.filter(...).delete()
+#   - Document.delete() / Document.objects.filter(...).delete() cascading to
+#     versions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestDocumentVersionQuerySetDelete:
+    def test_queryset_delete_blocked_when_checker_returns_true(self, tenant_a, user_a):
+        from documents.models import DocumentVersion
+
+        with DeletionProtectionRegistry._isolated():
+            DeletionProtectionRegistry.register("block_all", lambda dv: True)
+            dv = _make_document_version(tenant_a, user_a)
+            with pytest.raises(DocumentVersionDeleteForbidden):
+                DocumentVersion.objects.filter(pk=dv.pk).delete()
+            assert DocumentVersion.objects.filter(pk=dv.pk).exists()
+
+    def test_queryset_delete_allowed_when_no_checkers(self, tenant_a, user_a):
+        from documents.models import DocumentVersion
+
+        with DeletionProtectionRegistry._isolated():
+            dv = _make_document_version(tenant_a, user_a)
+            DocumentVersion.objects.filter(pk=dv.pk).delete()
+            assert not DocumentVersion.objects.filter(pk=dv.pk).exists()
+
+    def test_queryset_delete_blocked_if_any_row_in_bulk_is_blocked(self, tenant_a, user_a):
+        from documents.models import DocumentVersion
+
+        with DeletionProtectionRegistry._isolated():
+            blocked_dv = _make_document_version(tenant_a, user_a)
+            allowed_dv = _make_document_version(tenant_a, user_a)
+            DeletionProtectionRegistry.register(
+                "block_one", lambda dv: dv.pk == blocked_dv.pk
+            )
+            with pytest.raises(DocumentVersionDeleteForbidden):
+                DocumentVersion.objects.filter(
+                    pk__in=[blocked_dv.pk, allowed_dv.pk]
+                ).delete()
+            # Fails closed: neither row is removed when any row is blocked.
+            assert DocumentVersion.objects.filter(pk=blocked_dv.pk).exists()
+            assert DocumentVersion.objects.filter(pk=allowed_dv.pk).exists()
+
+
+@pytest.mark.django_db
+class TestDocumentDeleteCascade:
+    def test_document_instance_delete_blocked_when_version_referenced(
+        self, tenant_a, user_a
+    ):
+        from documents.models import DocumentVersion
+
+        with DeletionProtectionRegistry._isolated():
+            DeletionProtectionRegistry.register("block_all", lambda dv: True)
+            dv = _make_document_version(tenant_a, user_a)
+            doc = dv.document
+            with pytest.raises(DocumentVersionDeleteForbidden):
+                doc.delete()
+            assert DocumentVersion.objects.filter(pk=dv.pk).exists()
+
+    def test_document_instance_delete_allowed_when_no_checkers(self, tenant_a, user_a):
+        from documents.models import Document
+
+        with DeletionProtectionRegistry._isolated():
+            dv = _make_document_version(tenant_a, user_a)
+            doc_pk = dv.document_id
+            dv.document.delete()
+            assert not Document.objects.filter(pk=doc_pk).exists()
+
+    def test_document_queryset_delete_blocked_when_version_referenced(
+        self, tenant_a, user_a
+    ):
+        from documents.models import Document, DocumentVersion
+
+        with DeletionProtectionRegistry._isolated():
+            DeletionProtectionRegistry.register("block_all", lambda dv: True)
+            dv = _make_document_version(tenant_a, user_a)
+            doc_pk = dv.document_id
+            with pytest.raises(DocumentVersionDeleteForbidden):
+                Document.objects.filter(pk=doc_pk).delete()
+            assert Document.objects.filter(pk=doc_pk).exists()
+            assert DocumentVersion.objects.filter(pk=dv.pk).exists()
+
+
+# ---------------------------------------------------------------------------
+# Import-direction guard (no DB required)
+# ---------------------------------------------------------------------------
+
+
+def test_import_guard_no_circular_import():
+    """documents.deletion_protection must not import iig_checklist.
+
+    Parses the module's AST rather than substring-matching the source --
+    the module's own docstring names iig_checklist in prose, which a naive
+    substring check would misreport as an import.
+    """
+    import ast
+
+    import documents.deletion_protection as dp_module
+
+    with open(dp_module.__file__, encoding="utf-8") as f:
+        tree = ast.parse(f.read(), dp_module.__file__)
+
+    imported_modules = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported_modules.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported_modules.append(node.module)
+
+    assert not any(m == "iig_checklist" or m.startswith("iig_checklist.") for m in imported_modules)
