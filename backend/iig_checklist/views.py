@@ -1115,7 +1115,7 @@ class ChecklistResponseUpdateView(APIView):
             )
 
         try:
-            response = ChecklistResponse.objects.get(
+            response = ChecklistResponse.objects.select_related("question").get(
                 public_id=response_public_id,
                 execution=execution,
             )
@@ -1128,7 +1128,10 @@ class ChecklistResponseUpdateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = ChecklistResponseUpdateSerializer(data=request.data)
+        serializer = ChecklistResponseUpdateSerializer(
+            data=request.data,
+            context={"question": response.question, "execution": execution, "tenant": tenant},
+        )
         if not serializer.is_valid():
             raise ValidationError(serializer.errors)
 

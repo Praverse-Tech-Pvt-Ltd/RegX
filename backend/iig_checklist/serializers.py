@@ -322,6 +322,39 @@ class ChecklistResponseUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"error_code": "unknown_field", "detail": "version is not client-writable."}
             )
+
+        question = self.context.get("question")
+        raw_value = attrs.get("raw_value")
+        is_not_applicable = attrs.get("is_not_applicable")
+
+        if question is not None and "raw_value" in attrs:
+            from .response_validation import InvalidRawValueShape, validate_raw_value_shape
+
+            try:
+                validate_raw_value_shape(
+                    question.answer_type,
+                    raw_value,
+                    question=question,
+                    execution=self.context.get("execution"),
+                    tenant=self.context.get("tenant"),
+                )
+            except InvalidRawValueShape as exc:
+                raise serializers.ValidationError(
+                    {"error_code": "invalid_raw_value_shape", "detail": str(exc)}
+                ) from exc
+
+        if (
+            question is not None
+            and is_not_applicable
+            and question.answer_type
+            in {"calculated_value", "calculated_status", "approval_metadata"}
+        ):
+            raise serializers.ValidationError(
+                {
+                    "error_code": "invalid_raw_value_shape",
+                    "detail": f"{question.answer_type} does not support is_not_applicable.",
+                }
+            )
         return attrs
 
     def validate_raw_value(self, value):
