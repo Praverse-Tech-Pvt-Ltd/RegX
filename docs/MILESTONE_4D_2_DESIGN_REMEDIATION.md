@@ -1287,6 +1287,119 @@ row and no audit event is created on blocked writes.
 
 ---
 
+### R4-M-1 — MINOR — `ChecklistResponseHistory` instance save protection not specified (fourth independent review)
+
+**Status: CLOSED**
+
+**Finding:** The spec outline specified that `ChecklistResponseHistoryManager` raises
+`GovernedHistoryMutationForbidden` on queryset `.update()` and `.delete()`, and that
+instance `.delete()` is blocked. However, it did not specify what happens when `.save()`
+is called on an *existing* (already-persisted) history row — a distinct mutation path
+not covered by the queryset manager. Without an explicit guard, a developer could
+inadvertently call `.save()` on a retrieved history instance and mutate a governed
+amendment record.
+
+**Resolution (APPROVED):** The final implementation specification (§8) specifies:
+- Initial object creation (`pk is None`) is allowed via `save()`.
+- `save()` on an existing row (`pk is not None`) raises `GovernedHistoryMutationForbidden`.
+- Queryset `.update()` raises unconditionally.
+- Queryset `.delete()` raises unconditionally.
+- `bulk_update()` raises unconditionally.
+- Instance `.delete()` raises unconditionally.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §8` — full `ChecklistResponseHistoryManager`
+  and `ChecklistResponseHistory.save()` guard specified with exact Python pseudocode.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §48 AC18` — acceptance criterion updated.
+
+---
+
+### R4-M-2 — MINOR — `allowed_units` enforcement scope for `create_execution()` not specified (fourth independent review)
+
+**Status: CLOSED**
+
+**Finding:** The spec outline specified strict `allowed_units` validation in
+response-entry serializers but did not specify what happens when `create_execution()`
+encounters a `quantity_with_unit` question with `allowed_units = []` in the pinned
+version. The activation gate (4D-1 scope) was acknowledged as not modified, but the
+4D-2 execution creation path had no specified guard for this configuration.
+
+**Resolution (APPROVED):** The final implementation specification (§10) specifies:
+- `create_execution()` validates every applicable `quantity_with_unit` question in the
+  pinned `ChecklistVersion` before entering the transaction.
+- If any such question has `allowed_units = []`, execution creation fails with
+  `error_code = "execution_invalid_quantity_unit_config"` / 400.
+- This guard runs as a pre-transaction check (step 4 in §16) — no rows are written.
+- The 4D-1 activation gate is **not** modified. Strengthening it is deferred.
+- Response-level validation also rejects any unit when frozen `allowed_units` is empty.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §10` — enforcement scope, error code,
+  and scope boundary specified.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §16 step 4` — pre-transaction guard added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §32` — `execution_invalid_quantity_unit_config`
+  error code added to taxonomy.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §48 AC21` — acceptance criterion updated.
+
+---
+
+### R4-M-3 — MINOR — No direct tests for terminal state transitions (fourth independent review)
+
+**Status: CLOSED**
+
+**Finding:** The spec outline included a general note that "terminal states cannot
+transition" but did not include separate, named tests for the `rejected`, `cancelled`,
+`approved`, and `superseded` states. The test for `reject` from `draft` was present
+in §4.3 but the lifecycle tests in §13.2 did not enumerate the four distinct terminal
+state tests as individual test cases.
+
+**Resolution (APPROVED):** The final implementation specification (§40) adds direct
+named tests for:
+- `reject` from `draft` succeeds (explicitly required).
+- `reject` from `submitted_for_review` succeeds.
+- `reject` from `returned`, `approved`, `cancelled`, `rejected`, `superseded` blocked.
+- `cancel` from `draft` succeeds (direct test).
+- `cancel` from `returned` succeeds (direct test).
+- `cancel` from all other statuses blocked.
+- `supersede` from `approved` succeeds (direct test).
+- `supersede` from any non-`approved` status blocked.
+- Three terminal states (`rejected`, `cancelled`, `superseded`) cannot transition —
+  three separate direct tests.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §40` — direct test enumeration added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §48 AC23` — acceptance criterion added.
+
+---
+
+### R4-M-4 — MINOR — No direct tests for `not_applicable` fields in `ChecklistResponseHistory` (fourth independent review)
+
+**Status: CLOSED**
+
+**Finding:** The spec outline specified that `ChecklistResponseHistory` captures
+`prior_is_not_applicable`, `new_is_not_applicable`, `prior_not_applicable_reason`,
+and `new_not_applicable_reason`. However, the amendment tests in §13.5 did not
+include explicit verification that these four fields are accurately captured in
+the history row. Without direct tests, a developer could omit the fields from
+the history creation call and no test would catch the gap.
+
+**Resolution (APPROVED):** The final implementation specification (§43) explicitly
+requires verification that all four `not_applicable` fields are accurately captured
+in history rows during amendment. The field list in §8 and the service pseudocode
+in §19 step 14 also explicitly list all four fields with the `R4-M-4` cross-reference.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §8` — `prior_is_not_applicable`,
+  `new_is_not_applicable`, `prior_not_applicable_reason`, `new_not_applicable_reason`
+  field entries annotated with `# R4-M-4`.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §19 step 14` — all four fields listed
+  in history creation pseudocode with `# R4-M-4` annotation.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §43` — amendment test block explicitly
+  requires verification of all four fields.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC.md §48 AC24` — acceptance criterion added.
+
+---
+
 ## Decision register
 
 | # | Question | Decision | Status |
@@ -1340,8 +1453,12 @@ row and no audit event is created on blocked writes.
 | DR-2-31 | Minor | Migration specification missing version field and ChecklistResponseHistory model (from third independent review) | CLOSED |
 | DR-2-32 | Minor | Empty allowed_units behavior undefined — strict vs permissive (from third independent review) | CLOSED |
 | DR-2-33 | Minor | Returned / resubmitted / superseded reviewer-conclusion lifecycle tests missing (from third independent review) | CLOSED |
+| R4-M-1 | Minor | ChecklistResponseHistory instance save() protection not specified (from fourth independent review) | CLOSED |
+| R4-M-2 | Minor | allowed_units enforcement scope for create_execution() not specified (from fourth independent review) | CLOSED |
+| R4-M-3 | Minor | No direct tests for rejected, cancelled, approved, superseded terminal states (from fourth independent review) | CLOSED |
+| R4-M-4 | Minor | No direct tests for prior/new not_applicable fields in ChecklistResponseHistory (from fourth independent review) | CLOSED |
 
-**Total findings: 33**
+**Total findings: 37**
 **Critical remaining: 0**
 **Major remaining: 0**
 **Minor remaining: 0**
@@ -1379,6 +1496,10 @@ row and no audit event is created on blocked writes.
 | Migration specification lists all four CreateModel operations with all fields (DR-2-31) | YES |
 | Empty allowed_units strictly invalid for quantity_with_unit questions (DR-2-32) | YES |
 | Returned / resubmitted / superseded lifecycle tests specified (DR-2-33) | YES |
+| ChecklistResponseHistory instance save() protection specified (R4-M-1) | YES |
+| create_execution() allowed_units enforcement scope specified (R4-M-2) | YES |
+| Direct tests for rejected, cancelled, approved, superseded terminal states (R4-M-3) | YES |
+| Direct tests for prior/new not_applicable fields in history rows (R4-M-4) | YES |
 | Product code changed | NO |
 | Migrations added | NO |
 | Backend code changed | NO |
@@ -1389,15 +1510,11 @@ row and no audit event is created on blocked writes.
 
 **Ready for third independent design review:** YES (completed — FAIL, remediated)
 
-**Ready for fourth independent design review:** YES — all third-review findings
-(DR-2-27 through DR-2-33) closed. No Critical or Major findings remain.
+**Ready for fourth independent design review:** YES (completed — PASS; 4 Minor findings R4-M-1 through R4-M-4 closed in final specification)
 
-**Ready to finalize 4D-2 implementation specification:** YES — pending
-fourth independent design review PASS and formal human approval.
+**Ready to finalize 4D-2 implementation specification:** YES — fourth independent design review returned PASS. Final specification created at `docs/MILESTONE_4D_2_IMPLEMENTATION_SPEC.md`.
 
-**Ready to implement 4D-2:** NO — implementation specification must be
-formally approved by a human reviewer with domain authority before a
-feature branch opens.
+**Ready to implement 4D-2:** YES — pending formal human approval of `docs/MILESTONE_4D_2_IMPLEMENTATION_SPEC.md` and opening of implementation branch `regx/feat/milestone-4d-2-execution-foundation` from `regx-main`.
 
 ---
 
