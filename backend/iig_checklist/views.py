@@ -36,6 +36,8 @@ from .permissions import (
     PERM_EDIT_DRAFT,
     CanActivateChecklist,
     CanApproveChecklist,
+    CanApproveExecution,
+    CanCancelExecution,
     CanCloneChecklist,
     CanCreateChecklistDefinition,
     CanCreateExecution,
@@ -46,6 +48,8 @@ from .permissions import (
     CanReviewExecution,
     CanRetireChecklist,
     CanSubmitChecklistReview,
+    CanSubmitExecution,
+    CanSupersedeExecution,
     CanViewChecklistDefinition,
     CanViewExecution,
     can_create_definition_for_scope,
@@ -934,7 +938,10 @@ def _get_execution_or_404(public_id, tenant):
 
 
 class ChecklistExecutionListCreateView(APIView):
-    permission_classes = [CanViewExecution]
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [CanCreateExecution()]
+        return [CanViewExecution()]
 
     def get(self, request):
         tenant = _require_tenant()
@@ -1052,34 +1059,34 @@ class _ChecklistExecutionActionViewBase(APIView):
 
 
 class ChecklistExecutionSubmitView(_ChecklistExecutionActionViewBase):
-    permission_classes = [CanViewExecution]
+    permission_classes = [CanSubmitExecution]
     action = "submit_review"
 
 
 class ChecklistExecutionApproveView(_ChecklistExecutionActionViewBase):
-    permission_classes = [CanViewExecution]
+    permission_classes = [CanApproveExecution]
     action = "approve"
     serializer_class = ApproveSerializer
 
 
 class ChecklistExecutionReturnView(_ChecklistExecutionActionViewBase):
-    permission_classes = [CanViewExecution]
+    permission_classes = [CanReviewExecution]
     action = "return"
     serializer_class = ReturnSerializer
 
 
 class ChecklistExecutionRejectView(_ChecklistExecutionActionViewBase):
-    permission_classes = [CanViewExecution]
+    permission_classes = [CanApproveExecution]
     action = "reject"
 
 
 class ChecklistExecutionCancelView(_ChecklistExecutionActionViewBase):
-    permission_classes = [CanViewExecution]
+    permission_classes = [CanCancelExecution]
     action = "cancel"
 
 
 class ChecklistExecutionSupersedeView(_ChecklistExecutionActionViewBase):
-    permission_classes = [CanViewExecution]
+    permission_classes = [CanSupersedeExecution]
     action = "supersede"
 
 
