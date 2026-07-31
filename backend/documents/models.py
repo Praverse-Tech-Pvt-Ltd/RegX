@@ -78,6 +78,17 @@ class Document(PublicIDModel, TimeStampedModel):
     def __str__(self):
         return f"{self.title} ({self.tenant})"
 
+    def delete(self, using=None, keep_parents=False):
+        from .deletion_protection import DeletionProtectionRegistry, DocumentVersionDeleteForbidden
+
+        blocked = [dv for dv in self.versions.all() if DeletionProtectionRegistry.check(dv)]
+        if blocked:
+            raise DocumentVersionDeleteForbidden(
+                "This document has versions referenced by governed content "
+                "and cannot be deleted."
+            )
+        return super().delete(using=using, keep_parents=keep_parents)
+
 
 class ScanStatus(models.TextChoices):
     PENDING = "pending", "Pending Scan"
