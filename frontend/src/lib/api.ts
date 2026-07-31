@@ -1284,6 +1284,45 @@ export interface ChecklistQuestion {
   required: boolean;
 }
 
+// 4D-2 Execution types
+export interface ChecklistExecution {
+  publicId: string;
+  status: string;
+  checklistVersion: { publicId: string; versionNumber: number; status: string };
+  formulationVersionPublicId: string;
+  createdByEmail: string | null;
+  submittedByEmail: string | null;
+  submittedAt: string | null;
+  returnedByEmail: string | null;
+  returnedAt: string | null;
+  returnReason: string;
+  approvedByEmail: string | null;
+  approvedAt: string | null;
+  rejectedByEmail: string | null;
+  rejectedAt: string | null;
+  cancelledByEmail: string | null;
+  cancelledAt: string | null;
+  reviewerConclusionNote: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChecklistResponse {
+  publicId: string;
+  questionPublicId: string;
+  dataSourceTypeSnapshot: string;
+  rawValue: unknown | null;
+  isNotApplicable: boolean;
+  notApplicableReason: string | null;
+  enteredByEmail: string | null;
+  enteredAt: string | null;
+  confirmedByEmail: string | null;
+  confirmedAt: string | null;
+  overrideReason: string;
+  systemDerivedValue: unknown | null;
+  version: number;
+}
+
 export const iigChecklists = {
   definitions: {
     list: (tenantSlug: string, params?: { page?: number }) => {
@@ -1408,6 +1447,102 @@ export const iigChecklists = {
         headers: { "X-Tenant-Slug": tenantSlug },
         body: { reason },
       }),
+  },
+
+  // 4D-2 Execution API
+  executions: {
+    list: (tenantSlug: string, params?: { page?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set("page", String(params.page));
+      const query = qs.toString() ? `?${qs}` : "";
+      return apiRequest<PaginatedResponse<ChecklistExecution>>(
+        `/api/regx/v1/iig-checklists/executions/${query}`,
+        { headers: { "X-Tenant-Slug": tenantSlug } }
+      );
+    },
+
+    create: (
+      tenantSlug: string,
+      data: { checklist_version_public_id: string; formulation_version_public_id: string }
+    ) =>
+      apiRequest<ChecklistExecution>("/api/regx/v1/iig-checklists/executions/", {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: data,
+      }),
+
+    get: (tenantSlug: string, publicId: string) =>
+      apiRequest<ChecklistExecution>(`/api/regx/v1/iig-checklists/executions/${publicId}/`, {
+        headers: { "X-Tenant-Slug": tenantSlug },
+      }),
+
+    submitReview: (tenantSlug: string, publicId: string) =>
+      apiRequest<ChecklistExecution>(
+        `/api/regx/v1/iig-checklists/executions/${publicId}/submit-review/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+      ),
+
+    approve: (tenantSlug: string, publicId: string, reviewerConclusionNote: string) =>
+      apiRequest<ChecklistExecution>(
+        `/api/regx/v1/iig-checklists/executions/${publicId}/approve/`,
+        {
+          method: "POST",
+          headers: { "X-Tenant-Slug": tenantSlug },
+          body: { reviewer_conclusion_note: reviewerConclusionNote },
+        }
+      ),
+
+    return: (tenantSlug: string, publicId: string, returnReason: string) =>
+      apiRequest<ChecklistExecution>(
+        `/api/regx/v1/iig-checklists/executions/${publicId}/return/`,
+        {
+          method: "POST",
+          headers: { "X-Tenant-Slug": tenantSlug },
+          body: { return_reason: returnReason },
+        }
+      ),
+
+    reject: (tenantSlug: string, publicId: string) =>
+      apiRequest<ChecklistExecution>(
+        `/api/regx/v1/iig-checklists/executions/${publicId}/reject/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+      ),
+
+    cancel: (tenantSlug: string, publicId: string) =>
+      apiRequest<ChecklistExecution>(
+        `/api/regx/v1/iig-checklists/executions/${publicId}/cancel/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+      ),
+
+    supersede: (tenantSlug: string, publicId: string) =>
+      apiRequest<ChecklistExecution>(
+        `/api/regx/v1/iig-checklists/executions/${publicId}/supersede/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+      ),
+
+    responses: {
+      list: (tenantSlug: string, executionPublicId: string) =>
+        apiRequest<ChecklistResponse[]>(
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/`,
+          { headers: { "X-Tenant-Slug": tenantSlug } }
+        ),
+
+      update: (
+        tenantSlug: string,
+        executionPublicId: string,
+        responsePublicId: string,
+        data: {
+          raw_value?: unknown;
+          is_not_applicable?: boolean;
+          not_applicable_reason?: string | null;
+          override_reason?: string;
+        }
+      ) =>
+        apiRequest<ChecklistResponse>(
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/${responsePublicId}/`,
+          { method: "PATCH", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+        ),
+    },
   },
 };
 
