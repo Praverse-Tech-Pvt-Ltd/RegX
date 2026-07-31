@@ -48,7 +48,7 @@ def _make_active_cv(tenant_definition, user):
     )
 
 
-def _make_question(cv, user, answer_type="yes_no", code="Q-1", required=False):
+def _make_question(cv, user, answer_type="yes_no", code="Q-1", required=False, **extra):
     from iig_checklist.models import ChecklistQuestion, ChecklistSection
 
     section, _ = ChecklistSection.objects.get_or_create(
@@ -60,16 +60,18 @@ def _make_question(cv, user, answer_type="yes_no", code="Q-1", required=False):
             "criticality": "low",
         },
     )
-    return ChecklistQuestion.objects.create(
+    fields = dict(
         section=section,
         code=code,
         question_text="Question text",
         display_order=ChecklistQuestion.objects.filter(section=section).count() + 1,
         answer_type=answer_type,
-        data_source_classification="user_required",
+        data_source_classification=extra.pop("data_source_classification", "user_required"),
         criticality="low",
         required=required,
     )
+    fields.update(extra)
+    return ChecklistQuestion.objects.create(**fields)
 
 
 def _make_execution_with_responses(tenant, cv, fv, user):
