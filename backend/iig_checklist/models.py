@@ -1,4 +1,5 @@
 """Checklist definition-governance models -- Milestone 4D-1.
+Execution, response and outcome models -- Milestone 4D-2.
 
 Scope: authoring and governing checklist *content* (definitions,
 versions, sections, questions, applicability rules). No execution
@@ -14,8 +15,11 @@ docs/MILESTONE_4D_1_IMPLEMENTATION_SPEC.md §3a/§6a and
 docs/MILESTONE_4D_1_SPEC_REMEDIATION.md (SR-01).
 """
 
+import json
+
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 
 from common.models import PublicIDModel, TimeStampedModel
 
@@ -23,11 +27,19 @@ from .enums import (
     AnswerType,
     ApplicabilityOutcome,
     ApplicabilityRuleStatus,
+    CalculationStatus,
     ChecklistScopeType,
     ChecklistVersionStatus,
     Criticality,
     DataSourceClassification,
     EvidenceRequirement,
+    ExecutionStatus,
+)
+from .execution_constants import (
+    MAX_NOT_APPLICABLE_REASON_CHARS,
+    MAX_RAW_VALUE_BYTES,
+    MAX_REVIEWER_CONCLUSION_CHARS,
+    MAX_RETURN_REASON_CHARS,
 )
 from .managers import (
     ChecklistDefinitionManager,
@@ -393,4 +405,326 @@ class ChecklistQuestion(PublicIDModel, TimeStampedModel):
         if not self.section.checklist_version.is_editable() and self.pk:
             raise ValidationError(
                 "Cannot modify a ChecklistQuestion once its ChecklistVersion leaves draft/returned."
+            )
+
+
+# ---------------------------------------------------------------------------
+# Milestone 4D-2 -- Execution, Response and Outcome models
+# ---------------------------------------------------------------------------
+
+_CALCULATION_NAMES = frozenset(
+    {
+        "calculate_percentage_w_w",
+        "calculate_daily_exposure",
+        "calculate_percentage_of_potency",
+        "calculate_difference_from_potency",
+        "calculate_percentage_of_mde",
+        "calculate_difference_from_mde",
+    }
+)
+
+
+class ChecklistExecutionManager(models.Manager):
+    def visible_to(self, tenant):
+        """Tenant-scoped -- executions are never platform-scoped."""
+        return self.get_queryset().filter(tenant=tenant)
+
+
+class ChecklistExecution(PublicIDModel, TimeStampedModel):
+    """A tenant's execution of a specific ChecklistVersion against a
+    specific FormulationVersion."""
+
+    objects = ChecklistExecutionManager()
+
+    tenant = models.ForeignKey("tenancy.Tenant", on_delete=models.PROTECT)
+    checklist_version = models.ForeignKey(ChecklistVersion, on_delete=models.PROTECT)
+    formulation_version = models.ForeignKey(
+        "formulations.FormulationVersion",
+        on_delete=models.PROTECT,
+        related_name="checklist_executions",
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=ExecutionStatus.choices,
+        default=ExecutionStatus.DRAFT,
+    )
+    created_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    submitted_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    returned_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    returned_at = models.DateTimeField(null=True, blank=True)
+    return_reason = models.TextField(blank=True, max_length=MAX_RETURN_REASON_CHARS)
+    approved_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    cancelled_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    superseded_by = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="supersedes",
+    )
+    reviewer_conclusion_note = models.TextField(
+        blank=True,
+        max_length=MAX_REVIEWER_CONCLUSION_CHARS,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tenant", "checklist_version", "formulation_version"],
+                condition=~Q(status__in=["rejected", "cancelled", "superseded"]),
+                name="unique_active_execution_per_version_formulation",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "status"]),
+            models.Index(fields=["checklist_version"]),
+        ]
+
+
+class ChecklistResponse(PublicIDModel, TimeStampedModel):
+    """Pre-created response slot per applicable question per execution."""
+
+    execution = models.ForeignKey(
+        ChecklistExecution,
+        on_delete=models.PROTECT,
+        related_name="responses",
+    )
+    question = models.ForeignKey(
+        ChecklistQuestion,
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    data_source_type_snapshot = models.CharField(max_length=50)
+    raw_value = models.JSONField(null=True, blank=True)
+    is_not_applicable = models.BooleanField(default=False)
+    not_applicable_reason = models.CharField(
+        null=True,
+        blank=True,
+        max_length=MAX_NOT_APPLICABLE_REASON_CHARS,
+    )
+    entered_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    entered_at = models.DateTimeField(null=True, blank=True)
+    confirmed_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    override_reason = models.TextField(blank=True)
+    system_derived_value = models.JSONField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["execution", "question"],
+                name="unique_response_per_question_per_execution",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["execution"]),
+        ]
+
+    def clean(self):
+        # 1. Immutability when execution is not in a mutable state.
+        if self.pk is not None and self.execution_id is not None:
+            try:
+                exec_status = self.execution.status
+            except Exception:
+                exec_status = None
+            if exec_status not in {"draft", "returned"}:
+                raise ValidationError("response_immutable")
+
+        # 2. is_not_applicable=True implies raw_value must be null.
+        if self.is_not_applicable and self.raw_value is not None:
+            raise ValidationError(
+                "raw_value must be null when is_not_applicable is True."
+            )
+
+        # 3. not_applicable_reason required when is_not_applicable=True.
+        if self.is_not_applicable and not (self.not_applicable_reason or "").strip():
+            raise ValidationError("not_applicable_requires_reason")
+
+        # 4. override_reason required when system_derived_value is not null.
+        if self.system_derived_value is not None and not (self.override_reason or "").strip():
+            raise ValidationError(
+                "override_reason must be non-empty when system_derived_value is set."
+            )
+
+        # 5. Payload byte limit on raw_value.
+        if self.raw_value is not None:
+            size = len(json.dumps(self.raw_value).encode("utf-8"))
+            if size > MAX_RAW_VALUE_BYTES:
+                raise ValidationError("payload_too_large")
+
+
+class GovernedHistoryMutationForbidden(Exception):
+    """Raised when any mutation (save, update, delete) is attempted on an
+    existing ChecklistResponseHistory row."""
+
+
+class _ImmutableHistoryQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise GovernedHistoryMutationForbidden(
+            "ChecklistResponseHistory rows are append-only and cannot be updated."
+        )
+
+    def delete(self):
+        raise GovernedHistoryMutationForbidden(
+            "ChecklistResponseHistory rows are append-only and cannot be deleted."
+        )
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise GovernedHistoryMutationForbidden(
+            "ChecklistResponseHistory rows are append-only and cannot be bulk-updated."
+        )
+
+
+class ChecklistResponseHistoryManager(models.Manager):
+    def get_queryset(self):
+        return _ImmutableHistoryQuerySet(self.model, using=self._db)
+
+
+class ChecklistResponseHistory(PublicIDModel, TimeStampedModel):
+    """Append-only governed amendment audit for reviewer-conclusion amendments.
+
+    Created inside the same transaction as the response update; one row per
+    amendment; never on first entry. Rows may never be mutated or deleted.
+    """
+
+    objects = ChecklistResponseHistoryManager()
+
+    response = models.ForeignKey(
+        ChecklistResponse,
+        on_delete=models.PROTECT,
+        related_name="history",
+    )
+    prior_raw_value = models.JSONField(null=True)
+    new_raw_value = models.JSONField(null=True)
+    prior_is_not_applicable = models.BooleanField()
+    new_is_not_applicable = models.BooleanField()
+    prior_not_applicable_reason = models.CharField(null=True, blank=True, max_length=200)
+    new_not_applicable_reason = models.CharField(null=True, blank=True, max_length=200)
+    prior_entered_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    prior_entered_at = models.DateTimeField(null=True, blank=True)
+    prior_version = models.PositiveIntegerField()
+    new_version = models.PositiveIntegerField()
+    correction_reason = models.TextField()
+    amended_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.PROTECT,
+        related_name="+",
+    )
+    amended_at = models.DateTimeField(auto_now_add=True)
+    source_classification_snapshot = models.CharField(max_length=50)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["response"]),
+        ]
+
+    def delete(self, using=None, keep_parents=False):
+        raise GovernedHistoryMutationForbidden(
+            "ChecklistResponseHistory rows are append-only and cannot be deleted."
+        )
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise GovernedHistoryMutationForbidden(
+                "ChecklistResponseHistory rows are append-only; "
+                "save() on an existing row is forbidden."
+            )
+        super().save(*args, **kwargs)
+
+
+class CalculationOutcome(PublicIDModel, TimeStampedModel):
+    """Calculation result placeholder created at execution creation.
+    Populated with actual values in 4D-3."""
+
+    response = models.ForeignKey(
+        ChecklistResponse,
+        on_delete=models.CASCADE,
+        related_name="calculation_outcomes",
+    )
+    calculation_name = models.CharField(max_length=100)
+    formula_version = models.CharField(max_length=50, blank=True)
+    status = models.CharField(
+        max_length=50,
+        choices=CalculationStatus.choices,
+        default=CalculationStatus.DATA_REQUIRED,
+    )
+    value = models.DecimalField(null=True, blank=True, max_digits=20, decimal_places=10)
+    unit = models.CharField(blank=True, max_length=50)
+    inputs = models.JSONField(default=dict)
+    input_provenance = models.JSONField(default=dict)
+    rounding_rule = models.CharField(blank=True, max_length=100)
+    reason_code = models.CharField(blank=True, max_length=100)
+    generated_at = models.DateTimeField(null=True, blank=True)
+    source_assessment_snapshot_public_id = models.UUIDField(null=True, blank=True)
+
+    def clean(self):
+        if self.calculation_name not in _CALCULATION_NAMES:
+            raise ValidationError(
+                f"calculation_name {self.calculation_name!r} is not one of the six "
+                "approved iid_assessment calculation function names."
             )

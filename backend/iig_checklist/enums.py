@@ -103,3 +103,29 @@ class ApplicabilityOutcome(models.TextChoices):
 class ApplicabilityRuleStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     APPROVED = "approved", "Approved"
+
+
+class ExecutionStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    SUBMITTED_FOR_REVIEW = "submitted_for_review", "Submitted for review"
+    RETURNED = "returned", "Returned"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+    CANCELLED = "cancelled", "Cancelled"
+    SUPERSEDED = "superseded", "Superseded"
+
+
+TERMINAL_EXECUTION_STATUSES = frozenset(
+    {
+        ExecutionStatus.REJECTED,
+        ExecutionStatus.CANCELLED,
+        ExecutionStatus.SUPERSEDED,
+    }
+)
+
+
+class CalculationStatus(models.TextChoices):
+    DATA_REQUIRED = "data_required", "Data required"
+    CALCULATING = "calculating", "Calculating"
+    COMPLETE = "complete", "Complete"
+    ERROR = "error", "Error"
