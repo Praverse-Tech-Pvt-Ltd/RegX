@@ -56,6 +56,25 @@ Coverage:
   answer type rejected on normal response PATCH endpoint, N/A + reason accepted
 - Response immutability when execution is not mutable
 
+## Layer 0: Response Shape Validation
+
+**File:** `backend/iig_checklist/tests/test_response_validation.py`
+
+Unit tests (no DB, except the reference-type existence checks) for
+`response_validation.validate_raw_value_shape()` covering all 18 `AnswerType`
+DB values (DR-2-17, §23/§24): canonical shape accepted, malformed shape
+rejected with `InvalidRawValueShape`; `integer` bool/int subclass trap
+(DR-2-24); `quantity_with_unit` allowed-units enforcement including empty
+`allowed_units` (DR-2-25, DR-2-32); `decimal`/`percentage` reject JSON float;
+`percentage` range bounds; `yes_no` rejects strings; `yes_no_na` rejects
+booleans and out-of-set strings; `single_select`/`multi_select` option-code
+validation when `question.validation_rule["options"]` is defined;
+`multi_select` duplicate/sort/empty-list rejection; `calculated_value`/
+`calculated_status`/`approval_metadata` reject any client `raw_value`;
+`reviewer_conclusion` rejected via this path (dedicated endpoint only);
+`fda_record_reference`/`formulation_component_reference`/`attachment_reference`
+existence and shape checks.
+
 ## Layer 4: Deletion Protection
 
 **File:** `backend/documents/tests/test_deletion_protection.py`
@@ -67,7 +86,15 @@ Coverage:
 - `DocumentVersion.delete()` blocked when checker returns `True`
 - `DocumentVersion.delete()` allowed when no checkers or checker returns `False`
 - `DocumentVersion.delete()` blocked when checker raises (fail-closed)
-- Import guard: `documents.deletion_protection` does not import `iig_checklist`
+- `DocumentVersion.objects.filter(...).delete()` (queryset/bulk delete)
+  blocked when any row in the queryset is blocked, even if other rows in the
+  same queryset are not; no partial deletion
+- `Document.delete()` blocked when any of its versions is referenced by
+  governed content (cascade protection)
+- `Document.objects.filter(...).delete()` blocked under the same condition
+- Import guard: `documents.deletion_protection` does not import `iig_checklist`,
+  verified via AST import-node inspection (not substring search, which
+  false-positives on the module's own docstring)
 
 ## Layer 5: Frontend / Playwright
 
