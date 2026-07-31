@@ -24,7 +24,9 @@ from .enums import ChecklistVersionStatus
 from .models import (
     ApplicabilityRule,
     ChecklistDefinition,
+    ChecklistExecution,
     ChecklistQuestion,
+    ChecklistResponse,
     ChecklistSection,
     ChecklistVersion,
 )
@@ -36,33 +38,68 @@ from .permissions import (
     CanApproveChecklist,
     CanCloneChecklist,
     CanCreateChecklistDefinition,
+    CanCreateExecution,
     CanDeleteChecklistDraft,
     CanEditChecklistDraft,
-    CanRetireChecklist,
+    CanEditExecution,
     CanReviewChecklist,
+    CanReviewExecution,
+    CanRetireChecklist,
     CanSubmitChecklistReview,
     CanViewChecklistDefinition,
+    CanViewExecution,
     can_create_definition_for_scope,
     can_mutate_definition_scope,
+    has_iig_checklist_permission,
 )
 from .serializers import (
     ApplicabilityRuleSerializer,
+    ApproveSerializer,
     ChecklistDefinitionSerializer,
+    ChecklistExecutionCreateSerializer,
+    ChecklistExecutionSerializer,
     ChecklistQuestionSerializer,
+    ChecklistResponseSerializer,
+    ChecklistResponseUpdateSerializer,
     ChecklistSectionSerializer,
     ChecklistVersionSerializer,
     CloneDefinitionSerializer,
+    EmptyActionSerializer,
+    ReturnSerializer,
+    ReviewerConclusionSerializer,
     VersionActionSerializer,
 )
 from .services import (
+    ChecklistVersionNotActive,
     CloneRequest,
     CloneSourceNotEligible,
     DuplicateCodeError,
+    ExecutionAlreadyActive,
+    FormulationVersionNotApproved,
+    FormulationVersionTenantMismatch,
+    IncompleteExecution,
+    InvalidQuantityUnitConfig,
+    MissingReturnReason,
+    ReviewerConclusionCorrectionReasonRequired,
+    ReviewerConclusionEmpty,
+    ReviewerConclusionInvalidPayload,
+    ReviewerConclusionInvalidState,
+    ReviewerConclusionPayloadTooLarge,
+    ReviewerConclusionPermissionDenied,
+    ReviewerConclusionRequired,
+    ReviewerConclusionStaleVersion,
+    ReviewerConclusionTooLong,
+    ReviewerConclusionWrongAnswerType,
+    SelfApprovalForbidden,
     VersionAllocationConflict,
     clone_definition,
+    create_execution,
     create_next_version,
+    enter_reviewer_conclusion,
+    transition_execution,
 )
 from .transitions import IllegalVersionTransition, VersionAction, validate_version_transition
+from .execution_transitions import IllegalExecutionTransition
 
 _ACTION_EVENT_MAP = {
     VersionAction.SUBMIT_REVIEW: IigChecklistEvent.VERSION_SUBMITTED,
@@ -873,3 +910,327 @@ class ApplicabilityRuleValidateView(APIView):
             payload={"field_registry_version": registry_version},
         )
         return Response({"valid": True})
+
+
+# ---------------------------------------------------------------------------
+# Milestone 4D-2 -- Execution and Response views
+# ---------------------------------------------------------------------------
+
+
+def _get_execution_or_404(public_id, tenant):
+    try:
+        return ChecklistExecution.objects.visible_to(tenant).select_related(
+            "checklist_version",
+            "formulation_version",
+            "created_by",
+            "submitted_by",
+            "returned_by",
+            "approved_by",
+            "rejected_by",
+            "cancelled_by",
+        ).get(public_id=public_id)
+    except ChecklistExecution.DoesNotExist as exc:
+        raise NotFound() from exc
+
+
+class ChecklistExecutionListCreateView(APIView):
+    permission_classes = [CanViewExecution]
+
+    def get(self, request):
+        tenant = _require_tenant()
+        if not has_iig_checklist_permission(request.user, tenant, "iig_checklist.view_execution"):
+            raise PermissionDenied()
+        qs = ChecklistExecution.objects.visible_to(tenant).select_related(
+            "checklist_version", "formulation_version", "created_by",
+            "submitted_by", "returned_by", "approved_by", "rejected_by", "cancelled_by",
+        ).order_by("-created_at")
+        paginator = _Pagination()
+        page = paginator.paginate_queryset(qs, request)
+        serializer = ChecklistExecutionSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    def post(self, request):
+        tenant = _require_tenant()
+        serializer = ChecklistExecutionCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+        try:
+            execution = create_execution(
+                tenant=tenant,
+                checklist_version_public_id=serializer.validated_data["checklist_version_public_id"],
+                formulation_version_public_id=serializer.validated_data["formulation_version_public_id"],
+                actor=request.user,
+            )
+        except ExecutionAlreadyActive:
+            return Response(
+                {"error_code": "execution_already_active", "detail": "An active execution already exists for this combination."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except ChecklistVersionNotActive:
+            return Response(
+                {"error_code": "checklist_version_not_active", "detail": "Checklist version is not active."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except FormulationVersionTenantMismatch:
+            return Response(
+                {"error_code": "formulation_version_tenant_mismatch", "detail": "Formulation version does not belong to this tenant."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except FormulationVersionNotApproved:
+            return Response(
+                {"error_code": "formulation_version_not_approved", "detail": "Formulation version is not approved."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except InvalidQuantityUnitConfig as exc:
+            return Response(
+                {"error_code": "execution_invalid_quantity_unit_config", "detail": f"Question {exc} has answer_type quantity_with_unit but allowed_units is empty. Contact the checklist administrator to correct the definition version before creating an execution."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            ChecklistExecutionSerializer(execution).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ChecklistExecutionDetailView(APIView):
+    permission_classes = [CanViewExecution]
+
+    def get(self, request, public_id):
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+        return Response(ChecklistExecutionSerializer(execution).data)
+
+
+class _ChecklistExecutionActionViewBase(APIView):
+    action: str = ""
+    serializer_class = EmptyActionSerializer
+
+    def post(self, request, public_id):
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+
+        serializer = self.serializer_class(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        kwargs = dict(serializer.validated_data)
+
+        try:
+            updated = transition_execution(
+                execution=execution,
+                action=self.action,
+                actor=request.user,
+                tenant=tenant,
+                **kwargs,
+            )
+        except IllegalExecutionTransition as exc:
+            return Response(
+                {"error_code": "illegal_execution_transition", "detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except IncompleteExecution as exc:
+            return Response(
+                {"error_code": "incomplete_execution", "detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except MissingReturnReason:
+            return Response(
+                {"error_code": "missing_return_reason", "detail": "return_reason is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ReviewerConclusionRequired:
+            return Response(
+                {"error_code": "reviewer_conclusion_required", "detail": "reviewer_conclusion_note is required to approve."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except SelfApprovalForbidden:
+            return Response(
+                {"error_code": "self_approval_forbidden", "detail": "You cannot approve an execution you submitted."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return Response(ChecklistExecutionSerializer(updated).data)
+
+
+class ChecklistExecutionSubmitView(_ChecklistExecutionActionViewBase):
+    permission_classes = [CanViewExecution]
+    action = "submit_review"
+
+
+class ChecklistExecutionApproveView(_ChecklistExecutionActionViewBase):
+    permission_classes = [CanViewExecution]
+    action = "approve"
+    serializer_class = ApproveSerializer
+
+
+class ChecklistExecutionReturnView(_ChecklistExecutionActionViewBase):
+    permission_classes = [CanViewExecution]
+    action = "return"
+    serializer_class = ReturnSerializer
+
+
+class ChecklistExecutionRejectView(_ChecklistExecutionActionViewBase):
+    permission_classes = [CanViewExecution]
+    action = "reject"
+
+
+class ChecklistExecutionCancelView(_ChecklistExecutionActionViewBase):
+    permission_classes = [CanViewExecution]
+    action = "cancel"
+
+
+class ChecklistExecutionSupersedeView(_ChecklistExecutionActionViewBase):
+    permission_classes = [CanViewExecution]
+    action = "supersede"
+
+
+class ChecklistResponseListView(APIView):
+    permission_classes = [CanViewExecution]
+
+    def get(self, request, public_id):
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+        responses = ChecklistResponse.objects.filter(
+            execution=execution,
+        ).select_related("question", "entered_by", "confirmed_by").order_by("created_at")
+        serializer = ChecklistResponseSerializer(responses, many=True)
+        return Response(serializer.data)
+
+
+class ChecklistResponseUpdateView(APIView):
+    permission_classes = [CanEditExecution]
+
+    def patch(self, request, public_id, response_public_id):
+        from django.utils import timezone
+
+        from .audit import IigChecklistEvent, emit
+        from .enums import AnswerType
+
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+
+        if execution.status not in {"draft", "returned"}:
+            return Response(
+                {"error_code": "response_immutable", "detail": "Responses cannot be modified outside draft or returned status."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            response = ChecklistResponse.objects.get(
+                public_id=response_public_id,
+                execution=execution,
+            )
+        except ChecklistResponse.DoesNotExist:
+            raise NotFound()
+
+        if response.question.answer_type == AnswerType.REVIEWER_CONCLUSION:
+            return Response(
+                {"error_code": "reviewer_conclusion_wrong_answer_type", "detail": "Use the /reviewer-conclusion/ endpoint for reviewer_conclusion questions."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = ChecklistResponseUpdateSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        prior_entered_by = response.entered_by_id
+
+        data = serializer.validated_data
+        for field in ("raw_value", "is_not_applicable", "not_applicable_reason", "override_reason"):
+            if field in data:
+                setattr(response, field, data[field])
+        response.entered_by = request.user
+        response.entered_at = timezone.now()
+
+        try:
+            response.full_clean()
+            response.save()
+        except DjangoValidationError as exc:
+            raise ValidationError({"error_code": "invalid_raw_value_shape", "detail": str(exc)})
+
+        event_type = (
+            IigChecklistEvent.RESPONSE_UPDATED
+            if prior_entered_by
+            else IigChecklistEvent.RESPONSE_ENTERED
+        )
+
+        def _audit():
+            emit(
+                event_type=event_type,
+                resource_id=str(response.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload={
+                    "execution_public_id": str(execution.public_id),
+                    "response_public_id": str(response.public_id),
+                    "question_public_id": str(response.question.public_id),
+                    "data_source_type_snapshot": response.data_source_type_snapshot,
+                },
+            )
+
+        transaction.on_commit(_audit)
+        return Response(ChecklistResponseSerializer(response).data)
+
+
+class ChecklistReviewerConclusionView(APIView):
+    permission_classes = [CanReviewExecution]
+
+    def post(self, request, public_id, response_public_id):
+        tenant = _require_tenant()
+        serializer = ReviewerConclusionSerializer(data=request.data)
+        if not serializer.is_valid():
+            raise ValidationError(serializer.errors)
+
+        try:
+            response = enter_reviewer_conclusion(
+                tenant=tenant,
+                execution_public_id=public_id,
+                response_public_id=response_public_id,
+                actor=request.user,
+                raw_value=serializer.validated_data["raw_value"],
+                expected_version=serializer.validated_data["expected_version"],
+                correction_reason=serializer.validated_data.get("correction_reason", ""),
+            )
+        except ReviewerConclusionInvalidState:
+            return Response(
+                {"error_code": "reviewer_conclusion_invalid_state", "detail": "Execution must be in submitted_for_review status."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except ReviewerConclusionPermissionDenied:
+            raise PermissionDenied()
+        except ReviewerConclusionWrongAnswerType:
+            return Response(
+                {"error_code": "reviewer_conclusion_wrong_answer_type", "detail": "Question is not a reviewer_conclusion type."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ReviewerConclusionEmpty:
+            return Response(
+                {"error_code": "reviewer_conclusion_empty", "detail": "Reviewer conclusion must not be empty."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ReviewerConclusionTooLong:
+            return Response(
+                {"error_code": "reviewer_conclusion_too_long", "detail": "Reviewer conclusion exceeds 4000 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ReviewerConclusionPayloadTooLarge:
+            return Response(
+                {"error_code": "reviewer_conclusion_payload_too_large", "detail": "Payload exceeds byte limit."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ReviewerConclusionStaleVersion:
+            return Response(
+                {"error_code": "reviewer_conclusion_stale_version", "detail": "expected_version does not match current version. Reload and retry."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        except ReviewerConclusionCorrectionReasonRequired:
+            return Response(
+                {"error_code": "reviewer_conclusion_correction_reason_required", "detail": "correction_reason is required when amending an existing reviewer conclusion."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ReviewerConclusionInvalidPayload:
+            return Response(
+                {"error_code": "reviewer_conclusion_invalid_payload", "detail": "Invalid raw_value structure."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(ChecklistResponseSerializer(response).data)
