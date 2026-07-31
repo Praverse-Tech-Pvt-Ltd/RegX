@@ -1049,6 +1049,244 @@ locking, as well as confirming that `enter_response()` and
 
 ---
 
+### DR-2-27 — MAJOR — ChecklistResponseHistory created before transaction lock (third independent review R3-F-1)
+
+**Status: CLOSED**
+
+**Finding:** In the prior `enter_reviewer_conclusion()` specification (§6.4),
+`ChecklistResponseHistory` was created at step 7b — outside the
+`transaction.atomic()` + `select_for_update()` block, and before the
+optimistic-version check at step 8a. Under concurrent access, a stale or
+racing update caused the history row to be committed to the database even
+when the amendment ultimately failed the version check. This left an orphaned
+`ChecklistResponseHistory` record for an amendment that never succeeded,
+corrupting the regulated amendment audit trail.
+
+**Resolution (APPROVED):** `enter_reviewer_conclusion()` is restructured into
+two phases: Phase A (non-mutating preliminary validation, outside any
+transaction) and Phase B (all regulated writes inside one `transaction.atomic()`
+block). History creation now occurs at step 14 — inside the transaction, after
+`select_for_update()` on both rows, after the version check passes (step 11d),
+and after the response is saved (step 13). A stale or failed version check at
+step 11d causes an immediate rollback with no history row created and no audit
+event emitted.
+
+**Invariants made explicit:**
+- No history row may exist for a failed amendment.
+- No audit success event may exist for a failed amendment.
+- History and response update succeed or fail atomically.
+- No regulated write occurs before the stale-version check.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §6.4` — full service
+  specification rewritten as 17-step two-phase procedure; history creation
+  moved to step 14 inside the transaction.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §3.4` — introductory
+  sentence updated to say "inside the same transaction, after the version
+  check passes and after the response row is saved."
+- `MILESTONE_4D_2_DISCOVERY.md §6e` — amendment paragraph updated to state
+  history is created inside the same transaction after the version check.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5` — stale-version test
+  updated: "zero ChecklistResponseHistory rows created for that attempt."
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §16` — acceptance criterion
+  22 added: failed stale-version amendment creates zero history rows and
+  zero audit success events.
+- `MILESTONE_4D_2_DISCOVERY.md §19` — stale-version test updated.
+
+---
+
+### DR-2-28 — MAJOR — ChecklistResponse.version not exposed in read serializer (third independent review R3-F-2)
+
+**Status: CLOSED**
+
+**Finding:** `ChecklistResponseSerializer` (§8.3) did not include `version` in
+its read-only field list. `ReviewerConclusionSerializer` (§8.5) requires the
+client to supply `expected_version` as a required field. Without `version` in
+the response body, the client had no server-sourced value to use as
+`expected_version`, making the optimistic-locking mechanism unusable in
+practice.
+
+**Resolution (APPROVED):** `version` added as a read-only positive integer to
+`ChecklistResponseSerializer` (§8.3). Clients must echo the latest
+server-provided `version` as `expected_version` when calling the
+reviewer-conclusion endpoint. `version` is not writable through any writable
+serializer (`ChecklistResponseUpdateSerializer` or any other). A
+client-supplied `version` in a writable request body is rejected with a
+structured 400.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.3` — `version` added to
+  read-only field list; prose block added defining semantics.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.4` — `version` added to
+  mass-assignment guard list.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.1` — version-exposure
+  and version mass-assignment tests added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5` — endpoint tests
+  updated to confirm response body includes updated `version`.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §16` — acceptance criterion
+  19 added.
+- `MILESTONE_4D_2_DISCOVERY.md §19` — `GET responses/<uuid>/` version-field
+  tests added.
+
+---
+
+### DR-2-29 — MAJOR — Reviewer-conclusion character limit contradictory (third independent review R3-F-3)
+
+**Status: CLOSED**
+
+**Finding:** Discovery §8 defined `MAX_FREE_TEXT_CHARS = 4_000` and applied
+it to `reviewer_conclusion` in the same list as `short_text` and
+`long_narrative`. Spec outline §14 (error taxonomy) stated
+`reviewer_conclusion_too_long` triggers when "raw_value exceeds 20 000
+characters." Spec outline §13.5 (test) said "raw_value exceeds 20 000 chars."
+These were directly contradictory — one limit was 4,000, the other 20,000.
+
+**Resolution (APPROVED):** Authoritative limit is
+`MAX_REVIEWER_CONCLUSION_CHARS = 4_000` Unicode code points — the same
+constant already applied to `reviewer_conclusion_note` on `ChecklistExecution`.
+`reviewer_conclusion` answer `raw_value.value` does NOT use `MAX_FREE_TEXT_CHARS`.
+The "20 000" value is removed from all normative locations. Exactly 4 000
+chars is accepted; 4 001 chars returns `reviewer_conclusion_too_long` / 400.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §8` — size-limits block updated to list
+  `reviewer_conclusion` separately under `MAX_REVIEWER_CONCLUSION_CHARS`,
+  with explicit note it does not use `MAX_FREE_TEXT_CHARS`; `short_text`
+  and `long_narrative` now listed separately under `MAX_FREE_TEXT_CHARS`.
+- `MILESTONE_4D_2_DISCOVERY.md §8` — `reviewer_conclusion` answer-type row
+  size-limit column updated to "MAX_REVIEWER_CONCLUSION_CHARS (4 000 chars)".
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §6.4` (step 6) — "max
+  MAX_REVIEWER_CONCLUSION_CHARS (4 000) chars" stated explicitly.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.5` — validation
+  references `MAX_REVIEWER_CONCLUSION_CHARS (4 000)`, explicitly noted as
+  not `MAX_FREE_TEXT_CHARS`.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §14` — error taxonomy
+  updated: "exceeds `MAX_REVIEWER_CONCLUSION_CHARS` (4 000) Unicode code
+  points."
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5` — test updated:
+  "exactly 4 000 chars → accepted; 4 001 chars → `reviewer_conclusion_too_long`
+  / 400."
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §16` — acceptance criterion
+  20 added.
+
+---
+
+### DR-2-30 — MINOR — ChecklistResponseHistory schema incomplete and lacks immutability protection (third independent review R3-M-2)
+
+**Status: CLOSED**
+
+**Finding:** `ChecklistResponseHistory` was missing: `new_raw_value`,
+`prior_is_not_applicable`, `new_is_not_applicable`, `prior_not_applicable_reason`,
+`new_not_applicable_reason`, `prior_version`, `new_version`, and
+`source_classification_snapshot` fields. The `response` FK used
+`on_delete=CASCADE` (allowing cascade deletion of governed amendment records).
+No immutable manager or deletion protection was specified at the model or
+queryset level. The spec stated "Full amendment history lives in
+`ChecklistResponseHistory` rows, not reconstructed from audit events" (§9.2)
+but the history rows lacked version numbers, contradicting that claim.
+
+**Resolution (APPROVED):** Full model specification with all required fields
+added. `response FK` changed to `on_delete=PROTECT`. `GovernedHistoryMutationForbidden`
+exception raised on instance `.delete()`, queryset `.delete()`, and
+`.update()`. This ensures governed amendment history is truly append-only
+and cannot be removed without a superuser-level DB operation.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §3.4` — complete field
+  list; `on_delete=PROTECT`; immutability/retention rules specified.
+- `MILESTONE_4D_2_DISCOVERY.md §5` — `ChecklistResponseHistory` model
+  updated with full field list; `on_delete=PROTECT`; append-only note.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §6.4` (step 14) — history
+  creation updated to pass all new fields.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §10` — `CreateModel
+  ChecklistResponseHistory` in migration plan now lists all fields and
+  PROTECT relationship.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.1` — history deletion-
+  blocked and PROTECT tests added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5` — amendment test
+  updated to verify `prior_version`, `new_version`, `new_raw_value`.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §16` — acceptance criterion
+  18 added.
+- `MILESTONE_4D_2_DISCOVERY.md §19` — history immutability and PROTECT tests
+  added.
+
+---
+
+### DR-2-31 — MINOR — Migration specification incomplete (third independent review R3-M-1 / R3-M-5)
+
+**Status: CLOSED**
+
+**Finding:** §10 listed only three `CreateModel` operations
+(`ChecklistExecution`, `ChecklistResponse`, `CalculationOutcome`). The
+`ChecklistResponse.version` field (added by DR-2-23) and the
+`ChecklistResponseHistory` model (added by DR-2-23) were absent from the
+migration plan. An implementer writing the migration from §10 alone would
+produce incomplete models.
+
+**Resolution (APPROVED):** §10 rewritten as an explicit four-model migration
+plan listing every field, constraint, FK, and index for all proposed 4D-2
+models. Code-level retention controls (immutable manager) documented
+separately from DB-level constraints.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §10` — complete migration
+  plan: four `CreateModel` entries; all fields; all constraints; all indexes.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §15` — rollback note updated
+  to reference four tables.
+
+---
+
+### DR-2-32 — MINOR — Empty allowed_units behavior undefined (third independent review R3-M-3)
+
+**Status: CLOSED**
+
+**Finding:** If `ChecklistQuestion.allowed_units = []` (the field default),
+neither document stated whether validation rejected all units (strict) or
+accepted any unit (permissive). An implementer must not invent this behavior
+for a regulated response-validation path.
+
+**Resolution (APPROVED):** Strict semantics. An empty `allowed_units` list
+means no unit is valid — it does not mean "any unit allowed." A
+`quantity_with_unit` question must have at least one controlled unit code in
+`allowed_units` before the `ChecklistVersion` can be approved or activated.
+Non-`quantity_with_unit` questions must have an empty `allowed_units`. Response
+validation with an empty frozen list returns `invalid_raw_value_shape` / 400.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §8` — `quantity_with_unit` row updated with
+  strict-semantics note.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.4` — empty-list behavior
+  added to `quantity_with_unit` validation rule.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.1` — empty `allowed_units`
+  test and governance-gate test added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §16` — acceptance criterion
+  21 added.
+
+---
+
+### DR-2-33 — MINOR — Returned/resubmitted/superseded reviewer-conclusion tests missing (third independent review R3-M-4)
+
+**Status: CLOSED**
+
+**Finding:** No tests covered three lifecycle scenarios for `reviewer_conclusion`:
+(a) a `returned` execution retaining the conclusion as read-only; (b) the
+reviewer amending the conclusion after the execution is resubmitted; (c) a
+`superseded` execution rejecting reviewer-conclusion writes.
+
+**Resolution (APPROVED):** Direct tests for all three scenarios added to both
+discovery §19 and spec outline §13.5, including verification that no history
+row and no audit event is created on blocked writes.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5` — "Returned /
+  resubmitted / superseded lifecycle" block added with all required tests.
+- `MILESTONE_4D_2_DISCOVERY.md §19` — three lifecycle scenario tests added
+  to reviewer-conclusion test block.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §16` — acceptance criterion
+  17 updated to reference DR-2-33.
+
+---
+
 ## Decision register
 
 | # | Question | Decision | Status |
@@ -1095,8 +1333,15 @@ locking, as well as confirming that `enter_response()` and
 | DR-2-24 | Minor | Integer AnswerType does not reject JSON booleans (from second independent review) | CLOSED |
 | DR-2-25 | Minor | quantity_with_unit allowed_units source undefined (from second independent review) | CLOSED |
 | DR-2-26 | Minor | reviewer_conclusion provenance tests missing (from second independent review) | CLOSED |
+| DR-2-27 | Major | ChecklistResponseHistory created before transaction lock — orphaned history on stale version (from third independent review) | CLOSED |
+| DR-2-28 | Major | ChecklistResponse.version not exposed in read serializer — optimistic lock unusable (from third independent review) | CLOSED |
+| DR-2-29 | Major | reviewer_conclusion character limit contradictory — 4 000 vs 20 000 (from third independent review) | CLOSED |
+| DR-2-30 | Minor | ChecklistResponseHistory schema incomplete and lacks retention / immutability protection (from third independent review) | CLOSED |
+| DR-2-31 | Minor | Migration specification missing version field and ChecklistResponseHistory model (from third independent review) | CLOSED |
+| DR-2-32 | Minor | Empty allowed_units behavior undefined — strict vs permissive (from third independent review) | CLOSED |
+| DR-2-33 | Minor | Returned / resubmitted / superseded reviewer-conclusion lifecycle tests missing (from third independent review) | CLOSED |
 
-**Total findings: 26**
+**Total findings: 33**
 **Critical remaining: 0**
 **Major remaining: 0**
 **Minor remaining: 0**
@@ -1127,16 +1372,28 @@ locking, as well as confirming that `enter_response()` and
 | Integer AnswerType explicitly rejects JSON booleans (DR-2-24) | YES |
 | quantity_with_unit allowed_units source and freeze semantics defined (DR-2-25) | YES |
 | reviewer_conclusion provenance and history tests specified (DR-2-26) | YES |
+| ChecklistResponseHistory creation atomic with version check — no orphaned history rows (DR-2-27) | YES |
+| ChecklistResponse.version exposed in read serializer — optimistic lock usable by clients (DR-2-28) | YES |
+| reviewer_conclusion character limit resolved to MAX_REVIEWER_CONCLUSION_CHARS = 4 000 (DR-2-29) | YES |
+| ChecklistResponseHistory schema complete with full field list and immutability controls (DR-2-30) | YES |
+| Migration specification lists all four CreateModel operations with all fields (DR-2-31) | YES |
+| Empty allowed_units strictly invalid for quantity_with_unit questions (DR-2-32) | YES |
+| Returned / resubmitted / superseded lifecycle tests specified (DR-2-33) | YES |
 | Product code changed | NO |
 | Migrations added | NO |
 | Backend code changed | NO |
 | Frontend code changed | NO |
 | Docker / CI changed | NO |
 
-**Ready for second independent design review:** YES
+**Ready for second independent design review:** YES (completed — FAIL, remediated)
+
+**Ready for third independent design review:** YES (completed — FAIL, remediated)
+
+**Ready for fourth independent design review:** YES — all third-review findings
+(DR-2-27 through DR-2-33) closed. No Critical or Major findings remain.
 
 **Ready to finalize 4D-2 implementation specification:** YES — pending
-second independent design review PASS and formal human approval.
+fourth independent design review PASS and formal human approval.
 
 **Ready to implement 4D-2:** NO — implementation specification must be
 formally approved by a human reviewer with domain authority before a
