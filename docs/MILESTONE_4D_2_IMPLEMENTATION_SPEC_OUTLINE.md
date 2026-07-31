@@ -182,24 +182,53 @@ and migration; rows are populated by 4D-3.
 
 Inherits `PublicIDModel`, `TimeStampedModel`.
 
-Created by `enter_reviewer_conclusion()` before each amendment to retain
-a complete, auditable prior-value record. Not accessible through a
-client-facing write or delete endpoint.
+Created by `enter_reviewer_conclusion()` **inside the same transaction,
+after the version check passes and after the response row is saved** — one
+row per amendment, never on first entry (DR-2-27, DR-2-30). Rows are
+governed records and may not be mutated or deleted after creation.
+
+Tenant is derived through `response.execution.tenant`; no direct `tenant` FK.
 
 ```
-response                FK(ChecklistResponse, on_delete=CASCADE)
-prior_raw_value         JSONField(null=True)    — raw_value before amendment
+response                FK(ChecklistResponse, on_delete=PROTECT)
+                        — PROTECT: a response with history cannot be deleted;
+                          no cascade deletion of governed amendment records
+prior_raw_value         JSONField(null=True)   — raw_value before amendment
+new_raw_value           JSONField(null=True)   — raw_value written by amendment
+prior_is_not_applicable BooleanField           — is_not_applicable before amendment
+new_is_not_applicable   BooleanField           — is_not_applicable after amendment
+prior_not_applicable_reason CharField(null=True) — not_applicable_reason before
+new_not_applicable_reason   CharField(null=True) — not_applicable_reason after
 prior_entered_by        FK(User, SET_NULL, null=True)
 prior_entered_at        DateTimeField(null=True)
-correction_reason       TextField()             — required; non-empty
+prior_version           PositiveIntegerField   — response.version before increment
+new_version             PositiveIntegerField   — response.version after increment
+correction_reason       TextField()            — required; non-empty
 amended_by              FK(User, on_delete=PROTECT)
 amended_at              DateTimeField(auto_now_add=True)
+source_classification_snapshot  CharField      — frozen copy of
+                        response.data_source_type_snapshot at amendment time,
+                        so the history row is self-interpreting without a
+                        live question lookup
 ```
 
+**Retention and immutability (DR-2-30):**
+- History rows are append-only; no `update()` or `save()` after initial
+  creation.
+- `ChecklistResponseHistoryManager` (an `ImmutableManager`-style queryset)
+  raises `GovernedHistoryMutationForbidden` on `.update()` or
+  `.delete()` at the queryset level.
+- `ChecklistResponseHistory.delete()` raises
+  `GovernedHistoryMutationForbidden` at the model instance level.
+- `ChecklistResponse.on_delete=PROTECT` on the history FK ensures no
+  cascade deletion occurs. A `ChecklistResponse` with one or more history
+  rows cannot be deleted through any path.
+- No `bulk_update` on history rows is permitted.
+- No client-facing write or delete endpoint exposes these rows.
+
 Read-only endpoint (optional, 4D-2 scope decision): history rows may be
-surfaced via a `GET responses/<uuid>/history/` list endpoint. If included,
-access requires `PERM_VIEW_EXECUTION` and follows tenant-scoped retrieval
-through the parent execution.
+surfaced via `GET responses/<uuid>/history/` requiring `PERM_VIEW_EXECUTION`,
+accessed through tenant-scoped retrieval via the parent execution.
 
 ---
 
@@ -400,7 +429,15 @@ accepting reviewer conclusions or operating during `submitted_for_review`.
 
 ### 6.4 `enter_reviewer_conclusion(*, execution, response_public_id, actor, raw_value, expected_version, correction_reason=None)`
 
+**Transaction ordering rule (DR-2-27):** every regulated write — the
+`ChecklistResponseHistory` row and the `ChecklistResponse` update — occurs
+inside a single `transaction.atomic()` block, after the optimistic-version
+check passes. No history row may be created for a failed or racing update.
+No audit success event may exist for a failed amendment.
+
 ```
+Phase A — non-mutating preliminary validation (outside any transaction):
+
 1. Resolve execution via ChecklistExecution.objects.visible_to(tenant)
    — generic 404 if not found or cross-tenant.
 2. Verify execution.status == "submitted_for_review"
@@ -413,43 +450,85 @@ accepting reviewer conclusions or operating during `submitted_for_review`.
    response.execution == execution (generic 404 if mismatch).
 5. Verify response.question.answer_type == reviewer_conclusion
    → else error_code = "reviewer_conclusion_wrong_answer_type" / 400.
-6. Validate raw_value against reviewer_conclusion canonical shape:
+6. Validate raw_value shape and payload limits:
    {"value": "..."} — value must be a non-empty string after trim;
-   max MAX_FREE_TEXT_CHARS chars; max MAX_RAW_VALUE_BYTES bytes total;
-   no additional keys; no arrays or nested objects.
+   max MAX_REVIEWER_CONCLUSION_CHARS (4 000) chars; max MAX_RAW_VALUE_BYTES
+   bytes total; no additional keys; no arrays or nested objects.
    Error codes: "reviewer_conclusion_empty" / 400 (empty after trim);
-   "reviewer_conclusion_too_long" / 400 (exceeds char limit);
+   "reviewer_conclusion_too_long" / 400 (exceeds 4 000 char limit);
    "reviewer_conclusion_payload_too_large" / 400 (exceeds byte limit);
    "reviewer_conclusion_invalid_payload" / 400 (wrong shape).
-7. Amendment path (response.raw_value is not null):
+7. If amendment path (response.raw_value is not null):
    a. Verify correction_reason is non-empty
       → else error_code = "reviewer_conclusion_correction_reason_required" / 400.
-   b. Create ChecklistResponseHistory(
+
+Phase B — all regulated writes, inside one transaction (DR-2-27):
+
+8. Enter transaction.atomic().
+9. select_for_update() on ChecklistExecution (lock order: execution first).
+10. select_for_update() on ChecklistResponse (lock order: response second).
+11. Re-validate after acquiring locks:
+    a. Verify execution.status == "submitted_for_review"
+       → else rollback and return reviewer_conclusion_invalid_state / 409.
+    b. Verify response still belongs to execution (paranoia guard).
+    c. Verify response.question.answer_type == reviewer_conclusion.
+    d. Verify response.version == expected_version
+       → else rollback and return reviewer_conclusion_stale_version / 409.
+       No history row is created. No audit event is emitted.
+12. Capture pre-write state for history (in memory, not yet saved):
+    is_amendment = (response.raw_value is not null)
+    prior_raw_value = response.raw_value
+    prior_is_not_applicable = response.is_not_applicable
+    prior_not_applicable_reason = response.not_applicable_reason
+    prior_entered_by = response.entered_by
+    prior_entered_at = response.entered_at
+    prior_version = response.version
+13. Write response:
+    a. Set response.raw_value = raw_value.
+    b. Set response.entered_by = actor.
+    c. Set response.entered_at = now (UTC).
+    d. Ensure response.data_source_type_snapshot is set
+       (= response.question.data_source_classification if null).
+    e. response.version = prior_version + 1.
+    f. response.full_clean() → response.save().
+14. If is_amendment: create ChecklistResponseHistory inside this same
+    transaction (after version check, after response save):
+      ChecklistResponseHistory(
         response=response,
-        prior_raw_value=response.raw_value,
-        prior_entered_by=response.entered_by,
-        prior_entered_at=response.entered_at,
+        prior_raw_value=prior_raw_value,
+        new_raw_value=raw_value,
+        prior_is_not_applicable=prior_is_not_applicable,
+        new_is_not_applicable=response.is_not_applicable,
+        prior_not_applicable_reason=prior_not_applicable_reason,
+        new_not_applicable_reason=response.not_applicable_reason,
+        prior_entered_by=prior_entered_by,
+        prior_entered_at=prior_entered_at,
+        prior_version=prior_version,
+        new_version=response.version,
         correction_reason=correction_reason,
         amended_by=actor,
-      ) — outside the locked block so history is safe even if the
-        locked update races.
-8. Inside transaction.atomic() + select_for_update() on response:
-   a. Verify response.version == expected_version
-      → else error_code = "reviewer_conclusion_stale_version" / 409.
-   b. Set response.raw_value = raw_value.
-   c. Set response.entered_by = actor.
-   d. Set response.entered_at = now (UTC).
-   e. Ensure response.data_source_type_snapshot is set
-      (= response.question.data_source_classification if null).
-   f. Increment response.version by 1.
-   g. response.full_clean() → response.save().
-9. Determine event type:
-   - First entry (was null before step 8): emit
-     checklist_response.reviewer_conclusion_entered.
-   - Amendment: emit checklist_response.reviewer_conclusion_updated.
-   Audit emitted only after successful commit, never on failure.
-10. Return response.
+        source_classification_snapshot=response.data_source_type_snapshot,
+      ).save()
+15. Commit transaction.
+
+Phase C — post-commit:
+
+16. Via transaction.on_commit():
+    Emit audit event (only after successful commit):
+    - First entry (is_amendment was False): emit
+      checklist_response.reviewer_conclusion_entered.
+    - Amendment (is_amendment was True): emit
+      checklist_response.reviewer_conclusion_updated.
+17. Return response.
 ```
+
+**Invariants enforced by this sequence:**
+- A `ChecklistResponseHistory` row never exists for a failed amendment.
+- An audit success event never exists for a failed amendment.
+- History row and response update succeed or fail atomically.
+- No regulated write occurs before the stale-version check at step 11d.
+- `response.version` in the history row (`prior_version`/`new_version`)
+  accurately reflects the before/after state of that specific amendment.
 
 No direct status mutation occurs. No automated regulatory conclusion is
 generated. No override/deviation metadata in 4D-2.
@@ -567,14 +646,24 @@ client input — set only by the service.
 
 ### 8.3 `ChecklistResponseSerializer`
 
-Read-only:
+Read-only (DR-2-28):
 ```
 public_id, question_public_id, data_source_type_snapshot,
 raw_value, is_not_applicable, not_applicable_reason,
 entered_by_email, entered_at,
 confirmed_by_email, confirmed_at,
-override_reason, system_derived_value
+override_reason, system_derived_value,
+version
 ```
+
+`version` is a read-only positive integer. Initial value is 1. The server
+increments it after each successful write (first entry or amendment). Clients
+must echo the latest server-provided `version` value as `expected_version` when
+calling the reviewer-conclusion endpoint. `version` cannot be supplied through
+`ChecklistResponseUpdateSerializer` or any other writable serializer — any
+client-supplied `version` in a non-reviewer-conclusion request body is rejected
+with a structured 400. Every successful reviewer-conclusion response body
+includes the updated `version`.
 
 ### 8.4 `ChecklistResponseUpdateSerializer`
 
@@ -587,8 +676,8 @@ override_reason: TextField (blank)
 ```
 
 `execution`, `question`, `data_source_type_snapshot`, `confirmed_by`,
-`confirmed_at`, and `system_derived_value` are never client-writable —
-all set by the service layer only.
+`confirmed_at`, `system_derived_value`, and `version` are never
+client-writable — all set by the service layer only.
 
 Mass-assignment guard: any unknown field in the request body returns a
 structured 400, not silent acceptance.
@@ -608,7 +697,10 @@ structured 400, not silent acceptance.
 - a unit not present in the pinned question's `allowed_units` JSONField
   for `quantity_with_unit` — `allowed_units` is frozen by 4D-1 version
   immutability; validation reads from the resolved question object, not
-  a live DB query (DR-2-25);
+  a live DB query (DR-2-25); an empty `allowed_units` list is strictly
+  invalid — no unit is accepted when the list is empty
+  (`invalid_raw_value_shape` / 400); a non-`quantity_with_unit` question
+  must have an empty `allowed_units` (DR-2-32);
 - a string `"true"`/`"false"` where a JSON boolean is required (`yes_no`);
 - a boolean where a controlled string enum is required (`yes_no_na`);
 - any `yes_no_na` value outside `{"value": "yes"}`, `{"value": "no"}`,
@@ -640,7 +732,8 @@ Validation (structural only — object-level permission and lifecycle
 checks are enforced in the service, §6.4):
 - `raw_value.value` must be a string.
 - Trimmed `raw_value.value` must not be empty.
-- `raw_value.value` max `MAX_FREE_TEXT_CHARS` characters.
+- `raw_value.value` max `MAX_REVIEWER_CONCLUSION_CHARS` (4 000) Unicode
+  code points (DR-2-29). Not `MAX_FREE_TEXT_CHARS`.
 - `json.dumps(raw_value)` max `MAX_RAW_VALUE_BYTES` bytes.
 - No additional keys in `raw_value`.
 - Unknown fields in request body → structured 400.
@@ -713,22 +806,69 @@ transition, or authorization denial.
 
 ## Section 10 — Migration
 
+**Proposed migration plan (DR-2-31). This is a documentation-only outline;
+no migration file is created during this design task.**
+
 `backend/iig_checklist/migrations/0002_execution.py`:
 
 ```
-- CreateModel ChecklistExecution (all fields, FK constraints,
-  UniqueConstraint with condition on non-terminal statuses — Q2)
-- CreateModel ChecklistResponse (all fields,
-  UniqueConstraint(execution, question))
-- CreateModel CalculationOutcome (all fields)
-- AddIndex(ChecklistExecution, fields=["tenant", "status"])
-- AddIndex(ChecklistExecution, fields=["checklist_version"])
-- AddIndex(ChecklistResponse, fields=["execution"])
+1. CreateModel ChecklistExecution — all fields from §3.1, including:
+   - all provenance FK fields (SET_NULL on User)
+   - reviewer_conclusion_note TextField(blank=True, max_length=4000)
+   - UniqueConstraint(
+       fields=["tenant", "checklist_version", "formulation_version"],
+       condition=~Q(status__in=["rejected","cancelled","superseded"]),
+       name="unique_active_execution_per_version_formulation"
+     )
+
+2. CreateModel ChecklistResponse — all fields from §3.2, including:
+   - version = PositiveIntegerField(default=1)       ← DR-2-23/DR-2-28
+   - all provenance FK fields (SET_NULL on User)
+   - override_reason TextField(blank=True)
+   - system_derived_value JSONField(null=True)
+   - UniqueConstraint(
+       fields=["execution", "question"],
+       name="unique_response_per_question_per_execution"
+     )
+
+3. CreateModel ChecklistResponseHistory — all fields from §3.4, including:
+   ← DR-2-30/DR-2-31
+   - response FK(ChecklistResponse, on_delete=PROTECT)
+   - prior_raw_value JSONField(null=True)
+   - new_raw_value JSONField(null=True)
+   - prior_is_not_applicable BooleanField
+   - new_is_not_applicable BooleanField
+   - prior_not_applicable_reason CharField(null=True)
+   - new_not_applicable_reason CharField(null=True)
+   - prior_entered_by FK(User, SET_NULL, null=True)
+   - prior_entered_at DateTimeField(null=True)
+   - prior_version PositiveIntegerField
+   - new_version PositiveIntegerField
+   - correction_reason TextField()
+   - amended_by FK(User, on_delete=PROTECT)
+   - amended_at DateTimeField(auto_now_add=True)
+   - source_classification_snapshot CharField
+
+4. CreateModel CalculationOutcome — all fields from §3.3.
+
+5. AddIndex(ChecklistExecution, fields=["tenant", "status"])
+6. AddIndex(ChecklistExecution, fields=["checklist_version"])
+7. AddIndex(ChecklistResponse, fields=["execution"])
+8. AddIndex(ChecklistResponseHistory, fields=["response"])
 ```
+
+**Code-level retention controls (not database constraints — must be
+implemented in Python):**
+- `ChecklistResponseHistoryManager` overrides `.update()` and `.delete()`
+  to raise `GovernedHistoryMutationForbidden`.
+- `ChecklistResponseHistory.delete()` (model instance) raises
+  `GovernedHistoryMutationForbidden`.
+- These controls are registered in `IigChecklistConfig.ready()` alongside
+  the `DeletionProtectionRegistry` hook.
 
 Migration safety:
 - All `CreateModel` operations on new tables — no `ALTER TABLE` on
-  existing tables.
+  existing 4D-1 tables.
 - No data migration.
 - `migrate --check` must pass; `squashmigrations` must not be run
   on 4D-2 migrations until after 4D-3 is shipped and all rollback
@@ -858,17 +998,36 @@ export const iigChecklists = {
   `{"value": 0}` accepted; `{"value": true}` rejected with
   `invalid_raw_value_shape`; `{"value": false}` rejected; `{"value": 1.0}`
   rejected; `{"value": "1"}` rejected.
-- `quantity_with_unit` allowed-units validation (DR-2-25): a unit
+- `quantity_with_unit` allowed-units validation (DR-2-25, DR-2-32): a unit
   present in `question.allowed_units` accepted; a unit absent from
   `question.allowed_units` rejected with `invalid_raw_value_shape`; an
-  empty unit rejected; `question.allowed_units` from the pinned version
-  (not a live re-query).
+  empty unit string rejected; `question.allowed_units = []` → any unit
+  rejected (empty list is strictly invalid, not permissive); duplicate
+  unit codes in `allowed_units` rejected; a non-`quantity_with_unit`
+  question with non-empty `allowed_units` rejected at the governance gate;
+  `question.allowed_units` read from the resolved question object at the
+  time of validation, not re-queried from a live (possibly mutated) source.
 - `ChecklistResponse.version` (DR-2-23): default is 1; increments to 2
   after `enter_reviewer_conclusion()` first entry; increments to 3 after
   amendment.
-- `ChecklistResponseHistory` (DR-2-23): created on amendment;
-  `prior_raw_value` equals pre-amendment value; `correction_reason`
-  non-empty; `amended_by` is the acting user; not created on first entry.
+- `ChecklistResponseHistory` (DR-2-23, DR-2-30): created on amendment;
+  `prior_raw_value` equals pre-amendment value; `new_raw_value` equals
+  the value written; `prior_version` and `new_version` accurately reflect
+  before/after state; `correction_reason` non-empty; `amended_by` is the
+  acting user; not created on first entry.
+- History immutability (DR-2-30): calling `.delete()` on a
+  `ChecklistResponseHistory` instance raises `GovernedHistoryMutationForbidden`;
+  `ChecklistResponseHistory.objects.filter(...).delete()` raises
+  `GovernedHistoryMutationForbidden`; `ChecklistResponseHistory.objects.update(...)`
+  raises `GovernedHistoryMutationForbidden`.
+- Response PROTECT guard (DR-2-30): attempting to delete a
+  `ChecklistResponse` that has one or more `ChecklistResponseHistory` rows
+  raises a Django `ProtectedError` (via `on_delete=PROTECT` on the FK).
+- `ChecklistResponseSerializer` version exposure (DR-2-28): a `GET` on a
+  response returns `version`; initial value is 1; after first
+  `enter_reviewer_conclusion()` it is 2; after amendment it is 3; the
+  `version` field is absent from `ChecklistResponseUpdateSerializer` writable
+  fields; a `PATCH` with `{"version": 99}` is rejected with structured 400.
 - FormulationVersion status gate (DR-2-10): `create_execution()` rejects
   `draft` and `under_review` formulation versions with
   `formulation_version_not_approved`.
@@ -941,7 +1100,7 @@ export const iigChecklists = {
 - `document_version_public_id` in `raw_value` validated for tenant
   ownership.
 
-### 13.5 Reviewer-conclusion tests (DR-2-23, DR-2-26)
+### 13.5 Reviewer-conclusion tests (DR-2-23, DR-2-26, DR-2-27, DR-2-28, DR-2-29, DR-2-33)
 
 **Service — first entry:**
 
@@ -950,32 +1109,57 @@ export const iigChecklists = {
   updated; `response.version` incremented from 1 to 2; no
   `ChecklistResponseHistory` row created.
 - Actor lacking `PERM_REVIEW_EXECUTION` → `reviewer_conclusion_permission_denied`
-  / 403.
+  / 403; no history row; no audit event.
 - `execution.status=draft` → `reviewer_conclusion_invalid_state` / 409.
-- `execution.status=returned` → `reviewer_conclusion_invalid_state` / 409.
+- `execution.status=returned` → `reviewer_conclusion_invalid_state` / 409;
+  existing conclusion value is retained unmodified on the response.
 - `execution.status=approved` → `reviewer_conclusion_immutable` / 409.
+- `execution.status=superseded` → `reviewer_conclusion_immutable` / 409.
 - `raw_value` empty string → `reviewer_conclusion_empty` / 400.
-- `raw_value` exceeds 20 000 chars → `reviewer_conclusion_too_long` / 400.
+- `raw_value` exactly 4 000 chars → accepted (DR-2-29).
+- `raw_value` 4 001 chars → `reviewer_conclusion_too_long` / 400 (DR-2-29).
 - `expected_version` mismatch (stale) → `reviewer_conclusion_stale_version`
-  / 409; DB not written.
-- `expected_version` mismatch (concurrent write simulation) → same 409.
+  / 409; DB not written; no history row created (DR-2-27).
+- `expected_version` mismatch (concurrent write simulation via two threads) →
+  exactly one succeeds, one receives 409; only one history row exists
+  after both attempts (DR-2-27).
 - `question.answer_type ≠ reviewer_conclusion` passed to
   `enter_reviewer_conclusion()` → raises (programmer error guard).
 
 **Service — amendment:**
 
 - Amendment with `correction_reason` provided: `response.version`
-  increments; one `ChecklistResponseHistory` row created with correct
-  `prior_raw_value`, `prior_entered_by`, `amended_by`, `amended_at`,
-  and `correction_reason`.
+  increments; one `ChecklistResponseHistory` row created inside the same
+  transaction with correct `prior_raw_value`, `new_raw_value`,
+  `prior_version`, `new_version`, `prior_entered_by`, `amended_by`,
+  `amended_at`, and `correction_reason` (DR-2-27, DR-2-30).
+- Stale `expected_version` on amendment attempt: 409 returned; zero
+  `ChecklistResponseHistory` rows created for that attempt (DR-2-27).
 - Amendment without `correction_reason` →
-  `reviewer_conclusion_correction_reason_required` / 400; no DB write.
+  `reviewer_conclusion_correction_reason_required` / 400; no DB write;
+  no history row.
 - Multiple amendments produce multiple `ChecklistResponseHistory` rows in
-  insertion order.
+  insertion order; `prior_version`/`new_version` chain is contiguous.
+
+**Returned / resubmitted / superseded lifecycle (DR-2-33):**
+
+- Execution is `returned` after a reviewer_conclusion exists: conclusion
+  value is retained on the `ChecklistResponse` row; no history row created
+  on return transition.
+- While execution is `returned`: `enter_reviewer_conclusion()` →
+  `reviewer_conclusion_invalid_state` / 409; conclusion value unchanged.
+- Execution is resubmitted (→ `submitted_for_review`): reviewer may amend
+  the conclusion; amendment requires non-empty `correction_reason`; one
+  `ChecklistResponseHistory` row is created with `prior_raw_value` =
+  value from before resubmission; no audit or history created on the
+  resubmission transition itself.
+- Execution is `superseded`: `enter_reviewer_conclusion()` →
+  `reviewer_conclusion_immutable` / 409; no history row; no audit event.
 
 **Endpoint — `POST .../responses/<uuid>/reviewer-conclusion/`:**
 
-- Happy-path 200: correct actor, valid payload, correct state.
+- Happy-path 200: correct actor, valid payload, correct state; response
+  body includes updated `version`.
 - Non-reviewer actor → 403.
 - Wrong execution state → 409 with structured error.
 - Missing `raw_value` → 400.
@@ -987,6 +1171,9 @@ export const iigChecklists = {
   `reviewer_conclusion_wrong_answer_type` / 400.
 - `ChecklistResponseUpdateView` rejects `reviewer_conclusion` payload →
   `reviewer_conclusion_wrong_answer_type` / 400.
+- `GET responses/<uuid>/` exposes `version`; initial value is 1; after
+  first entry it is 2; `PATCH` with `{"version": 99}` is rejected with
+  structured 400 (DR-2-28).
 
 **Audit:**
 
@@ -998,6 +1185,8 @@ export const iigChecklists = {
 - `checklist_response.reviewer_conclusion_updated` event emitted on
   amendment; payload contains `correction_reason_present=True`; does NOT
   contain conclusion text or `prior_raw_value`.
+- No success audit event on any failure path (stale version, wrong
+  permission, wrong state, wrong answer_type).
 
 ### 13.6 Platform-authorization pin test
 
@@ -1054,7 +1243,7 @@ Structured errors returned by 4D-2 endpoints:
 | `reviewer_conclusion_permission_denied` | 403 | Actor lacks `PERM_REVIEW_EXECUTION` for `enter_reviewer_conclusion()` (DR-2-23) |
 | `reviewer_conclusion_invalid_payload` | 400 | `ReviewerConclusionSerializer` validation failure (DR-2-23) |
 | `reviewer_conclusion_empty` | 400 | `raw_value` is blank or empty string (DR-2-23) |
-| `reviewer_conclusion_too_long` | 400 | `raw_value` exceeds 20 000 characters (DR-2-23) |
+| `reviewer_conclusion_too_long` | 400 | `raw_value` exceeds `MAX_REVIEWER_CONCLUSION_CHARS` (4 000) Unicode code points (DR-2-23, DR-2-29) |
 | `reviewer_conclusion_payload_too_large` | 400 | Outer payload exceeds limit constant (DR-2-23) |
 | `reviewer_conclusion_stale_version` | 409 | `expected_version` does not match `response.version` (DR-2-23) |
 | `reviewer_conclusion_correction_reason_required` | 400 | Amendment attempt with no `correction_reason` (DR-2-23) |
@@ -1070,9 +1259,10 @@ Format (identical to 4D-1):
 ## Section 15 — Rollback strategy
 
 4D-2 adds new tables only. Rollback is `python manage.py migrate
-iig_checklist 0001` — drops the three new tables with no effect on
-4D-1 data. The frontend pages are new routes; removing them does not
-affect 4D-1 pages. No 4D-1 migration or model is modified.
+iig_checklist 0001` — drops the four new tables (`ChecklistExecution`,
+`ChecklistResponse`, `ChecklistResponseHistory`, `CalculationOutcome`)
+with no effect on 4D-1 data. The frontend pages are new routes; removing
+them does not affect 4D-1 pages. No 4D-1 migration or model is modified.
 
 ---
 
@@ -1119,8 +1309,23 @@ affect 4D-1 pages. No 4D-1 migration or model is modified.
     pinned question at time of response entry; a unit not in
     `allowed_units` is rejected (DR-2-25).
 17. All reviewer-conclusion provenance tests in §13.5 pass, including
-    optimistic-locking stale-version tests and `ChecklistResponseHistory`
-    row creation on amendment (DR-2-26).
+    optimistic-locking stale-version tests, `ChecklistResponseHistory`
+    row creation on amendment with correct `prior_version`/`new_version`,
+    and returned/resubmitted/superseded lifecycle cases (DR-2-26, DR-2-33).
+18. `ChecklistResponseHistory` is append-only: instance `.delete()` and
+    queryset `.delete()`/`.update()` raise `GovernedHistoryMutationForbidden`;
+    a `ChecklistResponse` with history cannot be deleted (DR-2-30).
+19. `ChecklistResponseSerializer` exposes `version` (read-only); initial
+    value is 1; successful reviewer-conclusion write returns new version;
+    `version` is not writable through `ChecklistResponseUpdateSerializer`
+    (DR-2-28).
+20. reviewer_conclusion `raw_value` of exactly 4 000 chars is accepted;
+    4 001 chars returns `reviewer_conclusion_too_long` / 400 (DR-2-29).
+21. `quantity_with_unit` question with `allowed_units = []` is rejected at
+    the approval/activation governance gate; response validation with an
+    empty frozen list returns `invalid_raw_value_shape` / 400 (DR-2-32).
+22. Failed stale-version amendment creates zero `ChecklistResponseHistory`
+    rows and emits zero audit success events (DR-2-27).
 
 ---
 

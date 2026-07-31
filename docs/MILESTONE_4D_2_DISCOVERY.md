@@ -253,13 +253,26 @@ ChecklistResponse
 
 ChecklistResponseHistory
   public_id               UUID
-  response                FK → ChecklistResponse (on_delete=CASCADE)
+  response                FK → ChecklistResponse (on_delete=PROTECT)
+                          — PROTECT prevents cascade deletion of governed
+                            amendment records (DR-2-30)
   prior_raw_value         JSONField (nullable) — raw_value before amendment
+  new_raw_value           JSONField (nullable) — raw_value written by amendment
+  prior_is_not_applicable BooleanField — is_not_applicable before amendment
+  new_is_not_applicable   BooleanField — is_not_applicable after amendment
+  prior_not_applicable_reason CharField (nullable) — before amendment
+  new_not_applicable_reason   CharField (nullable) — after amendment
   prior_entered_by        FK → identity.User (SET_NULL, nullable)
   prior_entered_at        DateTimeField (nullable)
+  prior_version           PositiveIntegerField — response.version before increment
+  new_version             PositiveIntegerField — response.version after increment
   correction_reason       TextField — required on all amendments
   amended_by              FK → identity.User (on_delete=PROTECT)
   amended_at              DateTimeField — server timestamp at amendment
+  source_classification_snapshot  CharField — frozen copy of
+                          data_source_type_snapshot at amendment time
+  Append-only: model-level and queryset-level deletion and update are
+  blocked by GovernedHistoryMutationForbidden (DR-2-30)
 
 CalculationOutcome
   public_id               UUID
@@ -365,11 +378,18 @@ populated; `response.version` increments to 2.
 
 **Amendment:** While execution remains `submitted_for_review`, the reviewer
 may amend a previously saved conclusion. Amendment requires a non-empty
-`correction_reason`. Before overwriting, a `ChecklistResponseHistory` record
-is created capturing `prior_raw_value`, `prior_entered_by`, `prior_entered_at`,
-`correction_reason`, and `amended_by`/`amended_at`. `response.version`
-increments again. Silent overwrite without `correction_reason` is rejected
-with `error_code = "reviewer_conclusion_correction_reason_required"` / 400.
+`correction_reason`. A `ChecklistResponseHistory` record is created **inside
+the same database transaction, after the optimistic-version check passes and
+after the response row is saved** (DR-2-27). The history row captures
+`prior_raw_value`, `new_raw_value`, `prior_version`, `new_version`,
+`prior_is_not_applicable`, `new_is_not_applicable`,
+`prior_not_applicable_reason`, `new_not_applicable_reason`,
+`prior_entered_by`, `prior_entered_at`, `correction_reason`, `amended_by`,
+`amended_at`, and `source_classification_snapshot`. No history row is
+created if the version check fails. `response.version` increments within
+the same transaction. Silent overwrite without `correction_reason` is
+rejected with `error_code = "reviewer_conclusion_correction_reason_required"`
+/ 400.
 
 **Optimistic locking:** The service accepts `expected_version` from the
 client. If `response.version != expected_version`, the operation fails with
@@ -490,7 +510,7 @@ answer type named "system_calculated".
 | `long_narrative` | YES | `{"value": "..."}` | MAX_FREE_TEXT_CHARS | Non-empty string |
 | `integer` | YES | `{"value": 42}` | — | JSON integer; floats, strings, and booleans explicitly rejected. Python `bool` is an `int` subclass — validation must check `isinstance(val, bool)` and reject before `isinstance(val, int)` accepts. |
 | `decimal` | YES | `{"value": "12.3400"}` | — | Decimal string; JSON float rejected |
-| `quantity_with_unit` | YES | `{"value": "12.3400", "unit": "mg"}` | — | Decimal string + one unit from `allowed_units`. `allowed_units` is a per-question `JSONField` on `ChecklistQuestion` (field confirmed present in 4D-1 codebase at `models.py`). Frozen by 4D-1 version immutability. Validation uses the pinned question's frozen `allowed_units` list — not a live lookup. Empty unit rejected; unit not in frozen set rejected. |
+| `quantity_with_unit` | YES | `{"value": "12.3400", "unit": "mg"}` | — | Decimal string + one unit from `allowed_units`. `allowed_units` is a per-question `JSONField` on `ChecklistQuestion` (field confirmed present in 4D-1 codebase at `models.py`). Frozen by 4D-1 version immutability. Validation uses the pinned question's frozen `allowed_units` list — not a live lookup. Empty unit string rejected; unit not in frozen set rejected. Empty `allowed_units = []` is strictly invalid: no unit is ever accepted; empty list does not mean "any unit allowed" (DR-2-32). |
 | `percentage` | YES | `{"value": "12.3400"}` | — | Decimal string; range `0.0000`–`100.0000` inclusive |
 | `date` | YES | `{"value": "YYYY-MM-DD"}` | — | ISO 8601 date string only |
 | `yes_no` | YES | `{"value": true}` or `{"value": false}` | — | JSON boolean only; strings rejected |
@@ -502,7 +522,7 @@ answer type named "system_calculated".
 | `attachment_reference` | YES | `{"document_version_public_id": "<uuid>"}` | — | Must belong to same tenant; DR-2-06 deletion protection applies |
 | `calculated_value` | NO | `null` always | — | Value in `CalculationOutcome`; client-supplied `raw_value` rejected with `invalid_raw_value_shape` |
 | `calculated_status` | NO | `null` always | — | Status/value in `CalculationOutcome`; client-supplied `raw_value` rejected |
-| `reviewer_conclusion` | CONDITIONAL | `{"value": "..."}` | MAX_FREE_TEXT_CHARS | Only actor with `PERM_REVIEW_EXECUTION`; only while execution is `submitted_for_review`; dedicated endpoint `POST responses/<uuid>/reviewer-conclusion/`; provenance via `entered_by`/`entered_at`; amendment requires non-empty `correction_reason`; prior value retained in `ChecklistResponseHistory`; optimistic lock via `expected_version`; immutable once execution leaves `submitted_for_review`; no automated conclusion. See §6e. |
+| `reviewer_conclusion` | CONDITIONAL | `{"value": "..."}` | MAX_REVIEWER_CONCLUSION_CHARS (4 000 chars) | Only actor with `PERM_REVIEW_EXECUTION`; only while execution is `submitted_for_review`; dedicated endpoint `POST responses/<uuid>/reviewer-conclusion/`; provenance via `entered_by`/`entered_at`; amendment requires non-empty `correction_reason`; prior and new values retained in `ChecklistResponseHistory` atomically inside the same transaction as the response update (DR-2-27); optimistic lock via `expected_version`; immutable once execution leaves `submitted_for_review`; no automated conclusion. See §6e. |
 | `approval_metadata` | NO | `null` in 4D-2 | — | Populated by lifecycle infrastructure; client input prohibited; shape defined in 4D-4 |
 
 **`NOT_APPLICABLE` state (any type):** `raw_value = null`,
@@ -516,13 +536,17 @@ and must not be marked `not_applicable` through the client.
 `is_not_applicable = False`, `entered_by = null`. Distinguishable from
 `NOT_APPLICABLE` by the `is_not_applicable` flag.
 
-**Size limits — RESOLVED (DR-2-01):**
+**Size limits — RESOLVED (DR-2-01, DR-2-29):**
 - `raw_value`: max `MAX_RAW_VALUE_BYTES = 16_384` bytes (serialized JSON)
 - `return_reason`: max `MAX_RETURN_REASON_CHARS = 2_000`
-- `reviewer_conclusion_note`: max `MAX_REVIEWER_CONCLUSION_CHARS = 4_000`
+- `reviewer_conclusion_note` on `ChecklistExecution`: max `MAX_REVIEWER_CONCLUSION_CHARS = 4_000`
+- `reviewer_conclusion` answer `raw_value.value`: max `MAX_REVIEWER_CONCLUSION_CHARS = 4_000`
+  Unicode code points (DR-2-29). Uses the same named constant as the
+  `reviewer_conclusion_note` field. Does NOT use `MAX_FREE_TEXT_CHARS`.
+  Exceeding this limit returns `reviewer_conclusion_too_long` / 400.
+- `short_text`, `long_narrative` `value`: max `MAX_FREE_TEXT_CHARS = 4_000` chars
 - `not_applicable_reason`: max `MAX_NOT_APPLICABLE_REASON_CHARS = 200`
 - `multi_select` arrays: max `MAX_SELECT_OPTIONS = 64` items
-- `short_text`, `long_narrative`, `reviewer_conclusion` `value`: max `MAX_FREE_TEXT_CHARS = 4_000` chars
 
 All limits validated at the serializer layer; `error_code = "payload_too_large"`
 / 400 on violation. No silent truncation.
@@ -899,14 +923,35 @@ Follows the same layered approach as `docs/MILESTONE_4D_1_TEST_STRATEGY.md`.
 - `data_source_type_snapshot` retained on response row after entry.
 - Second update without `correction_reason` → 400
   (`reviewer_conclusion_correction_reason_required`).
-- Second update with `correction_reason` → accepted; prior value
-  retained in `ChecklistResponseHistory`; `response.version` increments.
-- Stale `expected_version` → 409 (`reviewer_conclusion_stale_version`).
+- Second update with `correction_reason` → accepted; prior value and
+  new value retained in `ChecklistResponseHistory` (created inside same
+  transaction, after version check); `prior_version` and `new_version`
+  accurate; `response.version` increments (DR-2-27, DR-2-30).
+- Stale `expected_version` → 409 (`reviewer_conclusion_stale_version`);
+  zero `ChecklistResponseHistory` rows created (DR-2-27).
+- Raw_value exactly 4 000 chars → accepted; 4 001 chars →
+  `reviewer_conclusion_too_long` / 400 (DR-2-29).
+- `GET responses/<uuid>/` returns `version` field; initial value 1;
+  increments to 2 after first entry (DR-2-28).
+- `PATCH responses/<uuid>/` with `{"version": 99}` → structured 400
+  (version not writable) (DR-2-28).
 - No audit event emitted on failure path.
 - `checklist_response.reviewer_conclusion_entered` emitted on first value.
 - `checklist_response.reviewer_conclusion_updated` emitted on amendment.
 - Conclusion is immutable once execution is `approved` → 409
-  (`reviewer_conclusion_immutable`).
+  (`reviewer_conclusion_immutable`); no history row; no audit event.
+- Conclusion is immutable once execution is `superseded` → 409
+  (`reviewer_conclusion_immutable`) (DR-2-33).
+- Execution `returned`: existing conclusion retained; write attempt →
+  `reviewer_conclusion_invalid_state` / 409; value unchanged (DR-2-33).
+- Execution resubmitted after return: reviewer may amend with
+  `correction_reason`; `ChecklistResponseHistory` row created; prior
+  value from before resubmission captured (DR-2-33).
+- `ChecklistResponseHistory` instance `.delete()` raises
+  `GovernedHistoryMutationForbidden` (DR-2-30).
+- `ChecklistResponseHistory.objects.filter(...).delete()` raises
+  `GovernedHistoryMutationForbidden` (DR-2-30).
+- `ChecklistResponse` with history cannot be deleted (PROTECT raises) (DR-2-30).
 - No automated regulatory conclusion is produced.
 - Ordinary `PATCH responses/<uuid>/` endpoint with `reviewer_conclusion`
   `raw_value` → 400 (`reviewer_conclusion_wrong_answer_type`).
