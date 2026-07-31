@@ -907,6 +907,148 @@ deferred to 4D-4.
 
 ---
 
+### DR-2-23 — MAJOR — reviewer_conclusion AnswerType lacks a service and endpoint path (second independent review R2-F-1)
+
+**Status: CLOSED**
+
+**Finding:** `reviewer_conclusion` was specified in the DR-2-17 18-type table
+as writable only during `submitted_for_review` by actors holding
+`PERM_REVIEW_EXECUTION`. However, `enter_response()` (§6.3) allowed only
+`{draft, returned}` states with `PERM_EDIT_EXECUTION`, and no dedicated
+endpoint existed. An implementer following the spec would be unable to enter
+reviewer conclusions at all. `ChecklistResponseUpdateView` used the wrong
+permission class.
+
+**Resolution (APPROVED):** Dedicated `enter_reviewer_conclusion()` service,
+`ChecklistReviewerConclusionView` (POST only, `PERM_REVIEW_EXECUTION`),
+`ReviewerConclusionSerializer`, and `POST
+iig-checklists/executions/<uuid>/responses/<uuid>/reviewer-conclusion/`
+endpoint specified. `enter_response()` and `ChecklistResponseUpdateView`
+explicitly reject `reviewer_conclusion` raw values with
+`reviewer_conclusion_wrong_answer_type` / 400. `ChecklistResponse.version`
+(optimistic locking) and `ChecklistResponseHistory` (amendment audit) models
+added. Ten new error codes defined in §14.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §5` — `ChecklistResponse.version` and
+  `ChecklistResponseHistory` model added.
+- `MILESTONE_4D_2_DISCOVERY.md §6b` — reviewer_conclusion excluded from
+  submit_review completeness gate; approve gate may check reviewer_conclusion
+  questions.
+- `MILESTONE_4D_2_DISCOVERY.md §6e` (new) — "Reviewer-conclusion entry and
+  amendment" section with full semantics.
+- `MILESTONE_4D_2_DISCOVERY.md §8` — reviewer_conclusion row expanded with
+  dedicated endpoint reference, amendment semantics, optimistic lock,
+  immutability.
+- `MILESTONE_4D_2_DISCOVERY.md §13` — two new audit events added.
+- `MILESTONE_4D_2_DISCOVERY.md §14` — `POST
+  .../responses/<uuid>/reviewer-conclusion/` endpoint added.
+- `MILESTONE_4D_2_DISCOVERY.md §19` — comprehensive reviewer-conclusion test
+  block added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §3.2` — `version` field added
+  to ChecklistResponse.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §3.4` (new) —
+  `ChecklistResponseHistory` model specified.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §4.3` — reviewer_conclusion
+  completeness gate for approve added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §6.3` — scope exclusion note
+  for reviewer_conclusion added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §6.4` (new) —
+  `enter_reviewer_conclusion()` 10-step service specification.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §7.2` —
+  `ChecklistReviewerConclusionView` row added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §7.3` —
+  `reviewer-conclusion/` URL path added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.4` —
+  reviewer_conclusion rejection rule added to
+  `ChecklistResponseUpdateSerializer`.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.5` (new) —
+  `ReviewerConclusionSerializer` specified.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §9.1` — two new audit event
+  constants added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §9.2` — reviewer-conclusion
+  audit payload conventions added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5` (new) — comprehensive
+  reviewer-conclusion test block (25+ tests).
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §14` — ten new error codes
+  added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §16` — five new acceptance
+  criteria added (criteria 13–17).
+
+---
+
+### DR-2-24 — MINOR — Integer AnswerType does not explicitly reject JSON booleans (second independent review OBS-1)
+
+**Status: CLOSED**
+
+**Finding:** The integer validation description did not address Python's
+`isinstance(True, int) == True` trap. A naive implementation would accept
+JSON booleans as valid integer values.
+
+**Resolution (APPROVED):** Both discovery §8 and spec outline §8.4 updated to
+state: "JSON integer; floats, strings, and booleans explicitly rejected.
+Python `bool` is an `int` subclass — validation must check
+`isinstance(val, bool)` first and reject before `isinstance(val, int)`
+accepts." Corresponding test cases added in spec outline §13.1.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §8` — integer row updated with explicit boolean
+  rejection rule and Python bool-subclass note.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.4` — integer validation
+  rule updated.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.1` — six integer boolean
+  rejection test cases added.
+
+---
+
+### DR-2-25 — MINOR — `quantity_with_unit` `allowed_units` source was undefined (second independent review OBS-2)
+
+**Status: CLOSED**
+
+**Finding:** The `allowed_units` source for `quantity_with_unit` validation was
+not identified in either document. An implementer could not determine where
+the allowable unit list came from or whether it was mutable at validation
+time.
+
+**Resolution (APPROVED):** Codebase confirmed `ChecklistQuestion.allowed_units
+= models.JSONField(default=list, blank=True)` present in the 4D-1 codebase
+at `backend/iig_checklist/models.py:318`. Both discovery §8 and spec outline
+§8.4 updated to state that `allowed_units` is a per-question `JSONField` on
+`ChecklistQuestion`, frozen by 4D-1 version immutability. Validation uses the
+pinned question's frozen `allowed_units` list, not a live lookup.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §8` — `quantity_with_unit` row updated with
+  `allowed_units` source and freeze semantics.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §8.4` — `quantity_with_unit`
+  rule updated with frozen `allowed_units` note.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.1` — `quantity_with_unit`
+  allowed-units validation test cases added.
+
+---
+
+### DR-2-26 — MINOR — reviewer_conclusion provenance and history tests were missing (second independent review OBS-3)
+
+**Status: CLOSED**
+
+**Finding:** No tests covered the provenance lifecycle of `reviewer_conclusion`
+responses: first entry, amendment with history, optimistic-locking conflicts,
+or immutability on approved executions.
+
+**Resolution (APPROVED):** Comprehensive reviewer-conclusion test block added
+in `MILESTONE_4D_2_DISCOVERY.md §19` and `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5`
+(renumbered from old 13.5/13.6 to 13.6/13.7). Covers all service and endpoint
+scenarios, audit events, `ChecklistResponseHistory` creation, and optimistic
+locking, as well as confirming that `enter_response()` and
+`ChecklistResponseUpdateView` correctly reject `reviewer_conclusion` values.
+
+**Corrections applied:**
+- `MILESTONE_4D_2_DISCOVERY.md §19` — reviewer-conclusion test block added.
+- `MILESTONE_4D_2_IMPLEMENTATION_SPEC_OUTLINE.md §13.5` (new) — 25+ reviewer
+  conclusion tests; old §13.5/§13.6 renumbered §13.6/§13.7.
+
+---
+
 ## Decision register
 
 | # | Question | Decision | Status |
@@ -949,7 +1091,12 @@ deferred to 4D-4.
 | DR-2-20 | Major | Discovery §5 model field not corrected (from independent review) | CLOSED |
 | DR-2-21 | Minor | Stale open-Q1 wording in discovery §3b (from independent review) | CLOSED |
 | DR-2-22 | Minor | Stale conditional Q5 wording (from independent review) | CLOSED |
+| DR-2-23 | Major | reviewer_conclusion lacks service and endpoint path (from second independent review) | CLOSED |
+| DR-2-24 | Minor | Integer AnswerType does not reject JSON booleans (from second independent review) | CLOSED |
+| DR-2-25 | Minor | quantity_with_unit allowed_units source undefined (from second independent review) | CLOSED |
+| DR-2-26 | Minor | reviewer_conclusion provenance tests missing (from second independent review) | CLOSED |
 
+**Total findings: 26**
 **Critical remaining: 0**
 **Major remaining: 0**
 **Minor remaining: 0**
@@ -976,6 +1123,10 @@ deferred to 4D-4.
 | Discovery §5 model field corrected to live FK (DR-2-20) | YES |
 | Stale open-Q1 wording removed (DR-2-21) | YES |
 | Q5 reviewer-conclusion scope finalized (DR-2-22) | YES |
+| reviewer_conclusion service and endpoint path specified (DR-2-23) | YES |
+| Integer AnswerType explicitly rejects JSON booleans (DR-2-24) | YES |
+| quantity_with_unit allowed_units source and freeze semantics defined (DR-2-25) | YES |
+| reviewer_conclusion provenance and history tests specified (DR-2-26) | YES |
 | Product code changed | NO |
 | Migrations added | NO |
 | Backend code changed | NO |
