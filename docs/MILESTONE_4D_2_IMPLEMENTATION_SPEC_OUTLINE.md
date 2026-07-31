@@ -129,6 +129,9 @@ confirmed_by            FK(User, SET_NULL, null=True)
 confirmed_at            DateTimeField(null=True)
 override_reason         TextField(blank=True)
 system_derived_value    JSONField(null=True)
+version                 PositiveIntegerField(default=1)  # incremented
+                        # on every raw_value write; used for optimistic
+                        # locking in enter_reviewer_conclusion() (DR-2-23)
 ```
 
 DB constraints:
@@ -174,6 +177,29 @@ source_assessment_snapshot_public_id  UUIDField(null=True)
 No client-facing write endpoint — only server-side services may
 create or update `CalculationOutcome` rows. 4D-2 creates the model
 and migration; rows are populated by 4D-3.
+
+### 3.4 `ChecklistResponseHistory`
+
+Inherits `PublicIDModel`, `TimeStampedModel`.
+
+Created by `enter_reviewer_conclusion()` before each amendment to retain
+a complete, auditable prior-value record. Not accessible through a
+client-facing write or delete endpoint.
+
+```
+response                FK(ChecklistResponse, on_delete=CASCADE)
+prior_raw_value         JSONField(null=True)    — raw_value before amendment
+prior_entered_by        FK(User, SET_NULL, null=True)
+prior_entered_at        DateTimeField(null=True)
+correction_reason       TextField()             — required; non-empty
+amended_by              FK(User, on_delete=PROTECT)
+amended_at              DateTimeField(auto_now_add=True)
+```
+
+Read-only endpoint (optional, 4D-2 scope decision): history rows may be
+surfaced via a `GET responses/<uuid>/history/` list endpoint. If included,
+access requires `PERM_VIEW_EXECUTION` and follows tenant-scoped retrieval
+through the parent execution.
 
 ---
 
@@ -227,6 +253,13 @@ class ExecutionStatus(models.TextChoices):
 
 `approve` (DR-2-05 — redundant safety re-check):
 - Same completeness check as `submit_review`.
+- `reviewer_conclusion` completeness (DR-2-23): for every `required=True`
+  question with `answer_type == reviewer_conclusion` applicable to this
+  execution, the response must have a non-null `raw_value` and
+  `is_not_applicable=False`. A missing required reviewer conclusion raises
+  `error_code = "incomplete_execution"` / 400. This gate does not apply at
+  `submit_review` — a reviewer conclusion cannot legally exist before the
+  execution reaches `submitted_for_review`.
 - `reviewer_conclusion_note` non-empty, provided in the request body
   (DR-2-07: `ApproveSerializer` accepts this field; service stores it on
   `ChecklistExecution` atomically with the status transition).
@@ -341,6 +374,14 @@ to reach another tenant's execution. Same convention as 4D-1.
 
 ### 6.3 `enter_response(execution, question_public_id, actor, raw_value, is_not_applicable, not_applicable_reason)`
 
+**Scope:** applies only to questions whose `answer_type` is **not**
+`reviewer_conclusion`. For `reviewer_conclusion` questions, use
+`enter_reviewer_conclusion()` (§6.4). If a `reviewer_conclusion` `raw_value`
+is passed to this service, step 4 shape-validation rejects it with
+`error_code = "reviewer_conclusion_wrong_answer_type"` / 400 before any
+DB write. This prevents the ordinary response path from accidentally
+accepting reviewer conclusions or operating during `submitted_for_review`.
+
 ```
 1. Verify execution.status in {draft, returned}.
 2. Verify actor has PERM_EDIT_EXECUTION.
@@ -356,6 +397,62 @@ to reach another tenant's execution. Same convention as 4D-1.
 9. Emit iig_checklist.response.entered or .updated audit event.
 10. Return response.
 ```
+
+### 6.4 `enter_reviewer_conclusion(*, execution, response_public_id, actor, raw_value, expected_version, correction_reason=None)`
+
+```
+1. Resolve execution via ChecklistExecution.objects.visible_to(tenant)
+   — generic 404 if not found or cross-tenant.
+2. Verify execution.status == "submitted_for_review"
+   → else raise ReviewerConclusionInvalidState /
+     error_code = "reviewer_conclusion_invalid_state" / 409.
+3. Verify actor has PERM_REVIEW_EXECUTION
+   → else raise ReviewerConclusionPermissionDenied /
+     error_code = "reviewer_conclusion_permission_denied" / 403.
+4. Resolve ChecklistResponse by response_public_id; verify
+   response.execution == execution (generic 404 if mismatch).
+5. Verify response.question.answer_type == reviewer_conclusion
+   → else error_code = "reviewer_conclusion_wrong_answer_type" / 400.
+6. Validate raw_value against reviewer_conclusion canonical shape:
+   {"value": "..."} — value must be a non-empty string after trim;
+   max MAX_FREE_TEXT_CHARS chars; max MAX_RAW_VALUE_BYTES bytes total;
+   no additional keys; no arrays or nested objects.
+   Error codes: "reviewer_conclusion_empty" / 400 (empty after trim);
+   "reviewer_conclusion_too_long" / 400 (exceeds char limit);
+   "reviewer_conclusion_payload_too_large" / 400 (exceeds byte limit);
+   "reviewer_conclusion_invalid_payload" / 400 (wrong shape).
+7. Amendment path (response.raw_value is not null):
+   a. Verify correction_reason is non-empty
+      → else error_code = "reviewer_conclusion_correction_reason_required" / 400.
+   b. Create ChecklistResponseHistory(
+        response=response,
+        prior_raw_value=response.raw_value,
+        prior_entered_by=response.entered_by,
+        prior_entered_at=response.entered_at,
+        correction_reason=correction_reason,
+        amended_by=actor,
+      ) — outside the locked block so history is safe even if the
+        locked update races.
+8. Inside transaction.atomic() + select_for_update() on response:
+   a. Verify response.version == expected_version
+      → else error_code = "reviewer_conclusion_stale_version" / 409.
+   b. Set response.raw_value = raw_value.
+   c. Set response.entered_by = actor.
+   d. Set response.entered_at = now (UTC).
+   e. Ensure response.data_source_type_snapshot is set
+      (= response.question.data_source_classification if null).
+   f. Increment response.version by 1.
+   g. response.full_clean() → response.save().
+9. Determine event type:
+   - First entry (was null before step 8): emit
+     checklist_response.reviewer_conclusion_entered.
+   - Amendment: emit checklist_response.reviewer_conclusion_updated.
+   Audit emitted only after successful commit, never on failure.
+10. Return response.
+```
+
+No direct status mutation occurs. No automated regulatory conclusion is
+generated. No override/deviation metadata in 4D-2.
 
 ---
 
@@ -393,6 +490,23 @@ returns a structured 403 with `error_code = "self_approval_forbidden"`.
 |---|---|---|---|
 | `ChecklistResponseListView` | GET | `.../executions/<uuid>/responses/` | `view_execution` |
 | `ChecklistResponseUpdateView` | PATCH | `.../executions/<uuid>/responses/<uuid>/` | `edit_execution` |
+| `ChecklistReviewerConclusionView` | POST | `.../executions/<uuid>/responses/<uuid>/reviewer-conclusion/` | `review_execution` |
+
+`ChecklistReviewerConclusionView`:
+- POST only; resolves execution and response by public UUID via
+  tenant-scoped retrieval (generic 404 for cross-tenant).
+- Validates request body with `ReviewerConclusionSerializer` (§8.5).
+- Invokes `enter_reviewer_conclusion()` (§6.4).
+- Server-side `PERM_REVIEW_EXECUTION` check inside the service — not
+  solely at the view level.
+- Returns the updated `ChecklistResponseSerializer` representation
+  (UUID-only; no internal IDs; no storage paths).
+- Structured 400/403/409 on all error paths; no raw exception text.
+
+`ChecklistResponseUpdateView` (PATCH) does **not** accept
+`reviewer_conclusion` answer types. The serializer (§8.4) rejects any
+`reviewer_conclusion` raw_value with
+`error_code = "reviewer_conclusion_wrong_answer_type"` / 400.
 
 PATCH only — responses are always created eagerly (pending Q6) or via
 a dedicated "enter response" endpoint. `status` is never a writable
@@ -413,6 +527,8 @@ path("executions/<uuid:public_id>/supersede/", ChecklistExecutionSupersedeView.a
 path("executions/<uuid:public_id>/responses/", ChecklistResponseListView.as_view()),
 path("executions/<uuid:public_id>/responses/<uuid:response_public_id>/",
      ChecklistResponseUpdateView.as_view()),
+path("executions/<uuid:public_id>/responses/<uuid:response_public_id>/reviewer-conclusion/",
+     ChecklistReviewerConclusionView.as_view()),
 ```
 
 ---
@@ -484,18 +600,55 @@ structured 400, not silent acceptance.
   or `approval_metadata` (client input prohibited);
 - a JSON float where a decimal string is required (`decimal`,
   `quantity_with_unit`, `percentage`);
+- a Python `bool` value where a JSON integer is required (`integer`) —
+  `bool` is an `int` subclass in Python; serializer must check
+  `isinstance(val, bool)` and reject **before** `isinstance(val, int)`
+  accepts. `{"value": true}` and `{"value": false}` both return
+  `error_code = "invalid_raw_value_shape"` (DR-2-24);
+- a unit not present in the pinned question's `allowed_units` JSONField
+  for `quantity_with_unit` — `allowed_units` is frozen by 4D-1 version
+  immutability; validation reads from the resolved question object, not
+  a live DB query (DR-2-25);
 - a string `"true"`/`"false"` where a JSON boolean is required (`yes_no`);
 - a boolean where a controlled string enum is required (`yes_no_na`);
 - any `yes_no_na` value outside `{"value": "yes"}`, `{"value": "no"}`,
   `{"value": "not_applicable"}`;
 - duplicate option codes in `multi_select`;
-- a `reviewer_conclusion` `raw_value` submitted by an actor without
-  `PERM_REVIEW_EXECUTION`.
+- any `reviewer_conclusion` `raw_value` — this answer type must use the
+  dedicated `/reviewer-conclusion/` endpoint and `ReviewerConclusionSerializer`
+  (§8.5). Return `error_code = "reviewer_conclusion_wrong_answer_type"` / 400
+  (DR-2-23).
 
 All validation failures return `error_code = "invalid_raw_value_shape"` /
 400 before any DB write.
 
-### 8.5 Lifecycle action serializers
+### 8.5 `ReviewerConclusionSerializer`
+
+Used exclusively by `ChecklistReviewerConclusionView` (§7.2).
+
+Writable fields:
+```
+raw_value:          JSONField — required; must match reviewer_conclusion
+                    canonical shape {"value": "..."}
+expected_version:   IntegerField — required; must equal response.version
+                    at lock time; stale value → 409
+correction_reason:  CharField (optional on first entry; required when
+                    response.raw_value is not null)
+```
+
+Validation (structural only — object-level permission and lifecycle
+checks are enforced in the service, §6.4):
+- `raw_value.value` must be a string.
+- Trimmed `raw_value.value` must not be empty.
+- `raw_value.value` max `MAX_FREE_TEXT_CHARS` characters.
+- `json.dumps(raw_value)` max `MAX_RAW_VALUE_BYTES` bytes.
+- No additional keys in `raw_value`.
+- Unknown fields in request body → structured 400.
+- `correction_reason` is `CharField(max_length=MAX_REVIEWER_CONCLUSION_CHARS,
+  blank=True)` — blank is accepted structurally; the service enforces
+  non-empty when amendment is detected.
+
+### 8.6 Lifecycle action serializers
 
 Each action has a minimal request-body serializer:
 
@@ -530,6 +683,8 @@ EXECUTION_CANCELLED           = "iig_checklist.execution.cancelled"
 EXECUTION_SUPERSEDED          = "iig_checklist.execution.superseded"
 RESPONSE_ENTERED              = "iig_checklist.response.entered"
 RESPONSE_UPDATED              = "iig_checklist.response.updated"
+RESPONSE_REVIEWER_CONCLUSION_ENTERED = "checklist_response.reviewer_conclusion_entered"
+RESPONSE_REVIEWER_CONCLUSION_UPDATED = "checklist_response.reviewer_conclusion_updated"
 ```
 
 ### 9.2 Payload conventions
@@ -541,6 +696,15 @@ Response events: execution `public_id`, response `public_id`,
 `question_public_id`, `data_source_type_snapshot`. Never: `raw_value`
 (may contain proprietary formulation data), question text, numeric PKs,
 storage paths.
+
+Reviewer-conclusion events (`reviewer_conclusion_entered` /
+`reviewer_conclusion_updated`): execution `public_id`, response
+`public_id`, question `public_id`, actor email, `prior_response_version`,
+`new_response_version`, `execution_status`, and a boolean
+`correction_reason_present` (true/false — presence indicator only).
+Never: the conclusion text itself, full `raw_value`, prior `raw_value`,
+or any regulated conclusion content. Full amendment history lives in
+`ChecklistResponseHistory` rows, not reconstructed from audit events.
 
 Emit only on success. No audit event on validation failure, illegal
 transition, or authorization denial.
@@ -690,6 +854,21 @@ export const iigChecklists = {
   `percentage` reject JSON floats; `yes_no` rejects strings; `yes_no_na`
   rejects booleans and any string outside the three controlled values;
   `multi_select` rejects duplicate option codes.
+- Integer boolean rejection (DR-2-24): `{"value": 1}` accepted;
+  `{"value": 0}` accepted; `{"value": true}` rejected with
+  `invalid_raw_value_shape`; `{"value": false}` rejected; `{"value": 1.0}`
+  rejected; `{"value": "1"}` rejected.
+- `quantity_with_unit` allowed-units validation (DR-2-25): a unit
+  present in `question.allowed_units` accepted; a unit absent from
+  `question.allowed_units` rejected with `invalid_raw_value_shape`; an
+  empty unit rejected; `question.allowed_units` from the pinned version
+  (not a live re-query).
+- `ChecklistResponse.version` (DR-2-23): default is 1; increments to 2
+  after `enter_reviewer_conclusion()` first entry; increments to 3 after
+  amendment.
+- `ChecklistResponseHistory` (DR-2-23): created on amendment;
+  `prior_raw_value` equals pre-amendment value; `correction_reason`
+  non-empty; `amended_by` is the acting user; not created on first entry.
 - FormulationVersion status gate (DR-2-10): `create_execution()` rejects
   `draft` and `under_review` formulation versions with
   `formulation_version_not_approved`.
@@ -762,13 +941,71 @@ export const iigChecklists = {
 - `document_version_public_id` in `raw_value` validated for tenant
   ownership.
 
-### 13.5 Platform-authorization pin test
+### 13.5 Reviewer-conclusion tests (DR-2-23, DR-2-26)
+
+**Service — first entry:**
+
+- `enter_reviewer_conclusion()` with `execution.status=submitted_for_review`
+  and actor holding `PERM_REVIEW_EXECUTION` succeeds; `response.raw_value`
+  updated; `response.version` incremented from 1 to 2; no
+  `ChecklistResponseHistory` row created.
+- Actor lacking `PERM_REVIEW_EXECUTION` → `reviewer_conclusion_permission_denied`
+  / 403.
+- `execution.status=draft` → `reviewer_conclusion_invalid_state` / 409.
+- `execution.status=returned` → `reviewer_conclusion_invalid_state` / 409.
+- `execution.status=approved` → `reviewer_conclusion_immutable` / 409.
+- `raw_value` empty string → `reviewer_conclusion_empty` / 400.
+- `raw_value` exceeds 20 000 chars → `reviewer_conclusion_too_long` / 400.
+- `expected_version` mismatch (stale) → `reviewer_conclusion_stale_version`
+  / 409; DB not written.
+- `expected_version` mismatch (concurrent write simulation) → same 409.
+- `question.answer_type ≠ reviewer_conclusion` passed to
+  `enter_reviewer_conclusion()` → raises (programmer error guard).
+
+**Service — amendment:**
+
+- Amendment with `correction_reason` provided: `response.version`
+  increments; one `ChecklistResponseHistory` row created with correct
+  `prior_raw_value`, `prior_entered_by`, `amended_by`, `amended_at`,
+  and `correction_reason`.
+- Amendment without `correction_reason` →
+  `reviewer_conclusion_correction_reason_required` / 400; no DB write.
+- Multiple amendments produce multiple `ChecklistResponseHistory` rows in
+  insertion order.
+
+**Endpoint — `POST .../responses/<uuid>/reviewer-conclusion/`:**
+
+- Happy-path 200: correct actor, valid payload, correct state.
+- Non-reviewer actor → 403.
+- Wrong execution state → 409 with structured error.
+- Missing `raw_value` → 400.
+- Missing `expected_version` → 400.
+- Stale `expected_version` → 409 with `reviewer_conclusion_stale_version`.
+- Response UUID belongs to different execution → 404.
+- Cross-tenant response UUID → 404.
+- `enter_response()` rejects `reviewer_conclusion` payload →
+  `reviewer_conclusion_wrong_answer_type` / 400.
+- `ChecklistResponseUpdateView` rejects `reviewer_conclusion` payload →
+  `reviewer_conclusion_wrong_answer_type` / 400.
+
+**Audit:**
+
+- `checklist_response.reviewer_conclusion_entered` event emitted on
+  first entry; payload contains execution `public_id`, response
+  `public_id`, question `public_id`, actor email, `prior_response_version`,
+  `new_response_version`, `execution_status`; does NOT contain conclusion
+  text.
+- `checklist_response.reviewer_conclusion_updated` event emitted on
+  amendment; payload contains `correction_reason_present=True`; does NOT
+  contain conclusion text or `prior_raw_value`.
+
+### 13.6 Platform-authorization pin test
 
 A dedicated test confirms that `can_mutate_definition_scope()` and
 `can_author_platform_master()` are never called during any execution
 path. This is a regression guard for the 4D-1 authorization boundary.
 
-### 13.6 Docker integration test
+### 13.7 Docker integration test
 
 Add to `.github/workflows/docker-integration.yml`:
 
@@ -812,6 +1049,16 @@ Structured errors returned by 4D-2 endpoints:
 | `payload_too_large` | 400 | Any field exceeds its limit constant (DR-2-01) |
 | `not_applicable_requires_reason` | 400 | `is_not_applicable=True` without reason |
 | `document_version_not_found` | 400 | `raw_value.document_version_public_id` not in tenant (DR-2-06) |
+| `reviewer_conclusion_wrong_answer_type` | 400 | `enter_response()` or `ChecklistResponseUpdateView` receives `reviewer_conclusion` raw value (DR-2-23) |
+| `reviewer_conclusion_invalid_state` | 409 | `enter_reviewer_conclusion()` called when execution not in `submitted_for_review` (DR-2-23) |
+| `reviewer_conclusion_permission_denied` | 403 | Actor lacks `PERM_REVIEW_EXECUTION` for `enter_reviewer_conclusion()` (DR-2-23) |
+| `reviewer_conclusion_invalid_payload` | 400 | `ReviewerConclusionSerializer` validation failure (DR-2-23) |
+| `reviewer_conclusion_empty` | 400 | `raw_value` is blank or empty string (DR-2-23) |
+| `reviewer_conclusion_too_long` | 400 | `raw_value` exceeds 20 000 characters (DR-2-23) |
+| `reviewer_conclusion_payload_too_large` | 400 | Outer payload exceeds limit constant (DR-2-23) |
+| `reviewer_conclusion_stale_version` | 409 | `expected_version` does not match `response.version` (DR-2-23) |
+| `reviewer_conclusion_correction_reason_required` | 400 | Amendment attempt with no `correction_reason` (DR-2-23) |
+| `reviewer_conclusion_immutable` | 409 | `enter_reviewer_conclusion()` on approved execution (DR-2-23) |
 
 Format (identical to 4D-1):
 ```json
@@ -860,6 +1107,20 @@ affect 4D-1 pages. No 4D-1 migration or model is modified.
     (equivalent standard to the 4D-1 post-implementation review).
 12. All nine design decisions from `MILESTONE_4D_2_DESIGN_REMEDIATION.md`
     are referenced in the implementation PR description.
+13. `enter_reviewer_conclusion()` can only be called when
+    `execution.status=submitted_for_review`; all other states return the
+    appropriate structured error (DR-2-23).
+14. `enter_response()` and `ChecklistResponseUpdateView` reject
+    `reviewer_conclusion` raw values with
+    `reviewer_conclusion_wrong_answer_type` / 400 (DR-2-23).
+15. Integer `raw_value` of `true` or `false` is rejected with
+    `invalid_raw_value_shape`; integers 0 and 1 are accepted (DR-2-24).
+16. `quantity_with_unit` validation uses `question.allowed_units` from the
+    pinned question at time of response entry; a unit not in
+    `allowed_units` is rejected (DR-2-25).
+17. All reviewer-conclusion provenance tests in §13.5 pass, including
+    optimistic-locking stale-version tests and `ChecklistResponseHistory`
+    row creation on amendment (DR-2-26).
 
 ---
 
