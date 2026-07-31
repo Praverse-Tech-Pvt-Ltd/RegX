@@ -477,8 +477,11 @@ invalidating applicability evaluation. `superseded` or `retired` versions
 are blocked with `error_code = "formulation_version_not_approved"`.
 
 Cross-tenant protection: `create_execution()` verifies
-`formulation_version.product_development_record.tenant == execution.tenant`
-before writing the FK. Violation returns
+`formulation_version.product.tenant == execution.tenant`
+before writing the FK. `FormulationVersion.product` is the actual FK
+field to `ProductDevelopmentRecord` (see `backend/formulations/models.py`);
+there is no `product_development_record` field on this model
+(corrected by DR-2-34, fifth independent review). Violation returns
 `error_code = "formulation_version_tenant_mismatch"` / 400.
 
 ---
@@ -578,14 +581,19 @@ Evidence references are stored as `{"document_version_public_id": "<uuid>"}` in
 `raw_value`. A live FK in `ChecklistResponse` to `DocumentVersion` would
 require a nullable FK on every response row regardless of question type.
 
-Deletion protection: the `documents` app exposes a
-`DeletionProtectionRegistry`. `IigChecklistConfig.ready()` registers
+Deletion protection: `DeletionProtectionRegistry` **does not exist in the
+current codebase** (confirmed by grep across `backend/` — DR-2-35, fifth
+independent review). It is **new Milestone 4D-2 infrastructure to be
+implemented in the `documents` app**, not existing infrastructure the
+`documents` app already exposes. `IigChecklistConfig.ready()` registers
 a callable that checks whether any `ChecklistResponse` belonging to an
 `approved` execution references the given `document_version_public_id`.
 If yes, the callable returns `True` (protected) and the `documents` app
 raises `DocumentVersionDeleteForbidden` before any DB deletion. The
 import direction stays clean: `iig_checklist` registers its hook into
-`documents`; `documents` never imports `iig_checklist`.
+`documents`; `documents` never imports `iig_checklist`. See
+`docs/MILESTONE_4D_2_IMPLEMENTATION_SPEC.md` for the concrete class
+interface, location, and registration contract.
 
 Tenant ownership check: the `enter_response()` service must verify that
 the referenced `document_version_public_id` belongs to a `Document`

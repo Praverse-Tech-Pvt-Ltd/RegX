@@ -364,8 +364,11 @@ to reach another tenant's execution. Same convention as 4D-1.
    Verify status == "active" → else raise ChecklistVersionNotActive / 400.
 2. Resolve FormulationVersion, verify status == "approved" (DR-2-10)
    → else raise FormulationVersionNotApproved / 400.
-   Verify formulation_version.product_development_record.tenant == tenant
+   Verify formulation_version.product.tenant == tenant
    → else raise FormulationVersionTenantMismatch / 400.
+   (`FormulationVersion.product` is the actual FK to
+   ProductDevelopmentRecord; there is no product_development_record
+   field on this model — corrected by DR-2-34, fifth independent review.)
 3. Check actor has PERM_CREATE_EXECUTION.
 4. Inside transaction.atomic():
    a. select_for_update() on ChecklistVersion (DR-2-16, lock 1).
