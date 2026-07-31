@@ -162,6 +162,16 @@ class DocumentVersion(PublicIDModel, TimeStampedModel):
     def __str__(self):
         return f"{self.document.title} v{self.version_number}"
 
+    def delete(self, using=None, keep_parents=False):
+        from .deletion_protection import DocumentVersionDeleteForbidden, DeletionProtectionRegistry
+
+        blocking = DeletionProtectionRegistry.check(self)
+        if blocking:
+            raise DocumentVersionDeleteForbidden(
+                "This document version is referenced by governed content and cannot be deleted."
+            )
+        return super().delete(using=using, keep_parents=keep_parents)
+
 
 class LocatorType(models.TextChoices):
     PAGE = "page", "Page"
