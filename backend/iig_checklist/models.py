@@ -38,8 +38,8 @@ from .enums import (
 from .execution_constants import (
     MAX_NOT_APPLICABLE_REASON_CHARS,
     MAX_RAW_VALUE_BYTES,
-    MAX_REVIEWER_CONCLUSION_CHARS,
     MAX_RETURN_REASON_CHARS,
+    MAX_REVIEWER_CONCLUSION_CHARS,
 )
 from .managers import (
     ChecklistDefinitionManager,
@@ -587,13 +587,25 @@ class ChecklistResponse(PublicIDModel, TimeStampedModel):
             except Exception:
                 exec_status = None
             if exec_status not in {"draft", "returned"}:
-                raise ValidationError("response_immutable")
+                # reviewer_conclusion responses may be updated during
+                # submitted_for_review via the dedicated
+                # enter_reviewer_conclusion() service only.  All other
+                # answer types and all other non-mutable statuses remain
+                # unconditionally immutable here.
+                _is_rc_under_review = False
+                if exec_status == "submitted_for_review":
+                    try:
+                        _is_rc_under_review = (
+                            self.question.answer_type == AnswerType.REVIEWER_CONCLUSION
+                        )
+                    except Exception:
+                        _is_rc_under_review = False
+                if not _is_rc_under_review:
+                    raise ValidationError("response_immutable")
 
         # 2. is_not_applicable=True implies raw_value must be null.
         if self.is_not_applicable and self.raw_value is not None:
-            raise ValidationError(
-                "raw_value must be null when is_not_applicable is True."
-            )
+            raise ValidationError("raw_value must be null when is_not_applicable is True.")
 
         # 3. not_applicable_reason required when is_not_applicable=True.
         if self.is_not_applicable and not (self.not_applicable_reason or "").strip():
