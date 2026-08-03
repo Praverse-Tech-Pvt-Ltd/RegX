@@ -10,9 +10,12 @@ isinstance(val, bool) is checked before isinstance(val, int) everywhere a
 JSON integer is expected -- Python's bool is an int subclass (DR-2-24).
 """
 
+import re
 import uuid
 from datetime import date
 from decimal import Decimal, InvalidOperation
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 from .enums import AnswerType
 from .execution_constants import FDA_RECORD_TYPES, MAX_FREE_TEXT_CHARS, MAX_SELECT_OPTIONS
@@ -105,10 +108,12 @@ def _validate_date(value):
     v = value["value"]
     if not isinstance(v, str):
         _fail("date value must be a string.")
+    if not _DATE_RE.match(v):
+        _fail("date value must be an ISO 8601 date string in YYYY-MM-DD format.")
     try:
         date.fromisoformat(v)
     except ValueError:
-        _fail("date value must be an ISO 8601 date string (YYYY-MM-DD).")
+        _fail("date value must be a valid calendar date in YYYY-MM-DD format.")
 
 
 def _validate_yes_no(value):
