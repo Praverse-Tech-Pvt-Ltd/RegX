@@ -4,6 +4,13 @@
  * Authentication uses secure HttpOnly session cookies set by Django.
  */
 
+import {
+  toChecklistExecution,
+  toChecklistResponse,
+  type ChecklistExecutionDTO,
+  type ChecklistResponseDTO,
+} from "./api/execution-mappers";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 async function getCsrfToken(): Promise<string> {
@@ -1284,44 +1291,14 @@ export interface ChecklistQuestion {
   required: boolean;
 }
 
-// 4D-2 Execution types
-export interface ChecklistExecution {
-  publicId: string;
-  status: string;
-  checklistVersion: { publicId: string; versionNumber: number; status: string };
-  formulationVersionPublicId: string;
-  createdByEmail: string | null;
-  submittedByEmail: string | null;
-  submittedAt: string | null;
-  returnedByEmail: string | null;
-  returnedAt: string | null;
-  returnReason: string;
-  approvedByEmail: string | null;
-  approvedAt: string | null;
-  rejectedByEmail: string | null;
-  rejectedAt: string | null;
-  cancelledByEmail: string | null;
-  cancelledAt: string | null;
-  reviewerConclusionNote: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ChecklistResponse {
-  publicId: string;
-  questionPublicId: string;
-  dataSourceTypeSnapshot: string;
-  rawValue: unknown | null;
-  isNotApplicable: boolean;
-  notApplicableReason: string | null;
-  enteredByEmail: string | null;
-  enteredAt: string | null;
-  confirmedByEmail: string | null;
-  confirmedAt: string | null;
-  overrideReason: string;
-  systemDerivedValue: unknown | null;
-  version: number;
-}
+// 4D-2 Execution types — re-exported from the centralised mapper module.
+// UI models are camelCase; DTO types mirror the Django snake_case API response.
+export type {
+  ChecklistExecution,
+  ChecklistResponse,
+  ChecklistExecutionDTO,
+  ChecklistResponseDTO,
+} from "./api/execution-mappers";
 
 export const iigChecklists = {
   definitions: {
@@ -1450,82 +1427,84 @@ export const iigChecklists = {
   },
 
   // 4D-2 Execution API
+  // Django returns snake_case JSON; toChecklistExecution/toChecklistResponse
+  // map each DTO to the camelCase UI model at the single boundary here.
   executions: {
     list: (tenantSlug: string, params?: { page?: number }) => {
       const qs = new URLSearchParams();
       if (params?.page) qs.set("page", String(params.page));
       const query = qs.toString() ? `?${qs}` : "";
-      return apiRequest<PaginatedResponse<ChecklistExecution>>(
+      return apiRequest<PaginatedResponse<ChecklistExecutionDTO>>(
         `/api/regx/v1/iig-checklists/executions/${query}`,
         { headers: { "X-Tenant-Slug": tenantSlug } }
-      );
+      ).then((page) => ({ ...page, results: page.results.map(toChecklistExecution) }));
     },
 
     create: (
       tenantSlug: string,
       data: { checklist_version_public_id: string; formulation_version_public_id: string }
     ) =>
-      apiRequest<ChecklistExecution>("/api/regx/v1/iig-checklists/executions/", {
+      apiRequest<ChecklistExecutionDTO>("/api/regx/v1/iig-checklists/executions/", {
         method: "POST",
         headers: { "X-Tenant-Slug": tenantSlug },
         body: data,
-      }),
+      }).then(toChecklistExecution),
 
     get: (tenantSlug: string, publicId: string) =>
-      apiRequest<ChecklistExecution>(`/api/regx/v1/iig-checklists/executions/${publicId}/`, {
+      apiRequest<ChecklistExecutionDTO>(`/api/regx/v1/iig-checklists/executions/${publicId}/`, {
         headers: { "X-Tenant-Slug": tenantSlug },
-      }),
+      }).then(toChecklistExecution),
 
     submitReview: (tenantSlug: string, publicId: string) =>
-      apiRequest<ChecklistExecution>(
+      apiRequest<ChecklistExecutionDTO>(
         `/api/regx/v1/iig-checklists/executions/${publicId}/submit-review/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
-      ),
+      ).then(toChecklistExecution),
 
     approve: (tenantSlug: string, publicId: string, reviewerConclusionNote: string) =>
-      apiRequest<ChecklistExecution>(
+      apiRequest<ChecklistExecutionDTO>(
         `/api/regx/v1/iig-checklists/executions/${publicId}/approve/`,
         {
           method: "POST",
           headers: { "X-Tenant-Slug": tenantSlug },
           body: { reviewer_conclusion_note: reviewerConclusionNote },
         }
-      ),
+      ).then(toChecklistExecution),
 
     return: (tenantSlug: string, publicId: string, returnReason: string) =>
-      apiRequest<ChecklistExecution>(
+      apiRequest<ChecklistExecutionDTO>(
         `/api/regx/v1/iig-checklists/executions/${publicId}/return/`,
         {
           method: "POST",
           headers: { "X-Tenant-Slug": tenantSlug },
           body: { return_reason: returnReason },
         }
-      ),
+      ).then(toChecklistExecution),
 
     reject: (tenantSlug: string, publicId: string) =>
-      apiRequest<ChecklistExecution>(
+      apiRequest<ChecklistExecutionDTO>(
         `/api/regx/v1/iig-checklists/executions/${publicId}/reject/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
-      ),
+      ).then(toChecklistExecution),
 
     cancel: (tenantSlug: string, publicId: string) =>
-      apiRequest<ChecklistExecution>(
+      apiRequest<ChecklistExecutionDTO>(
         `/api/regx/v1/iig-checklists/executions/${publicId}/cancel/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
-      ),
+      ).then(toChecklistExecution),
 
     supersede: (tenantSlug: string, publicId: string) =>
-      apiRequest<ChecklistExecution>(
+      apiRequest<ChecklistExecutionDTO>(
         `/api/regx/v1/iig-checklists/executions/${publicId}/supersede/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
-      ),
+      ).then(toChecklistExecution),
 
     responses: {
       list: (tenantSlug: string, executionPublicId: string) =>
-        apiRequest<ChecklistResponse[]>(
+        apiRequest<ChecklistResponseDTO[]>(
           `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/`,
           { headers: { "X-Tenant-Slug": tenantSlug } }
-        ),
+        ).then((dtos) => dtos.map(toChecklistResponse)),
 
       update: (
         tenantSlug: string,
@@ -1538,10 +1517,10 @@ export const iigChecklists = {
           override_reason?: string;
         }
       ) =>
-        apiRequest<ChecklistResponse>(
+        apiRequest<ChecklistResponseDTO>(
           `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/${responsePublicId}/`,
           { method: "PATCH", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
-        ),
+        ).then(toChecklistResponse),
     },
   },
 };
