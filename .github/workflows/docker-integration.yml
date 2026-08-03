@@ -688,8 +688,9 @@ jobs:
 
           # Create an approved formulation version.
           product = ProductDevelopmentRecord.objects.create(
-              tenant=tenant, product_code='CI-4D2-PROD', name='CI 4D-2 Product',
-              dosage_form='tablet', administration_route='oral', created_by=doer,
+              tenant=tenant, product_code='CI-4D2-PROD', proposed_product_name='CI 4D-2 Product',
+              active_ingredient='Synthetic CI 4D-2 Ingredient', dosage_form='tablet',
+              route='oral', created_by=doer,
           )
           fv = FormulationVersion(
               product=product, version_number=1, status='approved',
