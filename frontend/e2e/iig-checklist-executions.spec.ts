@@ -212,11 +212,12 @@ test("new execution page shows 403 inline", async ({ page }) => {
 
 test("execution detail page renders draft execution with submit/cancel buttons", async ({ page }) => {
   await mockCsrf(page);
+  // Wildcard registered first (lower priority); exact GET registered second (higher priority).
+  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
   await page.route(
     `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
     jsonRoute(executionFixture({ status: "draft" }))
   );
-  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
 
   await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
   await expect(page.getByText("Checklist Execution")).toBeVisible();
@@ -227,11 +228,11 @@ test("execution detail page renders draft execution with submit/cancel buttons",
 
 test("execution detail page renders submitted_for_review state with approve/return/reject", async ({ page }) => {
   await mockCsrf(page);
+  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
   await page.route(
     `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
     jsonRoute(executionFixture({ status: "submitted_for_review" }))
   );
-  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
 
   await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
   await expect(page.getByRole("button", { name: /Approve/i })).toBeVisible();
@@ -243,11 +244,11 @@ test("execution detail page renders submitted_for_review state with approve/retu
 
 test("approve button enabled only when reviewer conclusion note is filled", async ({ page }) => {
   await mockCsrf(page);
+  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
   await page.route(
     `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
     jsonRoute(executionFixture({ status: "submitted_for_review" }))
   );
-  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
 
   await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
   const approveBtn = page.getByRole("button", { name: /Approve/i });
@@ -259,6 +260,7 @@ test("approve button enabled only when reviewer conclusion note is filled", asyn
 
 test("execution detail page renders approved state with supersede button only", async ({ page }) => {
   await mockCsrf(page);
+  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
   await page.route(
     `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
     jsonRoute(
@@ -270,7 +272,6 @@ test("execution detail page renders approved state with supersede button only", 
       })
     )
   );
-  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
 
   await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
   await expect(page.getByRole("button", { name: /Supersede/i })).toBeVisible();
@@ -282,11 +283,11 @@ test("execution detail page renders approved state with supersede button only", 
 test("execution detail page shows no action buttons for terminal statuses", async ({ page }) => {
   for (const status of ["rejected", "cancelled", "superseded"]) {
     await mockCsrf(page);
+    await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
     await page.route(
       `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
       jsonRoute(executionFixture({ status }))
     );
-    await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
 
     await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
     await expect(page.getByRole("button", { name: /Submit for review/i })).not.toBeVisible();
@@ -297,15 +298,16 @@ test("execution detail page shows no action buttons for terminal statuses", asyn
 
 test("execution detail page shows 403 action error inline (no redirect to signin)", async ({ page }) => {
   await mockCsrf(page);
-  await page.route(
-    `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
-    jsonRoute(executionFixture({ status: "draft" }))
-  );
+  // Wildcard first (lowest priority); cancel/ exact second; GET exact last (highest priority).
+  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
   await page.route(
     `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/cancel/`,
     jsonRoute({ detail: "Forbidden" }, 403)
   );
-  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
+  await page.route(
+    `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
+    jsonRoute(executionFixture({ status: "draft" }))
+  );
 
   await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
   await page.getByRole("button", { name: /Cancel/i }).click();
@@ -316,6 +318,7 @@ test("execution detail page shows 403 action error inline (no redirect to signin
 
 test("execution detail page shows returned state with submit/cancel buttons", async ({ page }) => {
   await mockCsrf(page);
+  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
   await page.route(
     `${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/`,
     jsonRoute(
@@ -327,10 +330,9 @@ test("execution detail page shows returned state with submit/cancel buttons", as
       })
     )
   );
-  await page.route(`${API}/api/regx/v1/iig-checklists/executions/exec-e2e-1/**`, jsonRoute({}));
 
   await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
-  await expect(page.getByText("returned")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "returned" })).toBeVisible();
   await expect(page.getByText("Please fix Q3.")).toBeVisible();
   await expect(page.getByRole("button", { name: /Submit for review/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /Cancel/i })).toBeVisible();
