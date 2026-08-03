@@ -283,9 +283,10 @@ class TestReferenceAnswerTypes:
         product = ProductDevelopmentRecord.objects.create(
             tenant=tenant_a,
             product_code="PROD-VAL-1",
-            name="Product",
+            proposed_product_name="Product",
+            active_ingredient="Synthetic Val Ingredient",
             dosage_form="tablet",
-            administration_route="oral",
+            route="oral",
             created_by=user_a,
         )
         fv = FormulationVersion(

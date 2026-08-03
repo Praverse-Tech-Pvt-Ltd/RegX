@@ -15,9 +15,10 @@ def _make_product(tenant, user):
     return ProductDevelopmentRecord.objects.create(
         tenant=tenant,
         product_code="PROD-API-01",
-        name="API Test Product",
+        proposed_product_name="API Test Product",
+        active_ingredient="Synthetic API Ingredient",
         dosage_form="tablet",
-        administration_route="oral",
+        route="oral",
         created_by=user,
     )
 

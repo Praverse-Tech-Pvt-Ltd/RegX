@@ -80,9 +80,10 @@ def _make_product(tenant, user):
     return ProductDevelopmentRecord.objects.create(
         tenant=tenant,
         product_code="PROD-LC-01",
-        name="LC Test Product",
+        proposed_product_name="LC Test Product",
+        active_ingredient="Synthetic LC Ingredient",
         dosage_form="tablet",
-        administration_route="oral",
+        route="oral",
         created_by=user,
     )
 

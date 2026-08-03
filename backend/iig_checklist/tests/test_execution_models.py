@@ -27,9 +27,10 @@ def _make_product(tenant, user):
     return ProductDevelopmentRecord.objects.create(
         tenant=tenant,
         product_code="PROD-TEST-01",
-        name="Test Product",
+        proposed_product_name="Test Product",
+        active_ingredient="Synthetic Test Ingredient",
         dosage_form="tablet",
-        administration_route="oral",
+        route="oral",
         created_by=user,
     )
 
