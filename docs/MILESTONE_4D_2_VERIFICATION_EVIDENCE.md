@@ -100,32 +100,176 @@ Test Files  7 passed (7)
 ### Frontend (Playwright e2e)
 
 ```
-88 passed (35.5s)
+88 passed (12.4s)
 ```
 Includes 15/15 execution-suite tests (`iig-checklist-executions.spec.ts`).
 
 ### Backend (pytest)
 
-PostgreSQL connection timed out in this environment during test database
-creation (`create_test_db` → `psycopg.errors.ConnectionTimeout`). This is
-an infrastructure constraint unrelated to the code changes. The fixture
-field corrections are verified correct by static inspection against the
-`ProductDevelopmentRecord` model definition in `formulations/models.py`
-(fields: `proposed_product_name`, `active_ingredient`, `route`).
+```
+920 passed, 0 failed, 0 error
+Coverage: 93.09%
+```
+
+### Import-linter
+
+```
+7/7 contracts clean
+```
+
+### Django system check
+
+```
+0 issues
+```
 
 ### TypeScript
 
-Zero type errors (`tsc --noEmit` clean).
+```
+0 errors (tsc --noEmit)
+```
 
 ---
 
-## Commit log (this remediation)
+## F6 Remediation summary (2026-08-03)
+
+### F6-F-1: ChecklistResponse.clean() blocked governed reviewer conclusions
+
+**Root cause.** `clean()` raised `response_immutable` for ALL non-`{draft,returned}`
+statuses, including `submitted_for_review`. This blocked
+`enter_reviewer_conclusion()` from writing RC responses during review.
+
+**Fix.** Exempt `answer_type == reviewer_conclusion` when
+`execution.status == submitted_for_review`. All terminal statuses
+(`approved`, `rejected`, `cancelled`, `superseded`) and all other answer
+types remain unconditionally immutable.
+
+**File.** `backend/iig_checklist/models.py` (`ChecklistResponse.clean()`)
+
+**Commit.** `37d0f78` — fix: permit governed reviewer conclusions during review
+
+---
+
+### F6-F-2: Response-list endpoint returned plain list instead of paginated envelope
+
+**Root cause.** `ChecklistResponseListView.get()` returned
+`Response(serializer.data)` directly, without pagination.
+
+**Fix.** Added `_Pagination` (existing `PageNumberPagination` helper,
+`page_size=25`) to `ChecklistResponseListView`. Response is now
+`{count, results, next, previous}`.
+
+**File.** `backend/iig_checklist/views.py` (`ChecklistResponseListView`)
+
+**Commit.** `4860d27` — fix: align execution response-list API contract…
+
+---
+
+### F6-F-3: Cross-tenant execution retrieval leaked object existence via 403
+
+**Root cause.** Class-level `permission_classes` on execution views fired
+before the view method ran, returning 403 even when the public_id belonged
+to a different tenant's execution. The 403 revealed that an object with
+that ID existed.
+
+**Fix.** Removed class-level `permission_classes` from all execution views.
+Each handler now calls `_get_execution_or_404(public_id, tenant)` first
+(uses `visible_to(tenant)` → `DoesNotExist` → 404 for cross-tenant IDs),
+then checks permission inline.
+
+**Files.** `backend/iig_checklist/views.py` (all execution detail/action/response views)
+
+**Commit.** `4860d27` — fix: align execution response-list API contract…
+
+---
+
+### F6-T-1: Self-approval test fired PermissionDenied before SelfApprovalForbidden
+
+**Root cause.** `user_a` (doer role) was used as both submitter and
+approver-attempt. `doer` lacks `PERM_APPROVE_EXECUTION`, so
+`PermissionDenied` fired before the self-approval guard could run.
+
+**Fix.** Use `vp_user` (who holds `PERM_APPROVE_EXECUTION`) as the
+submitter; vp_user attempting to approve their own submission triggers
+`SelfApprovalForbidden`. Added a companion test confirming a doer gets
+`PermissionDenied` with no state change.
+
+**File.** `backend/iig_checklist/tests/test_execution_lifecycle.py`
+
+**Commit.** `c25ce03` — test: correct 4D-2 lifecycle and model fixtures
+
+---
+
+### F6-T-2: Conflicting version_number=1 IntegrityError in model tests
+
+**Root cause.** Two model tests received the `draft_version` fixture, which
+creates `ChecklistVersion(version_number=1)`. Both tests also called
+`_make_active_checklist_version()` which creates another `version_number=1`
+on the same definition, violating the unique constraint.
+
+**Fix.** Removed `draft_version` from both affected test signatures.
+
+**File.** `backend/iig_checklist/tests/test_execution_models.py`
+
+**Commit.** `c25ce03` — test: correct 4D-2 lifecycle and model fixtures
+
+---
+
+### F6-T-3: CalculationOutcome tests omitted required JSONField inputs
+
+**Root cause.** `test_valid_calculation_name_accepted` and
+`test_invalid_calculation_name_rejected` passed no `inputs` or
+`input_provenance`. Django's `EMPTY_VALUES` treats `{}` (and missing) as
+blank, so `full_clean()` raised `ValidationError` on `blank=False` fields.
+
+**Fix.** Both tests now supply `inputs={"placeholder": True}` and
+`input_provenance={"placeholder": "pre_calculation"}`.
+
+**File.** `backend/iig_checklist/tests/test_execution_models.py`
+
+**Commit.** `c25ce03` — test: correct 4D-2 lifecycle and model fixtures
+
+---
+
+## Docker smoke flow (2026-08-03)
+
+Script: `backend/iig_checklist/tests/smoke_4d2_execution.py`
+
+Run against a fresh Docker stack:
+```
+docker compose -p regx-ci up -d
+docker exec -i <backend> python manage.py shell \
+  < backend/iig_checklist/tests/smoke_4d2_execution.py
+```
+
+**Result (all 15 steps pass):**
+```
+STEP 1 active checklist version + reviewer_conclusion question: OK
+STEP 2 approved formulation version: OK
+STEP 3 execution created in draft (UUID-only): OK
+STEP 4 duplicate active execution rejected with 409: OK
+STEP 5 execution submitted for review: OK
+STEP 5b response list paginated (count + results): OK
+STEP 5c reviewer conclusion first entry: OK
+STEP 5d reviewer conclusion amendment + 1 history row: OK
+STEP 5e stale version no history created: OK
+STEP 6 execution returned with reason: OK
+STEP 7 execution approved by VP: OK
+STEP 7b terminal (approved) reviewer_conclusion immutable: OK
+STEP 7c generic PATCH cannot edit reviewer_conclusion: OK
+STEP 8 cross-tenant execution detail returns 404: OK
+STEP 8b in-tenant reviewer (no approve perm) gets 403: OK
+IIG CHECKLIST EXECUTION 4D-2 SMOKE FLOW v2: ALL STEPS PASS
+```
+
+---
+
+## Commit log (F6 remediation)
 
 | SHA | Message |
 |-----|---------|
-| `139999a` | test: correct 4D-2 formulation fixtures |
-| `51e496a` | fix: align execution frontend API field mapping |
-| `d929cee` | fix: enforce strict YYYY-MM-DD date format in response_validation |
-| `6845c2c` | test: correct 4D-2 Docker integration fixture |
-| `7f017a3` | test: resolve remaining browser-suite Playwright failures |
-| `<next>` | docs: add 4D-2 verification evidence |
+| `37d0f78` | fix: permit governed reviewer conclusions during review |
+| `4860d27` | fix: align execution response-list API contract and return generic 404 for cross-tenant executions |
+| `c25ce03` | test: correct 4D-2 lifecycle and model fixtures |
+| `54d31a6` | test: extend final backend and Docker verification for 4D-2 |
+| `<next>` | docs: update 4D-2 final verification evidence |
