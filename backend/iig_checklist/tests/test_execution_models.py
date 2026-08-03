@@ -1,7 +1,5 @@
 """Model/constraint tests for Milestone 4D-2 execution models."""
 
-import json
-
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -14,7 +12,6 @@ from iig_checklist.models import (
     ChecklistResponseHistory,
     GovernedHistoryMutationForbidden,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -103,9 +100,7 @@ def _make_yes_no_question(draft_version, user):
 
 @pytest.mark.django_db
 class TestChecklistExecutionUniqueConstraint:
-    def test_unique_active_execution_rejected(
-        self, tenant_a, tenant_definition, user_a, draft_version
-    ):
+    def test_unique_active_execution_rejected(self, tenant_a, tenant_definition, user_a):
         """Two active executions for same (tenant, cv, fv) must fail."""
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
@@ -117,9 +112,7 @@ class TestChecklistExecutionUniqueConstraint:
             with transaction.atomic():
                 _make_execution(tenant_a, cv, fv, user_a)
 
-    def test_second_execution_allowed_after_rejected(
-        self, tenant_a, tenant_definition, user_a, draft_version
-    ):
+    def test_second_execution_allowed_after_rejected(self, tenant_a, tenant_definition, user_a):
         """A rejected execution unlocks the unique constraint so a new one can be created."""
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
@@ -132,9 +125,7 @@ class TestChecklistExecutionUniqueConstraint:
         e2 = _make_execution(tenant_a, cv, fv, user_a)
         assert e2.pk != e1.pk
 
-    def test_second_execution_allowed_after_cancelled(
-        self, tenant_a, tenant_definition, user_a
-    ):
+    def test_second_execution_allowed_after_cancelled(self, tenant_a, tenant_definition, user_a):
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
         cv = _make_active_checklist_version(tenant_definition, user_a)
@@ -146,9 +137,7 @@ class TestChecklistExecutionUniqueConstraint:
         e2 = _make_execution(tenant_a, cv, fv, user_a)
         assert e2.pk != e1.pk
 
-    def test_second_execution_allowed_after_superseded(
-        self, tenant_a, tenant_definition, user_a
-    ):
+    def test_second_execution_allowed_after_superseded(self, tenant_a, tenant_definition, user_a):
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
         cv = _make_active_checklist_version(tenant_definition, user_a)
@@ -163,11 +152,7 @@ class TestChecklistExecutionUniqueConstraint:
 
 @pytest.mark.django_db
 class TestChecklistExecutionVisibleTo:
-    def test_visible_to_filters_by_tenant(
-        self, tenant_a, tenant_b, tenant_definition, user_a
-    ):
-        from tenancy.models import Tenant
-
+    def test_visible_to_filters_by_tenant(self, tenant_a, tenant_b, tenant_definition, user_a):
         product_a = _make_product(tenant_a, user_a)
         fv_a = _make_formulation_version(product_a, user_a)
         cv = _make_active_checklist_version(tenant_definition, user_a)
@@ -189,7 +174,10 @@ class TestChecklistResponseClean:
         fv = _make_formulation_version(product, user)
         cv = _make_active_checklist_version(tenant_definition, user)
         question = _make_yes_no_question(
-            ChecklistExecution.objects.model._meta.get_field("checklist_version").related_model.objects.get(pk=cv.pk).sections.first().checklist_version
+            ChecklistExecution.objects.model._meta.get_field("checklist_version")
+            .related_model.objects.get(pk=cv.pk)
+            .sections.first()
+            .checklist_version
             if False
             else cv,
             user,
@@ -214,9 +202,7 @@ class TestChecklistResponseClean:
         with pytest.raises(ValidationError, match="not_applicable_requires_reason"):
             response.full_clean()
 
-    def test_not_applicable_with_raw_value_rejected(
-        self, tenant_a, tenant_definition, user_a
-    ):
+    def test_not_applicable_with_raw_value_rejected(self, tenant_a, tenant_definition, user_a):
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
         cv = _make_active_checklist_version(tenant_definition, user_a)
@@ -251,9 +237,7 @@ class TestChecklistResponseClean:
         with pytest.raises(ValidationError, match="payload_too_large"):
             response.full_clean()
 
-    def test_immutability_when_execution_not_mutable(
-        self, tenant_a, tenant_definition, user_a
-    ):
+    def test_immutability_when_execution_not_mutable(self, tenant_a, tenant_definition, user_a):
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
         cv = _make_active_checklist_version(tenant_definition, user_a)
@@ -281,9 +265,7 @@ class TestChecklistResponseClean:
 
 @pytest.mark.django_db
 class TestChecklistResponseHistoryImmutability:
-    def test_history_save_on_existing_row_raises(
-        self, tenant_a, tenant_definition, user_a
-    ):
+    def test_history_save_on_existing_row_raises(self, tenant_a, tenant_definition, user_a):
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
         cv = _make_active_checklist_version(tenant_definition, user_a)
@@ -406,6 +388,8 @@ class TestCalculationOutcomeClean:
             response=response,
             calculation_name="invalid_name",
             status=CalculationStatus.DATA_REQUIRED,
+            inputs={"placeholder": True},
+            input_provenance={"placeholder": "pre_calculation"},
         )
         with pytest.raises(ValidationError):
             outcome.full_clean()
@@ -421,11 +405,16 @@ class TestCalculationOutcomeClean:
             question=q,
             data_source_type_snapshot="user_required",
         )
+        # inputs and input_provenance require non-empty dicts (JSONField
+        # blank=False treats {} as empty via Django's EMPTY_VALUES).
         outcome = CalculationOutcome(
             response=response,
             calculation_name="calculate_percentage_w_w",
             status=CalculationStatus.DATA_REQUIRED,
+            inputs={"placeholder": True},
+            input_provenance={"placeholder": "pre_calculation"},
         )
         outcome.full_clean()  # must not raise
         outcome.save()
         assert outcome.pk is not None
+        assert outcome.status == CalculationStatus.DATA_REQUIRED

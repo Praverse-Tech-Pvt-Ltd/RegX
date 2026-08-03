@@ -3,15 +3,14 @@
 import pytest
 
 from iig_checklist.execution_transitions import (
-    IllegalExecutionTransition,
     TERMINAL_EXECUTION_STATUSES,
+    IllegalExecutionTransition,
     validate_execution_transition,
 )
 from iig_checklist.services import (
     SelfApprovalForbidden,
     transition_execution,
 )
-
 
 # ---------------------------------------------------------------------------
 # Pure transition table tests (no DB)
@@ -115,8 +114,8 @@ def _make_active_cv(tenant_definition, user):
 
 
 def _make_execution(tenant, cv, fv, user):
-    from iig_checklist.models import ChecklistExecution
     from iig_checklist.enums import ExecutionStatus
+    from iig_checklist.models import ChecklistExecution
 
     ex = ChecklistExecution(
         tenant=tenant,
@@ -142,18 +141,50 @@ class TestSelfApprovalGuard:
         vp_membership,
         reviewer_membership,
     ):
+        """vp_user has PERM_APPROVE_EXECUTION and also submitted — must raise
+        SelfApprovalForbidden, not PermissionDenied."""
         product = _make_product(tenant_a, user_a)
         fv = _make_formulation_version(product, user_a)
         cv = _make_active_cv(tenant_definition, user_a)
         execution = _make_execution(tenant_a, cv, fv, user_a)
 
-        # user_a submits
+        # vp_user submits (force status to skip service call)
+        execution.status = "submitted_for_review"
+        execution.submitted_by = vp_user
+        execution.save()
+
+        # vp_user has approval permission AND is the submitter → SelfApprovalForbidden
+        with pytest.raises(SelfApprovalForbidden):
+            transition_execution(
+                execution=execution,
+                action="approve",
+                actor=vp_user,
+                tenant=tenant_a,
+                reviewer_conclusion_note="Some conclusion",
+            )
+
+    def test_no_approve_permission_raises_permission_denied(
+        self,
+        tenant_a,
+        tenant_definition,
+        user_a,
+        doer_membership,
+    ):
+        """Actor without PERM_APPROVE_EXECUTION receives PermissionDenied
+        regardless of self-approval status; no state change or audit occurs."""
+        from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
+
+        product = _make_product(tenant_a, user_a)
+        fv = _make_formulation_version(product, user_a)
+        cv = _make_active_cv(tenant_definition, user_a)
+        execution = _make_execution(tenant_a, cv, fv, user_a)
+
         execution.status = "submitted_for_review"
         execution.submitted_by = user_a
         execution.save()
 
-        # user_a tries to approve their own submission — must fail
-        with pytest.raises(SelfApprovalForbidden):
+        # user_a has doer role only — no approve permission
+        with pytest.raises(DRFPermissionDenied):
             transition_execution(
                 execution=execution,
                 action="approve",
@@ -161,6 +192,9 @@ class TestSelfApprovalGuard:
                 tenant=tenant_a,
                 reviewer_conclusion_note="Some conclusion",
             )
+
+        execution.refresh_from_db()
+        assert execution.status == "submitted_for_review"  # no state change
 
     def test_different_user_can_approve(
         self,
