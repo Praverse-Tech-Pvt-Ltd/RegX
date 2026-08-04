@@ -62,7 +62,20 @@ Prior head `c214a62` was reviewed **FAIL** (0 Critical, 1 Major, 3 Minor).
 | MAJ-A the two-form resolver vocabulary could not supply the kwargs of any approved calculation | Six allow-listed resolver forms, a complete kwarg mapping for all six functions, a governed unit-conversion layer reusing `iid_assessment/unit_conversion.py`, one unified `resolve_calculation_inputs()` pipeline, resolver-derived dependency edges, snapshot ordering, and a closed resolver-failure vocabulary | Part 3A |
 | Minor 1 conservative-policy justification unrecorded | Monotonicity rationale recorded with source evidence, plus a governance rule for future consumers | M4D3-MDU-022 … 024 |
 | Minor 2 scope register X-12 gloss unreconciled | "Consumer only" gloss replaced with an explicit boundary | Scope register X-12 clarification |
-| Minor 3 documentation rows presented as executable tests | Sixteen rows classified as **Review assertion** with source-inspection evidence | Part 21 preamble |
+| Minor 3 documentation rows presented as executable tests | Fourteen rows classified as **Review assertion** with source-inspection evidence | Part 21 preamble |
+
+## Fourth revision note — findings resolved after the second final review
+
+Prior head `84b6dd9` was reviewed **FAIL** (0 Critical, 3 Major, 3 Minor).
+
+| Finding | Resolution | Part |
+|---|---|---|
+| MAJ-B the subject `FormulationComponent` was never determined | Two governed selector forms, mandatory `required_component_type`, prohibited inference strategies, zero/ambiguous fail-closed rules, component provenance, and an explicit per-component cardinality decision | Part 3A.2.2, 3A.2.3 |
+| MAJ-C `AssessmentSnapshot` resolution was non-deterministic | New immutable snapshot per governed event, carried in a transaction-scoped context; broad re-query and `.first()` prohibited; consistency checks on tenant, component and release; cross-app transaction ownership specified against the verified single-database configuration | Part 3A.6 |
+| MAJ-D `M4D3-IFV-005` was non-deterministic and conflated security with scientific failure | Replaced by a complete one-to-one mapping table over 28 detail codes, with five new canonical reason codes separating configuration, security, data-integrity, snapshot and component faults | M4D3-IFV-003, M4D3-RSN-001 |
+| Minor 1 snapshot stale/review tests had no schema basis | Replaced with real-field conditions on `iid_release_public_id`, `formulation_component_public_id`, `tenant` and the IID value/unit fields | Test strategy §10.15 |
+| Minor 2 cross-app transaction mechanics asserted, not specified | Verified single `"default"` PostgreSQL database with no routers; helper joins the outer transaction | M4D3-SNO-012 |
+| Minor 3 Form D omitted the unit fields it needed | `iid_potency_unit` and `iid_mde_unit` added to the permitted field list | M4D3-INP-006 |
 
 ---
 
@@ -114,6 +127,12 @@ Prior head `c214a62` was reviewed **FAIL** (0 Critical, 1 Major, 3 Minor).
 | SCOPE-OUT-19 | Direct writes by `iig_checklist` to `iid_assessment` model classes | Never |
 | SCOPE-OUT-20 | System-only background recalculation with no authenticated actor | Never in 4D-3 |
 | SCOPE-OUT-21 | Manual resolution of a `REVIEW_REQUIRED` state | 4D-4 |
+| SCOPE-OUT-22 | Automatic expansion or generation of checklist questions from the number of formulation components | Never in 4D-3 |
+| SCOPE-OUT-23 | Per-component child execution model | Never in 4D-3 |
+| SCOPE-OUT-24 | New execution-to-component join model or field | Never in 4D-3 |
+| SCOPE-OUT-25 | Aggregate multi-component calculation in a single response | Never |
+| SCOPE-OUT-26 | `AssessmentSnapshot` uniqueness migration | Not in 4D-3 |
+| SCOPE-OUT-27 | Generic snapshot deduplication framework | Not in 4D-3 |
 
 ---
 
@@ -345,8 +364,11 @@ carries a `REVIEW_REQUIRED:` marker, or holds a value that cannot be coerced to
 
 **M4D3-INP-004** Form B — formulation field:
 `{"source": "formulation_field", "object": "formulation_version"|"formulation_component",
-"field": ..., "unit_field": ..., "required_unit": ...}`. It reads a named field from the
-execution's `FormulationVersion` or the subject `FormulationComponent`, scoped through
+"field": ..., "unit_field": ..., "required_unit": ..., "component_selector": ...}`. With
+`object = "formulation_version"` it reads a named field from the execution's
+`FormulationVersion`. With `object = "formulation_component"` it reads a named field from
+the **subject component resolved under Part 3A.2.2**, and `component_selector` is
+mandatory. Both are scoped through
 `formulation_version__product__tenant = execution.tenant`. It fails closed on a missing
 object, a missing field value, or a missing unit where `required_unit` is declared.
 
@@ -357,13 +379,19 @@ provenance. Registry entries shall not restate or duplicate that selection logic
 
 **M4D3-INP-006** Form D — assessment snapshot:
 `{"source": "assessment_snapshot", "field": ..., "unit_field": ..., "required_unit": ...}`.
-It reads persisted governed IID/FDA values from the `AssessmentSnapshot` created for the
-current execution under Part 3A.6. Permitted `field` values are exactly
-`iid_potency_amount` and `iid_mde`, with `unit_field` values `iid_potency_unit` and
-`iid_mde_unit` respectively — the actual field names on `iid_assessment.AssessmentSnapshot`.
-The snapshot's `tenant` shall equal `execution.tenant`. This form shall never perform a
-live IID lookup. It fails closed when the snapshot is absent, belongs to another tenant,
-or the named field is null or blank.
+It reads persisted governed IID/FDA values from the **transaction-scoped snapshot object**
+supplied under Part 3A.6, never by re-querying. Permitted `field` values are
+`iid_potency_amount`, `iid_potency_unit`, `iid_mde`, `iid_mde_unit`; permitted read-only
+context fields are `public_id`, `tenant`, `formulation_component_public_id` and
+`iid_release_public_id`. These are the actual field names on
+`iid_assessment.AssessmentSnapshot`. This form shall never perform a live IID lookup and
+shall fail closed when the snapshot is absent, fails a Part 3A.6 consistency check, or the
+named field is null or blank.
+
+**M4D3-INP-015** Naming clarification: `selected_iid_potency_amount` and `selected_iid_mde`
+are **calculation-function kwargs**; the corresponding **snapshot model fields** are
+`iid_potency_amount` and `iid_mde`. No `selected_iid_*` model field exists and no
+requirement shall refer to one.
 
 **M4D3-INP-007** Form E — prior calculation outcome:
 `{"source": "calculation_outcome", "question_code": ..., "field": "value",
@@ -381,6 +409,95 @@ author one, no free-form runtime value is permitted, and no expression shall be 
 
 **M4D3-INP-009** Forms A, B, D and F read stored or declared data. Only Form E creates a
 calculation-to-calculation dependency edge (Part 3A.5). Form C creates no edge.
+
+### 3A.2.2 Subject formulation component (MAJ-B)
+
+**M4D3-FCR-001** Verified architecture: `ChecklistExecution` references a
+`FormulationVersion` and holds **no** component reference of any kind;
+`FormulationComponent` is one-to-many via `related_name="components"` with no uniqueness
+constraint and a `component_type` of `active` or `inactive`. The approved calculations are
+per component. The subject component shall therefore be resolved by an explicit governed
+selector, never inferred.
+
+**M4D3-FCR-002** Every Form B resolver with `object = "formulation_component"` shall
+declare a `component_selector` of exactly one of the two forms below, plus a
+`required_component_type`.
+
+**M4D3-FCR-003** Selector form A — response reference:
+`{"type": "response_reference", "question_code": ...}`. It reads the
+`ChecklistResponse` for the named question in the same execution, whose
+`question.answer_type` shall be `AnswerType.FORMULATION_COMPONENT_REFERENCE`, and takes
+the component identified by that response's `raw_value`. The existing validator
+`_validate_formulation_component_reference()` in
+`backend/iig_checklist/response_validation.py` already requires the exact key set
+`{"public_id"}`, a valid UUID, and membership of
+`execution.formulation_version` — the resolver shall rely on that governed shape and
+re-verify it, never bypass it.
+
+**M4D3-FCR-004** Selector form B — registry component code:
+`{"type": "registry_component_code", "component_code": ...}`. This form is permitted only
+where the approved checklist definition uniquely identifies one governed component, and
+only if the code is immutable, unique within the `FormulationVersion`, and validated at
+`ChecklistVersion` activation. Where the repository provides no immutable per-component
+code satisfying that constraint, selector form A shall be used.
+
+**M4D3-FCR-005** The resolved component shall satisfy all of: it belongs to
+`execution.formulation_version`; its tenant resolves through
+`formulation_version__product__tenant = execution.tenant`; and its `component_type`
+equals `required_component_type`.
+
+**M4D3-FCR-006** The following selection strategies are **prohibited**: first row; lowest
+primary key; creation or `display_order` order; `.first()`; any arbitrary inactive
+component; an implicit single-component assumption; ingredient-name substring matching;
+and any client-authored selector logic.
+
+**M4D3-FCR-007** A selector resolving zero components shall fail closed with resolver
+detail `FORMULATION_COMPONENT_MISSING`.
+
+**M4D3-FCR-008** A selector resolving more than one component shall fail closed with
+resolver detail `FORMULATION_COMPONENT_AMBIGUOUS`. The service shall not choose among
+them.
+
+**M4D3-FCR-009** Component resolution provenance shall record: the selected component
+public UUID; the `FormulationVersion` public UUID; the `component_type`; the governed
+component code or approved display name; the selector type; the selector-source response
+public UUID for form A; the component quantity; its source unit; the converted quantity;
+the conversion factor and rule version; and the registry `binding_version`.
+
+**M4D3-FCR-010** Component provenance shall not expose internal database primary keys,
+unrestricted component free text, cross-tenant metadata, or a raw client-supplied UUID
+that has not been resolved to a governed component identity.
+
+**M4D3-FCR-011** A failed component resolution shall prevent invocation of the
+calculation function, leave no partial `CalculationOutcome`, and emit no success audit.
+
+### 3A.2.3 Per-component cardinality (MAJ-B)
+
+**M4D3-CAR-001** A `ChecklistExecution` remains scoped to one `FormulationVersion`. No
+per-component child execution and no execution-to-component join model shall be
+introduced.
+
+**M4D3-CAR-002** An individual `SYSTEM_CALCULATED` question is bound to one subject
+component through its registry `component_selector` or a governed component-reference
+response. That binding determines which component the resulting `CalculationOutcome`
+evaluates.
+
+**M4D3-CAR-003** `CalculationOutcome` remains one row per `SYSTEM_CALCULATED` response.
+
+**M4D3-CAR-004** One execution may contain several calculated questions bound to
+different components.
+
+**M4D3-CAR-005** A single calculated response shall never aggregate multiple components.
+
+**M4D3-CAR-006** Assessing every inactive component requires the approved
+`ChecklistVersion` to contain repeated governed question groups or separately bound
+responses, one per component. Dynamic question generation is outside 4D-3.
+
+**M4D3-CAR-007** No checklist question shall be created, expanded or cloned automatically
+from the number of formulation components.
+
+**M4D3-CAR-008** No new database model, field or migration is introduced by Part 3A.2.2
+or Part 3A.2.3.
 
 ### 3A.2.1 Complete kwarg mapping
 
@@ -421,6 +538,20 @@ convert from.
 **M4D3-MAP-008** Every mapping above uses kwarg names taken verbatim from
 M4D3-INP-001 and model field names taken verbatim from `formulations.models` and
 `iid_assessment.models`. No alternative or invented name shall be used.
+
+**M4D3-MAP-009** Every component-sourced mapping — M4D3-MAP-001 (`quantity_per_unit_grams`),
+M4D3-MAP-002 (`quantity_per_dosage_unit`) and M4D3-MAP-003 / M4D3-MAP-004
+(`converted_proposed_quantity`) — shall declare a `component_selector` and
+`required_component_type = "inactive"` per Part 3A.2.2, read `quantity_per_dosage_unit`
+with `unit_field = quantity_unit`, convert to the target unit of M4D3-UNC-006, fail closed
+per M4D3-FCR-007 on zero matches and M4D3-FCR-008 on multiple matches, and record the
+provenance of M4D3-FCR-009.
+
+**M4D3-MAP-010** M4D3-MAP-005 and M4D3-MAP-006 (the MDE calculations) take no direct
+component input: they preserve the Form E prior-outcome dependency and Form D snapshot
+resolution. Their subject component is inherited from the upstream
+`calculate_daily_exposure` response, and M4D3-SNO-010 shall confirm the snapshot's
+`formulation_component_public_id` matches that component.
 
 ### 3A.3 Unit conversion
 
@@ -541,6 +672,27 @@ defensive runtime revalidation of M4D3-DAG-010 retained.
 that is not `SYSTEM_CALCULATED`, shall be rejected at activation with
 `error_code = "UNKNOWN_DEPENDENCY_CODE"`.
 
+**M4D3-DEP-007** Graph node identity shall be the governed **question/response identity**,
+not the calculation function name. Two questions bound to the same function but different
+subject components are two distinct nodes and shall never collapse.
+
+**M4D3-DEP-008** The dependency graph is therefore per calculated response: component
+binding forms part of the node's identity through its registry entry or governed
+component-reference response.
+
+**M4D3-DEP-009** Topological tie-breaking shall use the governed question `code` (and
+response public UUID where two responses share a code across sections), never the function
+name.
+
+**M4D3-DEP-010** Cycle detection shall operate over response/question nodes, so a cycle
+between two instances of the same function bound to different components is still
+detected.
+
+**M4D3-DEP-011** A Form E resolver shall resolve the upstream outcome for the **same
+subject component** as the dependent calculation. An upstream outcome bound to a different
+component shall fail closed with `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` where a snapshot
+is involved, or `UPSTREAM_CALCULATION_MISSING` where no matching upstream node exists.
+
 ### 3A.6 Snapshot ordering
 
 **M4D3-SNO-001** Because potency and MDE calculations consume snapshot fields, the
@@ -561,38 +713,128 @@ within the same `transaction.atomic()` block as the rest of the population pass
 `calculate_daily_exposure` has completed where a Form E dependency exists, honoring the
 topological order of M4D3-DAG-006.
 
+**M4D3-SNO-005** Verified schema fact (MAJ-C): `AssessmentSnapshot.Meta` declares only
+`indexes = [Index(fields=["tenant", "formulation_component_public_id"])]` and **no
+`UniqueConstraint`**. Multiple snapshots for the same tenant, component and release are
+schema-permissible, and no execution-to-snapshot foreign key exists. Any design relying on
+a broad lookup returning exactly one row is therefore invalid.
+
+**M4D3-SNO-006** Normative snapshot policy: the orchestration service shall **create a new
+immutable `AssessmentSnapshot` for every governed population or recalculation event** in
+`draft` or `returned`. It shall not search for, deduplicate, or reuse an earlier snapshot.
+This makes the snapshot deterministic without a schema change and preserves the exact
+source assessment used for each event. Any earlier "reuse an exact existing match"
+phrasing is withdrawn and appears nowhere in this specification; no requirement permits a
+reuse or deduplication path.
+
+**M4D3-SNO-007** The created snapshot object shall be carried in memory as part of a
+transaction-scoped calculation context. The Form D resolver shall read fields directly
+from that exact object.
+
+**M4D3-SNO-008** No resolver shall re-query `AssessmentSnapshot` by tenant, component or
+release after creation. `.first()` and creation-order selection are prohibited on that
+model.
+
+**M4D3-SNO-009** Required order for each governed calculation event: resolve the subject
+component (Part 3A.2.2); resolve the current approved FDA/IID release (M4D3-SRC-001); call
+the governed `iid_assessment` snapshot service; receive exactly one `AssessmentSnapshot`
+object; retain it in the transaction-scoped context; resolve snapshot-derived kwargs from
+it; execute the potency and MDE calculations; persist each `CalculationOutcome` with the
+snapshot `public_id` and provenance; commit; emit audit after commit.
+
+**M4D3-SNO-010** Before use, the in-memory snapshot shall be checked: its `tenant` equals
+`execution.tenant`; its `formulation_component_public_id` equals the resolved subject
+component's `public_id`; and its `iid_release_public_id` equals the selected release. Any
+mismatch fails closed with the corresponding Part 3A.7 detail code and no calculation is
+invoked.
+
+**M4D3-SNO-011** No client-supplied snapshot UUID shall ever be accepted or used to select
+a snapshot.
+
+**M4D3-SNO-012** Cross-app transaction ownership: the repository is configured with a
+single `"default"` PostgreSQL database and no `DATABASE_ROUTERS`
+(`backend/regx/settings/base.py`), so all apps share one Django database transaction. The
+top-level `iig_checklist` orchestration service opens `transaction.atomic()`; the approved
+`iid_assessment` snapshot helper participates in that same transaction and shall not
+commit independently; it returns the created object; any downstream calculation failure
+rolls back both the snapshot and every outcome; audit emits only after the outer commit;
+and `iig_checklist` performs no direct `iid_assessment` model write and adds no reverse
+import.
+
 ### 3A.7 Resolver failure vocabulary
 
 **M4D3-IFV-001** A closed vocabulary `ALLOWED_INPUT_FAILURE_CODES` shall be defined
-alongside the pipeline, containing exactly: `INPUT_RESPONSE_MISSING`,
-`INPUT_RESPONSE_NOT_APPLICABLE`, `INPUT_REVIEW_REQUIRED`, `INPUT_VALUE_INVALID`,
-`INPUT_UNIT_MISSING`, `INPUT_UNIT_UNSUPPORTED`, `INPUT_UNIT_DIMENSION_MISMATCH`,
-`FORMULATION_COMPONENT_MISSING`, `FORMULATION_FIELD_MISSING`,
-`ASSESSMENT_SNAPSHOT_MISSING`, `ASSESSMENT_FIELD_MISSING`,
-`UPSTREAM_CALCULATION_MISSING`, `UPSTREAM_CALCULATION_INCOMPLETE`,
-`UPSTREAM_CALCULATION_DUPLICATE`, `INPUT_TENANT_MISMATCH`, `INPUT_RESOLVER_UNKNOWN`.
+alongside the pipeline, containing exactly these twenty-six codes:
+`INPUT_RESPONSE_MISSING`, `INPUT_RESPONSE_NOT_APPLICABLE`, `INPUT_REVIEW_REQUIRED`,
+`INPUT_VALUE_INVALID`, `INPUT_VALUE_NOT_COMPARABLE`, `INPUT_UNIT_MISSING`,
+`INPUT_UNIT_UNSUPPORTED`, `INPUT_UNIT_DIMENSION_MISMATCH`, `INPUT_DENSITY_REQUIRED`,
+`FORMULATION_COMPONENT_MISSING`, `FORMULATION_COMPONENT_AMBIGUOUS`,
+`FORMULATION_COMPONENT_TYPE_MISMATCH`, `FORMULATION_COMPONENT_WRONG_FORMULATION`,
+`FORMULATION_COMPONENT_TENANT_MISMATCH`, `FORMULATION_COMPONENT_REFERENCE_INVALID`,
+`FORMULATION_FIELD_MISSING`, `ASSESSMENT_SNAPSHOT_MISSING`,
+`ASSESSMENT_SNAPSHOT_DUPLICATE`, `ASSESSMENT_SNAPSHOT_TENANT_MISMATCH`,
+`ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH`, `ASSESSMENT_SNAPSHOT_RELEASE_MISMATCH`,
+`ASSESSMENT_FIELD_MISSING`, `UPSTREAM_CALCULATION_MISSING`,
+`UPSTREAM_CALCULATION_INCOMPLETE`, `UPSTREAM_CALCULATION_DUPLICATE`,
+`INPUT_TENANT_MISMATCH`, plus `INPUT_RESOLVER_UNKNOWN` and `UNKNOWN_INTERNAL_FAILURE`.
 
 **M4D3-IFV-002** Failure codes are provenance metadata. They shall never be written to
 `CalculationOutcome.reason_code` and shall never appear in `ALLOWED_REASON_CODES`.
 
-**M4D3-IFV-003** Missing-data failures — `INPUT_RESPONSE_MISSING`,
-`INPUT_RESPONSE_NOT_APPLICABLE`, `INPUT_UNIT_MISSING`, `FORMULATION_COMPONENT_MISSING`,
-`FORMULATION_FIELD_MISSING`, `ASSESSMENT_SNAPSHOT_MISSING`, `ASSESSMENT_FIELD_MISSING`,
-`UPSTREAM_CALCULATION_MISSING`, `UPSTREAM_CALCULATION_INCOMPLETE` — shall produce
-`status = "data_required"` with `reason_code = "DATA_REQUIRED"`.
+**M4D3-IFV-003** The mapping below is **complete and one-to-one**. Every resolver-detail
+code maps to exactly one stored `status`, exactly one canonical `reason_code`, and a fixed
+`value` rule. No implementer choice, conditional phrasing, or "where X is at fault"
+language is permitted anywhere in the failure mapping.
 
-**M4D3-IFV-004** `INPUT_REVIEW_REQUIRED` shall produce `status = "data_required"` with
-`reason_code = "DATA_REQUIRED"`, consistent with M4D3-POP-003 blocking calculation for a
-review-required question.
+| Resolver detail code | Stored `status` | Canonical `reason_code` | `value` |
+|---|---|---|---|
+| `INPUT_RESPONSE_MISSING` | `data_required` | `DATA_REQUIRED` | null |
+| `INPUT_RESPONSE_NOT_APPLICABLE` | `data_required` | `DATA_REQUIRED` | null |
+| `FORMULATION_COMPONENT_MISSING` | `data_required` | `DATA_REQUIRED` | null |
+| `FORMULATION_FIELD_MISSING` | `data_required` | `DATA_REQUIRED` | null |
+| `ASSESSMENT_SNAPSHOT_MISSING` | `data_required` | `DATA_REQUIRED` | null |
+| `ASSESSMENT_FIELD_MISSING` | `data_required` | `DATA_REQUIRED` | null |
+| `UPSTREAM_CALCULATION_MISSING` | `data_required` | `DATA_REQUIRED` | null |
+| `UPSTREAM_CALCULATION_INCOMPLETE` | `data_required` | `DATA_REQUIRED` | null |
+| `INPUT_UNIT_MISSING` | `data_required` | `DATA_REQUIRED` | null |
+| `INPUT_REVIEW_REQUIRED` | `error` | `REGULATORY_REVIEW_REQUIRED` | null |
+| `INPUT_VALUE_INVALID` | `error` | `INPUT_RESOLUTION_FAILED` | null |
+| `INPUT_VALUE_NOT_COMPARABLE` | `error` | `NOT_COMPARABLE` | null |
+| `INPUT_UNIT_UNSUPPORTED` | `error` | `UNIT_MISMATCH` | null |
+| `INPUT_UNIT_DIMENSION_MISMATCH` | `error` | `UNIT_MISMATCH` | null |
+| `INPUT_DENSITY_REQUIRED` | `error` | `NOT_COMPARABLE` | null |
+| `INPUT_RESOLVER_UNKNOWN` | `error` | `INPUT_RESOLUTION_FAILED` | null |
+| `UNKNOWN_INTERNAL_FAILURE` | `error` | `INPUT_RESOLUTION_FAILED` | null |
+| `INPUT_TENANT_MISMATCH` | `error` | `TENANT_ISOLATION_VIOLATION` | null |
+| `FORMULATION_COMPONENT_TENANT_MISMATCH` | `error` | `TENANT_ISOLATION_VIOLATION` | null |
+| `ASSESSMENT_SNAPSHOT_TENANT_MISMATCH` | `error` | `TENANT_ISOLATION_VIOLATION` | null |
+| `UPSTREAM_CALCULATION_DUPLICATE` | `error` | `DUPLICATE_UPSTREAM_OUTCOME` | null |
+| `ASSESSMENT_SNAPSHOT_DUPLICATE` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
+| `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
+| `ASSESSMENT_SNAPSHOT_RELEASE_MISMATCH` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
+| `FORMULATION_COMPONENT_AMBIGUOUS` | `error` | `FORMULATION_COMPONENT_RESOLUTION_FAILED` | null |
+| `FORMULATION_COMPONENT_TYPE_MISMATCH` | `error` | `FORMULATION_COMPONENT_RESOLUTION_FAILED` | null |
+| `FORMULATION_COMPONENT_WRONG_FORMULATION` | `error` | `FORMULATION_COMPONENT_RESOLUTION_FAILED` | null |
+| `FORMULATION_COMPONENT_REFERENCE_INVALID` | `error` | `FORMULATION_COMPONENT_RESOLUTION_FAILED` | null |
 
-**M4D3-IFV-005** Invalid or unsupported conditions — `INPUT_VALUE_INVALID`,
-`INPUT_UNIT_UNSUPPORTED`, `INPUT_UNIT_DIMENSION_MISMATCH`,
-`UPSTREAM_CALCULATION_DUPLICATE`, `INPUT_TENANT_MISMATCH`, `INPUT_RESOLVER_UNKNOWN` —
-shall produce `status = "error"` with the canonical `reason_code` selected per
-M4D3-UNC-008 for unit failures and `UNKNOWN_ENGINE_STATUS` is **not** used; duplicate,
-tenant-mismatch and unknown-resolver conditions shall use
-`reason_code = "UNKNOWN_REGISTRY_IDENTIFIER"` where configuration is at fault and
-`NOT_COMPARABLE` where data is at fault.
+**M4D3-IFV-004** `INPUT_VALUE_INVALID` denotes malformed or uncoercible input and is a
+configuration/data-quality fault; `INPUT_VALUE_NOT_COMPARABLE` denotes a legitimate
+scientific non-comparability. The two shall never be conflated, and
+`INPUT_VALUE_INVALID` shall never map to `NOT_COMPARABLE`.
+
+**M4D3-IFV-005** `NOT_COMPARABLE` shall never be used for a tenant mismatch, a duplicate
+row, an unknown resolver, an invalid registry configuration, a component ambiguity, or a
+snapshot mismatch. `DATA_REQUIRED` shall never be used for a duplicate row or a tenant
+mismatch.
+
+**M4D3-IFV-007** An `INPUT_REVIEW_REQUIRED` condition arising from an upstream
+applicability marker is distinct from M4D3-POP-003, which blocks the calculation from
+running at all for a review-required question. This code applies only where an upstream
+*input* response carries the marker while the calculated question itself is applicable.
+
+**M4D3-IFV-008** Any internal condition without a defined detail code shall be recorded as
+`UNKNOWN_INTERNAL_FAILURE` and mapped per the table. It shall never yield
+`status = "complete"`.
 
 **M4D3-IFV-006** No resolver exception text, stack trace or internal message shall be
 stored as a governed reason code or exposed to a client.
@@ -769,7 +1011,22 @@ marked in error.
 `UNIT_MISMATCH`, `FDA_VALUE_UNAVAILABLE`, `NOT_COMPARABLE`,
 `REGULATORY_REVIEW_REQUIRED`, `UNKNOWN_ENGINE_STATUS`, `UNKNOWN_REGISTRY_IDENTIFIER`,
 `INVALID_GENERATED_AT`, `DEPENDENCY_DEPTH_EXCEEDED`, `CASCADE_NODE_LIMIT_EXCEEDED`,
-`DEPENDENCY_CYCLE`, `APPLICABILITY_REEVALUATED`.
+`DEPENDENCY_CYCLE`, `APPLICABILITY_REEVALUATED`, `INPUT_RESOLUTION_FAILED`,
+`TENANT_ISOLATION_VIOLATION`, `DUPLICATE_UPSTREAM_OUTCOME`,
+`SNAPSHOT_RESOLUTION_FAILED`, `FORMULATION_COMPONENT_RESOLUTION_FAILED`.
+
+**M4D3-RSN-009** The five codes added for input resolution —
+`INPUT_RESOLUTION_FAILED`, `TENANT_ISOLATION_VIOLATION`, `DUPLICATE_UPSTREAM_OUTCOME`,
+`SNAPSHOT_RESOLUTION_FAILED` and `FORMULATION_COMPONENT_RESOLUTION_FAILED` — each carry
+exactly one meaning: configuration or malformed-input fault; tenant-isolation breach;
+duplicate upstream calculation row; snapshot identity or duplication fault; and subject
+component resolution fault, respectively. Each is at most 100 characters and fits
+`CalculationOutcome.reason_code`.
+
+**M4D3-RSN-010** The scientific codes `NOT_COMPARABLE`, `UNIT_MISMATCH`,
+`FDA_VALUE_UNAVAILABLE`, `REGULATORY_REVIEW_REQUIRED` and `DATA_REQUIRED` retain their
+existing meanings and shall not be reused for configuration, security or data-integrity
+faults.
 
 **M4D3-RSN-002** Reason codes shall be uppercase ASCII with underscores, at most 100
 characters, fitting `CalculationOutcome.reason_code`
@@ -1643,9 +1900,10 @@ constraint, an existing constant or migration fact, or the breaking nature of an
 change. Their evidence is source inspection recorded in the review checklist, not an
 executable test, and no fabricated runtime test shall be authored for them. Every other
 row remains a normative control requiring implementation and executable coverage. The
-review-assertion rows are exactly these fourteen: M4D3-SVC-001, M4D3-VER-001,
+review-assertion rows are exactly these seventeen: M4D3-SVC-001, M4D3-VER-001,
 M4D3-OUT-003, M4D3-OUT-007, M4D3-PST-001, M4D3-SRC-014, M4D3-RTE-001, M4D3-DAG-002,
-M4D3-SNP-007, M4D3-MIG-004, M4D3-INP-001, M4D3-MDU-022, M4D3-MDU-023 and M4D3-DEP-004.
+M4D3-SNP-007, M4D3-MIG-004, M4D3-INP-001, M4D3-INP-015, M4D3-MDU-022, M4D3-MDU-023,
+M4D3-DEP-004, M4D3-FCR-001 and M4D3-SNO-005.
 
 M4D3-REG-001 and M4D3-MDU-001 are **not** review assertions: each records a verified fact
 *and* imposes a normative obligation (correcting `create_execution()`, and prohibiting a
@@ -1854,6 +2112,45 @@ scalar-only resolution rule), so both retain an executable implementation compon
 | M4D3-MDU-022 | Review assertion | TST-409 | Monotonicity rationale recorded | Regulatory |
 | M4D3-MDU-023 | Review assertion | TST-410 | Non-consumers identified | Correctness |
 | M4D3-MDU-024 | Registry governance | TST-411 | New consumer requires monotonicity review | Regulatory |
+| M4D3-INP-015 | Review assertion | TST-412 | Kwarg vs snapshot field names distinguished | Correctness |
+| M4D3-FCR-001 | Review assertion | TST-413 | Component architecture recorded | Correctness |
+| M4D3-FCR-002 | Registry entry | TST-414 | Component selector and type declared | Data integrity |
+| M4D3-FCR-003 | Component resolver | TST-415 | Response-reference selector resolves governed component | Regulatory |
+| M4D3-FCR-004 | Activation service | TST-416 | Registry code selector validated as unique and immutable | Data integrity |
+| M4D3-FCR-005 | Component resolver | TST-417 | Formulation, tenant and type all enforced | Security |
+| M4D3-FCR-006 | Component resolver | TST-418 | No first-row, pk, order or name-match selection | Regulatory |
+| M4D3-FCR-007 | Component resolver | TST-419 | Zero match → `FORMULATION_COMPONENT_MISSING` | Data integrity |
+| M4D3-FCR-008 | Component resolver | TST-420 | Multiple match → `FORMULATION_COMPONENT_AMBIGUOUS`, no choice made | Regulatory |
+| M4D3-FCR-009 | Component resolver | TST-421 | Full component provenance recorded | Reproducibility |
+| M4D3-FCR-010 | Component resolver | TST-422 | No internal IDs or unresolved client UUID exposed | Security |
+| M4D3-FCR-011 | Input pipeline | TST-423 | Failure blocks calculation; no partial outcome or audit | Data integrity |
+| M4D3-CAR-001 | Architecture | TST-424 | Execution stays per formulation version | Scope |
+| M4D3-CAR-002 | Registry entry | TST-425 | Question binding determines evaluated component | Regulatory |
+| M4D3-CAR-003 | Outcome writer | TST-426 | One outcome row per calculated response | Data integrity |
+| M4D3-CAR-004 | Population service | TST-427 | Two questions, two components, one execution | Correctness |
+| M4D3-CAR-005 | Outcome writer | TST-428 | No multi-component aggregation | Regulatory |
+| M4D3-CAR-006 | Checklist authoring | TST-429 | Repeated question groups, not dynamic generation | Scope |
+| M4D3-CAR-007 | Population service | TST-430 | No question auto-expansion from component count | Scope |
+| M4D3-CAR-008 | Repository check | TST-431 | No model, field or migration added | Compatibility |
+| M4D3-MAP-009 | Registry entry | TST-432 | Component-sourced mappings fully declared | Correctness |
+| M4D3-MAP-010 | Registry entry | TST-433 | MDE mappings inherit upstream component | Correctness |
+| M4D3-DEP-007 | Dependency graph | TST-434 | Nodes keyed by question identity, not function | Correctness |
+| M4D3-DEP-008 | Dependency graph | TST-435 | Graph is per calculated response | Correctness |
+| M4D3-DEP-009 | Ordering function | TST-436 | Tie-break uses governed identity | Correctness |
+| M4D3-DEP-010 | Dependency graph | TST-437 | Cycles detected across response nodes | Robustness |
+| M4D3-DEP-011 | Resolver form E | TST-438 | Upstream must share the subject component | Regulatory |
+| M4D3-SNO-005 | Review assertion | TST-439 | Absence of snapshot uniqueness recorded | Correctness |
+| M4D3-SNO-006 | Snapshot service | TST-440 | New immutable snapshot per governed event | Regulatory |
+| M4D3-SNO-007 | Calculation context | TST-441 | Snapshot carried in memory | Data integrity |
+| M4D3-SNO-008 | Snapshot resolver | TST-442 | No broad re-query; no `.first()` | Data integrity |
+| M4D3-SNO-009 | Population service | TST-443 | Nine-step order observed | Regulatory |
+| M4D3-SNO-010 | Snapshot resolver | TST-444 | Tenant, component and release all checked | Security |
+| M4D3-SNO-011 | Request serializers | TST-445 | Client snapshot UUID rejected | Security |
+| M4D3-SNO-012 | Transaction ownership | TST-446 | Single DB; helper joins outer transaction; rollback covers both | Data integrity |
+| M4D3-IFV-007 | Input pipeline | TST-447 | Upstream review-required distinct from POP-003 block | Regulatory |
+| M4D3-IFV-008 | Input pipeline | TST-448 | Undefined condition → `UNKNOWN_INTERNAL_FAILURE`, never complete | Security |
+| M4D3-RSN-009 | Translation module | TST-449 | Five new codes, one meaning each, ≤ 100 chars | Data integrity |
+| M4D3-RSN-010 | Translation module | TST-450 | Scientific codes not reused for config/security faults | Regulatory |
 | M4D3-MDU-001 | Dosage resolver | TST-323 | Both sources considered; scalar-only rule absent | Regulatory |
 | M4D3-MDU-002 | Dosage resolver | TST-324 | Version candidate only when non-null and positive | Data integrity |
 | M4D3-MDU-003 | Dosage resolver | TST-325 | All related regimens are candidates; no invented lifecycle filter | Correctness |
