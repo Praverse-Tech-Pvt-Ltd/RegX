@@ -1,6 +1,6 @@
 # Milestone 4D-3 Test Strategy
 
-**Status: SPECIFICATION COMPLETE. Test gates finalized in §10 (M-3, M-4, M-5, stale expected_version). Pending adversarial specification review before implementation.**
+**Status: SPECIFICATION REVISED after failed adversarial review. Test gates in §9 (second review) and §10 (third review: C-1, C-2, M-A … M-E). Matrix reconciliation in §11. Pending second adversarial specification review before implementation.**
 
 **Discovery document:** `docs/MILESTONE_4D_3_DISCOVERY.md`
 **Scope register:** `docs/MILESTONE_4D_3_SCOPE_REGISTER.md`
@@ -463,7 +463,7 @@ Extend `.github/workflows/docker-integration.yml` with a 4D-3 smoke step:
 
 ---
 
-## 10. Minor-Finding Additions (from Second Adversarial Review)
+## 9. Second-Review Test Requirements (M-3, M-4, M-5, stale version)
 
 The following normative test cases resolve findings M-3, M-4, and M-5 from the second
 adversarial discovery review, and add an explicit stale-version test that was missing
@@ -583,9 +583,194 @@ The optimistic lock is enforced at the service layer, not only in the client.
 
 ---
 
-## 9. What This Test Strategy Explicitly Does Not Cover
+## 10. Third-Review Test Requirements (C-1, C-2, M-A … M-E)
+
+These tests resolve the Critical and Major findings of the third adversarial review.
+They are mandatory. Identifiers `TST-101` … `TST-321` correspond one-to-one with the
+acceptance matrix in Part 21 of the implementation specification.
+
+### 10.1 C-1 — Registry identifier versus calculation name
+
+Verified defect: `create_execution()` writes
+`calculation_name=q.calculation_binding_identifier`, and `CalculationOutcome.clean()`
+accepts only the six approved function names. A registry-key identifier therefore aborts
+execution creation.
+
+**Test file:** `backend/iig_checklist/tests/test_calculation_registry.py`
+
+| Test ID | Test name | Assertion |
+|---|---|---|
+| TST-116 | `test_identifier_never_written_as_calculation_name` | For every registry entry, the created outcome's `calculation_name` equals `entry["calculation_name"]`, never the registry key |
+| TST-120 | `test_identifier_to_calculation_name_mapping_exact` | All six identifiers map to the exact approved function names; identifier and name differ in all six cases |
+| TST-122 | `test_registry_self_check_rejects_invalid_entry` | An entry whose `calculation_name` is outside `_CALCULATION_NAMES` raises at import |
+| TST-126 | `test_registry_resolved_before_outcome_creation` | A valid key produces an outcome that passes `full_clean()` |
+| TST-127 | `test_unknown_key_aborts_creation_atomically` | Unknown key → structured 400 `unknown_registry_identifier`; **zero** `ChecklistExecution`, `ChecklistResponse` and `CalculationOutcome` rows remain |
+| TST-128 | `test_invalid_calculation_name_aborts_creation_atomically` | Entry with a bad `calculation_name` → atomic abort, no partial rows |
+| TST-129 | `test_runtime_unknown_key_fails_closed` | Runtime unknown key → `status="error"`, `reason_code="UNKNOWN_REGISTRY_IDENTIFIER"`, no unhandled exception |
+| TST-130 | `test_alias_semantics_identical` | A compatibility alias resolves to an entry with identical `calculation_name`, `function`, `input_resolvers`, `dependencies`, `required_units` |
+
+### 10.2 C-2 — Governed response-update service
+
+Verified state: no `enter_response()` exists; `ChecklistResponseUpdateView.patch()`
+performs no transaction, no lock, no version check.
+
+**Test file:** `backend/iig_checklist/tests/test_update_checklist_response.py`
+
+| Test ID | Assertion |
+|---|---|
+| TST-133 | No test or fixture references an `enter_response()` symbol |
+| TST-134 | The governed service exists and is importable |
+| TST-135 | The service performs lookup, state, permission, version, lock, validation, recalculation, history, increment, transaction and audit |
+| TST-136 | The view delegates: no model mutation and no `emit()` call inside the view body |
+| TST-137 | PATCH of an `fda_derived_default` or `system_calculated` response by a non-override actor → 403 `server_controlled_value` |
+| TST-269 | Lock acquisition order is execution → responses (pk asc) → outcomes (pk asc) |
+| TST-270 | All writes occur inside one `transaction.atomic()` |
+| TST-272 | An exception after the response write rolls back both the response and every outcome |
+| TST-274 | Concurrent updates on one execution serialize on the execution lock |
+
+### 10.3 `expected_version` contract
+
+| Test ID | Assertion |
+|---|---|
+| TST-142 | `expected_version` is required on the governed request serializer |
+| TST-144 | Omitted → HTTP 400 `expected_version_required`; version unchanged; no history; no audit |
+| TST-145 | Stale → HTTP 409 `stale_version`; `raw_value` unchanged; version unchanged; no history row; no audit event |
+| TST-146 | Matching version succeeds and increments `version` by exactly one |
+| TST-147 | Frontend handles 409 by reloading; no automatic retry |
+| TST-271 | The version comparison is made against the row returned by `select_for_update()` |
+
+### 10.4 M-A — Completeness gate for calculated and FDA-derived answers
+
+**Test file:** `backend/iig_checklist/tests/test_execution_completeness.py`
+
+| Test ID | Scenario | Expected |
+|---|---|---|
+| TST-214 | Required calculated question, applicable, `status="complete"`, `value` non-null | Submission permitted |
+| TST-215a | Required calculated, `status="data_required"` | Blocked; error names question code and `reason_code` |
+| TST-215b | Required calculated, `status="error"` | Blocked |
+| TST-215c | Required calculated, no outcome row | Blocked |
+| TST-215d | Required calculated, `status="complete"` but `value` null | Blocked |
+| TST-215e | Required calculated, applicability `review_required` | Blocked |
+| TST-216 | Required FDA-derived populated and no marker | Permitted; unpopulated → blocked |
+| TST-217 | Response persisted `not_applicable` with reason | Permitted, matching existing behavior |
+| TST-218 | Gate execution issues no `run_preview()` call | Persisted state only |
+
+### 10.5 M-B — REVIEW_REQUIRED submission gate
+
+| Test ID | Assertion |
+|---|---|
+| TST-219 | Any response carrying a `REVIEW_REQUIRED:` marker blocks submission |
+| TST-220 | Blocking occurs for `question.required = False` exactly as for `True` |
+| TST-221 | HTTP 400 `review_required_unresolved`, listing affected response public UUIDs and `ApplicabilityRule.code` values |
+| TST-222 | The error payload contains no `raw_value` content |
+| TST-223 | Execution status is unchanged and no success audit event is emitted |
+| TST-224 | No API affordance exists to clear the marker manually within 4D-3 |
+| TST-225 | Correcting the governing context and re-running authorized recalculation clears the marker and unblocks submission |
+
+### 10.6 M-C — Historical applicability reproducibility
+
+**Test file:** `backend/iig_checklist/tests/test_applicability_persistence.py`
+
+| Test ID | Assertion |
+|---|---|
+| TST-181 | A `ChecklistResponse` with `is_not_applicable=False` and a non-empty `not_applicable_reason` passes `full_clean()` — confirming the marker design needs no migration |
+| TST-183 | A 100-character `reason_code` yields a 116-character marker, within the 200-character limit |
+| TST-184 | Activation rejects a rule whose composed marker would exceed 200 characters |
+| TST-187 | In `draft`, recomputation through the governed service updates the persisted marker |
+| TST-188 | **Drift test:** approve an execution; change the active FDA release so the live context would flip the outcome; re-read the execution; the serialized `applicability_outcome` is unchanged, and `run_preview()` is not called during the read |
+| TST-189 | Derivation: `is_not_applicable=True` → `not_applicable`; marker prefix → `review_required`; rule-governed with neither → `applicable`; no rule → `no_rule` |
+| TST-190 | No serialized payload reports `is_not_applicable=false` together with `applicability_outcome="not_applicable"` |
+| TST-191 | An unpersisted live result is never returned as the record's applicability |
+| TST-192 | Every rule-governed response carries a persisted outcome before submission is allowed |
+| TST-193 | `applicability_outcome` is absent from every writable serializer field set |
+
+### 10.7 M-D — Applicability re-evaluation and history
+
+**Test file:** `backend/iig_checklist/tests/test_applicability_reevaluation.py`
+
+| Test ID | Assertion |
+|---|---|
+| TST-194 | Re-evaluation occurs on creation, on a dependency response update, and on authorized recalculation — and on nothing else |
+| TST-195 | No re-evaluation occurs for `submitted_for_review` or any terminal status |
+| TST-196 | An FDA release change alone triggers no re-evaluation |
+| TST-200 | Execution creation writes no `ChecklistResponseHistory` row |
+| TST-201 | A persisted applicability transition populates **all twelve** required fields: `response`, `prior_raw_value`, `new_raw_value`, `prior_is_not_applicable`, `new_is_not_applicable`, `prior_not_applicable_reason`, `new_not_applicable_reason`, `prior_version`, `new_version`, `correction_reason`, `amended_by`, `source_classification_snapshot` |
+| TST-202 | `amended_by` equals the authenticated triggering actor, and is **not** `execution.created_by` when a different user triggered the change |
+| TST-203 | `correction_reason` equals `APPLICABILITY_REEVALUATED` |
+| TST-205 | `prior_version` and `new_version` bracket the increment |
+| TST-206 | Forcing a rollback leaves neither the history row nor the response change |
+| TST-207 | Mutating or deleting an existing history row raises `GovernedHistoryMutationForbidden` |
+
+### 10.8 M-E — Client-writable applicability fields
+
+| Test ID | Assertion |
+|---|---|
+| TST-176 | PATCH supplying `is_not_applicable` or `not_applicable_reason` for a rule-governed response → 403 `applicability_server_controlled` |
+| TST-177 | PATCH declaring N/A on a response with no applicability rule remains permitted |
+| TST-178 | PATCH supplying a `not_applicable_reason` beginning `REVIEW_REQUIRED:` → 403 `reserved_reason_prefix`, for governed and ungoverned responses alike |
+| TST-179 | A user-declared N/A on an ungoverned response survives a subsequent population pass |
+| TST-186 | No client request can create or clear the reserved marker |
+
+### 10.9 N/A raw-value transitions
+
+| Test ID | Assertion |
+|---|---|
+| TST-208 | Transition to N/A sets `raw_value = null` and passes `full_clean()` |
+| TST-209 | The prior `raw_value` is present in `ChecklistResponseHistory.prior_raw_value` |
+| TST-210 | `not_applicable_reason` is set from `ApplicabilityRule.reason_code` |
+| TST-211 | Transition back to applicable does **not** restore `raw_value` from history |
+| TST-212 | Transition back clears both flags and records prior values in history |
+
+### 10.10 Outcome invariants and duplicates
+
+| Test ID | Assertion |
+|---|---|
+| TST-150 | No test asserts validation via a bare `save()`; validation assertions call `full_clean()` or the governed service |
+| TST-151 | No documentation or code claims a `CalculationOutcome` unique constraint |
+| TST-153 | **Planted failure:** insert a second `CalculationOutcome` row for the same response and `calculation_name` directly (the schema permits it), then invoke the governed service; the service raises `duplicate_calculation_outcome` and does not guess |
+| TST-154 | `python manage.py makemigrations --check --dry-run` reports no pending migration |
+| TST-156 | A non-complete status carrying a non-null `value` is rejected with `invalid_outcome_value` before `full_clean()` |
+
+### 10.11 Reason-code vocabulary
+
+| Test ID | Assertion |
+|---|---|
+| TST-163 | `ALLOWED_REASON_CODES` contains exactly the fifteen approved codes |
+| TST-164 | Every code is uppercase ASCII with underscores and at most 100 characters |
+| TST-165 | A reason code outside the allow-list is rejected by the governed service |
+| TST-166 | No request serializer accepts a `reason_code` field |
+| TST-167 | No stored `reason_code` contains exception text, a stack frame, or a file path |
+
+---
+
+## 11. Acceptance Matrix Reconciliation
+
+A mechanical comparison was run between the normative requirement identifiers defined in
+`docs/MILESTONE_4D_3_IMPLEMENTATION_SPEC.md` and the identifiers listed in its Part 21
+acceptance matrix.
+
+| Metric | Value |
+|---|---|
+| Normative requirement IDs defined | 221 |
+| Acceptance matrix IDs | 221 |
+| Missing (defined but absent from matrix) | 0 |
+| Duplicate requirement definitions | 0 |
+| Duplicate matrix rows | 0 |
+| Orphan matrix IDs (in matrix but undefined) | 0 |
+
+Per-block counts: API 5, APP 13, AUD 7, CMP 6, DAG 10, FE 9, HST 9, MDL 13, MIG 8, NA 5,
+OUT 8, POP 8, PRV 4, PST 13, RCL 5, REG 19, REV 5, RSN 5, SEC 5, SER 9, SNP 7, SRC 13,
+SUB 7, SVC 8, TRL 6, TXN 6, VER 8.
+
+This reconciliation shall be re-run and the table updated whenever either document
+changes.
+
+---
+
+## 12. What This Test Strategy Explicitly Does Not Cover
 
 - Override/deviation workflow tests (4D-4 scope).
+- Manual resolution of a `REVIEW_REQUIRED` state (4D-4 scope; blocking in 4D-3).
 - Export and SHA-256 checksum tests (4D-4 scope).
 - Real FDA data ingestion scenarios.
 - Production client formulation data scenarios.
@@ -593,3 +778,4 @@ The optimistic lock is enforced at the service layer, not only in the client.
 - Any test that asserts an automatic safety or approval conclusion.
 - Asynchronous calculation execution paths (`CalculationStatus.CALCULATING`).
 - Generic `CalculationOutcome` write endpoint tests (no such endpoint exists).
+- System-only background recalculation without an authenticated actor (out of scope).
