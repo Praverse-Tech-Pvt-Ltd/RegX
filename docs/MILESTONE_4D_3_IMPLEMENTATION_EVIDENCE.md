@@ -95,8 +95,20 @@ All match the approved specification exactly. Nothing was silently adjusted.
 | Gate | Command | Result |
 |---|---|---|
 | Database-free unit tests | `python -m pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **153 passed** |
+| Existing DB-free regression | `python -m pytest common/tests/test_guards.py iig_checklist/tests/test_compatibility.py iid_assessment/tests -k "not django_db" --no-cov -q` | **172 passed, 36 deselected** — no regression |
 | Ruff | `python -m ruff check <six modules + test file>` | **All checks passed** |
 | Import-linter | `.venv\Scripts\lint-imports.exe` | **7 contracts kept, 0 broken** |
+| Migration check | `python manage.py makemigrations --check --dry-run` | **`No changes detected`, exit code 0** |
+
+**Migration check — scope of the assertion.** The command completed (exit 0) but
+emitted `RuntimeWarning: Got an error checking a consistent migration history
+performed for database connection 'default': connection timeout expired`. Django
+degraded gracefully: it could **not** verify applied migration *history* against
+a live database, but it **did** complete the model-state-versus-migration-files
+comparison, which is precisely the question "does this change require a new
+migration?". That comparison returned `No changes detected`. The gate is
+therefore genuinely PASS for the no-migration constraint, and separately
+unverified for migration-history consistency, which needs PostgreSQL.
 
 The test run is itself the proof of database-independence: it passes with **no
 PostgreSQL running at all**. The test module contains no `django_db` marker, no
@@ -109,14 +121,15 @@ PostgreSQL running at all**. The test module contains no `django_db` marker, no
 | Targeted 4D-3 DB tests | BLOCKED — PostgreSQL unavailable |
 | Complete backend suite | BLOCKED — PostgreSQL unavailable |
 | Coverage (`--cov-fail-under=55`) | BLOCKED — PostgreSQL unavailable |
-| `makemigrations --check --dry-run` | BLOCKED — hangs on the Postgres connection for its consistency check |
+| Migration *history* consistency | BLOCKED — PostgreSQL unavailable (model-state check itself passed, see above) |
 | Frontend Vitest / typecheck / lint | NOT RUN — no frontend file changed in this run |
 | Playwright E2E | BLOCKED — needs a running backend + database |
 | Docker smoke | BLOCKED — Docker daemon unavailable |
 
-Because the migration gate could not run, absence of schema change was verified
-**structurally instead**: `git status --porcelain` shows seven new files, none
-under any `migrations/` directory and none touching a `models.py`.
+Absence of schema change is therefore established two independent ways: the
+`makemigrations --check` model-state comparison returned `No changes detected`,
+and structurally `git status --porcelain` shows seven new files, none under any
+`migrations/` directory and none touching a `models.py`.
 
 ---
 
@@ -162,8 +175,11 @@ No fake repository, stub or mock was introduced as a production stand-in.
    `1E+3`. Provenance in a regulated record must stay readable, so the adapter
    formats the factor with `f"{…:f}"` to force plain notation.
 
-4. **`makemigrations` connects to the database** even with `--check --dry-run`,
-   so that gate is genuinely blocked rather than merely slow.
+4. **`makemigrations` attempts a database connection** even with
+   `--check --dry-run`. It is slow rather than blocked: the connection attempt
+   times out with a `RuntimeWarning`, then the command completes its model-state
+   comparison normally. Allow roughly two minutes for it in an environment with
+   no reachable database.
 
 ---
 
