@@ -11,7 +11,9 @@ Approved test strategy:  docs/MILESTONE_4D_3_TEST_STRATEGY.md
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from decimal import Decimal
+from types import MappingProxyType
 
 import pytest
 
@@ -302,7 +304,8 @@ class TestRegistry:
 
     def test_registry_is_immutable(self):
         with pytest.raises(TypeError):
-            registry_mod.CALCULATION_BINDING_REGISTRY["x"] = None  # type: ignore[index]
+            # Deliberately invalid: a read-only mapping must reject assignment.
+            registry_mod.CALCULATION_BINDING_REGISTRY["x"] = None
 
     def test_unknown_key_returns_none(self):
         assert registry_mod.get_entry("does_not_exist") is None
@@ -649,6 +652,215 @@ class TestCalculationGraph:
         assert graph.depth == 2
         assert graph.depth <= registry_mod.CALCULATION_MAX_DEPENDENCY_DEPTH
         assert len(graph.downstream_closure("n-exposure")) + 1 == 3
+
+
+# ===========================================================================
+# Graph boundary limits (M4D3-DAG-003/004, M4D3-DEP-004)
+#
+# The six-entry production registry has a maximum chain depth of 2 and cannot
+# express these graphs, so the boundaries are exercised with synthetic entries
+# built from an approved entry.  Only the public graph API is used.
+# ===========================================================================
+
+
+def _synthetic_registry(*, chain: int = 0, fanout: int = 0):
+    """Build synthetic registry entries: a linear chain and/or a fan-out star."""
+    base = registry_mod.CALCULATION_BINDING_REGISTRY["percentage_w_w"]
+    entries: dict[str, registry_mod.RegistryEntry] = {}
+
+    def _add(identifier: str, dependencies: tuple[str, ...]) -> None:
+        entries[identifier] = registry_mod.RegistryEntry(
+            calculation_name=base.calculation_name,
+            function=base.function,
+            formula_version=base.formula_version,
+            binding_version=base.binding_version,
+            input_resolvers=base.input_resolvers,
+            calculation_dependencies=dependencies,
+            recalculation_triggers=base.recalculation_triggers,
+            required_units=base.required_units,
+            output_unit=base.output_unit,
+            rounding_rule=base.rounding_rule,
+            allowed_answer_type=base.allowed_answer_type,
+        )
+
+    for index in range(chain):
+        _add(f"chain_{index}", () if index == 0 else (f"QC_{index - 1}",))
+    if fanout:
+        _add("root", ())
+        for index in range(fanout):
+            _add(f"leaf_{index}", ("QC_ROOT",))
+    return MappingProxyType(entries)
+
+
+def _chain_nodes(length: int) -> tuple[CalculationNode, ...]:
+    return tuple(
+        CalculationNode(f"n{i}", f"QC_{i}", f"chain_{i}") for i in range(length)
+    )
+
+
+def _star_nodes(leaves: int) -> tuple[CalculationNode, ...]:
+    nodes = [CalculationNode("nroot", "QC_ROOT", "root")]
+    nodes += [
+        CalculationNode(f"nl{i}", f"QC_L{i}", f"leaf_{i}") for i in range(leaves)
+    ]
+    return tuple(nodes)
+
+
+@contextmanager
+def _using_registry(registry):
+    """Swap the registry for the duration of one synthetic graph assertion."""
+    saved = registry_mod.CALCULATION_BINDING_REGISTRY
+    registry_mod.CALCULATION_BINDING_REGISTRY = registry
+    try:
+        yield
+    finally:
+        registry_mod.CALCULATION_BINDING_REGISTRY = saved
+
+
+class TestGraphDepthBoundary:
+    def test_isolated_node_has_depth_one(self):
+        with _using_registry(_synthetic_registry(chain=1)):
+            graph = graph_mod.build_graph(_chain_nodes(1))
+        assert graph.depth == 1
+
+    def test_depth_five_accepted(self):
+        """M4D3-DAG-003 -- the approved maximum is permitted, not rejected."""
+        with _using_registry(_synthetic_registry(chain=5)):
+            graph = graph_mod.build_graph(_chain_nodes(5))
+        assert graph.depth == registry_mod.CALCULATION_MAX_DEPENDENCY_DEPTH == 5
+        assert len(graph.order) == 5
+
+    def test_depth_six_rejected(self):
+        """M4D3-DAG-003 -- one beyond the limit fails closed."""
+        with _using_registry(_synthetic_registry(chain=6)):
+            with pytest.raises(GraphConfigurationError) as exc:
+                graph_mod.build_graph(_chain_nodes(6))
+        assert exc.value.error_code == graph_mod.ERROR_DEPENDENCY_DEPTH_EXCEEDED
+
+    def test_depth_rejection_is_deterministic(self):
+        with _using_registry(_synthetic_registry(chain=6)):
+            codes = set()
+            for _ in range(5):
+                with pytest.raises(GraphConfigurationError) as exc:
+                    graph_mod.build_graph(_chain_nodes(6))
+                codes.add(exc.value.error_code)
+        assert codes == {graph_mod.ERROR_DEPENDENCY_DEPTH_EXCEEDED}
+
+    def test_no_partial_graph_returned_on_depth_rejection(self):
+        with _using_registry(_synthetic_registry(chain=6)):
+            result = None
+            try:
+                result = graph_mod.build_graph(_chain_nodes(6))
+            except GraphConfigurationError:
+                pass
+        assert result is None
+
+
+class TestGraphCascadeBoundary:
+    def test_ten_reachable_nodes_accepted(self):
+        """M4D3-DAG-004 -- root plus nine leaves is exactly the limit."""
+        with _using_registry(_synthetic_registry(fanout=9)):
+            graph = graph_mod.build_graph(_star_nodes(9))
+        reachable = len(graph.downstream_closure("nroot")) + 1
+        assert reachable == registry_mod.CALCULATION_MAX_CASCADE_NODES == 10
+
+    def test_eleven_reachable_nodes_rejected(self):
+        with _using_registry(_synthetic_registry(fanout=10)):
+            with pytest.raises(GraphConfigurationError) as exc:
+                graph_mod.build_graph(_star_nodes(10))
+        assert exc.value.error_code == graph_mod.ERROR_CASCADE_NODE_LIMIT_EXCEEDED
+
+    def test_no_partial_cascade_returned_on_rejection(self):
+        with _using_registry(_synthetic_registry(fanout=10)):
+            result = None
+            try:
+                result = graph_mod.build_graph(_star_nodes(10))
+            except GraphConfigurationError:
+                pass
+        assert result is None
+
+    def test_external_triggers_are_not_counted_as_nodes(self):
+        """A ten-node graph stays within the limit despite trigger codes."""
+        with _using_registry(_synthetic_registry(fanout=9)):
+            graph = graph_mod.build_graph(_star_nodes(9))
+        codes = {node.question_code for node in graph.nodes.values()}
+        assert registry_mod.Q_SUBJECT_COMPONENT not in codes
+        assert len(graph.nodes) == 10
+
+    def test_duplicate_nodes_rejected_independently_of_size(self):
+        """Duplicate identity fails as a duplicate, not as a size violation."""
+        with _using_registry(_synthetic_registry(fanout=2)):
+            nodes = (
+                CalculationNode("nroot", "QC_ROOT", "root"),
+                CalculationNode("dup", "QC_L0", "leaf_0"),
+                CalculationNode("dup", "QC_L1", "leaf_1"),
+            )
+            with pytest.raises(GraphConfigurationError) as exc:
+                graph_mod.build_graph(nodes)
+        assert exc.value.error_code == graph_mod.ERROR_DUPLICATE_NODE
+
+
+# ===========================================================================
+# Foundation immutability (M4D3-REG-004)
+# ===========================================================================
+
+
+class TestResolverKeyImmutability:
+    def test_outer_mapping_is_read_only(self):
+        with pytest.raises(TypeError):
+            registry_mod._RESOLVER_KEYS["new_form"] = (frozenset(), frozenset())
+
+    def test_existing_form_cannot_be_replaced(self):
+        with pytest.raises(TypeError):
+            registry_mod._RESOLVER_KEYS[registry_mod.SOURCE_CONSTANT] = (
+                frozenset(),
+                frozenset(),
+            )
+
+    def test_nested_key_sets_are_frozen(self):
+        required, optional = registry_mod._RESOLVER_KEYS[
+            registry_mod.SOURCE_QUESTION_RESPONSE
+        ]
+        assert isinstance(required, frozenset)
+        assert isinstance(optional, frozenset)
+        with pytest.raises(AttributeError):
+            # Deliberately invalid: a frozenset exposes no mutating method.
+            required.add("smuggled")
+
+    def test_form_count_unchanged(self):
+        assert set(registry_mod._RESOLVER_KEYS) == (
+            registry_mod.ALLOWED_RESOLVER_SOURCES
+        )
+
+
+class TestCanonicalCodePredicate:
+    """The named predicate replacing the former lambda -- identical behaviour."""
+
+    @pytest.mark.parametrize(
+        "value", ["DATA_REQUIRED", "A", "A1", "COMPONENT_REBOUND", "X_9_Y"]
+    )
+    def test_accepts_canonical_codes(self, value):
+        assert translation.is_canonical_code(value) is True
+
+    @pytest.mark.parametrize(
+        "value", ["", "lower", "Mixed_Case", "HAS SPACE", "HAS-DASH", None, 5, b"X"]
+    )
+    def test_rejects_non_canonical(self, value):
+        assert translation.is_canonical_code(value) is False
+
+    def test_every_vocabulary_member_is_canonical(self):
+        for vocabulary in (
+            translation.ALLOWED_REASON_CODES,
+            translation.ALLOWED_RESOLVER_DETAIL_CODES,
+            translation.ALLOWED_INPUT_FAILURE_CODES,
+            vocab.ALLOWED_HISTORY_REASON_CODES,
+            vocab.ALLOWED_SERVICE_DETAIL_CODES,
+        ):
+            assert all(translation.is_canonical_code(c) for c in vocabulary)
+
+    def test_import_time_validation_still_passes(self):
+        """Re-running the guard must not raise after the refactor."""
+        translation._validate_vocabularies()
 
 
 # ===========================================================================
