@@ -269,32 +269,40 @@ module-level functions in `answer_sources.py`):
 
 ---
 
-## 3. Recalculation Tests (`test_recalculation.py`)
+## 3. Recalculation Tests (`test_update_checklist_response.py`)
 
-Location: `backend/iig_checklist/tests/test_recalculation.py`
+Location: `backend/iig_checklist/tests/test_update_checklist_response.py`
 
-Tests for the cascade recalculation path triggered by `enter_response()` on `draft`
-executions (S-03, S-04, OQ-3 resolved):
+Tests for the cascade recalculation path triggered by the governed service
+`update_checklist_response()` on `draft` executions (S-03, S-04, OQ-3 resolved).
 
-- `enter_response()` with a `USER_REQUIRED` answer that feeds into one
+The governed service is the only runtime owner of `transaction.atomic()`, the execution
+lock, the response lock, `expected_version` validation, response validation,
+applicability re-evaluation, dependent recalculation, history creation, the response
+version increment and `transaction.on_commit()` audit dispatch.
+`ChecklistResponseUpdateView.patch()` is a thin adapter and is exercised only through the
+API tests in §4.
+
+- `update_checklist_response()` with a `USER_REQUIRED` answer that feeds into one
   `SYSTEM_CALCULATED` question: after the call, `CalculationOutcome.status = "complete"`
   and `value` is non-null (assuming valid inputs).
-- `enter_response()` with a `USER_REQUIRED` answer that feeds into two
+- `update_checklist_response()` with a `USER_REQUIRED` answer that feeds into two
   `SYSTEM_CALCULATED` questions: both `CalculationOutcome` rows are updated.
-- `enter_response()` when the new value produces a blocked calculation (e.g. user sets
-  quantity to `None`): `CalculationOutcome.status = "data_required"` (not `"error"` —
-  the blocking condition is missing input, which translates to `"data_required"`);
-  `reason_code = "DATA_REQUIRED"`; `value = None`.
-- `enter_response()` producing a mismatch result: `CalculationOutcome.status = "error"`;
-  `reason_code` = canonical engine status string; `value = None`.
+- `update_checklist_response()` when the new value produces a blocked calculation (e.g.
+  user sets quantity to `None`): `CalculationOutcome.status = "data_required"` (not
+  `"error"` — the blocking condition is missing input, which translates to
+  `"data_required"`); `reason_code = "DATA_REQUIRED"`; `value = None`.
+- `update_checklist_response()` producing a mismatch result:
+  `CalculationOutcome.status = "error"`; `reason_code` = canonical engine status string;
+  `value = None`.
 - No recalculation triggered when execution is `submitted_for_review` (responses are
-  locked): `enter_response()` on a `submitted_for_review` execution returns
+  locked): `update_checklist_response()` on a `submitted_for_review` execution returns
   `response_immutable` / 400.
-- Recalculation on a `returned` execution (valid recalculable state): `enter_response()`
-  succeeds and recalculation runs.
-- Concurrent `enter_response()` calls on the same execution: only one proceeds at a time
-  (serialized by `select_for_update()` on the execution — T-06 mitigation). Test using
-  `transaction=True`.
+- Recalculation on a `returned` execution (valid recalculable state):
+  `update_checklist_response()` succeeds and recalculation runs.
+- Concurrent `update_checklist_response()` calls on the same execution: only one proceeds
+  at a time (serialized by `select_for_update()` on the execution — T-06 mitigation).
+  Test using `transaction=True`.
 - Lock order respected: execution locked before response rows, response rows before
   `CalculationOutcome` rows; no deadlock.
 - Atomic rollback: if the calculation step raises an exception after the `USER_REQUIRED`
@@ -556,30 +564,14 @@ the prior value.
 **What it proves:** No regulated user-entered value is silently discarded when
 applicability changes. Every transition is auditable.
 
-### 10.4 Stale `expected_version` API Rejection
+### 9.4 Stale `expected_version` — withdrawn from this section
 
-**Requirement:** `enter_response()` must reject a PATCH whose `expected_version` does
-not match the current `ChecklistResponse.version`, return 409, and make no writes.
-
-**Fixture:** A `ChecklistExecution` in `draft` status; a `USER_REQUIRED`
-`ChecklistResponse` with `version = 3`.
-
-**Test file:** `backend/iig_checklist/tests/test_enter_response.py`
-
-**Test name:** `test_stale_expected_version_returns_409_and_no_writes`
-
-**Assertions:**
-1. PATCH with `expected_version = 2` (stale) returns HTTP 409.
-2. Response body includes `error_code = "stale_version"`.
-3. `ChecklistResponse.version` is still `3` (not incremented).
-4. `ChecklistResponse.raw_value` is unchanged.
-5. No `ChecklistResponseHistory` row was created.
-6. No audit event was emitted.
-
-**Negative test:** PATCH with `expected_version = 3` (current) succeeds (HTTP 200).
-
-**What it proves:** Concurrent edits cannot silently overwrite each other's changes.
-The optimistic lock is enforced at the service layer, not only in the client.
+The stale-`expected_version` control has **exactly one** normative test definition, in
+§10.3 (TST-145). The earlier duplicate that appeared here was written against a service
+and test file that do not exist in the repository; it is withdrawn. Do not reinstate a
+second definition of this control, and route all coverage through
+`update_checklist_response()` and
+`backend/iig_checklist/tests/test_update_checklist_response.py`.
 
 ---
 
@@ -634,10 +626,36 @@ performs no transaction, no lock, no version check.
 |---|---|
 | TST-142 | `expected_version` is required on the governed request serializer |
 | TST-144 | Omitted → HTTP 400 `expected_version_required`; version unchanged; no history; no audit |
-| TST-145 | Stale → HTTP 409 `stale_version`; `raw_value` unchanged; version unchanged; no history row; no audit event |
+| TST-145 | **Sole normative stale-version definition.** See the expanded specification immediately below. |
 | TST-146 | Matching version succeeds and increments `version` by exactly one |
 | TST-147 | Frontend handles 409 by reloading; no automatic retry |
 | TST-271 | The version comparison is made against the row returned by `select_for_update()` |
+
+#### TST-145 — stale `expected_version` (single normative definition)
+
+**Test file:** `backend/iig_checklist/tests/test_update_checklist_response.py`
+**Test name:** `test_stale_expected_version_returns_409_and_no_writes`
+
+**Fixture:** a `ChecklistExecution` in `draft`; a `USER_REQUIRED` `ChecklistResponse`
+with `version = 3` that is a declared dependency of a `SYSTEM_CALCULATED` question whose
+`CalculationOutcome` is already `complete`.
+
+**Invocation path:** PATCH through `ChecklistResponseUpdateView`, which delegates to
+`update_checklist_response()`. The control is exercised end-to-end through the adapter,
+not by calling the service directly.
+
+**Assertions:**
+1. HTTP 409 with `error_code = "stale_version"` for `expected_version = 2`.
+2. `ChecklistResponse.raw_value` is unchanged — no response mutation.
+3. `ChecklistResponse.version` is still `3` — no version increment.
+4. No `ChecklistResponseHistory` row exists.
+5. No recalculation ran.
+6. The dependent `CalculationOutcome` is byte-for-byte unchanged, including `value`,
+   `status`, `reason_code`, `generated_at` and `input_provenance`.
+7. No success audit event was emitted.
+
+**Negative control:** `expected_version = 3` succeeds with HTTP 200 and increments
+`version` to `4`.
 
 ### 10.4 M-A — Completeness gate for calculated and FDA-derived answers
 
@@ -741,6 +759,75 @@ performs no transaction, no lock, no version check.
 | TST-166 | No request serializer accepts a `reason_code` field |
 | TST-167 | No stored `reason_code` contains exception text, a stack frame, or a file path |
 
+### 10.12 Maximum dosage units resolver
+
+Verified schema: `FormulationVersion.maximum_dosage_units_per_day` is nullable;
+`DosingRegimen.maximum_units_per_day` is required, `> 0` by check constraint, and
+one-to-many per version with no lifecycle field. All fixtures are synthetic.
+
+**Test file:** `backend/iig_checklist/tests/test_max_dosage_units_resolver.py`
+
+| Test ID | Scenario | Expected |
+|---|---|---|
+| TST-324 | Version scalar present, no regimens | Scalar used; source type `formulation_version` |
+| TST-329a | Scalar null, one regimen | Regimen value used; source type `dosing_regimen` |
+| TST-329b | Scalar null, three regimens (10, 25, 15) | **25** selected as worst case |
+| TST-332a | Scalar and regimen equal | That value used; both provenances recorded; `source_disagreement` false |
+| TST-332b | Scalar 10, regimen 25 | **25** used (regimen higher) |
+| TST-332c | Scalar 25, regimen 10 | **25** used (scalar higher) |
+| TST-330 | Two regimens tied at the highest value | Lowest `public_id` selected; repeated runs select the same row |
+| TST-335 | No scalar and no regimen | Engine yields `MAX_DAILY_UNITS_MISSING`; stored `status = "data_required"`, `reason_code = "DATA_REQUIRED"`; provenance detail `MAX_DAILY_UNITS_REQUIRED` |
+| TST-327 | Regimen row with a value that cannot be coerced to a valid positive `Decimal` | Excluded from selection; recorded invalid; if no valid candidate remains, fails closed with detail `MAX_DAILY_UNITS_SOURCE_INVALID` |
+| TST-326 | Regimen belonging to another tenant via `formulation_version__product__tenant` | Not selected, not counted, and absent from provenance |
+| TST-333 | Scalar and regimen differ | Higher value used and `source_disagreement = true` recorded with both values |
+| TST-331 | Three regimens with distinct `patient_population` labels | Worst case selected across all populations; populations appear as provenance only, never as a filter |
+| TST-342 | Resolver run ten times against unchanged data | Identical selected value and identical provenance ordering every run |
+| TST-343 | Approved execution, then a new higher `DosingRegimen` is added | Persisted `CalculationOutcome.value` and provenance are unchanged |
+| TST-323 | Static check | No code path resolves maximum units from the version scalar alone |
+| TST-334 | Selection audit | Never the lower value, never an average, never creation-order selection |
+| TST-336 | Engine mapping | No new stored status or `reason_code` value is introduced |
+| TST-337 | Provenance separation | Detail code appears in `input_provenance`, never in `CalculationOutcome.reason_code` |
+| TST-338 | Provenance content | All fields required by M4D3-MDU-016 present |
+| TST-339 | Provenance | `resolver_version` recorded |
+| TST-340 | Provenance | No internal primary key present |
+| TST-341 | Serializer | Client receives sanitized summary only |
+| TST-328 | Request serializer | A dosing value in the request payload is rejected |
+| TST-325 | Resolver | No lifecycle/status filter is applied to `DosingRegimen` |
+
+### 10.13 Applicability reason-code format validation
+
+**Test file:** `backend/iig_checklist/tests/test_applicability_rule_validation.py`
+
+| Test ID | Input `reason_code` | Expected |
+|---|---|---|
+| TST-353 | `EXCIPIENT_NOT_IN_IID` | Accepted at activation |
+| TST-355 | `REVIEW:REQUIRED` | Rejected — colon |
+| TST-357a | `REVIEW_REQUIRED` | Rejected — reserved, `error_code = "reserved_reason_code"` |
+| TST-357b | `REVIEW_REQUIRED:FOO` | Rejected — reserved prefix |
+| TST-356a | `excipient_not_in_iid` | Rejected — lowercase |
+| TST-356b | `EXCIPIENT NOT IN IID` | Rejected — whitespace |
+| TST-354a | 100-character conforming code | Accepted (boundary) |
+| TST-354b | 101-character code | Rejected |
+| TST-358 | 100-character code composed into a marker | Result is 116 characters and passes `full_clean()` within the 200-character limit |
+| TST-359 | Client-supplied `reason_code` or composed marker | Rejected |
+
+### 10.14 Blank route and dosage form
+
+**Test file:** `backend/iig_checklist/tests/test_controlled_term_resolution.py`
+
+| Test ID | Scenario | Expected |
+|---|---|---|
+| TST-345a | `product.route = ""` | Treated as missing; `status = "data_required"`; provenance detail `ROUTE_NOT_PROVIDED` |
+| TST-345b | `product.dosage_form = ""` | Treated as missing; provenance detail `DOSAGE_FORM_NOT_PROVIDED` |
+| TST-345c | Both blank | Both details recorded; single `data_required` outcome |
+| TST-349a | Non-blank unknown route code | Engine canonical `ROUTE_MISMATCH` → `status = "error"` |
+| TST-349b | Route code whose `ControlledRoute.lifecycle != "active"` | Same as unknown code — `.first()` returns `None` and this is not success |
+| TST-349c | Valid active route and dosage form | Resolution succeeds |
+| TST-346 | Static check | A blank value is never passed to `run_preview()` as a resolved argument |
+| TST-347 | Resolver | A `None` lookup result is never treated as successful resolution |
+| TST-348 | Resolver | No fallback or default controlled term is substituted |
+| TST-344 | Documentation | Blank-capable fields recorded as verified |
+
 ---
 
 ## 11. Acceptance Matrix Reconciliation
@@ -751,16 +838,17 @@ acceptance matrix.
 
 | Metric | Value |
 |---|---|
-| Normative requirement IDs defined | 221 |
-| Acceptance matrix IDs | 221 |
+| Normative requirement IDs defined | 259 |
+| Acceptance matrix IDs | 259 |
 | Missing (defined but absent from matrix) | 0 |
 | Duplicate requirement definitions | 0 |
 | Duplicate matrix rows | 0 |
 | Orphan matrix IDs (in matrix but undefined) | 0 |
+| Matrix rows missing a required cell | 0 |
 
-Per-block counts: API 5, APP 13, AUD 7, CMP 6, DAG 10, FE 9, HST 9, MDL 13, MIG 8, NA 5,
-OUT 8, POP 8, PRV 4, PST 13, RCL 5, REG 19, REV 5, RSN 5, SEC 5, SER 9, SNP 7, SRC 13,
-SUB 7, SVC 8, TRL 6, TXN 6, VER 8.
+Per-block counts: API 5, APP 13, AUD 7, CMP 6, DAG 10, FE 9, HST 9, MDL 13, MDU 21,
+MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13, RCL 5, REG 19, REV 5, RFV 7, RSN 8, RTE 6,
+SEC 5, SER 9, SNP 7, SRC 14, SUB 7, SVC 8, TRL 6, TXN 6, VER 8.
 
 This reconciliation shall be re-run and the table updated whenever either document
 changes.
