@@ -53,6 +53,17 @@ Prior head `51a4fcc` was reviewed **FAIL** (0 Critical, 2 Major, 5 Minor).
 | Minor 4 blank `route`/`dosage_form` undefined | Blank treated as missing governed data; no fallback | Part 14.2 |
 | Minor 5 backend and frontend tests merged | Split into separate sequence steps | Part 22 |
 
+## Third revision note — findings resolved after the final adversarial review
+
+Prior head `c214a62` was reviewed **FAIL** (0 Critical, 1 Major, 3 Minor).
+
+| Finding | Resolution | Part |
+|---|---|---|
+| MAJ-A the two-form resolver vocabulary could not supply the kwargs of any approved calculation | Six allow-listed resolver forms, a complete kwarg mapping for all six functions, a governed unit-conversion layer reusing `iid_assessment/unit_conversion.py`, one unified `resolve_calculation_inputs()` pipeline, resolver-derived dependency edges, snapshot ordering, and a closed resolver-failure vocabulary | Part 3A |
+| Minor 1 conservative-policy justification unrecorded | Monotonicity rationale recorded with source evidence, plus a governance rule for future consumers | M4D3-MDU-022 … 024 |
+| Minor 2 scope register X-12 gloss unreconciled | "Consumer only" gloss replaced with an explicit boundary | Scope register X-12 clarification |
+| Minor 3 documentation rows presented as executable tests | Sixteen rows classified as **Review assertion** with source-inspection evidence | Part 21 preamble |
+
 ---
 
 ## Part 1 — Scope
@@ -246,15 +257,16 @@ failing the deployment rather than producing invalid outcomes.
 
 ### 3.3 Input resolvers
 
-**M4D3-REG-010** An `InputResolver` shall be one of exactly two forms:
-`{"source": "question", "question_code": "<code>"}` reading `ChecklistResponse.raw_value`
-for that question on the current execution; or
-`{"source": "formulation", "field": "<field_name>"}` reading a named field from
-`FormulationVersion` or `FormulationComponent`. No other form is valid.
+**M4D3-REG-010** An `InputResolver` shall be one of exactly the six allow-listed forms
+defined in Part 3A. The earlier two-form vocabulary was insufficient: it could not
+express FDA/IID-derived values, prior calculation results, the maximum-daily-units
+resolver, or unit conversion, and therefore could not supply the kwargs of any of the six
+approved calculations. No form outside Part 3A is valid without a governed specification
+change.
 
-**M4D3-REG-011** Resolvers shall use only named model fields. No `eval`, `exec`,
-dynamic import, `getattr` from an untrusted string, SQL fragment, or template
-expression is permitted.
+**M4D3-REG-011** Resolvers shall use only named model fields and allow-listed source
+kinds. No `eval`, `exec`, dynamic import, `getattr` from an untrusted string, SQL
+fragment, or template expression is permitted.
 
 ### 3.4 Resolution and failure behavior
 
@@ -295,6 +307,295 @@ and the graph respects the Part 13 limits.
 **M4D3-REG-019** Activation shall be rejected with a structured error naming the
 specific sub-reason if any check in M4D3-REG-018 fails, and the `ChecklistVersion`
 shall remain in its pre-activation status.
+
+---
+
+## Part 3A — Input resolution (MAJ-A)
+
+### 3A.1 Verified calculation contracts
+
+**M4D3-INP-001** The six approved functions have exactly these signatures, confirmed
+against `backend/iid_assessment/calculations.py`. Kwarg names are normative and shall not
+be altered or invented:
+
+| Function | Kwargs |
+|---|---|
+| `calculate_percentage_w_w` | `quantity_per_unit_grams`, `total_dosage_unit_weight_grams` |
+| `calculate_daily_exposure` | `quantity_per_dosage_unit`, `maximum_dosage_units_per_day` |
+| `calculate_percentage_of_potency` | `converted_proposed_quantity`, `selected_iid_potency_amount` |
+| `calculate_difference_from_potency` | `selected_iid_potency_amount`, `converted_proposed_quantity` |
+| `calculate_percentage_of_mde` | `converted_proposed_daily_exposure`, `selected_iid_mde` |
+| `calculate_difference_from_mde` | `selected_iid_mde`, `converted_proposed_daily_exposure` |
+
+**M4D3-INP-002** No kwarg shall remain without an approved resolver. A registry entry
+whose `input_resolvers` does not cover every kwarg of its bound function shall fail the
+import-time self-check (M4D3-REG-009).
+
+### 3A.2 Allow-listed resolver forms
+
+**M4D3-INP-003** Form A — question response:
+`{"source": "question_response", "question_code": ..., "value_field": "raw_value",
+"expected_type": ..., "required_unit": ..., "unit_source": ...}`. It resolves a
+`ChecklistResponse` for the named question in the current execution, scoped to
+`execution.tenant`. It shall never be used to read a `SYSTEM_CALCULATED` response as a
+calculation result, because `raw_value` is permanently null for those responses
+(M4D3-MDL-006). It fails closed when the response is missing, `is_not_applicable`,
+carries a `REVIEW_REQUIRED:` marker, or holds a value that cannot be coerced to
+`expected_type`.
+
+**M4D3-INP-004** Form B — formulation field:
+`{"source": "formulation_field", "object": "formulation_version"|"formulation_component",
+"field": ..., "unit_field": ..., "required_unit": ...}`. It reads a named field from the
+execution's `FormulationVersion` or the subject `FormulationComponent`, scoped through
+`formulation_version__product__tenant = execution.tenant`. It fails closed on a missing
+object, a missing field value, or a missing unit where `required_unit` is declared.
+
+**M4D3-INP-005** Form C — maximum daily units:
+`{"source": "maximum_daily_units", "resolver_version": ...}`. It invokes the conservative
+resolver defined in Part 14.1 and returns the selected `Decimal` together with its
+provenance. Registry entries shall not restate or duplicate that selection logic.
+
+**M4D3-INP-006** Form D — assessment snapshot:
+`{"source": "assessment_snapshot", "field": ..., "unit_field": ..., "required_unit": ...}`.
+It reads persisted governed IID/FDA values from the `AssessmentSnapshot` created for the
+current execution under Part 3A.6. Permitted `field` values are exactly
+`iid_potency_amount` and `iid_mde`, with `unit_field` values `iid_potency_unit` and
+`iid_mde_unit` respectively — the actual field names on `iid_assessment.AssessmentSnapshot`.
+The snapshot's `tenant` shall equal `execution.tenant`. This form shall never perform a
+live IID lookup. It fails closed when the snapshot is absent, belongs to another tenant,
+or the named field is null or blank.
+
+**M4D3-INP-007** Form E — prior calculation outcome:
+`{"source": "calculation_outcome", "question_code": ..., "field": "value",
+"required_status": "complete", "required_unit": ..., "unit_source": ...}`. It reads
+`CalculationOutcome.value` for the named `SYSTEM_CALCULATED` question in the same
+execution. It requires exactly one matching outcome row, `status = "complete"`, and a
+non-null `value`. It fails closed on zero rows, more than one row (M4D3-OUT-005),
+`data_required`, `error`, a null value, or a unit that cannot be converted to
+`required_unit`.
+
+**M4D3-INP-008** Form F — constant:
+`{"source": "constant", "value": ..., "type": "decimal"|"string", "binding_version": ...}`.
+Constants shall be hard-coded in the version-controlled registry. No tenant or client may
+author one, no free-form runtime value is permitted, and no expression shall be evaluated.
+
+**M4D3-INP-009** Forms A, B, D and F read stored or declared data. Only Form E creates a
+calculation-to-calculation dependency edge (Part 3A.5). Form C creates no edge.
+
+### 3A.2.1 Complete kwarg mapping
+
+**M4D3-MAP-001** `calculate_percentage_w_w` — `quantity_per_unit_grams` resolves by
+Form B from `FormulationComponent.quantity_per_dosage_unit` with
+`unit_field = quantity_unit`, converted to `gram`; `total_dosage_unit_weight_grams`
+resolves by Form B from `FormulationVersion.total_dosage_unit_weight` with
+`unit_field = total_dosage_unit_weight_unit`, converted to `gram`.
+
+**M4D3-MAP-002** `calculate_daily_exposure` — `quantity_per_dosage_unit` resolves by
+Form B from `FormulationComponent.quantity_per_dosage_unit` with
+`unit_field = quantity_unit`, converted to `gram`; `maximum_dosage_units_per_day`
+resolves by Form C with no conversion.
+
+**M4D3-MAP-003** `calculate_percentage_of_potency` — `converted_proposed_quantity`
+resolves by Form B from `FormulationComponent.quantity_per_dosage_unit`, converted to the
+unit given by the snapshot's `iid_potency_unit`; `selected_iid_potency_amount` resolves by
+Form D from `AssessmentSnapshot.iid_potency_amount` with no conversion.
+
+**M4D3-MAP-004** `calculate_difference_from_potency` — identical resolved inputs to
+M4D3-MAP-003; only the kwarg order differs.
+
+**M4D3-MAP-005** `calculate_percentage_of_mde` — `converted_proposed_daily_exposure`
+resolves by Form E from the `calculate_daily_exposure` outcome
+(`required_status = "complete"`), converted from `gram` per day to the unit given by the
+snapshot's `iid_mde_unit`; `selected_iid_mde` resolves by Form D from
+`AssessmentSnapshot.iid_mde` with no conversion.
+
+**M4D3-MAP-006** `calculate_difference_from_mde` — identical resolved inputs to
+M4D3-MAP-005; only the kwarg order differs.
+
+**M4D3-MAP-007** `calculate_daily_exposure` returns a `CalculationResult` with no `unit`
+set. Its stored `CalculationOutcome.unit` shall therefore be written by the governed
+service as `gram` per day, derived from the canonical target unit of
+`quantity_per_dosage_unit`, so that the Form E resolver has an explicit source unit to
+convert from.
+
+**M4D3-MAP-008** Every mapping above uses kwarg names taken verbatim from
+M4D3-INP-001 and model field names taken verbatim from `formulations.models` and
+`iid_assessment.models`. No alternative or invented name shall be used.
+
+### 3A.3 Unit conversion
+
+**M4D3-UNC-001** All unit conversion required by a kwarg contract shall be performed by
+the **input-resolution service**, never by a calculation function and never by the
+frontend.
+
+**M4D3-UNC-002** Conversion shall use the existing approved service
+`backend/iid_assessment/unit_conversion.py` via
+`convert(value, from_unit, to_unit, *, density_g_per_ml=None) -> ConversionResult`.
+4D-3 shall not introduce a second conversion implementation or table.
+
+**M4D3-UNC-003** The allow-listed unit vocabulary is that module's:
+`MASS_UNITS` = `microgram`, `milligram`, `gram`, `kilogram` (base `gram`);
+`VOLUME_UNITS` = `microlitre`, `millilitre`, `litre` (base `litre`);
+`COUNT_UNITS` = `tablet`, `capsule`, `unit`, `actuation`, `dose`. Canonical unit strings
+are spelled in full — `"gram"`, not `"g"`; `"milligram"`, not `"mg"`. Abbreviated unit
+tokens shall not appear in registry entries.
+
+**M4D3-UNC-004** Source unit and target unit shall both be explicit in the resolver
+declaration. No unit shall be inferred or defaulted.
+
+**M4D3-UNC-005** Arithmetic shall be `Decimal` only; no float shall appear on any
+conversion or resolution path.
+
+**M4D3-UNC-006** Canonical target units per kwarg:
+
+| Kwarg | Target unit |
+|---|---|
+| `quantity_per_unit_grams` | `gram` |
+| `total_dosage_unit_weight_grams` | `gram` |
+| `quantity_per_dosage_unit` | `gram` |
+| `maximum_dosage_units_per_day` | count; no conversion |
+| `converted_proposed_quantity` | the snapshot's `iid_potency_unit` |
+| `selected_iid_potency_amount` | as stored; no conversion |
+| `converted_proposed_daily_exposure` | the snapshot's `iid_mde_unit` |
+| `selected_iid_mde` | as stored; no conversion |
+
+The `converted_` kwargs convert the proposed value **into the IID reference unit**, so
+each comparison is made between like quantities.
+
+**M4D3-UNC-007** A `ConversionResult` with `ok = False` shall prevent invocation of the
+calculation function.
+
+**M4D3-UNC-008** Conversion failures shall map as follows, preserving the engine's
+existing canonicalization: `DIMENSION_MISMATCH`, `CONVERSION_NOT_SUPPORTED` and
+`UNIT_UNKNOWN` produce `status = "error"` with `reason_code = "UNIT_MISMATCH"`;
+`VALUE_MISSING` produces `status = "data_required"` with `reason_code = "DATA_REQUIRED"`;
+`DENSITY_REQUIRED` and `BASIS_REQUIRED` produce `status = "error"` with
+`reason_code = "NOT_COMPARABLE"`. This is the only path by which `UNIT_MISMATCH` is
+produced in 4D-3.
+
+**M4D3-UNC-009** Mass↔volume conversion requires an explicitly supplied approved density;
+4D-3 shall introduce no new density source and shall fail closed with `DENSITY_REQUIRED`
+when one is absent.
+
+**M4D3-UNC-010** No client shall supply, override, or influence a conversion factor.
+
+**M4D3-UNC-011** Every applied conversion shall record in provenance the original value,
+original unit, converted value, converted unit and the conversion rule version.
+
+### 3A.4 Unified input-resolution pipeline
+
+**M4D3-INP-010** A single service
+`resolve_calculation_inputs(execution, response, registry_entry, actor)` shall own all
+input resolution. Part 14.1 maximum-daily-units resolution, snapshot resolution and
+prior-outcome resolution shall all be invoked **through** this pipeline. No parallel or
+ad hoc resolution mechanism shall remain.
+
+**M4D3-INP-011** The pipeline shall, in order: validate the registry entry; resolve each
+kwarg through its allow-listed form; enforce tenant scope on every access; enforce
+applicability state; perform unit conversion; collect provenance; validate the resolved
+Python/domain type; detect missing or ambiguous data; and return an immutable
+resolved-input object.
+
+**M4D3-INP-012** The pipeline shall never invoke the calculation function when any
+required kwarg is unresolved. Partial kwargs shall never be passed, so a missing-kwarg
+`TypeError` is unreachable.
+
+**M4D3-INP-013** The pipeline shall be pure with respect to the database: it reads and
+resolves but performs no write.
+
+**M4D3-INP-014** Resolved inputs and their provenance shall be recorded in
+`CalculationOutcome.inputs` and `CalculationOutcome.input_provenance` respectively.
+
+### 3A.5 Dependency edges
+
+**M4D3-DEP-001** The dependency graph shall be **derived from resolver declarations**,
+not authored separately. A registry entry's `dependencies` shall equal the set of
+`question_code` values appearing in its Form E resolvers.
+
+**M4D3-DEP-002** Form A, B, C, D and F resolvers shall create no calculation-to-calculation
+edge.
+
+**M4D3-DEP-003** The actual graph for the approved registry is:
+
+```
+calculate_daily_exposure
+    ├─→ calculate_percentage_of_mde
+    └─→ calculate_difference_from_mde
+```
+
+`calculate_percentage_of_mde` and `calculate_difference_from_mde` both consume the same
+upstream daily-exposure outcome and shall **not** depend on each other.
+`calculate_percentage_w_w`, `calculate_percentage_of_potency` and
+`calculate_difference_from_potency` have no calculation dependencies.
+
+**M4D3-DEP-004** Maximum path depth in the approved graph is therefore **2** and the
+maximum reachable calculated node count from any single question is **3**.
+`CALCULATION_MAX_DEPENDENCY_DEPTH = 5` and `CALCULATION_MAX_CASCADE_NODES = 10` are
+retained as governed limits providing headroom above the documented graph, consistent
+with M4D3-DAG-002.
+
+**M4D3-DEP-005** Graph validation shall occur at `ChecklistVersion` activation, with the
+defensive runtime revalidation of M4D3-DAG-010 retained.
+
+**M4D3-DEP-006** A Form E resolver naming a question that is absent from the version, or
+that is not `SYSTEM_CALCULATED`, shall be rejected at activation with
+`error_code = "UNKNOWN_DEPENDENCY_CODE"`.
+
+### 3A.6 Snapshot ordering
+
+**M4D3-SNO-001** Because potency and MDE calculations consume snapshot fields, the
+population pass shall observe this exact order: resolve the live FDA/IID source; create
+or reuse the governed `AssessmentSnapshot` through the approved `iid_assessment` service;
+obtain its `public_id`; resolve snapshot-derived calculation inputs; execute the potency
+and MDE calculations; persist each `CalculationOutcome` with the snapshot UUID and
+provenance.
+
+**M4D3-SNO-002** After the snapshot step, no potency or MDE calculation shall read live
+IID data directly. All such inputs shall come from the persisted snapshot via Form D.
+
+**M4D3-SNO-003** Snapshot creation and the dependent calculation persistence shall occur
+within the same `transaction.atomic()` block as the rest of the population pass
+(M4D3-POP-001), so a rollback discards both.
+
+**M4D3-SNO-004** Calculations requiring a snapshot shall run only after
+`calculate_daily_exposure` has completed where a Form E dependency exists, honoring the
+topological order of M4D3-DAG-006.
+
+### 3A.7 Resolver failure vocabulary
+
+**M4D3-IFV-001** A closed vocabulary `ALLOWED_INPUT_FAILURE_CODES` shall be defined
+alongside the pipeline, containing exactly: `INPUT_RESPONSE_MISSING`,
+`INPUT_RESPONSE_NOT_APPLICABLE`, `INPUT_REVIEW_REQUIRED`, `INPUT_VALUE_INVALID`,
+`INPUT_UNIT_MISSING`, `INPUT_UNIT_UNSUPPORTED`, `INPUT_UNIT_DIMENSION_MISMATCH`,
+`FORMULATION_COMPONENT_MISSING`, `FORMULATION_FIELD_MISSING`,
+`ASSESSMENT_SNAPSHOT_MISSING`, `ASSESSMENT_FIELD_MISSING`,
+`UPSTREAM_CALCULATION_MISSING`, `UPSTREAM_CALCULATION_INCOMPLETE`,
+`UPSTREAM_CALCULATION_DUPLICATE`, `INPUT_TENANT_MISMATCH`, `INPUT_RESOLVER_UNKNOWN`.
+
+**M4D3-IFV-002** Failure codes are provenance metadata. They shall never be written to
+`CalculationOutcome.reason_code` and shall never appear in `ALLOWED_REASON_CODES`.
+
+**M4D3-IFV-003** Missing-data failures — `INPUT_RESPONSE_MISSING`,
+`INPUT_RESPONSE_NOT_APPLICABLE`, `INPUT_UNIT_MISSING`, `FORMULATION_COMPONENT_MISSING`,
+`FORMULATION_FIELD_MISSING`, `ASSESSMENT_SNAPSHOT_MISSING`, `ASSESSMENT_FIELD_MISSING`,
+`UPSTREAM_CALCULATION_MISSING`, `UPSTREAM_CALCULATION_INCOMPLETE` — shall produce
+`status = "data_required"` with `reason_code = "DATA_REQUIRED"`.
+
+**M4D3-IFV-004** `INPUT_REVIEW_REQUIRED` shall produce `status = "data_required"` with
+`reason_code = "DATA_REQUIRED"`, consistent with M4D3-POP-003 blocking calculation for a
+review-required question.
+
+**M4D3-IFV-005** Invalid or unsupported conditions — `INPUT_VALUE_INVALID`,
+`INPUT_UNIT_UNSUPPORTED`, `INPUT_UNIT_DIMENSION_MISMATCH`,
+`UPSTREAM_CALCULATION_DUPLICATE`, `INPUT_TENANT_MISMATCH`, `INPUT_RESOLVER_UNKNOWN` —
+shall produce `status = "error"` with the canonical `reason_code` selected per
+M4D3-UNC-008 for unit failures and `UNKNOWN_ENGINE_STATUS` is **not** used; duplicate,
+tenant-mismatch and unknown-resolver conditions shall use
+`reason_code = "UNKNOWN_REGISTRY_IDENTIFIER"` where configuration is at fault and
+`NOT_COMPARABLE` where data is at fault.
+
+**M4D3-IFV-006** No resolver exception text, stack trace or internal message shall be
+stored as a governed reason code or exposed to a client.
 
 ---
 
@@ -994,6 +1295,28 @@ an identical value and emit provenance entries in an identical, stable order.
 `draft`/`returned` shall not alter that execution's persisted calculation result or
 stored provenance.
 
+**M4D3-MDU-022** Recorded monotonicity rationale, verified against
+`backend/iid_assessment/calculations.py` and `backend/formulations/models.py`:
+`calculate_daily_exposure` computes `quantity_per_dosage_unit × maximum_dosage_units_per_day`;
+`FormulationComponent.quantity_per_dosage_unit` is constrained strictly positive by
+`CheckConstraint` `formulation_component_quantity_positive`; daily exposure therefore
+increases monotonically with maximum daily units. `calculate_percentage_of_mde` computes
+`(exposure / mde) × 100` and increases with exposure; `calculate_difference_from_mde`
+computes `mde − exposure` and decreases with exposure, meaning less remaining headroom.
+Selecting the highest daily-units candidate is therefore safety-conservative for every
+current consumer, and no consuming calculation inverts.
+
+**M4D3-MDU-023** The three remaining approved functions —
+`calculate_percentage_w_w`, `calculate_percentage_of_potency` and
+`calculate_difference_from_potency` — do not consume maximum daily units, so the resolver
+does not affect them.
+
+**M4D3-MDU-024** Governance rule: any new calculation that consumes maximum daily units
+shall require a documented monotonicity review before it is bound in the registry. The
+global highest-value resolver shall not be reused automatically for a calculation with
+inverse or non-monotonic behavior; this specification and its tests shall be amended
+first.
+
 ### Part 14.2 — Blank controlled-term behavior
 
 **M4D3-RTE-001** Verified schema fact: `ProductDevelopmentRecord.route` and
@@ -1313,6 +1636,21 @@ an unhandled exception.
 
 Every normative requirement identifier appears exactly once below.
 
+**Review-assertion rows.** Rows whose implementation component is `Review assertion`
+record a verified architectural or source fact rather than a runtime control: that a
+service does not exist, an existing field type or nullability, the absence of a database
+constraint, an existing constant or migration fact, or the breaking nature of an API
+change. Their evidence is source inspection recorded in the review checklist, not an
+executable test, and no fabricated runtime test shall be authored for them. Every other
+row remains a normative control requiring implementation and executable coverage. The
+review-assertion rows are exactly these fourteen: M4D3-SVC-001, M4D3-VER-001,
+M4D3-OUT-003, M4D3-OUT-007, M4D3-PST-001, M4D3-SRC-014, M4D3-RTE-001, M4D3-DAG-002,
+M4D3-SNP-007, M4D3-MIG-004, M4D3-INP-001, M4D3-MDU-022, M4D3-MDU-023 and M4D3-DEP-004.
+
+M4D3-REG-001 and M4D3-MDU-001 are **not** review assertions: each records a verified fact
+*and* imposes a normative obligation (correcting `create_execution()`, and prohibiting a
+scalar-only resolution rule), so both retain an executable implementation component.
+
 | Req ID | Implementation component | Test | Expected result | Controlled risk |
 |---|---|---|---|---|
 | M4D3-MDL-001 | `ChecklistQuestion` usage | TST-101 | Identifier stores registry key only | Injection |
@@ -1347,7 +1685,7 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-REG-017 | Registry alias | TST-130 | Alias semantics identical; no reinterpretation | Regulatory |
 | M4D3-REG-018 | Activation service | TST-131 | All activation checks enforced | Security |
 | M4D3-REG-019 | Activation service | TST-132 | Structured rejection; status unchanged | Data integrity |
-| M4D3-SVC-001 | Documentation | TST-133 | No `enter_response()` claimed | Correctness |
+| M4D3-SVC-001 | Review assertion | TST-133 | No `enter_response()` claimed | Correctness |
 | M4D3-SVC-002 | New service | TST-134 | Governed service exists | Architecture |
 | M4D3-SVC-003 | New service | TST-135 | All responsibilities owned | Architecture |
 | M4D3-SVC-004 | View adapter | TST-136 | View contains no business logic | Architecture |
@@ -1355,7 +1693,7 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-SVC-006 | New service | TST-138 | Override fields untouched | Scope |
 | M4D3-SVC-007 | `answer_sources.py` | TST-139 | Explicit dispatch, no reflection | Security |
 | M4D3-SVC-008 | `answer_sources.py` | TST-140 | Resolvers pure | Correctness |
-| M4D3-VER-001 | Documentation | TST-141 | Breaking change acknowledged | Compatibility |
+| M4D3-VER-001 | Review assertion | TST-141 | Breaking change acknowledged | Compatibility |
 | M4D3-VER-002 | Request serializer | TST-142 | Field required | Data integrity |
 | M4D3-VER-003 | Deployment | TST-143 | Atomic deploy documented | Compatibility |
 | M4D3-VER-004 | New service | TST-144 | Missing → 400, no write | Data integrity |
@@ -1365,11 +1703,11 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-VER-008 | OpenAPI/release notes | TST-148 | Schema regenerated | Compatibility |
 | M4D3-OUT-001 | Outcome writer | TST-149 | `full_clean()` before every save | Data integrity |
 | M4D3-OUT-002 | Test suite | TST-150 | No bare-save validation assertion | Correctness |
-| M4D3-OUT-003 | Documentation | TST-151 | No uniqueness claimed | Correctness |
+| M4D3-OUT-003 | Review assertion | TST-151 | No uniqueness claimed | Correctness |
 | M4D3-OUT-004 | New service | TST-152 | Update-in-place under lock | Data integrity |
 | M4D3-OUT-005 | New service | TST-153 | Duplicate rows fail closed | Data integrity |
 | M4D3-OUT-006 | Repository check | TST-154 | No migration added | Compatibility |
-| M4D3-OUT-007 | Documentation | TST-155 | Not claimed as model invariant | Correctness |
+| M4D3-OUT-007 | Review assertion | TST-155 | Not claimed as model invariant | Correctness |
 | M4D3-OUT-008 | Outcome writer | TST-156 | Non-complete with value rejected | Data integrity |
 | M4D3-TRL-001 | Translation module | TST-157 | Pure function, no DB access | Architecture |
 | M4D3-TRL-002 | Translation module | TST-158 | Full table; 100% branch coverage | Security |
@@ -1395,7 +1733,7 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-APP-011 | New service | TST-178 | Reserved prefix rejected | Security |
 | M4D3-APP-012 | Population service | TST-179 | User N/A preserved | Regulatory |
 | M4D3-APP-013 | Population service | TST-180 | All eligibility checks applied | Correctness |
-| M4D3-PST-001 | Documentation | TST-181 | Model compatibility verified | Correctness |
+| M4D3-PST-001 | Review assertion | TST-181 | Model compatibility verified | Correctness |
 | M4D3-PST-002 | Applicability service | TST-182 | Marker persisted correctly | Regulatory |
 | M4D3-PST-003 | Applicability service | TST-183 | Marker ≤ 200 chars | Data integrity |
 | M4D3-PST-004 | Activation service | TST-184 | Over-long marker rejected | Data integrity |
@@ -1441,7 +1779,7 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-SUB-006 | Submission gate | TST-224 | No manual resolution path offered | Scope |
 | M4D3-SUB-007 | Recalculation | TST-225 | Correction + recalculation is the only path | Regulatory |
 | M4D3-DAG-001 | Registry module | TST-226 | Constants named and located | Correctness |
-| M4D3-DAG-002 | Documentation | TST-227 | Rationale stated as governance decision | Correctness |
+| M4D3-DAG-002 | Review assertion | TST-227 | Rationale stated as governance decision | Correctness |
 | M4D3-DAG-003 | Activation service | TST-228 | Depth > 5 rejected | Security |
 | M4D3-DAG-004 | Activation service | TST-229 | Node count > 10 rejected | Security |
 | M4D3-DAG-005 | Ordering function | TST-230 | Iterative algorithm, no unbounded recursion | Robustness |
@@ -1463,7 +1801,59 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-SRC-011 | Source resolver | TST-246 | Snapshot frozen after draft | Regulatory |
 | M4D3-SRC-012 | Deployment | TST-247 | Release change does not recalculate | Regulatory |
 | M4D3-SRC-013 | Static check | TST-248 | No `fda_data` writes | Architecture |
-| M4D3-SRC-014 | Documentation | TST-322 | Non-nullability recorded; no availability hedge | Correctness |
+| M4D3-SRC-014 | Review assertion | TST-322 | Non-nullability recorded; no availability hedge | Correctness |
+| M4D3-INP-001 | Review assertion | TST-360 | Six signatures recorded verbatim | Correctness |
+| M4D3-INP-002 | Import-time self-check | TST-361 | Entry missing a kwarg resolver raises at import | Data integrity |
+| M4D3-INP-003 | Resolver form A | TST-362 | Question response resolved; N/A, review-required, missing, invalid fail closed | Regulatory |
+| M4D3-INP-004 | Resolver form B | TST-363 | Formulation field resolved; tenant scoped; missing fails closed | Data integrity |
+| M4D3-INP-005 | Resolver form C | TST-364 | Delegates to Part 14.1; logic not duplicated | Correctness |
+| M4D3-INP-006 | Resolver form D | TST-365 | Snapshot fields resolved; no live IID lookup | Regulatory |
+| M4D3-INP-007 | Resolver form E | TST-366 | Exactly one complete outcome required | Data integrity |
+| M4D3-INP-008 | Resolver form F | TST-367 | Constants registry-authored only | Security |
+| M4D3-INP-009 | Dependency derivation | TST-368 | Only form E creates an edge | Correctness |
+| M4D3-MAP-001 | Registry entry | TST-369 | percentage_w_w kwargs mapped | Correctness |
+| M4D3-MAP-002 | Registry entry | TST-370 | daily_exposure kwargs mapped | Correctness |
+| M4D3-MAP-003 | Registry entry | TST-371 | percentage_of_potency kwargs mapped | Correctness |
+| M4D3-MAP-004 | Registry entry | TST-372 | difference_from_potency kwargs mapped | Correctness |
+| M4D3-MAP-005 | Registry entry | TST-373 | percentage_of_mde kwargs mapped | Correctness |
+| M4D3-MAP-006 | Registry entry | TST-374 | difference_from_mde kwargs mapped | Correctness |
+| M4D3-MAP-007 | Outcome writer | TST-375 | daily_exposure stored unit set to gram/day | Reproducibility |
+| M4D3-MAP-008 | Registry entry | TST-376 | Verbatim kwarg and field names | Correctness |
+| M4D3-UNC-001 | Input pipeline | TST-377 | Conversion owned by the pipeline only | Architecture |
+| M4D3-UNC-002 | Input pipeline | TST-378 | Existing service reused; no second table | Architecture |
+| M4D3-UNC-003 | Registry entry | TST-379 | Full-word unit vocabulary only | Data integrity |
+| M4D3-UNC-004 | Registry entry | TST-380 | Source and target units explicit | Data integrity |
+| M4D3-UNC-005 | Input pipeline | TST-381 | Decimal only; no float | Data integrity |
+| M4D3-UNC-006 | Input pipeline | TST-382 | Canonical target unit per kwarg | Correctness |
+| M4D3-UNC-007 | Input pipeline | TST-383 | Failed conversion blocks invocation | Data integrity |
+| M4D3-UNC-008 | Input pipeline | TST-384 | Conversion failure mapping; sole UNIT_MISMATCH source | Regulatory |
+| M4D3-UNC-009 | Input pipeline | TST-385 | Density required fails closed | Regulatory |
+| M4D3-UNC-010 | Request serializers | TST-386 | No client conversion factor | Security |
+| M4D3-UNC-011 | Input pipeline | TST-387 | Conversion recorded in provenance | Reproducibility |
+| M4D3-INP-010 | Input pipeline | TST-388 | Single pipeline; no ad hoc resolver | Architecture |
+| M4D3-INP-011 | Input pipeline | TST-389 | All eleven ordered steps performed | Correctness |
+| M4D3-INP-012 | Input pipeline | TST-390 | Function never invoked with partial kwargs | Robustness |
+| M4D3-INP-013 | Input pipeline | TST-391 | Pipeline performs no write | Architecture |
+| M4D3-INP-014 | Outcome writer | TST-392 | Inputs and provenance persisted | Reproducibility |
+| M4D3-DEP-001 | Registry validation | TST-393 | Dependencies derived from form E | Correctness |
+| M4D3-DEP-002 | Registry validation | TST-394 | Non-E forms create no edge | Correctness |
+| M4D3-DEP-003 | Registry entry | TST-395 | Documented graph matches registry | Correctness |
+| M4D3-DEP-004 | Review assertion | TST-396 | Depth 2, nodes 3; limits retained as headroom | Correctness |
+| M4D3-DEP-005 | Activation service | TST-397 | Validation at activation plus runtime defence | Security |
+| M4D3-DEP-006 | Activation service | TST-398 | Bad form E target rejected | Data integrity |
+| M4D3-SNO-001 | Population service | TST-399 | Six-step snapshot order observed | Regulatory |
+| M4D3-SNO-002 | Population service | TST-400 | No live IID read after snapshot | Regulatory |
+| M4D3-SNO-003 | Population service | TST-401 | Snapshot and outcomes share the transaction | Data integrity |
+| M4D3-SNO-004 | Population service | TST-402 | Snapshot calculations follow topological order | Correctness |
+| M4D3-IFV-001 | Input pipeline | TST-403 | Sixteen failure codes defined | Data integrity |
+| M4D3-IFV-002 | Outcome writer | TST-404 | Failure codes never reach reason_code | Data integrity |
+| M4D3-IFV-003 | Input pipeline | TST-405 | Missing-data failures map to data_required | Regulatory |
+| M4D3-IFV-004 | Input pipeline | TST-406 | Review-required maps to data_required | Regulatory |
+| M4D3-IFV-005 | Input pipeline | TST-407 | Invalid conditions map to error | Regulatory |
+| M4D3-IFV-006 | Input pipeline | TST-408 | No exception text stored or exposed | Security |
+| M4D3-MDU-022 | Review assertion | TST-409 | Monotonicity rationale recorded | Regulatory |
+| M4D3-MDU-023 | Review assertion | TST-410 | Non-consumers identified | Correctness |
+| M4D3-MDU-024 | Registry governance | TST-411 | New consumer requires monotonicity review | Regulatory |
 | M4D3-MDU-001 | Dosage resolver | TST-323 | Both sources considered; scalar-only rule absent | Regulatory |
 | M4D3-MDU-002 | Dosage resolver | TST-324 | Version candidate only when non-null and positive | Data integrity |
 | M4D3-MDU-003 | Dosage resolver | TST-325 | All related regimens are candidates; no invented lifecycle filter | Correctness |
@@ -1485,7 +1875,7 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-MDU-019 | Outcome serializer | TST-341 | Client sees sanitized summary only | Security |
 | M4D3-MDU-020 | Dosage resolver | TST-342 | Repeat runs identical value and ordering | Correctness |
 | M4D3-MDU-021 | Source resolver | TST-343 | Later regimen change leaves historical result intact | Regulatory |
-| M4D3-RTE-001 | Documentation | TST-344 | Blank-capable fields recorded | Correctness |
+| M4D3-RTE-001 | Review assertion | TST-344 | Blank-capable fields recorded | Correctness |
 | M4D3-RTE-002 | Source resolver | TST-345 | Blank treated as missing | Data integrity |
 | M4D3-RTE-003 | Source resolver | TST-346 | Blank never passed as resolved | Data integrity |
 | M4D3-RTE-004 | Source resolver | TST-347 | `None` lookup is not success | Robustness |
@@ -1507,7 +1897,7 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-SNP-004 | Snapshot service | TST-252 | Service added if absent | Architecture |
 | M4D3-SNP-005 | Snapshot service | TST-253 | `created_by` is triggering actor | Regulatory |
 | M4D3-SNP-006 | Outcome writer | TST-254 | Snapshot UUID recorded | Reproducibility |
-| M4D3-SNP-007 | Documentation | TST-255 | Scope exclusion clarified | Correctness |
+| M4D3-SNP-007 | Review assertion | TST-255 | Scope exclusion clarified | Correctness |
 | M4D3-POP-001 | Population service | TST-256 | Exact ordered pass in one transaction | Data integrity |
 | M4D3-POP-002 | Population service | TST-257 | FDA population precedes calculation | Correctness |
 | M4D3-POP-003 | Population service | TST-258 | N/A and review-required block both | Regulatory |
@@ -1569,7 +1959,7 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-MIG-001 | Repository check | TST-314 | No migration, field or backfill | Compatibility |
 | M4D3-MIG-002 | Compatibility test | TST-315 | Existing rows valid | Compatibility |
 | M4D3-MIG-003 | Deployment test | TST-316 | Historical executions unchanged | Regulatory |
-| M4D3-MIG-004 | Documentation | TST-317 | Breaking change stated | Compatibility |
+| M4D3-MIG-004 | Review assertion | TST-317 | Breaking change stated | Compatibility |
 | M4D3-MIG-005 | Deployment | TST-318 | Old client gets structured error | Compatibility |
 | M4D3-MIG-006 | Release notes | TST-319 | Contract change recorded | Compatibility |
 | M4D3-MIG-007 | Rollback plan | TST-320 | Coordinated rollback, no transformation | Compatibility |
@@ -1585,11 +1975,19 @@ Implementation remains unauthorized. When authorized, the order shall be:
 
 1. `calculation_registry.py` — registry entries, identifier→`calculation_name` mapping,
    binding versions, `CALCULATION_MAX_DEPENDENCY_DEPTH`, `CALCULATION_MAX_CASCADE_NODES`,
-   import-time self-check.
+   import-time self-check including full kwarg coverage (M4D3-INP-002).
+1a. **Resolver vocabulary** — the six allow-listed forms of Part 3A.2 and the complete
+   kwarg mappings of Part 3A.2.1.
+1b. **Unit-conversion layer** — governed wrapper over
+   `iid_assessment/unit_conversion.py`, canonical target units, and the failure mapping
+   of M4D3-UNC-008.
+1c. **Unified input-resolution service** — `resolve_calculation_inputs()` and
+   `ALLOWED_INPUT_FAILURE_CODES`, absorbing maximum-daily-units, snapshot and
+   prior-outcome resolution.
 2. **`services.py` correction** — `create_execution()` resolves the registry entry and
    writes `entry["calculation_name"]`; unknown or invalid entries abort atomically.
 3. `calculation_translation.py` — translation function, `ALLOWED_REASON_CODES`,
-   `INVALID_GENERATED_AT` path.
+   `ALLOWED_RESOLVER_DETAIL_CODES`, `INVALID_GENERATED_AT` path.
 4. `update_checklist_response()` governed service in `services.py`, and reduction of
    `ChecklistResponseUpdateView.patch()` in `views.py` to a thin adapter.
 5. `expected_version` on the governed request serializer, with the 400 and 409 contracts.
