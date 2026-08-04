@@ -17,6 +17,16 @@ PERM_CLONE = "iig_checklist.clone"
 PERM_DELETE_DRAFT = "iig_checklist.delete_draft"
 PERM_VIEW_AUDIT = "iig_checklist.view_audit"
 
+# Milestone 4D-2 -- Execution permissions
+PERM_CREATE_EXECUTION = "iig_checklist.create_execution"
+PERM_EDIT_EXECUTION = "iig_checklist.edit_execution"
+PERM_SUBMIT_EXECUTION = "iig_checklist.submit_execution"
+PERM_REVIEW_EXECUTION = "iig_checklist.review_execution"
+PERM_APPROVE_EXECUTION = "iig_checklist.approve_execution"
+PERM_CANCEL_EXECUTION = "iig_checklist.cancel_execution"
+PERM_SUPERSEDE_EXECUTION = "iig_checklist.supersede_execution"
+PERM_VIEW_EXECUTION = "iig_checklist.view_execution"
+
 # Deliberately NOT granted to any built-in role below. Platform-master
 # checklist definitions are globally visible to every tenant, so
 # authoring them requires a distinct, explicit platform-level grant --
@@ -35,8 +45,21 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_SUBMIT_REVIEW,
         PERM_CLONE,
         PERM_DELETE_DRAFT,
+        # 4D-2
+        PERM_CREATE_EXECUTION,
+        PERM_EDIT_EXECUTION,
+        PERM_SUBMIT_EXECUTION,
+        PERM_CANCEL_EXECUTION,
+        PERM_VIEW_EXECUTION,
     ],
-    Role.BuiltIn.REVIEWER: [PERM_VIEW_DEFINITION, PERM_REVIEW, PERM_VIEW_AUDIT],
+    Role.BuiltIn.REVIEWER: [
+        PERM_VIEW_DEFINITION,
+        PERM_REVIEW,
+        PERM_VIEW_AUDIT,
+        # 4D-2
+        PERM_REVIEW_EXECUTION,
+        PERM_VIEW_EXECUTION,
+    ],
     Role.BuiltIn.VP: [
         PERM_VIEW_DEFINITION,
         PERM_REVIEW,
@@ -44,8 +67,16 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_ACTIVATE,
         PERM_RETIRE,
         PERM_VIEW_AUDIT,
+        # 4D-2
+        PERM_APPROVE_EXECUTION,
+        PERM_SUPERSEDE_EXECUTION,
+        PERM_VIEW_EXECUTION,
     ],
-    Role.BuiltIn.TENANT_ADMIN: [PERM_VIEW_DEFINITION],
+    Role.BuiltIn.TENANT_ADMIN: [
+        PERM_VIEW_DEFINITION,
+        # 4D-2
+        PERM_VIEW_EXECUTION,
+    ],
     Role.BuiltIn.PLATFORM_SUPPORT: [],
 }
 
@@ -202,3 +233,36 @@ class CanDeleteChecklistDraft(_IigChecklistPermissionBase):
 
 class CanViewChecklistAudit(_IigChecklistPermissionBase):
     required_codename = PERM_VIEW_AUDIT
+
+
+# 4D-2 execution permission classes
+class CanCreateExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_CREATE_EXECUTION
+
+
+class CanEditExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_EDIT_EXECUTION
+
+
+class CanSubmitExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_SUBMIT_EXECUTION
+
+
+class CanReviewExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_REVIEW_EXECUTION
+
+
+class CanApproveExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_APPROVE_EXECUTION
+
+
+class CanCancelExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_CANCEL_EXECUTION
+
+
+class CanSupersedeExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_SUPERSEDE_EXECUTION
+
+
+class CanViewExecution(_IigChecklistPermissionBase):
+    required_codename = PERM_VIEW_EXECUTION

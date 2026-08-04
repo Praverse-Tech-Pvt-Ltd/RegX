@@ -1,4 +1,4 @@
-"""IIG checklist definition-governance URL configuration."""
+"""IIG checklist definition-governance and execution URL configuration."""
 
 from django.urls import path
 
@@ -96,5 +96,61 @@ urlpatterns = [
         "iig-checklists/applicability-rules/validate/",
         views.ApplicabilityRuleValidateView.as_view(),
         name="applicability-rule-validate",
+    ),
+    # 4D-2 Execution endpoints
+    path(
+        "iig-checklists/executions/",
+        views.ChecklistExecutionListCreateView.as_view(),
+        name="execution-list-create",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/",
+        views.ChecklistExecutionDetailView.as_view(),
+        name="execution-detail",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/submit-review/",
+        views.ChecklistExecutionSubmitView.as_view(),
+        name="execution-submit-review",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/approve/",
+        views.ChecklistExecutionApproveView.as_view(),
+        name="execution-approve",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/return/",
+        views.ChecklistExecutionReturnView.as_view(),
+        name="execution-return",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/reject/",
+        views.ChecklistExecutionRejectView.as_view(),
+        name="execution-reject",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/cancel/",
+        views.ChecklistExecutionCancelView.as_view(),
+        name="execution-cancel",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/supersede/",
+        views.ChecklistExecutionSupersedeView.as_view(),
+        name="execution-supersede",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/responses/",
+        views.ChecklistResponseListView.as_view(),
+        name="execution-response-list",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/responses/<uuid:response_public_id>/",
+        views.ChecklistResponseUpdateView.as_view(),
+        name="execution-response-update",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/responses/<uuid:response_public_id>/reviewer-conclusion/",
+        views.ChecklistReviewerConclusionView.as_view(),
+        name="execution-reviewer-conclusion",
     ),
 ]
