@@ -72,7 +72,7 @@ Prior head `84b6dd9` was reviewed **FAIL** (0 Critical, 3 Major, 3 Minor).
 |---|---|---|
 | MAJ-B the subject `FormulationComponent` was never determined | Two governed selector forms, mandatory `required_component_type`, prohibited inference strategies, zero/ambiguous fail-closed rules, component provenance, and an explicit per-component cardinality decision | Part 3A.2.2, 3A.2.3 |
 | MAJ-C `AssessmentSnapshot` resolution was non-deterministic | New immutable snapshot per governed event, carried in a transaction-scoped context; broad re-query and `.first()` prohibited; consistency checks on tenant, component and release; cross-app transaction ownership specified against the verified single-database configuration | Part 3A.6 |
-| MAJ-D `M4D3-IFV-005` was non-deterministic and conflated security with scientific failure | Replaced by a complete one-to-one mapping table over 28 detail codes, with five new canonical reason codes separating configuration, security, data-integrity, snapshot and component faults | M4D3-IFV-003, M4D3-RSN-001 |
+| MAJ-D `M4D3-IFV-005` was non-deterministic and conflated security with scientific failure | Replaced by a complete one-to-one mapping table, 28 detail codes at that revision and 29 today, with five new canonical reason codes separating configuration, security, data-integrity, snapshot and component faults | M4D3-IFV-003, M4D3-RSN-001 |
 | Minor 1 snapshot stale/review tests had no schema basis | Replaced with real-field conditions on `iid_release_public_id`, `formulation_component_public_id`, `tenant` and the IID value/unit fields | Test strategy §10.15 |
 | Minor 2 cross-app transaction mechanics asserted, not specified | Verified single `"default"` PostgreSQL database with no routers; helper joins the outer transaction | M4D3-SNO-012 |
 | Minor 3 Form D omitted the unit fields it needed | `iid_potency_unit` and `iid_mde_unit` added to the permitted field list | M4D3-INP-006 |
@@ -89,6 +89,16 @@ re-issued against an unchanged head and returned the same result.
 | Minor 1 `registry_component_code` verified absence unrecorded | Form B **disabled**; activation rejects it; verified field inventory recorded; `response_reference` is the only enabled selector | M4D3-FCR-004, FCR-012…014 |
 | Minor 2 DEP-011 conditional wording | Replaced by a three-row deterministic table; new detail code `UPSTREAM_CALCULATION_COMPONENT_MISMATCH` added and mapped | M4D3-DEP-011, M4D3-IFV-001/003 |
 | Minor 3 test strategy §3 contradicted the narrow definition | §3 rewritten around the trigger/dependency distinction with seven required cases | Test strategy §3 |
+
+## Sixth revision note — findings resolved after the latest final review
+
+Prior head `448b3f7` was reviewed **FAIL** (0 Critical, 1 Major, 2 Minor).
+
+| Finding | Resolution | Part |
+|---|---|---|
+| MAJ-G the rebinding history row had no governed `correction_reason` and its field values were unspecified | History scope broadened to **governed persisted-state transitions**; closed `ALLOWED_HISTORY_REASON_CODES` vocabulary with a distinct `COMPONENT_REBOUND` code; complete twelve-field rebinding row table; `full_clean()` before save; rollback on validation failure; two-row rule for a combined rebinding plus applicability transition | §10.2, §10.2.1, §10.2.2, M4D3-HST-001…016, M4D3-RBD-010 |
+| Minor 1 stale "28 mapped detail codes" and no named test for the 29th | Count corrected to 29 and TST-450d added for `UPSTREAM_CALCULATION_COMPONENT_MISMATCH` | Test strategy §10.18 |
+| Minor 2 `identifier` required but absent from the field table | Mapping key declared the sole identifier representation, with an import-time check rejecting a nested `identifier` key | M4D3-REG-005, M4D3-REG-020 |
 
 ---
 
@@ -231,7 +241,9 @@ name).
 in a new module `backend/iig_checklist/calculation_registry.py`. It shall not be a
 database table and shall not be mutable at runtime.
 
-**M4D3-REG-005** Each entry shall provide exactly these fields:
+**M4D3-REG-005** Each registry **mapping key is the identifier** — it is the single
+authoritative representation and shall not be duplicated as a nested entry field. Each
+mapped entry shall provide exactly the following nested fields:
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -264,6 +276,10 @@ CALCULATION_BINDING_REGISTRY = {
 
 **M4D3-REG-006** Registry identifiers shall be lowercase ASCII slugs of letters and
 underscores, at most 100 characters, compatible with `CharField(max_length=100)`.
+
+**M4D3-REG-020** The import-time self-check shall assert that no mapped entry contains an
+`identifier` key, so the mapping key remains the sole representation and the two can
+never disagree.
 
 **M4D3-REG-007** The approved identifier → `calculation_name` mapping for this release
 shall be exactly:
@@ -524,8 +540,12 @@ M4D3-FCR-005 (same `FormulationVersion`, same tenant, matching
 `ChecklistExecution`; lock the component-reference `ChecklistResponse`; lock every
 calculated response listing that selector response in `recalculation_triggers`; lock every
 downstream calculated response reachable through `calculation_dependencies`; lock all
-affected `CalculationOutcome` rows in ascending primary-key order; write a
-`ChecklistResponseHistory` row preserving the prior component reference; update the
+affected `CalculationOutcome` rows in ascending primary-key order; capture the prior
+component-reference payload, the prior N/A fields and the prior
+`data_source_type_snapshot`; construct the complete `ChecklistResponseHistory` row of
+M4D3-HST-015 with `correction_reason = COMPONENT_REBOUND` and `amended_by` set to the
+authenticated updater; call `full_clean()` on that row and save it, rolling the whole
+operation back if either fails (M4D3-HST-011); update the
 component-reference response and increment its version by one; resolve the new subject
 component; discard the prior component-specific resolved input context; create a fresh
 `AssessmentSnapshot` for the new component per M4D3-SNO-006; re-resolve every calculation
@@ -548,7 +568,11 @@ current `CalculationOutcome.input_provenance`. Historical evidence remains avail
 
 **M4D3-RBD-007** A rebinding that changes nothing — the submitted component reference
 equals the current one — shall perform no recalculation, no version increment, no history
-row and no audit event.
+row, no new `AssessmentSnapshot` and no audit event.
+
+**M4D3-RBD-010** A history `full_clean()` or persistence failure is a structural failure
+under M4D3-RBD-008 and shall roll the rebinding back entirely, consistent with
+M4D3-HST-011.
 
 **M4D3-RBD-008** Structural and transactional failures shall roll back the entire
 rebinding: the component-reference change is discarded; the response version is unchanged;
@@ -1168,7 +1192,7 @@ marked in error.
 `UNIT_MISMATCH`, `FDA_VALUE_UNAVAILABLE`, `NOT_COMPARABLE`,
 `REGULATORY_REVIEW_REQUIRED`, `UNKNOWN_ENGINE_STATUS`, `UNKNOWN_REGISTRY_IDENTIFIER`,
 `INVALID_GENERATED_AT`, `DEPENDENCY_DEPTH_EXCEEDED`, `CASCADE_NODE_LIMIT_EXCEEDED`,
-`DEPENDENCY_CYCLE`, `APPLICABILITY_REEVALUATED`, `INPUT_RESOLUTION_FAILED`,
+`DEPENDENCY_CYCLE`, `INPUT_RESOLUTION_FAILED`,
 `TENANT_ISOLATION_VIOLATION`, `DUPLICATE_UPSTREAM_OUTCOME`,
 `SNAPSHOT_RESOLUTION_FAILED`, `FORMULATION_COMPONENT_RESOLUTION_FAILED`.
 
@@ -1184,6 +1208,15 @@ component resolution fault, respectively. Each is at most 100 characters and fit
 `FDA_VALUE_UNAVAILABLE`, `REGULATORY_REVIEW_REQUIRED` and `DATA_REQUIRED` retain their
 existing meanings and shall not be reused for configuration, security or data-integrity
 faults.
+
+**M4D3-RSN-011** Three vocabularies exist and shall never be mixed:
+`ALLOWED_REASON_CODES` governs `CalculationOutcome.reason_code`;
+`ALLOWED_RESOLVER_DETAIL_CODES` governs the detail codes recorded in `input_provenance`;
+and `ALLOWED_HISTORY_REASON_CODES` (M4D3-HST-005) governs
+`ChecklistResponseHistory.correction_reason`. `APPLICABILITY_REEVALUATED` and
+`COMPONENT_REBOUND` belong exclusively to the history vocabulary and shall never appear
+in `CalculationOutcome.reason_code`; no `ALLOWED_REASON_CODES` member shall be written to
+`correction_reason`.
 
 **M4D3-RSN-002** Reason codes shall be uppercase ASCII with underscores, at most 100
 characters, fitting `CalculationOutcome.reason_code`
@@ -1384,34 +1417,44 @@ lacks an authenticated triggering actor.
 
 **M4D3-HST-001** `ChecklistResponseHistory` was introduced for reviewer-conclusion
 amendments; its docstring states one row per amendment and never on first entry. 4D-3
-extends its governed reuse to persisted applicability transitions. This reuse shall be
-documented in the model docstring update accompanying implementation.
+extends its governed reuse to **governed persisted-state transitions**, which for this
+milestone are exactly: persisted applicability transitions (§10.2.1) and
+component-reference rebinding (§10.2.2). No statement shall describe the model as used
+only for reviewer conclusions, or only for applicability. This reuse shall be documented
+in the model docstring update accompanying implementation.
 
 **M4D3-HST-002** At initial execution creation no history row shall be written, because
 responses are created with `raw_value = null` and `is_not_applicable = False` and no
 prior state exists.
 
-**M4D3-HST-003** When the persisted applicability state of an existing response changes,
-a `ChecklistResponseHistory` row shall be created in the same transaction, populating
-every required field: `response`, `prior_raw_value`, `new_raw_value`,
-`prior_is_not_applicable`, `new_is_not_applicable`, `prior_not_applicable_reason`,
-`new_not_applicable_reason`, `prior_version`, `new_version`, `correction_reason`,
-`amended_by`, `source_classification_snapshot`.
+**M4D3-HST-003** Whenever a governed persisted-state transition changes an existing
+`ChecklistResponse`, a `ChecklistResponseHistory` row shall be created in the same
+transaction, populating **every** required field: `response`, `prior_raw_value`,
+`new_raw_value`, `prior_is_not_applicable`, `new_is_not_applicable`,
+`prior_not_applicable_reason`, `new_not_applicable_reason`, `prior_version`,
+`new_version`, `correction_reason`, `amended_by`, `source_classification_snapshot`.
+`public_id` and `amended_at` are populated automatically by the model and shall not be
+set by the service.
 
 **M4D3-HST-004** `amended_by` shall be the authenticated actor who triggered the
 governed response update or the authorized recalculation. `execution.created_by` shall
 never be recorded as the actor unless that user actually triggered the operation.
 
-**M4D3-HST-005** `correction_reason` shall be the server-generated code
-`APPLICABILITY_REEVALUATED` for system applicability transitions. A fabricated
-human-authored correction reason shall never be written.
+**M4D3-HST-005** `correction_reason` shall be a server-generated code drawn from the
+closed vocabulary `ALLOWED_HISTORY_REASON_CODES`, defined alongside the governed
+services and containing exactly `APPLICABILITY_REEVALUATED` and `COMPONENT_REBOUND`.
+Each code is uppercase ASCII with underscores, is never client-supplied, and shall
+never carry free-form or exception text. `correction_reason` is a `TextField` so no
+length constraint applies, and both codes fit comfortably. A fabricated human-authored
+correction reason shall never be written, and no code shall be applied to an event type
+it does not describe.
 
 **M4D3-HST-006** `source_classification_snapshot` shall be set from the response's
-existing `data_source_type_snapshot`.
+existing `data_source_type_snapshot` at the time of the transition.
 
-**M4D3-HST-007** `prior_version` shall be the pre-update version and `new_version` the
-incremented value; the response version shall increment on every persisted applicability
-transition.
+**M4D3-HST-007** `prior_version` shall be the pre-update version and `new_version` shall
+be `prior_version + 1`; the response version shall increment exactly once on every
+governed persisted-state transition.
 
 **M4D3-HST-008** History creation and the response update shall be atomic; no history
 row shall be visible without its corresponding response state, and neither shall persist
@@ -1419,6 +1462,70 @@ if the transaction rolls back.
 
 **M4D3-HST-009** `ChecklistResponseHistory` rows shall remain append-only; the existing
 `GovernedHistoryMutationForbidden` guards shall not be bypassed.
+
+**M4D3-HST-010** Verified model facts: `correction_reason` is `TextField()` with no
+`null` and no `blank=True`, so an empty string fails validation; `amended_by` is a
+non-nullable `ForeignKey`; `prior_is_not_applicable`, `new_is_not_applicable`,
+`prior_version`, `new_version` and `source_classification_snapshot` are all required.
+The service shall construct the complete row, call `full_clean()`, and only then
+`save()`. A bare `save()` shall never be relied upon for validation.
+
+**M4D3-HST-011** A `full_clean()` failure or persistence failure on the history row
+shall roll back the entire enclosing operation. No response mutation, version increment,
+`AssessmentSnapshot`, `CalculationOutcome` mutation or success audit shall survive that
+rollback.
+
+**M4D3-HST-012** History payload safety: the stored `prior_raw_value` and
+`new_raw_value` shall conform to the existing `FORMULATION_COMPONENT_REFERENCE`
+validator shape — exactly `{"public_id": "<uuid>"}` — so only the public component UUID
+is retained. No internal database identifier, cross-tenant metadata, or unrestricted
+component free text shall be written to the history row.
+
+**M4D3-HST-013** Append-only history content and audit payloads are distinct: history
+retains the governed prior/new payloads required for traceability, while audit events
+remain limited to the metadata of M4D3-AUD-003 and shall not carry full raw response
+content.
+
+#### 10.2.1 Applicability-transition history
+
+**M4D3-HST-014** For a persisted applicability transition: `correction_reason` shall be
+`APPLICABILITY_REEVALUATED`; `prior_is_not_applicable` / `new_is_not_applicable` and
+`prior_not_applicable_reason` / `new_not_applicable_reason` shall reflect the actual
+state transition; `prior_raw_value` / `new_raw_value` shall reflect any governed nulling
+under M4D3-NA-001 or the retained value; `amended_by` is the triggering authenticated
+actor; `source_classification_snapshot` is populated; and the version increments once.
+`COMPONENT_REBOUND` shall never be used for this event.
+
+#### 10.2.2 Component-rebinding history
+
+**M4D3-HST-015** For a successful component-reference rebinding, exactly one
+`ChecklistResponseHistory` row shall be written against the selector response, with these
+values:
+
+| Field | Value |
+|---|---|
+| `response` | the component-reference `ChecklistResponse` being changed |
+| `prior_raw_value` | the complete prior governed component-reference payload, `{"public_id": "<component A uuid>"}` |
+| `new_raw_value` | the complete new governed component-reference payload, `{"public_id": "<component B uuid>"}` |
+| `prior_is_not_applicable` | copied from the response state before rebinding |
+| `new_is_not_applicable` | copied from the response state after rebinding — unchanged for a pure rebinding |
+| `prior_not_applicable_reason` | copied from the prior response state |
+| `new_not_applicable_reason` | copied from the new response state — unchanged for a pure rebinding |
+| `prior_version` | the version before the update |
+| `new_version` | `prior_version + 1` |
+| `correction_reason` | `COMPONENT_REBOUND` |
+| `amended_by` | the authenticated actor who performed the governed update |
+| `source_classification_snapshot` | the response's `data_source_type_snapshot` at the time of rebinding |
+
+`APPLICABILITY_REEVALUATED` shall never be used for this event.
+
+**M4D3-HST-016** Where a rebinding operation also causes a **separate** response's
+persisted applicability state to change, the normative behavior is **two distinct rows**,
+not one combined row: the selector response receives one row with
+`COMPONENT_REBOUND`, and each other response whose applicability state changed receives
+its own row with `APPLICABILITY_REEVALUATED`. All such rows share the same transaction
+and the same authenticated actor, and each shall pass `full_clean()`. No implementer
+choice is permitted.
 
 ### 10.3 N/A raw-value behavior
 
@@ -2190,6 +2297,15 @@ scalar-only resolution rule), so both retain an executable implementation compon
 | M4D3-HST-007 | Applicability service | TST-205 | Versions recorded and incremented | Data integrity |
 | M4D3-HST-008 | Applicability service | TST-206 | Atomic with response update | Data integrity |
 | M4D3-HST-009 | History model | TST-207 | Append-only guards intact | Regulatory |
+| M4D3-HST-010 | History row factory | TST-475 | Complete row built, `full_clean()` before `save()` | Data integrity |
+| M4D3-HST-011 | History row factory | TST-476 | Validation failure rolls back the whole operation | Data integrity |
+| M4D3-HST-012 | History row factory | TST-477 | Payload is the governed `{public_id}` shape only | Security |
+| M4D3-HST-013 | Audit dispatch | TST-478 | Audit carries no full raw response content | Security |
+| M4D3-HST-014 | Applicability service | TST-479 | `APPLICABILITY_REEVALUATED` used for applicability only | Regulatory |
+| M4D3-HST-015 | Rebinding service | TST-480 | All twelve rebinding field values correct | Regulatory |
+| M4D3-HST-016 | Rebinding service | TST-481 | Two distinct rows; no code misapplied | Regulatory |
+| M4D3-RBD-010 | Rebinding service | TST-482 | History failure is a structural rollback | Data integrity |
+| M4D3-REG-020 | Import-time self-check | TST-483 | No nested `identifier` key permitted | Correctness |
 | M4D3-NA-001 | Applicability service | TST-208 | `raw_value` nulled on N/A | Data integrity |
 | M4D3-NA-002 | Applicability service | TST-209 | Prior value preserved in history | Regulatory |
 | M4D3-NA-003 | Applicability service | TST-210 | Reason set from rule | Regulatory |
@@ -2323,6 +2439,7 @@ scalar-only resolution rule), so both retain an executable implementation compon
 | M4D3-IFV-008 | Input pipeline | TST-448 | Undefined condition → `UNKNOWN_INTERNAL_FAILURE`, never complete | Security |
 | M4D3-RSN-009 | Translation module | TST-449 | Five new codes, one meaning each, ≤ 100 chars | Data integrity |
 | M4D3-RSN-010 | Translation module | TST-450 | Scientific codes not reused for config/security faults | Regulatory |
+| M4D3-RSN-011 | Translation module | TST-484 | Three vocabularies kept separate; history codes never in `reason_code` | Data integrity |
 | M4D3-TRG-001 | Registry entry | TST-451 | `calculation_dependencies` is Form E only | Correctness |
 | M4D3-TRG-002 | Registry entry | TST-452 | `recalculation_triggers` covers Form A and component selectors | Correctness |
 | M4D3-TRG-003 | Registry entry | TST-453 | Both sets declared independently | Correctness |
@@ -2489,10 +2606,18 @@ Implementation remains unauthorized. When authorized, the order shall be:
    `ChecklistResponseUpdateView.patch()` in `views.py` to a thin adapter.
 4a. **Trigger-keyed recalculation** in `services.py` — cascade keyed on
    `recalculation_triggers`, expanded through `calculation_dependencies` (M4D3-RCL-001/006).
-4b. **Component-rebinding path** in `services.py` — governed component-reference update,
-   fresh snapshot for the new component, affected-outcome invalidation and recalculation,
-   downstream graph recalculation, provenance replacement, history and audit, with the
-   rollback-versus-governed-outcome split of M4D3-RBD-008/009.
+4b. **Component-rebinding path** in `backend/iig_checklist/services.py` — governed
+   component-reference update, fresh snapshot for the new component, affected-outcome
+   invalidation and recalculation, downstream graph recalculation, provenance
+   replacement, history and audit, with the rollback-versus-governed-outcome split of
+   M4D3-RBD-008/009.
+4c. **History event vocabulary and row factory** in `backend/iig_checklist/services.py` —
+   `ALLOWED_HISTORY_REASON_CODES` (`APPLICABILITY_REEVALUATED`, `COMPONENT_REBOUND`) and a
+   shared helper that builds a complete `ChecklistResponseHistory` row for any governed
+   persisted-state transition, calls `full_clean()` before `save()`, and rolls the
+   enclosing operation back on validation failure (M4D3-HST-003/005/010/011). The
+   applicability path and the rebinding path use the helper with their own event code and
+   remain separate (M4D3-HST-014/015/016).
 5. `expected_version` on the governed request serializer, with the 400 and 409 contracts.
 6. Governed applicability service and persisted `REVIEW_REQUIRED:` marker, including
    `evaluate_applicability()` in `applicability.py`.
