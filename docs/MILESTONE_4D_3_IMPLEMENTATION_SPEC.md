@@ -39,6 +39,20 @@ implementation code is created by this document. Implementation remains unauthor
 | Minor 10 snapshot write vs consumer-only scope | Ownership clarified | Part 15 |
 | Minor 11 test-strategy section order | Corrected in the test strategy document | — |
 
+## Second revision note — findings resolved after the second adversarial review
+
+Prior head `51a4fcc` was reviewed **FAIL** (0 Critical, 2 Major, 5 Minor).
+
+| Finding | Resolution | Part |
+|---|---|---|
+| MAJ-1 test strategy still specified tests against the nonexistent `enter_response()` | All references removed from both documents; §3 rewritten against `update_checklist_response()`; duplicate stale-version test withdrawn so exactly one normative definition remains | Part 4; test strategy §3, §9, §10.3 |
+| MAJ-2 `maximum_dosage_units_per_day` had two competing sources with no selection rule | Conservative worst-case resolver specified over both `FormulationVersion.maximum_dosage_units_per_day` and `DosingRegimen.maximum_units_per_day`, with tie-breaker, disagreement flag, provenance and fail-closed behavior | Part 14.1 |
+| Minor 1 no `reason_code` format validation | Pattern `^[A-Z][A-Z0-9_]{0,99}$` plus reserved-prefix rejection at activation | Part 9.2.1 |
+| Minor 2 M4D3-SRC-006 hedge too broad | Narrowed to genuinely unresolved runtime data; verified non-nullability recorded | M4D3-SRC-006, M4D3-SRC-014 |
+| Minor 3 duplicate stale-version coverage | Single normative definition retained | Test strategy §10.3 |
+| Minor 4 blank `route`/`dosage_form` undefined | Blank treated as missing governed data; no fallback | Part 14.2 |
+| Minor 5 backend and frontend tests merged | Split into separate sequence steps | Part 22 |
+
 ---
 
 ## Part 1 — Scope
@@ -469,6 +483,19 @@ payload.
 **M4D3-RSN-005** Raw exception text, stack traces and free-form internal messages shall
 never be written to `reason_code`.
 
+**M4D3-RSN-006** A second closed vocabulary `ALLOWED_RESOLVER_DETAIL_CODES` shall be
+defined in the same module for governed detail codes recorded in `input_provenance`.
+It shall contain exactly: `MAX_DAILY_UNITS_REQUIRED`, `MAX_DAILY_UNITS_SOURCE_INVALID`,
+`MAX_DAILY_UNITS_SOURCE_AMBIGUOUS`, `MAX_DAILY_UNITS_SOURCE_DISAGREEMENT`,
+`ROUTE_NOT_PROVIDED`, `DOSAGE_FORM_NOT_PROVIDED`.
+
+**M4D3-RSN-007** Detail codes are provenance metadata only. They shall never be written
+to `CalculationOutcome.reason_code`, shall never appear in
+`ALLOWED_REASON_CODES`, and shall never alter the engine's canonical status mapping.
+
+**M4D3-RSN-008** Detail codes shall follow the same casing and length rules as
+M4D3-RSN-002 and shall never be supplied by a client.
+
 ---
 
 ## Part 8 — Applicability evaluation and field ownership (M-E)
@@ -556,6 +583,32 @@ whose composed marker would exceed `MAX_NOT_APPLICABLE_REASON_CHARS`, with
 and `full_clean()` shall be called before every such save.
 
 **M4D3-PST-006** No client PATCH shall write or clear the marker (see M4D3-APP-011).
+
+### 9.2.1 Reason-code format validation
+
+**M4D3-RFV-001** `ApplicabilityRule.reason_code` is `CharField(max_length=100)` with no
+format validator in the current model. Activation-time validation shall require the
+pattern `^[A-Z][A-Z0-9_]{0,99}$`.
+
+**M4D3-RFV-002** The pattern is length-compatible with the field: it admits 1 to 100
+characters inclusive, matching `max_length=100` exactly.
+
+**M4D3-RFV-003** The pattern excludes the colon character, so a governed `reason_code`
+can never introduce ambiguous marker syntax into `not_applicable_reason`.
+
+**M4D3-RFV-004** The pattern excludes whitespace and lowercase characters.
+
+**M4D3-RFV-005** Activation shall additionally reject any `reason_code` equal to
+`REVIEW_REQUIRED` or beginning with `REVIEW_REQUIRED`, with
+`error_code = "reserved_reason_code"`, so the reserved marker prefix can never collide
+with a governed reason code.
+
+**M4D3-RFV-006** The persisted marker form remains
+`REVIEW_REQUIRED:<reason_code>`; with a maximum 100-character reason code the composed
+marker is at most 116 characters, within `MAX_NOT_APPLICABLE_REASON_CHARS = 200`.
+
+**M4D3-RFV-007** No client shall supply either a `reason_code` or a composed marker
+through any request payload.
 
 ### 9.3 State-dependent evaluation
 
@@ -791,20 +844,31 @@ resolved server-side on every call.
 
 **M4D3-SRC-004** `run_preview()` arguments shall be resolved as follows:
 `active_release_public_id` from M4D3-SRC-001; `route_code` and `dosage_form_code` from
-the execution's `FormulationVersion.product`; `proposed_quantity_per_unit` and
-`proposed_quantity_unit` from the `FormulationComponent`;
-`total_dosage_unit_weight` and `total_dosage_unit_weight_unit` from the
-`FormulationVersion`; `maximum_dosage_units_per_day` from the `FormulationVersion` where
-present; and substance identity fields from the `FormulationComponent`.
+the execution's `FormulationVersion.product` subject to Part 14.2;
+`proposed_quantity_per_unit` and `proposed_quantity_unit` from the
+`FormulationComponent`; `total_dosage_unit_weight` and `total_dosage_unit_weight_unit`
+from the `FormulationVersion` (verified non-nullable, M4D3-SRC-014);
+`maximum_dosage_units_per_day` from the governed resolver in Part 14.1; and substance
+identity fields from the `FormulationComponent`.
 
 **M4D3-SRC-005** Any required `run_preview()` argument that cannot be resolved shall
 produce `status = "data_required"` and `reason_code = "DATA_REQUIRED"` for the affected
 outcome, without raising.
 
-**M4D3-SRC-006** If any resolver above is not deterministically available in the current
-`formulations` schema at implementation time, that gap shall be treated as a **blocking
-implementation requirement** and raised for governed specification amendment rather than
-resolved by an implementer's assumption.
+**M4D3-SRC-006** This requirement applies **only to runtime data that is genuinely
+unresolved, invalid or ambiguous** — principally a maximum-dosage-units resolution
+failure under M4D3-MDU-013 or an unresolvable controlled term under Part 14.2. Such a
+condition shall fail closed under M4D3-SRC-005 and shall be surfaced through governed
+provenance. It shall not be read as a general statement that the fields named in
+M4D3-SRC-004 may be absent from the schema.
+
+**M4D3-SRC-014** Verified schema facts, confirmed against
+`backend/formulations/models.py`: `FormulationVersion.total_dosage_unit_weight` is
+`DecimalField(max_digits=20, decimal_places=6)` — **non-nullable** — and carries
+`CheckConstraint(total_dosage_unit_weight__gt=0)` named
+`formulation_total_weight_positive`; `FormulationVersion.total_dosage_unit_weight_unit`
+is `CharField(max_length=50)` and is **required** (no `blank=True`). Neither field may be
+described as potentially unavailable.
 
 **M4D3-SRC-007** All `AssessmentSnapshot` reads and writes shall filter by
 `tenant = execution.tenant`.
@@ -825,6 +889,137 @@ the translation table to `REGULATORY_REVIEW_REQUIRED`.
 recalculate an existing execution.
 
 **M4D3-SRC-013** No 4D-3 code shall write to `fda_data` models.
+
+### Part 14.1 — Maximum dosage units resolver
+
+**M4D3-MDU-001** Verified schema facts. Two governed sources exist and both shall be
+considered:
+
+| Source | Definition | Cardinality |
+|---|---|---|
+| `FormulationVersion.maximum_dosage_units_per_day` | `DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)` | zero or one per version |
+| `DosingRegimen.maximum_units_per_day` | `DecimalField(max_digits=10, decimal_places=4)`, required, with `CheckConstraint(maximum_units_per_day__gt=0)` named `dosing_regimen_max_units_positive` | zero or more per version, `related_name="dosing_regimens"`, no uniqueness on `formulation_version` |
+
+A scalar-only resolution rule is prohibited.
+
+**M4D3-MDU-002** Step 1 — the version-level candidate shall be `FormulationVersion.maximum_dosage_units_per_day`
+when it is non-null and strictly greater than zero; otherwise the version-level candidate
+is absent.
+
+**M4D3-MDU-003** Step 1 — regimen candidates shall be every `DosingRegimen` row whose
+`formulation_version` is the execution's `FormulationVersion`. Verified schema fact:
+`DosingRegimen` has **no** status or lifecycle field, so no lifecycle filter shall be
+invented; every related row is a governed candidate.
+
+**M4D3-MDU-004** Step 1 — candidate rows shall be constrained to the execution tenant
+through `formulation_version__product__tenant = execution.tenant`. A row failing this
+constraint shall be excluded and shall contribute nothing to provenance.
+
+**M4D3-MDU-005** Step 1 — any candidate value that is null, non-positive, or not a valid
+`Decimal` shall be excluded from selection and recorded as invalid in provenance.
+
+**M4D3-MDU-006** Step 1 — no dosing value shall ever be accepted from a client request
+payload.
+
+**M4D3-MDU-007** Step 2 — regimen resolution: with no eligible regimen the regimen
+candidate is absent; with exactly one, its `maximum_units_per_day` is the regimen
+candidate; with more than one, the **highest** valid `maximum_units_per_day` shall be
+selected as the conservative worst-case exposure input.
+
+**M4D3-MDU-008** Step 2 — where two or more regimens share the highest value, the
+selected row shall be the one with the lowest `public_id` in ascending UUID order,
+producing a deterministic and repeatable choice.
+
+**M4D3-MDU-009** Step 2 — `DosingRegimen.patient_population` is
+`CharField(max_length=255, blank=True)` with no controlled vocabulary, and neither
+`ChecklistExecution` nor `ProductDevelopmentRecord` exposes a governed patient-population
+selector. It shall therefore be treated as **provenance only and never as a filter**.
+Worst-case selection across all populations shall be retained. Should a deterministic,
+validated selector be introduced in a later milestone, filtering may be reconsidered
+through a governed specification change.
+
+**M4D3-MDU-010** Step 3 — reconciliation of the two candidates:
+
+| Version candidate | Regimen candidate | Selected value | Provenance source type |
+|---|---|---|---|
+| present | absent | version scalar | `formulation_version` |
+| absent | present | regimen value | `dosing_regimen` |
+| present | present, equal | that value | `combined_conservative` |
+| present | present, different | the **higher** of the two | `combined_conservative` |
+
+**M4D3-MDU-011** Step 3 — when both candidates are present and differ, a controlled
+provenance flag `source_disagreement = true` shall be recorded alongside both values.
+
+**M4D3-MDU-012** Step 3 — the resolver shall never prefer the lower value, never average
+or otherwise combine values arithmetically, and never select by row creation order or
+database insertion order.
+
+**M4D3-MDU-013** Step 4 — the resolver shall fail closed when neither candidate exists;
+when every available value is invalid; when tenant ownership cannot be established; when
+the formulation relationship is ambiguous; or when a required source record cannot be
+deterministically resolved.
+
+**M4D3-MDU-014** Step 4 — a fail-closed resolution shall leave
+`maximum_dosage_units_per_day` unresolved so that the engine's own canonicalization
+applies: `calculate_daily_exposure` returns `MAX_DAILY_UNITS_MISSING`, which resolves to
+the string `DATA_REQUIRED` and translates to `status = "data_required"` with
+`reason_code = "DATA_REQUIRED"`. The engine mapping shall be preserved unchanged and no
+new stored status or reason value shall be introduced on `CalculationOutcome`.
+
+**M4D3-MDU-015** The specific resolver failure shall be recorded as a governed detail
+code in `input_provenance` (M4D3-RSN-006), not in `CalculationOutcome.reason_code`. No
+database field and no migration shall be created for it.
+
+**M4D3-MDU-016** Resolver provenance shall record: the selected source type
+(`formulation_version`, `dosing_regimen`, or `combined_conservative`); the
+`FormulationVersion` public UUID; the version scalar where present; the public UUIDs of
+every considered `DosingRegimen`; their `patient_population` labels; every valid
+candidate value; the selected value; whether the UUID tie-breaker was applied; the
+`source_disagreement` flag; the resolver version; and the calculation registry
+`binding_version`.
+
+**M4D3-MDU-017** The resolver shall carry an explicit `resolver_version` string,
+incremented whenever its selection logic changes, and recorded in provenance.
+
+**M4D3-MDU-018** No internal database primary key shall appear in resolver provenance;
+only public UUIDs and approved labels.
+
+**M4D3-MDU-019** Clients shall receive only the sanitized provenance summary defined in
+M4D3-SER-002; full resolver provenance remains server-side.
+
+**M4D3-MDU-020** Repeated execution of the resolver against unchanged data shall select
+an identical value and emit provenance entries in an identical, stable order.
+
+**M4D3-MDU-021** A `DosingRegimen` added, altered or removed after an execution leaves
+`draft`/`returned` shall not alter that execution's persisted calculation result or
+stored provenance.
+
+### Part 14.2 — Blank controlled-term behavior
+
+**M4D3-RTE-001** Verified schema fact: `ProductDevelopmentRecord.route` and
+`ProductDevelopmentRecord.dosage_form` are both `CharField(max_length=255, blank=True)`
+and may therefore hold the empty string.
+
+**M4D3-RTE-002** An empty or whitespace-only `route` or `dosage_form` shall be treated as
+**missing governed source data**, not as a resolved value.
+
+**M4D3-RTE-003** A blank value shall not be passed to `run_preview()` as a resolved
+argument.
+
+**M4D3-RTE-004** `run_preview()` resolves controlled terms with
+`ControlledRoute.objects.filter(code=..., lifecycle="active").first()` and the equivalent
+dosage-form lookup, both of which return `None` for an unmatched or empty code. A `None`
+result shall never be treated as successful resolution.
+
+**M4D3-RTE-005** No arbitrary fallback route or dosage form shall be selected, and no
+default controlled term shall be substituted.
+
+**M4D3-RTE-006** A blank route or dosage form shall produce
+`status = "data_required"` with `reason_code = "DATA_REQUIRED"`, and the specific cause
+shall be recorded as a governed detail code in provenance. A non-blank but unknown code,
+and a code whose controlled term is not `lifecycle = "active"`, shall produce the
+engine's existing canonical unresolved-term behavior, translating to
+`ROUTE_MISMATCH` or `DOSAGE_FORM_MISMATCH` as applicable.
 
 ---
 
@@ -1268,6 +1463,44 @@ Every normative requirement identifier appears exactly once below.
 | M4D3-SRC-011 | Source resolver | TST-246 | Snapshot frozen after draft | Regulatory |
 | M4D3-SRC-012 | Deployment | TST-247 | Release change does not recalculate | Regulatory |
 | M4D3-SRC-013 | Static check | TST-248 | No `fda_data` writes | Architecture |
+| M4D3-SRC-014 | Documentation | TST-322 | Non-nullability recorded; no availability hedge | Correctness |
+| M4D3-MDU-001 | Dosage resolver | TST-323 | Both sources considered; scalar-only rule absent | Regulatory |
+| M4D3-MDU-002 | Dosage resolver | TST-324 | Version candidate only when non-null and positive | Data integrity |
+| M4D3-MDU-003 | Dosage resolver | TST-325 | All related regimens are candidates; no invented lifecycle filter | Correctness |
+| M4D3-MDU-004 | Dosage resolver | TST-326 | Cross-tenant regimen excluded, no provenance leakage | Security |
+| M4D3-MDU-005 | Dosage resolver | TST-327 | Invalid values excluded and recorded | Data integrity |
+| M4D3-MDU-006 | Request serializers | TST-328 | No client-supplied dosing value | Security |
+| M4D3-MDU-007 | Dosage resolver | TST-329 | None/one/highest-of-many selection | Regulatory |
+| M4D3-MDU-008 | Dosage resolver | TST-330 | Deterministic public-UUID tie-breaker | Correctness |
+| M4D3-MDU-009 | Dosage resolver | TST-331 | Population is provenance, never a filter | Regulatory |
+| M4D3-MDU-010 | Dosage resolver | TST-332 | All four reconciliation cases correct | Regulatory |
+| M4D3-MDU-011 | Dosage resolver | TST-333 | Disagreement flag recorded | Regulatory |
+| M4D3-MDU-012 | Dosage resolver | TST-334 | Never lower, averaged, or creation-ordered | Regulatory |
+| M4D3-MDU-013 | Dosage resolver | TST-335 | All five fail-closed conditions honored | Data integrity |
+| M4D3-MDU-014 | Dosage resolver | TST-336 | Engine mapping preserved to `data_required` | Compatibility |
+| M4D3-MDU-015 | Dosage resolver | TST-337 | Detail code in provenance, not `reason_code` | Data integrity |
+| M4D3-MDU-016 | Dosage resolver | TST-338 | Full provenance content recorded | Reproducibility |
+| M4D3-MDU-017 | Dosage resolver | TST-339 | Resolver version present | Reproducibility |
+| M4D3-MDU-018 | Dosage resolver | TST-340 | No internal primary keys in provenance | Security |
+| M4D3-MDU-019 | Outcome serializer | TST-341 | Client sees sanitized summary only | Security |
+| M4D3-MDU-020 | Dosage resolver | TST-342 | Repeat runs identical value and ordering | Correctness |
+| M4D3-MDU-021 | Source resolver | TST-343 | Later regimen change leaves historical result intact | Regulatory |
+| M4D3-RTE-001 | Documentation | TST-344 | Blank-capable fields recorded | Correctness |
+| M4D3-RTE-002 | Source resolver | TST-345 | Blank treated as missing | Data integrity |
+| M4D3-RTE-003 | Source resolver | TST-346 | Blank never passed as resolved | Data integrity |
+| M4D3-RTE-004 | Source resolver | TST-347 | `None` lookup is not success | Robustness |
+| M4D3-RTE-005 | Source resolver | TST-348 | No fallback term substituted | Regulatory |
+| M4D3-RTE-006 | Source resolver | TST-349 | Blank, unknown and inactive term outcomes | Regulatory |
+| M4D3-RSN-006 | Translation module | TST-350 | Detail vocabulary contains the six codes | Data integrity |
+| M4D3-RSN-007 | Outcome writer | TST-351 | Detail codes never reach `reason_code` | Data integrity |
+| M4D3-RSN-008 | Translation module | TST-352 | Detail codes formatted and server-only | Security |
+| M4D3-RFV-001 | Activation service | TST-353 | Pattern enforced at activation | Data integrity |
+| M4D3-RFV-002 | Activation service | TST-354 | 100-char accepted, 101-char rejected | Data integrity |
+| M4D3-RFV-003 | Activation service | TST-355 | Colon rejected | Security |
+| M4D3-RFV-004 | Activation service | TST-356 | Lowercase and whitespace rejected | Data integrity |
+| M4D3-RFV-005 | Activation service | TST-357 | Reserved prefix rejected | Security |
+| M4D3-RFV-006 | Applicability service | TST-358 | Composed marker ≤ 200 | Data integrity |
+| M4D3-RFV-007 | Request serializers | TST-359 | Client cannot supply code or marker | Security |
 | M4D3-SNP-001 | Import-linter | TST-249 | One-way import preserved | Architecture |
 | M4D3-SNP-002 | Static check | TST-250 | No direct cross-app model write | Architecture |
 | M4D3-SNP-003 | Snapshot service | TST-251 | Creation via approved service | Architecture |
@@ -1365,15 +1598,17 @@ Implementation remains unauthorized. When authorized, the order shall be:
 7. **`services.py` completeness-gate extension** in `_check_execution_completeness()`.
 8. **Submission gate** for unresolved `REVIEW_REQUIRED` in `transition_execution()`.
 9. Population service, calculation translation wiring and outcome updates.
-10. FDA source resolver in `answer_sources.py` and the governed `iid_assessment`
-    snapshot service.
-11. Serializers — nested read-only outcome, `provenance_summary`,
+10. FDA/IID and formulation source resolvers in `answer_sources.py`, including the
+    Part 14.1 maximum-dosage-units resolver and Part 14.2 controlled-term handling.
+11. Governed `iid_assessment` AssessmentSnapshot service.
+12. Serializers — nested read-only outcome, `provenance_summary`,
     `applicability_outcome`.
-12. Frontend — `execution-mappers.ts`, display states, `expected_version`, 409 handling,
+13. Frontend — `execution-mappers.ts`, display states, `expected_version`, 409 handling,
     CI lint rule.
-13. Backend and frontend tests per the test strategy.
-14. Docker integration smoke extension.
-15. Independent adversarial implementation review before merge.
+14. Backend targeted and full test suites per the test strategy.
+15. Frontend unit and Playwright test suites.
+16. Docker integration smoke extension.
+17. Independent adversarial implementation review before merge.
 
 Steps 2, 4, 7 and 8 modify existing 4D-2 runtime code and shall not be omitted.
 
