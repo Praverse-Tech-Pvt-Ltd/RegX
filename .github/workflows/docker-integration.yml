@@ -736,11 +736,18 @@ jobs:
           assert resp.status_code == 200 and resp.json()['status'] == 'approved', 'STEP 7 FAIL: approve returned %s' % resp.status_code
           print('STEP 7 execution approved by VP with conclusion note: OK')
 
-          # Cross-tenant isolation: reviewer cannot see this execution under a different tenant slug.
+          # Cross-tenant isolation: a user who is ONLY a member of other_tenant cannot see
+          # executions that belong to tenant. The requesting user must be a member of the
+          # tenant named in the header so TenantMiddleware passes; the view then returns 404
+          # because the execution's tenant does not match other_tenant.
           other_tenant, _ = Tenant.objects.get_or_create(slug='docker-ci-4d2-other', defaults={'name': 'Docker CI 4D-2 Other'})
-          other_reviewer_client = Client(SERVER_NAME='localhost')
-          other_reviewer_client.force_login(reviewer)
-          resp_cross = other_reviewer_client.get(BASE + '/iig-checklists/executions/%s/' % epub, HTTP_X_TENANT_SLUG='docker-ci-4d2-other')
+          other_user, _ = User.objects.get_or_create(email='ci-4d2-other@example.com', defaults={'full_name': 'CI 4D-2 Other'})
+          other_membership, _ = TenantMembership.objects.get_or_create(tenant=other_tenant, user=other_user)
+          other_role, _ = Role.objects.get_or_create(tenant=other_tenant, name='doer', defaults={'is_system': True})
+          MembershipRole.objects.get_or_create(membership=other_membership, role=other_role)
+          other_client = Client(SERVER_NAME='localhost')
+          other_client.force_login(other_user)
+          resp_cross = other_client.get(BASE + '/iig-checklists/executions/%s/' % epub, HTTP_X_TENANT_SLUG='docker-ci-4d2-other')
           assert resp_cross.status_code == 404, 'STEP 8 FAIL: cross-tenant access returned %s (must be 404)' % resp_cross.status_code
           print('STEP 8 cross-tenant execution access returns 404: OK')
 
