@@ -1,6 +1,6 @@
 # Milestone 4D-3 Test Strategy
 
-**Status: DISCOVERY COMPLETE. Pending second adversarial review before implementation specification.**
+**Status: SPECIFICATION COMPLETE. Test gates finalized in §10 (M-3, M-4, M-5, stale expected_version). Pending adversarial specification review before implementation.**
 
 **Discovery document:** `docs/MILESTONE_4D_3_DISCOVERY.md`
 **Scope register:** `docs/MILESTONE_4D_3_SCOPE_REGISTER.md`
@@ -460,6 +460,126 @@ Extend `.github/workflows/docker-integration.yml` with a 4D-3 smoke step:
 - OpenAPI schema: must regenerate cleanly with any new endpoints or serializer fields.
 - `CalculationOutcome.status` values in the schema must reflect the four
   `iig_checklist.enums.CalculationStatus` choices, not engine strings.
+
+---
+
+## 10. Minor-Finding Additions (from Second Adversarial Review)
+
+The following normative test cases resolve findings M-3, M-4, and M-5 from the second
+adversarial discovery review, and add an explicit stale-version test that was missing
+from the original strategy. All four tests are **mandatory**; they must pass before any
+4D-3 implementation PR may be opened.
+
+### 10.1 M-3 — Dependency Depth Rejection at Activation
+
+**Requirement:** `ChecklistVersion` activation must reject any dependency graph whose
+longest path exceeds `MAX_DEPENDENCY_DEPTH = 5`.
+
+**Fixture:** Construct a synthetic `ChecklistVersion` containing six `SYSTEM_CALCULATED`
+questions linked in a linear chain (Q₁ → Q₂ → Q₃ → Q₄ → Q₅ → Q₆) so that the
+maximum depth is 6, exceeding the limit.
+
+**Test file:** `backend/iig_checklist/tests/test_checklist_version_activation.py`
+
+**Test name:** `test_activation_rejects_dependency_depth_exceeding_limit`
+
+**Assertions:**
+1. Calling the activation service on the synthetic version raises a validation error
+   (or returns a structured failure) with `error_code = "DEPENDENCY_DEPTH_EXCEEDED"`.
+2. The `ChecklistVersion.status` remains in its pre-activation state (not `"active"`).
+3. A depth-5 chain (Q₁ → Q₂ → Q₃ → Q₄ → Q₅) is accepted without error.
+
+**What it proves:** The numeric constant is enforced at activation, not just documented.
+A depth-6 graph is impossible to reach at runtime.
+
+### 10.2 M-4 — Deterministic Topological Ordering
+
+**Requirement:** Stable topological ordering must produce identical output across
+repeated invocations with identical inputs; alphabetical `code` tiebreaker must be
+verified.
+
+**Fixture:** A three-question dependency graph with one root question (`Q_ROOT`) and
+two leaf questions (`Q_ALPHA`, `Q_BETA`) that both depend on `Q_ROOT` and have no
+dependency on each other. In a deterministic topological ordering with alphabetical
+tiebreaking, `Q_ALPHA` must always precede `Q_BETA`.
+
+**Test file:** `backend/iig_checklist/tests/test_dependency_graph.py`
+
+**Test name:** `test_topological_order_is_stable_and_deterministic`
+
+**Assertions:**
+1. Call the topological sort function with the above graph at least 10 times with
+   identical inputs; collect all results.
+2. Assert that all 10 results are identical (`len(set(map(tuple, results))) == 1`).
+3. Assert that `Q_ALPHA` appears before `Q_BETA` in every result (alphabetical
+   tiebreaker enforced).
+4. Assert that `Q_ROOT` appears before both leaf nodes.
+
+**What it proves:** Cascade recalculation order is reproducible across process
+restarts, parallel workers, and repeated invocations — determinism is a property of
+the sort function, not of iteration order over dicts or sets.
+
+### 10.3 M-5 — NOT_APPLICABLE Transition Preserves Prior Raw Value in History
+
+**Requirement:** When a `ChecklistResponse` that already has a non-null `raw_value`
+transitions to `NOT_APPLICABLE` (applicability evaluator returns `"not_applicable"`),
+a `ChecklistResponseHistory` row must be created in the same transaction preserving
+the prior value.
+
+**Fixture:**
+1. Create a synthetic `ChecklistExecution` with a `USER_REQUIRED` question
+   (code = `Q_AMOUNT`) that has an `ApplicabilityRule` with `outcome_if_false =
+   "applicable"` and `outcome_if_true = "not_applicable"`, conditioned on a
+   `FormulationVersion` field.
+2. Submit an answer for `Q_AMOUNT` (synthetic `raw_value = {"value": "5.0"}`).
+3. Modify the formulation context such that the applicability condition evaluates to
+   `True` (triggering `NOT_APPLICABLE`).
+4. Trigger the population pass (or the applicability re-evaluation service, once
+   implemented).
+
+**Test file:** `backend/iig_checklist/tests/test_population_not_applicable.py`
+
+**Test name:** `test_not_applicable_transition_creates_history_with_prior_value`
+
+**Assertions:**
+1. `ChecklistResponse.is_not_applicable == True` after the transition.
+2. `ChecklistResponse.not_applicable_reason == rule.reason_code` (non-empty string,
+   max 100 characters, fits within `MAX_NOT_APPLICABLE_REASON_CHARS = 200`).
+3. A `ChecklistResponseHistory` row exists with `prior_raw_value = {"value": "5.0"}`
+   (the value from step 2).
+4. The history row and the response update share the same transaction: if the history
+   write is rolled back, the response update is also rolled back (assert via
+   `transaction.atomic()` with forced rollback in a separate test variant).
+5. An audit event `iig_checklist.response.applicability_changed` was scheduled via
+   `transaction.on_commit()` (assert that the signal or callback was registered).
+
+**What it proves:** No regulated user-entered value is silently discarded when
+applicability changes. Every transition is auditable.
+
+### 10.4 Stale `expected_version` API Rejection
+
+**Requirement:** `enter_response()` must reject a PATCH whose `expected_version` does
+not match the current `ChecklistResponse.version`, return 409, and make no writes.
+
+**Fixture:** A `ChecklistExecution` in `draft` status; a `USER_REQUIRED`
+`ChecklistResponse` with `version = 3`.
+
+**Test file:** `backend/iig_checklist/tests/test_enter_response.py`
+
+**Test name:** `test_stale_expected_version_returns_409_and_no_writes`
+
+**Assertions:**
+1. PATCH with `expected_version = 2` (stale) returns HTTP 409.
+2. Response body includes `error_code = "stale_version"`.
+3. `ChecklistResponse.version` is still `3` (not incremented).
+4. `ChecklistResponse.raw_value` is unchanged.
+5. No `ChecklistResponseHistory` row was created.
+6. No audit event was emitted.
+
+**Negative test:** PATCH with `expected_version = 3` (current) succeeds (HTTP 200).
+
+**What it proves:** Concurrent edits cannot silently overwrite each other's changes.
+The optimistic lock is enforced at the service layer, not only in the client.
 
 ---
 
