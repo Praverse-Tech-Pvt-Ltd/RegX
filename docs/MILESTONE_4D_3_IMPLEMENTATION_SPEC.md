@@ -1,6 +1,6 @@
 # Milestone 4D-3 Implementation Specification
 
-**Status: SPECIFICATION COMPLETE. Pending adversarial specification review before implementation.**
+**Status: SPECIFICATION REVISED after failed adversarial review. Pending second adversarial specification review before implementation.**
 
 **Discovery document:** `docs/MILESTONE_4D_3_DISCOVERY.md`
 **Scope register:** `docs/MILESTONE_4D_3_SCOPE_REGISTER.md`
@@ -8,1209 +8,1382 @@
 **Test strategy:** `docs/MILESTONE_4D_3_TEST_STRATEGY.md`
 **Branch:** `regx/feat/milestone-4d-3-discovery`
 **Base SHA:** `c0adef4448153368c5bb280219c154f60be052f1` (Milestone 4D-2 merge)
-**Discovery head:** `b30fd01`
-**Second adversarial discovery review result:** PASS WITH MINOR CORRECTIONS
+**Prior specification head:** `4a15d0e` — adversarial review result **FAIL** (2 Critical, 5 Major, 11 Minor)
 
-This document is the normative implementation specification for Milestone 4D-3. It
-supersedes the discovery document for all implementation decisions. Requirements use
-"shall" for mandatory obligations. Every requirement is uniquely identified with a
-stable prefix and number. No implementation code appears in this document. No runtime
-behavior is created by this document.
+This document is the normative implementation specification for Milestone 4D-3.
+Requirements use "shall" for mandatory obligations. Every requirement carries a unique
+stable identifier and appears exactly once in the acceptance matrix (Part 21). No
+implementation code is created by this document. Implementation remains unauthorized.
 
-This specification resolves all five minor findings from the second adversarial
-discovery review (M-1 through M-5) and makes normative decisions on all deferred
-design questions.
+## Revision note — findings resolved in this revision
 
----
-
-## Part 1 — Confirmed Scope
-
-### 1.1 In-Scope Items
-
-| ID | Item |
-|---|---|
-| M4D3-S-001 | Draft-answer generation at execution creation |
-| M4D3-S-002 | Automatic `FDA_DERIVED_DEFAULT` population |
-| M4D3-S-003 | `SYSTEM_CALCULATED` computation |
-| M4D3-S-004 | Synchronous in-draft cascade recalculation |
-| M4D3-S-005 | Applicability evaluation required for population |
-| M4D3-S-006 | Source snapshot creation and provenance |
-| M4D3-S-007 | `CalculationStatus` translation layer |
-| M4D3-S-008 | `CalculationOutcome` read-only serialization |
-| M4D3-S-009 | `CALCULATION_BINDING_REGISTRY` definition and validation |
-| M4D3-S-010 | Required frontend display changes for populated and calculated answers |
-| M4D3-S-011 | Dependency graph DAG validation at `ChecklistVersion` activation |
-| M4D3-S-012 | Non-overwrite rules for `USER_REQUIRED`, `REVIEWER_CONCLUSION`, and `APPROVAL_METADATA` |
-| M4D3-S-013 | Idempotency of repeated population passes with identical inputs |
-| M4D3-S-014 | `generated_at` ISO-8601 string parsing and error handling |
-| M4D3-S-015 | Reproducibility chain (formula version, registry binding version, stored inputs) |
-
-### 1.2 Explicit Exclusions
-
-| ID | Excluded item | Deferred to |
+| Finding | Resolution | Part |
 |---|---|---|
-| M4D3-S-016 | Arbitrary formula builder | Never |
-| M4D3-S-017 | Tenant-authored executable logic | Never |
-| M4D3-S-018 | `eval`, `exec`, dynamic import from user-controlled values | Never |
-| M4D3-S-019 | Arbitrary SQL or expression evaluation | Never |
-| M4D3-S-020 | Manual override of calculated or FDA-derived values | 4D-4 |
-| M4D3-S-021 | Deviation workflow | 4D-4 |
-| M4D3-S-022 | Automatic approval based on calculation outcome | Never |
-| M4D3-S-023 | Final regulatory conclusion | Never |
-| M4D3-S-024 | Finalization workflow | 4D-4 |
-| M4D3-S-025 | Report or export generation | 4D-4 |
-| M4D3-S-026 | Dashboards | Not in 4D |
-| M4D3-S-027 | Push or webhook notifications | Not in 4D |
-| M4D3-S-028 | Asynchronous calculation engine (`CALCULATING` status reserved) | Future |
-| M4D3-S-029 | New calculation-definition database model | Never in 4D-3 |
-| M4D3-S-030 | New database field | Never in 4D-3 |
-| M4D3-S-031 | Django migration | Never in 4D-3 |
-| M4D3-S-032 | Generic `PATCH` or `PUT` endpoint for `CalculationOutcome` | Never |
-| M4D3-S-033 | New calculation formulas beyond the six in `iid_assessment.calculations` | Never in 4D |
-| M4D3-S-034 | 4D-4 UI elements (override, deviation, export triggers) | 4D-4 |
-| M4D3-S-035 | `CalculationStatus.CALCULATING` ever set by 4D-3 code | Never in 4D-3 |
+| C-1 registry identifier written into `calculation_name` | Registry entries carry an explicit `calculation_name`; identifier is never copied; `create_execution()` correction is mandated | Part 3 |
+| C-2 `enter_response()` does not exist | All references removed; new governed service `update_checklist_response()` specified; view becomes a thin adapter | Part 4 |
+| C-2b `expected_version` presented as additive | Acknowledged as a controlled breaking contract change with a defined deployment strategy | Part 5 |
+| M-A required calculated questions unsubmittable | Completeness gate extension specified | Part 11 |
+| M-B no REVIEW_REQUIRED submission gate | Mandatory blocking gate regardless of `question.required` | Part 12 |
+| M-C read-time recomputation breaks historical reproducibility | State-dependent evaluation; persisted state governs submitted and terminal executions | Part 9 |
+| M-D history not implementable, trigger undefined | Re-evaluation triggers defined; all twelve history fields specified; attribution rule fixed | Part 10 |
+| M-E applicability fields client-writable | Governed field ownership specified | Part 8 |
+| Minor 1 `approval_metadata` as data-source value | Corrected to `question.answer_type` guards | Part 2 |
+| Minor 2 N/A `raw_value` behavior | Both transition directions specified | Part 10 |
+| Minor 3 bare `save()` as validation assertion | Corrected; `full_clean()` required | Part 6 |
+| Minor 4 `CalculationOutcome` uniqueness | Verified absent; code-level discipline specified | Part 6 |
+| Minor 5 non-complete value invariant | Reassigned to the service layer | Part 6 |
+| Minor 6 no reason-code allow-list | Closed vocabulary defined | Part 7 |
+| Minor 7 dependency constant collision | Renamed with explicit module | Part 13 |
+| Minor 8 unevidenced limits | Rationale stated as a governance decision | Part 13 |
+| Minor 9 `run_preview()` inputs unspecified | All resolvers defined | Part 14 |
+| Minor 10 snapshot write vs consumer-only scope | Ownership clarified | Part 15 |
+| Minor 11 test-strategy section order | Corrected in the test strategy document | — |
 
 ---
 
-## Part 2 — Data-Model Usage
+## Part 1 — Scope
 
-### 2.1 `ChecklistQuestion`
+### 1.1 In scope
 
-**M4D3-M-001** `ChecklistQuestion.calculation_binding_identifier` is an existing
-`CharField(max_length=100, blank=True)`. It shall store only a short, governed
-registry key string (e.g. `"percentage_w_w"`). It shall not store a JSON payload,
-executable expression, SQL fragment, or any value not present in the
-`CALCULATION_BINDING_REGISTRY` at activation time.
+| Ref | Item |
+|---|---|
+| SCOPE-IN-01 | Draft-answer generation at execution creation |
+| SCOPE-IN-02 | Automatic `FDA_DERIVED_DEFAULT` population |
+| SCOPE-IN-03 | `SYSTEM_CALCULATED` computation |
+| SCOPE-IN-04 | Synchronous in-draft cascade recalculation |
+| SCOPE-IN-05 | Governed applicability evaluation and persisted applicability state |
+| SCOPE-IN-06 | Source snapshot creation and provenance |
+| SCOPE-IN-07 | `CalculationStatus` translation layer |
+| SCOPE-IN-08 | `CalculationOutcome` read-only serialization |
+| SCOPE-IN-09 | `CALCULATION_BINDING_REGISTRY` definition and validation |
+| SCOPE-IN-10 | Frontend display for populated, calculated and review-required answers |
+| SCOPE-IN-11 | Dependency-graph DAG validation at `ChecklistVersion` activation |
+| SCOPE-IN-12 | New governed response-update service and thin view adapter |
+| SCOPE-IN-13 | `expected_version` optimistic-lock contract on governed response updates |
+| SCOPE-IN-14 | Completeness-gate extension for calculated and FDA-derived answers |
+| SCOPE-IN-15 | Submission gate blocking unresolved `REVIEW_REQUIRED` |
+| SCOPE-IN-16 | Correction of the existing `create_execution()` identifier handling |
 
-**M4D3-M-002** A `SYSTEM_CALCULATED` question with a blank
-`calculation_binding_identifier` shall be rejected by the existing `ChecklistQuestion.clean()`
-validation and must not appear in an activated `ChecklistVersion`.
+### 1.2 Out of scope
 
-### 2.2 `ChecklistResponse`
+| Ref | Excluded item | Deferred to |
+|---|---|---|
+| SCOPE-OUT-01 | Arbitrary formula builder | Never |
+| SCOPE-OUT-02 | Tenant-authored executable logic | Never |
+| SCOPE-OUT-03 | `eval`, `exec`, dynamic import from user-controlled values | Never |
+| SCOPE-OUT-04 | Arbitrary SQL or expression evaluation | Never |
+| SCOPE-OUT-05 | Manual override of calculated or FDA-derived values | 4D-4 |
+| SCOPE-OUT-06 | Deviation workflow | 4D-4 |
+| SCOPE-OUT-07 | Automatic approval based on calculation outcome | Never |
+| SCOPE-OUT-08 | Final regulatory conclusion | Never |
+| SCOPE-OUT-09 | Finalization workflow | 4D-4 |
+| SCOPE-OUT-10 | Report or export generation | 4D-4 |
+| SCOPE-OUT-11 | Dashboards | Not in 4D |
+| SCOPE-OUT-12 | Push or webhook notifications | Not in 4D |
+| SCOPE-OUT-13 | Asynchronous calculation engine (`calculating` reserved, never set) | Future |
+| SCOPE-OUT-14 | New calculation-definition database model | Never in 4D-3 |
+| SCOPE-OUT-15 | New database field | Never in 4D-3 |
+| SCOPE-OUT-16 | Django migration | Never in 4D-3 |
+| SCOPE-OUT-17 | Generic `PATCH`/`PUT` endpoint for `CalculationOutcome` | Never |
+| SCOPE-OUT-18 | New calculation formulas beyond the six approved functions | Never in 4D |
+| SCOPE-OUT-19 | Direct writes by `iig_checklist` to `iid_assessment` model classes | Never |
+| SCOPE-OUT-20 | System-only background recalculation with no authenticated actor | Never in 4D-3 |
+| SCOPE-OUT-21 | Manual resolution of a `REVIEW_REQUIRED` state | 4D-4 |
 
-**M4D3-M-003** `data_source_type_snapshot` is immutable after creation. No 4D-3
-service shall overwrite it.
+---
 
-**M4D3-M-004** `USER_REQUIRED` values (`data_source_type_snapshot = "user_required"`)
-shall never be overwritten by the population pass, the recalculation pass, or any
-4D-3 service.
+## Part 2 — Data-model usage
 
-**M4D3-M-005** `REVIEWER_CONCLUSION` and `APPROVAL_METADATA` response rows shall
-never be touched by any 4D-3 service.
+**M4D3-MDL-001** `ChecklistQuestion.calculation_binding_identifier`
+(`CharField(max_length=100, blank=True)`) shall store only a governed registry key.
+It shall never store a JSON payload, expression, SQL fragment, or any value absent
+from `CALCULATION_BINDING_REGISTRY` at activation time.
 
-**M4D3-M-006** `FDA_DERIVED_DEFAULT` values written by the population pass may only
-be replaced by an explicit governed recalculation call, never by a client PATCH.
-`enter_response()` shall reject any PATCH from a `Doer`-level actor on a
-`FDA_DERIVED_DEFAULT` response with `error_code = "invalid_raw_value_shape"` / 400.
-This check shall be enforced in the service layer, not only in the serializer.
+**M4D3-MDL-002** `ChecklistResponse.data_source_type_snapshot` is immutable after
+creation. No 4D-3 code path shall modify it.
 
-**M4D3-M-007** `SYSTEM_CALCULATED` response `raw_value` shall remain `null` at all
-times; calculation results are stored exclusively in `CalculationOutcome`.
+**M4D3-MDL-003** Guards for reviewer-conclusion and approval-metadata questions shall
+inspect `question.answer_type` against `AnswerType.REVIEWER_CONCLUSION` and
+`AnswerType.APPROVAL_METADATA`. They shall never test `data_source_type_snapshot`
+for the values `"reviewer_conclusion"` or `"approval_metadata"`: `DataSourceClassification`
+contains only `fda_derived_default`, `user_required`, `system_calculated`,
+`reviewer_confirmed`, `evidence_derived`.
 
-**M4D3-M-008** The `is_not_applicable = True` path is exclusive to `NOT_APPLICABLE`
-applicability outcomes. The `REVIEW_REQUIRED` applicability outcome shall never set
-`is_not_applicable = True`. See §6.3 for the normative `REVIEW_REQUIRED` design.
+**M4D3-MDL-004** No 4D-3 service shall write to a `ChecklistResponse` whose
+`question.answer_type` is `REVIEWER_CONCLUSION` or `APPROVAL_METADATA`.
 
-**M4D3-M-009** When `is_not_applicable = True` is set, `not_applicable_reason` shall
-be populated from `ApplicabilityRule.reason_code` (governed structured code,
-max 100 characters). `MAX_NOT_APPLICABLE_REASON_CHARS = 200` (verified in
-`execution_constants.py`), so no truncation occurs. `full_clean()` shall be called
-before every save. **[M-2 resolved: compatible.]**
+**M4D3-MDL-005** A `ChecklistResponse` with `data_source_type_snapshot = "user_required"`
+and a non-null `raw_value` shall never be overwritten by population or recalculation.
 
-### 2.3 `CalculationOutcome`
+**M4D3-MDL-006** `SYSTEM_CALCULATED` responses shall keep `raw_value = null` at all
+times; results live exclusively in `CalculationOutcome`.
 
-**M4D3-M-010** `CalculationOutcome.status` uses `iig_checklist.enums.CalculationStatus`
-choices exclusively: `"data_required"`, `"calculating"`, `"complete"`, `"error"`.
-The `"calculating"` value shall never be set by any 4D-3 code path.
+**M4D3-MDL-007** `CalculationOutcome.status` shall be one of the four
+`iig_checklist.enums.CalculationStatus` values. The value `"calculating"` shall never
+be written by any 4D-3 code path.
 
-**M4D3-M-011** Engine-layer status strings from
-`iid_assessment.calculations.CalculationStatus` shall never be written directly to
-`CalculationOutcome.status`. The translation function defined in §5 is the only
-permitted path.
+**M4D3-MDL-008** Engine strings from `iid_assessment.calculations.CalculationStatus`
+shall never be assigned to `CalculationOutcome.status`; the Part 7 translation
+function is the only permitted path.
 
-**M4D3-M-012** `CalculationOutcome.value` shall be `null` whenever
-`status = "error"` or `status = "data_required"`. A non-null `value` is only valid
-when `status = "complete"`.
+**M4D3-MDL-009** `CalculationOutcome.inputs` and `input_provenance` shall contain only
+server-generated values. No client-supplied content shall reach either field.
 
-**M4D3-M-013** `CalculationOutcome.inputs` and `CalculationOutcome.input_provenance`
-shall contain only server-generated values. No client-supplied content shall be
-written to these fields. `input_provenance` shall always include a
-`"_registry_binding_version"` key set to the binding version of the registry entry
-used (see §13).
+**M4D3-MDL-010** 4D-3 shall only update `CalculationOutcome` rows created by
+`create_execution()`; it shall never create additional rows for an existing response.
 
-**M4D3-M-014** `full_clean()` shall be called before every `CalculationOutcome.save()`
-in any 4D-3 code path. The `AssessmentSnapshot.clean()` defect (guard unreachable
-because `full_clean()` was skipped) must not recur.
-
-**M4D3-M-015** `CalculationOutcome` rows are created by 4D-2 at execution creation
-time. 4D-3 shall only update existing rows — never create new ones during population
-or recalculation.
-
-### 2.4 `ApplicabilityRule`
-
-**M4D3-M-016** `ApplicabilityRule.condition_json` uses the runtime grammar from
-`backend/iig_checklist/applicability.py`: composite nodes are
+**M4D3-MDL-011** `ApplicabilityRule.condition_json` shall be interpreted using the
+runtime grammar in `backend/iig_checklist/applicability.py`: composite nodes are
 `{"operator": "all"|"any", "conditions": [...]}` and leaf nodes are
-`{"field": ..., "op": ..., "value": ...}`. No other shape is valid. The grammar from
-the overarching 4D design document (`{"all": [...]}` / `{"any": [...]}`) is
-**not** the runtime contract.
+`{"field": ..., "op": ..., "value": ...}`.
 
-**M4D3-M-017** The `ApplicabilityRule` model has no `condition_checksum` field. All
-references to `condition_checksum` in implementation code are forbidden.
+**M4D3-MDL-012** No implementation code shall reference a `condition_checksum` field;
+`ApplicabilityRule` has no such field. Governed identity is `code` plus `rule_version`.
 
-**M4D3-M-018** Applicability outcomes shall be read from `ApplicabilityRule.outcome_if_true`
-and `ApplicabilityRule.outcome_if_false`. The governed reason for N/A state is
-`ApplicabilityRule.reason_code`.
+**M4D3-MDL-013** Applicability outcomes shall be read from `ApplicabilityRule.outcome_if_true`
+and `outcome_if_false`; the governed reason string is `ApplicabilityRule.reason_code`
+(`max_length=100`).
 
 ---
 
-## Part 3 — Calculation Binding Registry
+## Part 3 — Calculation binding registry (C-1)
 
-### 3.1 Registry Location and Structure
+### 3.1 Verified defect being corrected
 
-**M4D3-REG-001** The `CALCULATION_BINDING_REGISTRY` shall be a Python `dict`
-defined in a new server-side module `backend/iig_checklist/calculation_registry.py`.
-It shall be a module-level constant, not a database table. No tenant or client may
-add, modify, or inject entries.
+**M4D3-REG-001** The existing `create_execution()` at
+`backend/iig_checklist/services.py:419` passes
+`calculation_name=q.calculation_binding_identifier` into `CalculationOutcome`, which is
+validated by `CalculationOutcome.clean()` against `_CALCULATION_NAMES` — the six
+approved *function* names. A registry-key identifier such as `"percentage_w_w"` is not
+a member of that set and therefore aborts execution creation with `ValidationError`.
+This conflation shall be corrected as part of 4D-3.
 
-**M4D3-REG-002** Each registry entry shall map a short identifier string to a
-`TypedDict` (or equivalent dataclass) with the following fields:
+**M4D3-REG-002** The implementation shall keep three concepts distinct at all times:
+the **registry identifier** (stored on `ChecklistQuestion.calculation_binding_identifier`),
+the **calculation function name** (a member of `_CALCULATION_NAMES`), and
+**`CalculationOutcome.calculation_name`** (which shall equal the calculation function
+name).
 
-| Field | Type | Description |
+**M4D3-REG-003** The registry identifier shall never be copied into
+`CalculationOutcome.calculation_name`. The value written shall always be the
+`calculation_name` field of the resolved registry entry.
+
+### 3.2 Registry structure
+
+**M4D3-REG-004** `CALCULATION_BINDING_REGISTRY` shall be a module-level Python `dict`
+in a new module `backend/iig_checklist/calculation_registry.py`. It shall not be a
+database table and shall not be mutable at runtime.
+
+**M4D3-REG-005** Each entry shall provide exactly these fields:
+
+| Field | Type | Purpose |
 |---|---|---|
-| `function` | `Callable` | Direct reference to one of the six approved calculation functions |
-| `binding_version` | `str` | Immutable binding version (see M4D3-REG-003) |
+| `calculation_name` | `str` | Must be a member of `_CALCULATION_NAMES`; written to `CalculationOutcome.calculation_name` |
+| `function` | `Callable` | Direct reference to the approved calculation function |
 | `formula_version` | `str` | Must equal `iid_assessment.calculations.FORMULA_VERSION` |
-| `input_resolvers` | `dict[str, InputResolver]` | Mapping of function kwarg name to resolver specification |
-| `dependencies` | `list[str]` | `ChecklistQuestion.code` values whose answers feed this calculation |
-| `output_unit` | `str` | Expected unit string (may be empty) |
-| `rounding_rule` | `str` | Human-readable rounding description |
-| `allowed_answer_type` | `str` | `AnswerType` value expected on the question |
-| `allowed_data_source` | `str` | Must be `"system_calculated"` |
+| `binding_version` | `str` | Immutable binding version (M4D3-REG-008) |
+| `input_resolvers` | `dict[str, InputResolver]` | Function kwarg name → resolver specification |
+| `dependencies` | `list[str]` | `ChecklistQuestion.code` values feeding this calculation |
+| `required_units` | `dict[str, str]` | Expected unit per unit-bearing input |
+| `output_unit` | `str` | Expected result unit; may be empty |
+| `rounding_rule` | `str` | Rounding descriptor written to the outcome |
+| `allowed_answer_type` | `str` | `AnswerType` value permitted on the bound question |
+| `allowed_data_source` | `str` | Shall be `"system_calculated"` |
 
-**M4D3-REG-003** Each registry entry shall declare an immutable `binding_version`
-string (e.g. `"1.0.0"`). This value must be incremented whenever the entry's
-`input_resolvers` or `dependencies` change, even if `formula_version` does not
-change. The `binding_version` shall be stored in
-`CalculationOutcome.input_provenance` under the server-controlled key
-`"_registry_binding_version"`. No tenant or client may supply or modify this key.
-**[M-1 resolved: registry binding version captured in provenance without a new column.]**
+Conceptual shape (illustrative only, not code to be copied verbatim):
 
-**M4D3-REG-004** Identifier format: short ASCII slug, lowercase letters and
-underscores only, maximum 100 characters, compatible with
-`CharField(max_length=100)`.
+```
+CALCULATION_BINDING_REGISTRY = {
+    "percentage_w_w": {
+        "calculation_name": "calculate_percentage_w_w",
+        "function": calculate_percentage_w_w,
+        "formula_version": FORMULA_VERSION,
+        "binding_version": "1.0.0",
+        ...
+    },
+}
+```
 
-**M4D3-REG-005** Approved identifier values for the current release:
+**M4D3-REG-006** Registry identifiers shall be lowercase ASCII slugs of letters and
+underscores, at most 100 characters, compatible with `CharField(max_length=100)`.
 
-| Identifier | Calculation function |
+**M4D3-REG-007** The approved identifier → `calculation_name` mapping for this release
+shall be exactly:
+
+| Registry identifier | `calculation_name` |
 |---|---|
-| `"percentage_w_w"` | `calculate_percentage_w_w` |
-| `"daily_exposure"` | `calculate_daily_exposure` |
-| `"percentage_of_iid_potency"` | `calculate_percentage_of_potency` |
-| `"difference_from_iid_potency"` | `calculate_difference_from_potency` |
-| `"percentage_of_iid_mde"` | `calculate_percentage_of_mde` |
-| `"difference_from_iid_mde"` | `calculate_difference_from_mde` |
+| `percentage_w_w` | `calculate_percentage_w_w` |
+| `daily_exposure` | `calculate_daily_exposure` |
+| `percentage_of_iid_potency` | `calculate_percentage_of_potency` |
+| `difference_from_iid_potency` | `calculate_difference_from_potency` |
+| `percentage_of_iid_mde` | `calculate_percentage_of_mde` |
+| `difference_from_iid_mde` | `calculate_difference_from_mde` |
 
 No other identifier is valid in this release.
 
-### 3.2 Input Resolver Specification
+**M4D3-REG-008** Each entry shall declare an immutable `binding_version`. It shall be
+incremented whenever `input_resolvers`, `dependencies`, `required_units`,
+`output_unit`, or `rounding_rule` change, independently of `formula_version`.
 
-**M4D3-REG-006** An `InputResolver` shall be one of two forms:
+**M4D3-REG-009** A module-level self-check shall assert at import time that every
+entry's `calculation_name` is a member of `_CALCULATION_NAMES` and that every
+`formula_version` equals `FORMULA_VERSION`. A violation shall raise at import,
+failing the deployment rather than producing invalid outcomes.
 
-- **Question resolver:** `{"source": "question", "question_code": "<code>"}` — reads
-  `ChecklistResponse.raw_value` for the named question on the current execution.
-- **Formulation resolver:** `{"source": "formulation", "field": "<field_name>"}` — reads
-  the named field from `FormulationVersion` or `FormulationComponent`.
+### 3.3 Input resolvers
 
-No other resolver form is valid.
+**M4D3-REG-010** An `InputResolver` shall be one of exactly two forms:
+`{"source": "question", "question_code": "<code>"}` reading `ChecklistResponse.raw_value`
+for that question on the current execution; or
+`{"source": "formulation", "field": "<field_name>"}` reading a named field from
+`FormulationVersion` or `FormulationComponent`. No other form is valid.
 
-**M4D3-REG-007** Input resolvers shall use only named model fields. No `getattr`
-from a user-supplied string, no `eval`, no dynamic import, no `exec`, no SQL
-fragment, and no template expression is permitted in any resolver.
+**M4D3-REG-011** Resolvers shall use only named model fields. No `eval`, `exec`,
+dynamic import, `getattr` from an untrusted string, SQL fragment, or template
+expression is permitted.
 
-### 3.3 Security Requirements
+### 3.4 Resolution and failure behavior
 
-**M4D3-REG-008** All registry lookups shall use `CALCULATION_BINDING_REGISTRY.get(key)`
-with explicit `None` handling, never `CALCULATION_BINDING_REGISTRY[key]` without a
-try/except that would allow unhandled propagation.
+**M4D3-REG-012** Registry lookups shall use explicit `.get()` with `None` handling.
 
-**M4D3-REG-009** An unknown identifier encountered at runtime shall fail closed:
-set `CalculationOutcome.status = "error"` and `reason_code = "UNKNOWN_REGISTRY_IDENTIFIER"`.
-It shall not raise an unhandled exception that aborts execution creation.
+**M4D3-REG-013** `create_execution()` shall resolve the registry entry **before**
+constructing the `CalculationOutcome`, and shall write
+`calculation_name = entry["calculation_name"]`.
 
-**M4D3-REG-010** A mismatch between the stored identifier and the resolved function
-(e.g. after a registry refactor) shall fail closed with the same error as an unknown
-identifier.
+**M4D3-REG-014** An unknown registry identifier encountered during execution creation
+shall abort the entire creation transaction with a structured error
+(`error_code = "unknown_registry_identifier"`, HTTP 400). No execution, response, or
+outcome row shall remain.
 
-### 3.4 Activation-Time Validation
+**M4D3-REG-015** A registry entry whose `calculation_name` is not a member of
+`_CALCULATION_NAMES` shall abort execution creation atomically with
+`error_code = "invalid_calculation_name"`.
 
-**M4D3-REG-011** When a `ChecklistVersion` is activated, the activation service shall
-validate every `SYSTEM_CALCULATED` question:
+**M4D3-REG-016** An unknown identifier encountered during population or recalculation
+of an already-created execution shall fail closed on that outcome only:
+`status = "error"`, `reason_code = "UNKNOWN_REGISTRY_IDENTIFIER"`, `value = null`. It
+shall not raise an unhandled exception.
 
-1. `calculation_binding_identifier` is present in `CALCULATION_BINDING_REGISTRY`.
-2. All declared `dependencies` (question codes) exist in the same `ChecklistVersion`.
-3. No cross-version dependency references exist.
-4. The dependency graph forms a DAG (no cycles); see §10.
-5. Maximum dependency graph depth does not exceed `MAX_DEPENDENCY_DEPTH`; see §10.
+**M4D3-REG-017** A registry key rename shall require either a compatibility alias
+whose target entry has identical `calculation_name`, `function`, `input_resolvers`,
+`dependencies` and `required_units`, or a governed admin update of the stored
+identifier on affected `ChecklistQuestion` rows before the old key is removed. An
+alias with differing semantics is prohibited; silent reinterpretation is prohibited.
 
-**M4D3-REG-012** Activation shall be rejected with a structured error
-(`error_code = "REGISTRY_VALIDATION_FAILED"`, including the specific sub-reason) if
-any check in M4D3-REG-011 fails. The `ChecklistVersion` shall remain in its current
-pre-activation state.
+### 3.5 Activation validation
 
-**M4D3-REG-013** A registry key rename in a new deployment shall require either:
-(a) a compatibility alias in the registry mapping the old key to the current entry, or
-(b) updating the stored `calculation_binding_identifier` on affected
-`ChecklistQuestion` rows via a governed admin operation before the old key is removed.
-Silent reinterpretation of an existing identifier is prohibited.
+**M4D3-REG-018** `ChecklistVersion` activation shall validate every `SYSTEM_CALCULATED`
+question: the identifier exists in the registry; the entry's `allowed_answer_type`
+matches `question.answer_type`; all declared `dependencies` exist as question codes in
+the same `ChecklistVersion`; no cross-version dependency exists; the graph is acyclic;
+and the graph respects the Part 13 limits.
 
----
-
-## Part 4 — Answer Source Resolver Functions
-
-**M4D3-SVC-001** A new module `backend/iig_checklist/answer_sources.py` shall provide
-module-level resolver functions:
-
-```
-resolve_fda_derived(
-    question: ChecklistQuestion,
-    formulation_version: FormulationVersion,
-    context: dict,
-) -> Any | None
-```
-
-```
-resolve_identity_match(
-    question: ChecklistQuestion,
-    formulation_version: FormulationVersion,
-) -> IIDIngredient | None
-```
-
-**M4D3-SVC-002** The mapping from question code to resolver shall be a small,
-explicit dispatch dict in `answer_sources.py`. No dynamic reflection. No `getattr`
-from question code. No `eval`.
-
-**M4D3-SVC-003** Resolvers shall call only the following approved read-only services:
-`fda_data.substance_matching.resolve_substance_identity()`,
-`iid_assessment.matching.find_iid_candidates()`, and direct field access on
-`FormulationVersion` / `FormulationComponent` model instances.
-
-**M4D3-SVC-004** Resolvers shall be pure functions. They shall not write to the
-database, emit audit events, or alter any Django model instance.
+**M4D3-REG-019** Activation shall be rejected with a structured error naming the
+specific sub-reason if any check in M4D3-REG-018 fails, and the `ChecklistVersion`
+shall remain in its pre-activation status.
 
 ---
 
-## Part 5 — Status Translation Layer
+## Part 4 — Governed response-update service (C-2)
 
-### 5.1 Module Location
+### 4.1 Verified current state
 
-**M4D3-TRL-001** The translation function shall live in a dedicated new module
-`backend/iig_checklist/calculation_translation.py`. It shall be a pure function
-with no database access, no side effects, and 100% branch coverage in tests.
+**M4D3-SVC-001** No `enter_response()` service exists in the repository. The current
+write path is `ChecklistResponseUpdateView.patch()` in `backend/iig_checklist/views.py`,
+which performs `full_clean()` and `save()` with **no** `transaction.atomic()`, **no**
+`select_for_update()`, **no** `expected_version`, and **no** version increment. No
+requirement in this specification shall attribute locking, versioning, transactional or
+recalculation behavior to that view as it exists today.
 
-### 5.2 Translation Function Signature
+### 4.2 New service
 
-```
-def translate_engine_status(
-    engine_result: CalculationResult,
-) -> tuple[str, str, Decimal | None]:
-    """Returns (stored_status, reason_code, value).
-    stored_status is always one of the four iig_checklist.enums.CalculationStatus values.
-    Never returns an engine-layer string as stored_status.
-    Fail-closed: unknown engine status maps to ("error", "UNKNOWN_ENGINE_STATUS", None).
-    """
-```
+**M4D3-SVC-002** A new governed service `update_checklist_response()` shall be added to
+`backend/iig_checklist/services.py`. Its name may differ, but the responsibility
+boundary defined here is mandatory.
 
-### 5.3 Exhaustive Translation Table
+**M4D3-SVC-003** `update_checklist_response()` shall own, in order: tenant-scoped
+execution lookup; tenant-scoped response lookup; execution-state validation; permission
+validation; `expected_version` validation; execution lock; response lock; response
+payload validation; governed applicability handling; dependent recalculation; history
+creation where required; response version increment; all writes inside a single
+`transaction.atomic()`; and audit dispatch via `transaction.on_commit()`.
 
-**M4D3-TRL-002** The translation function shall implement the following complete
-mapping. No default branch may produce `"complete"`. Unknown inputs shall fail
-closed to `"error"`.
+**M4D3-SVC-004** `ChecklistResponseUpdateView.patch()` shall be reduced to a thin API
+adapter that deserializes the request, calls the governed service, maps service
+exceptions to structured HTTP responses, and serializes the result. It shall contain no
+business logic, no direct model mutation, and no audit emission.
 
-| Engine result string | Stored `CalculationOutcome.status` | Stored `reason_code` | `value` |
+**M4D3-SVC-005** The governed service shall reject any write to a response whose
+`data_source_type_snapshot` is `fda_derived_default` or `system_calculated` from an
+actor without an override permission, with `error_code = "server_controlled_value"` and
+HTTP 403. This check shall live in the service, not only in the serializer.
+
+**M4D3-SVC-006** The `system_derived_value` and `override_reason` fields shall not be
+written by 4D-3; the override path is deferred to 4D-4.
+
+**M4D3-SVC-007** A new module `backend/iig_checklist/answer_sources.py` shall provide
+pure resolver functions for FDA-derived defaults, dispatched through an explicit
+question-code mapping dict. No dynamic reflection shall be used.
+
+**M4D3-SVC-008** Resolver functions shall be pure: no database writes, no audit
+emission, no model mutation.
+
+---
+
+## Part 5 — `expected_version` contract change
+
+**M4D3-VER-001** The ordinary response PATCH does not currently accept or require
+`expected_version`; only the reviewer-conclusion endpoint does. Introducing it is a
+**controlled breaking API contract change**, not an additive one. This specification
+shall not describe it as purely additive.
+
+**M4D3-VER-002** `expected_version` shall be a required integer field on the governed
+response-update request serializer.
+
+**M4D3-VER-003** Backend and frontend changes shall deploy atomically in the same
+release; the frontend shall be updated to send `expected_version` before or with the
+backend change.
+
+**M4D3-VER-004** A request omitting `expected_version` shall be rejected with HTTP 400
+and `error_code = "expected_version_required"`. No write shall occur. Silent overwrite
+is prohibited.
+
+**M4D3-VER-005** A request whose `expected_version` does not equal the locked
+`ChecklistResponse.version` shall be rejected with HTTP 409 and
+`error_code = "stale_version"`. No response write, no history row, no version
+increment, and no success audit shall occur.
+
+**M4D3-VER-006** A successful governed response update shall increment
+`ChecklistResponse.version` by exactly one.
+
+**M4D3-VER-007** The frontend shall handle 409 by reloading the response list and
+surfacing a conflict message; it shall not retry automatically with a new version.
+
+**M4D3-VER-008** The API contract change shall be recorded in release notes and in the
+regenerated OpenAPI schema.
+
+---
+
+## Part 6 — `CalculationOutcome` handling
+
+**M4D3-OUT-001** Every governed `CalculationOutcome` write shall call `full_clean()`
+before `save()`.
+
+**M4D3-OUT-002** A bare `Model.save()` shall never be used as evidence of validation.
+Tests asserting validation failure shall invoke `full_clean()` or the governed service.
+
+**M4D3-OUT-003** Verified schema fact: `CalculationOutcome` has no `Meta` class and
+migration `0002_execution.py` adds no constraint for it. There is therefore **no
+database uniqueness** on `(response, calculation_name)`, and `response` is a plain
+`ForeignKey`. The specification shall not claim a one-to-one or unique constraint.
+
+**M4D3-OUT-004** Because no database constraint exists, uniqueness shall be maintained
+by code discipline: the governed service shall select existing outcome rows for the
+locked response in ascending primary-key order and update in place, never create.
+
+**M4D3-OUT-005** If more than one `CalculationOutcome` row is found for a single
+response and `calculation_name`, the governed service shall fail closed with
+`error_code = "duplicate_calculation_outcome"` and shall not guess which row is
+authoritative.
+
+**M4D3-OUT-006** No migration shall be added to introduce the missing constraint;
+schema change is unauthorized in 4D-3.
+
+**M4D3-OUT-007** Verified schema fact: `CalculationOutcome.clean()` validates only
+`calculation_name`. The rule "`value` is null unless `status = "complete"`" is **not**
+a model invariant and `full_clean()` will not enforce it. The specification shall not
+describe it as an existing model invariant.
+
+**M4D3-OUT-008** The governed translation and update path shall enforce, before
+`full_clean()`, that `value` is non-null only when `status = "complete"`, and shall
+reject a non-null `value` for any other status with
+`error_code = "invalid_outcome_value"`.
+
+---
+
+## Part 7 — Status translation and reason codes
+
+### 7.1 Translation function
+
+**M4D3-TRL-001** A pure function `translate_engine_status()` shall live in a new module
+`backend/iig_checklist/calculation_translation.py`, with no database access and no side
+effects. It shall return `(stored_status, reason_code, value)`.
+
+**M4D3-TRL-002** The translation shall implement exactly this mapping. No branch shall
+default to `"complete"`.
+
+| Engine result string | Stored `status` | `reason_code` | `value` |
 |---|---|---|---|
-| `"OK"` | `"complete"` | `""` (blank) | from `engine_result.value` |
-| `"DATA_REQUIRED"` | `"data_required"` | `"DATA_REQUIRED"` | `null` |
-| `"INGREDIENT_UNRESOLVED"` | `"error"` | `"INGREDIENT_UNRESOLVED"` | `null` |
-| `"ROUTE_MISMATCH"` | `"error"` | `"ROUTE_MISMATCH"` | `null` |
-| `"DOSAGE_FORM_MISMATCH"` | `"error"` | `"DOSAGE_FORM_MISMATCH"` | `null` |
-| `"UNIT_MISMATCH"` | `"error"` | `"UNIT_MISMATCH"` | `null` |
-| `"FDA_VALUE_UNAVAILABLE"` | `"error"` | `"FDA_VALUE_UNAVAILABLE"` | `null` |
-| `"NOT_COMPARABLE"` | `"error"` | `"NOT_COMPARABLE"` | `null` |
-| `"REGULATORY_REVIEW_REQUIRED"` | `"error"` | `"REGULATORY_REVIEW_REQUIRED"` | `null` |
-| any other string | `"error"` | `"UNKNOWN_ENGINE_STATUS"` | `null` |
+| `OK` | `complete` | `""` | engine value |
+| `DATA_REQUIRED` | `data_required` | `DATA_REQUIRED` | `null` |
+| `INGREDIENT_UNRESOLVED` | `error` | `INGREDIENT_UNRESOLVED` | `null` |
+| `ROUTE_MISMATCH` | `error` | `ROUTE_MISMATCH` | `null` |
+| `DOSAGE_FORM_MISMATCH` | `error` | `DOSAGE_FORM_MISMATCH` | `null` |
+| `UNIT_MISMATCH` | `error` | `UNIT_MISMATCH` | `null` |
+| `FDA_VALUE_UNAVAILABLE` | `error` | `FDA_VALUE_UNAVAILABLE` | `null` |
+| `NOT_COMPARABLE` | `error` | `NOT_COMPARABLE` | `null` |
+| `REGULATORY_REVIEW_REQUIRED` | `error` | `REGULATORY_REVIEW_REQUIRED` | `null` |
+| any other string | `error` | `UNKNOWN_ENGINE_STATUS` | `null` |
 
-### 5.4 Alias Canonicalization
+**M4D3-TRL-003** The engine class exposes aliases whose *resolved string values* are
+already members of the table above (`UNIT_CONVERSION_FAILED` → `UNIT_MISMATCH`;
+`IID_VALUE_MISSING` and `IID_VALUE_INVALID` → `FDA_VALUE_UNAVAILABLE`;
+`PROPOSED_VALUE_MISSING` and `MAX_DAILY_UNITS_MISSING` → `DATA_REQUIRED`;
+`BASIS_UNCLEAR` → `NOT_COMPARABLE`; `RELEASE_NOT_ACTIVE` and `RECORD_SUPERSEDED` →
+`REGULATORY_REVIEW_REQUIRED`). The function shall operate on string values only and
+shall not enumerate alias attribute names.
 
-**M4D3-TRL-003** The following Python class attributes on
-`iid_assessment.calculations.CalculationStatus` are aliases. The translation
-function shall treat each alias's resolved string value as the canonical form before
-applying the table in §5.3.
+**M4D3-TRL-004** `CalculationResult.generated_at` is a string. A valid ISO-8601 value
+carrying a UTC offset or `Z` suffix shall be parsed to a timezone-aware `datetime`
+before assignment.
 
-| Python alias | Resolved string (key in §5.3 table) |
-|---|---|
-| `CalculationStatus.UNIT_CONVERSION_FAILED` | `"UNIT_MISMATCH"` |
-| `CalculationStatus.IID_VALUE_MISSING` | `"FDA_VALUE_UNAVAILABLE"` |
-| `CalculationStatus.IID_VALUE_INVALID` | `"FDA_VALUE_UNAVAILABLE"` |
-| `CalculationStatus.PROPOSED_VALUE_MISSING` | `"DATA_REQUIRED"` |
-| `CalculationStatus.MAX_DAILY_UNITS_MISSING` | `"DATA_REQUIRED"` |
-| `CalculationStatus.BASIS_UNCLEAR` | `"NOT_COMPARABLE"` |
-| `CalculationStatus.RELEASE_NOT_ACTIVE` | `"REGULATORY_REVIEW_REQUIRED"` |
-| `CalculationStatus.RECORD_SUPERSEDED` | `"REGULATORY_REVIEW_REQUIRED"` |
+**M4D3-TRL-005** An empty, malformed, or timezone-naive `generated_at` shall produce
+`status = "error"`, `reason_code = "INVALID_GENERATED_AT"`, `value = null`, and
+`generated_at = null`. The enclosing transaction shall continue; only that outcome is
+marked in error.
 
-Because the engine stores the resolved string (not the attribute name) in
-`CalculationResult.status`, the translation function operates on string values only.
-The alias table is informational; the implementation need not enumerate alias names.
+**M4D3-TRL-006** No client-supplied timestamp shall ever populate
+`CalculationOutcome.generated_at`.
 
-### 5.5 Generated-At Failure (M-1 partial)
+### 7.2 Closed reason-code vocabulary
 
-**M4D3-TRL-004** If `CalculationResult.generated_at` is malformed, empty, or a
-naive (timezone-unaware) datetime string, the calculation outcome shall be treated
-as an error:
+**M4D3-RSN-001** A module-level frozen set `ALLOWED_REASON_CODES` shall be defined in
+`backend/iig_checklist/calculation_translation.py` containing exactly:
 
-- `CalculationOutcome.status = "error"`
-- `CalculationOutcome.reason_code = "INVALID_GENERATED_AT"`
-- `CalculationOutcome.value = null`
-- `CalculationOutcome.generated_at = null`
-- The enclosing `transaction.atomic()` block shall continue (the response row is
-  still written; only the calculation outcome is marked error).
+`DATA_REQUIRED`, `INGREDIENT_UNRESOLVED`, `ROUTE_MISMATCH`, `DOSAGE_FORM_MISMATCH`,
+`UNIT_MISMATCH`, `FDA_VALUE_UNAVAILABLE`, `NOT_COMPARABLE`,
+`REGULATORY_REVIEW_REQUIRED`, `UNKNOWN_ENGINE_STATUS`, `UNKNOWN_REGISTRY_IDENTIFIER`,
+`INVALID_GENERATED_AT`, `DEPENDENCY_DEPTH_EXCEEDED`, `CASCADE_NODE_LIMIT_EXCEEDED`,
+`DEPENDENCY_CYCLE`, `APPLICABILITY_REEVALUATED`.
 
-This decision replaces the earlier discovery wording that allowed a fallback to
-`null` with a logged warning. The normative behavior is an error outcome.
-**[generated-at behavior resolved.]**
+**M4D3-RSN-002** Reason codes shall be uppercase ASCII with underscores, at most 100
+characters, fitting `CalculationOutcome.reason_code`
+(`CharField(blank=True, max_length=100)`).
 
-**M4D3-TRL-005** A valid `CalculationResult.generated_at` ISO-8601 string shall be
-parsed to a timezone-aware `datetime` object using Python's standard library before
-assignment to `CalculationOutcome.generated_at`. A naive datetime string (no UTC
-offset or Z suffix) shall be rejected and treated as malformed (M4D3-TRL-004).
-Client-supplied timestamps are prohibited; this field is populated exclusively from
-calculation function output.
+**M4D3-RSN-003** The governed service shall reject any `reason_code` outside
+`ALLOWED_REASON_CODES`, except the empty string used for a `complete` outcome.
+
+**M4D3-RSN-004** No client shall be able to supply a reason code through any request
+payload.
+
+**M4D3-RSN-005** Raw exception text, stack traces and free-form internal messages shall
+never be written to `reason_code`.
 
 ---
 
-## Part 6 — Applicability Runtime Evaluator
+## Part 8 — Applicability evaluation and field ownership (M-E)
 
-### 6.1 Module Location
+**M4D3-APP-001** A pure function `evaluate_applicability(rule, context) -> str` shall be
+added to `backend/iig_checklist/applicability.py`. It shall have no database access, no
+side effects, no `eval`, no `exec`, and no dynamic attribute access.
 
-**M4D3-APP-001** The runtime evaluator shall be a new function
-`evaluate_applicability(rule: ApplicabilityRule, context: dict) -> str` added to
-`backend/iig_checklist/applicability.py`. It shall be a pure function with no
-database access, no side effects, no `eval`, no `exec`, and no dynamic attribute
-access.
+**M4D3-APP-002** The evaluator shall mirror the grammar enforced by
+`validate_condition_json()` exactly and shall use the same operator set: `eq`, `neq`,
+`in`, `not_in`, `exists`, `not_exists`, `gt`, `gte`, `lt`, `lte`, with `all`/`any`
+composites.
 
-### 6.2 Grammar and Evaluation
+**M4D3-APP-003** A node matching neither the composite nor the leaf shape indicates a
+validator contract breach and shall raise `RuntimeError`, distinguishing it from a
+`ValidationError`.
 
-**M4D3-APP-002** The evaluator shall mirror the grammar enforced by the existing
-`validate_condition_json()` validator exactly:
+**M4D3-APP-004** The evaluator shall return `rule.outcome_if_true` when the condition
+evaluates true and `rule.outcome_if_false` otherwise; the returned value shall be one of
+`applicable`, `not_applicable`, `review_required`.
 
-- **Composite node:** `{"operator": "all"|"any", "conditions": [<node>, ...]}`
-- **Leaf node:** `{"field": "<name>", "op": "<op>", "value": <v>}` (no `"value"` key
-  for `exists`/`not_exists`)
+**M4D3-APP-005** A field absent from the context shall be treated as absent: `None` for
+existence checks, and `False` for comparison operators.
 
-Any node not matching one of these shapes is a validator defect and shall raise a
-`RuntimeError` (not a `ValidationError`) to distinguish a runtime-vs-validation
-contract breach.
+**M4D3-APP-006** The applicability context shall be assembled from exactly the six
+fields in field-registry version 1: `product.route`, `product.dosage_form`,
+`product.release_type`, `iid.match_status`, `iid.has_mde`, `iid.has_potency`.
 
-**M4D3-APP-003** The evaluator shall use the same operator dispatch table as the
-validator: `eq`, `neq`, `in`, `not_in`, `exists`, `not_exists`, `gt`, `gte`, `lt`,
-`lte` on `all`/`any` composites.
+**M4D3-APP-007** The context dict shall be assembled once per governed evaluation pass
+and shall never be persisted.
 
-**M4D3-APP-004** If the evaluated condition is `True`, the evaluator shall return
-`rule.outcome_if_true`. If `False`, it shall return `rule.outcome_if_false`. The
-return value shall be one of the `ApplicabilityOutcome` choices: `"applicable"`,
-`"not_applicable"`, or `"review_required"`.
+### 8.1 Governed field ownership
 
-**M4D3-APP-005** A missing field in the context dict shall be treated as absent:
-`None` for existence checks; an absent value for comparison checks (comparison
-returns `False`).
+**M4D3-APP-008** For any response whose `question.applicability_rule` is non-null, the
+fields `is_not_applicable` and `not_applicable_reason` are **server-owned**. The
+governed applicability service is their only writer.
 
-### 6.3 Outcome Consumption
+**M4D3-APP-009** The governed response-update service shall reject a client-supplied
+`is_not_applicable` or `not_applicable_reason` for a rule-governed response with
+`error_code = "applicability_server_controlled"` and HTTP 403.
 
-#### 6.3.1 `APPLICABLE`
+**M4D3-APP-010** For a response with no applicability rule, a client-declared N/A shall
+remain permitted subject to existing answer-type and execution-state rules.
 
-**M4D3-APP-006** When `evaluate_applicability()` returns `"applicable"`:
-- `ChecklistResponse.is_not_applicable` shall remain `False`.
-- `ChecklistResponse.not_applicable_reason` shall not be set.
-- Population and calculation shall proceed normally for this question.
+**M4D3-APP-011** The governed service shall reject any client-supplied
+`not_applicable_reason` beginning with the reserved prefix `REVIEW_REQUIRED:` for any
+response, rule-governed or not, with `error_code = "reserved_reason_prefix"`.
 
-#### 6.3.2 `NOT_APPLICABLE`
+**M4D3-APP-012** The population pass shall not overwrite a user-declared N/A on a
+non-rule-governed response merely because `raw_value` is null.
 
-**M4D3-APP-007** When `evaluate_applicability()` returns `"not_applicable"`:
-- `ChecklistResponse.is_not_applicable` shall be set to `True`.
-- `ChecklistResponse.not_applicable_reason` shall be set to the value of
-  `ApplicabilityRule.reason_code` (verified max 100 chars; fits within
-  `MAX_NOT_APPLICABLE_REASON_CHARS = 200`).
-- Population of `raw_value` for this question shall not proceed.
-- If the response already has a non-null `raw_value` from a prior user entry, the
-  transition shall create a `ChecklistResponseHistory` row before overwriting the
-  response state. The prior `raw_value`, `is_not_applicable`, and version shall be
-  preserved in the history row. This write shall be atomic with the response update.
-- Audit shall be emitted via `transaction.on_commit()` after the transaction commits.
-
-#### 6.3.3 `REVIEW_REQUIRED`
-
-**M4D3-APP-008** `REVIEW_REQUIRED` is a derived, recomputed state. It shall **not**
-be stored in any `ChecklistResponse` field. **[REVIEW_REQUIRED persistence resolved:
-no new database field; state recomputed at read time.]**
-
-**M4D3-APP-009** When `evaluate_applicability()` returns `"review_required"` during
-the population pass:
-- `ChecklistResponse.is_not_applicable` shall remain `False`.
-- `ChecklistResponse.not_applicable_reason` shall not be modified.
-- `ChecklistResponse.raw_value` shall remain unchanged.
-- No `FDA_DERIVED_DEFAULT` population or `SYSTEM_CALCULATED` computation shall
-  proceed for this question.
-
-**M4D3-APP-010** At API read time, the execution response serializer shall
-re-evaluate the `ApplicabilityRule` for each question against the assembled context
-and include a derived read-only field `applicability_outcome` in the response
-representation. Valid values: `"applicable"`, `"not_applicable"`,
-`"review_required"`, `"no_rule"` (when no `ApplicabilityRule` is linked). This field
-shall not be writable by any client.
-
-**M4D3-APP-011** A client PATCH shall never be able to forge a `"review_required"`
-applicability outcome. The state is derived from the governed `ApplicabilityRule` row
-and the assembled context, never from client input.
-
-**M4D3-APP-012** The frontend shall display "Review required" visibly when
-`applicability_outcome = "review_required"`. The question shall not be displayed as
-applicable or not-applicable. No population value shall be displayed.
-
-### 6.4 Context Assembly
-
-**M4D3-APP-013** The applicability context dict shall be assembled from:
-- `FormulationVersion` fields: `product.route`, `product.dosage_form`,
-  `product.release_type`.
-- FDA match result fields from `run_preview()` / `find_iid_candidates()`:
-  `iid.match_status`, `iid.has_mde`, `iid.has_potency`.
-
-**M4D3-APP-014** Context assembly shall happen once per population pass. The context
-dict is an in-memory value; it shall not be stored in the database.
+**M4D3-APP-013** Population eligibility for a response shall be determined by checking
+all of: applicability governance and current outcome; `is_not_applicable`;
+`not_applicable_reason` including any reserved marker; `data_source_type_snapshot`;
+existing `raw_value`; and execution status.
 
 ---
 
-## Part 7 — Population Pass
+## Part 9 — Applicability persistence and historical reproducibility (M-C)
 
-### 7.1 Pass Sequence
+### 9.1 Verified model compatibility
 
-**M4D3-POP-001** The population pass at execution creation shall execute the
-following steps inside a single `transaction.atomic()` block:
+**M4D3-PST-001** Verified schema fact: `ChecklistResponse.clean()` gates both N/A rules
+on `is_not_applicable` being true — rule 2 (`raw_value` must be null) and rule 3
+(reason required) are inactive when `is_not_applicable` is false. The field
+`not_applicable_reason` is `CharField(null=True, blank=True, max_length=200)`. Storing a
+reason string while `is_not_applicable` is false is therefore **permitted by the current
+model** and requires no migration.
 
-1. Create the `ChecklistExecution` and pre-create all `ChecklistResponse` and
-   `CalculationOutcome` rows (existing 4D-2 behavior; unchanged).
-2. Assemble the applicability context dict (M4D3-APP-013).
-3. For each question in the version (in defined display order):
-   a. If an `ApplicabilityRule` is linked, call `evaluate_applicability()`.
-   b. If outcome is `"not_applicable"`: apply M4D3-APP-007; skip steps 4–6 for
-      this question.
-   c. If outcome is `"review_required"`: apply M4D3-APP-009; skip steps 4–6 for
-      this question.
-   d. If outcome is `"applicable"` or no rule: continue.
-4. For all `FDA_DERIVED_DEFAULT` questions that passed applicability: call resolver
-   functions (M4D3-SVC-001) to populate `raw_value`; if resolver returns `None`,
-   leave `raw_value = null` with no error.
-5. For all `SYSTEM_CALCULATED` questions that passed applicability and whose
-   upstream inputs are now non-null: look up the registry entry, resolve inputs,
-   call the calculation function, run the translation function, produce
-   `(stored_status, reason_code, value)`.
-6. For each `CalculationOutcome` to be updated: populate all fields, call
-   `full_clean()`, then `save()`.
-7. After the `transaction.atomic()` block commits, emit audit events via
-   `transaction.on_commit()`.
+### 9.2 REVIEW_REQUIRED representation
 
-**M4D3-POP-002** Step 4 shall complete for all eligible questions before step 5
-begins. This order is deterministic: `FDA_DERIVED_DEFAULT` values that feed
-`SYSTEM_CALCULATED` calculations are resolved first.
+**M4D3-PST-002** A `REVIEW_REQUIRED` outcome shall be persisted as a reserved marker in
+`not_applicable_reason` of the form `REVIEW_REQUIRED:<ApplicabilityRule.reason_code>`,
+with `is_not_applicable` remaining false and `raw_value` unchanged.
 
-**M4D3-POP-003** The entire population pass (steps 1–7) shall occur within the same
-`transaction.atomic()`. If any step raises an uncaught exception, the full
-transaction shall roll back. No partial population state shall be committed.
+**M4D3-PST-003** The marker length is bounded: the 16-character prefix plus a
+`reason_code` of at most 100 characters yields at most 116 characters, within
+`MAX_NOT_APPLICABLE_REASON_CHARS = 200`.
 
-### 7.2 Non-Overwrite Rules
+**M4D3-PST-004** `ChecklistVersion` activation shall reject any `ApplicabilityRule`
+whose composed marker would exceed `MAX_NOT_APPLICABLE_REASON_CHARS`, with
+`error_code = "reason_marker_too_long"`.
 
-**M4D3-POP-004** The population pass shall never overwrite a `ChecklistResponse`
-whose `data_source_type_snapshot = "user_required"` that already has a non-null
-`raw_value`.
+**M4D3-PST-005** The marker shall be written only by the governed applicability service,
+and `full_clean()` shall be called before every such save.
 
-**M4D3-POP-005** The population pass shall never touch responses with
-`data_source_type_snapshot` in `{"reviewer_confirmed", "approval_metadata"}`.
+**M4D3-PST-006** No client PATCH shall write or clear the marker (see M4D3-APP-011).
 
-**M4D3-POP-006** An execution whose status is not in `{"draft", "returned"}` shall
-reject any population or recalculation call. The service shall raise a
-`ValueError` with `error_code = "execution_not_recalculable"`.
+### 9.3 State-dependent evaluation
 
-### 7.3 Idempotency
+**M4D3-PST-007** For executions in `draft` or `returned`, applicability may be
+recomputed from the current governed context through the governed service, and any
+resulting change shall follow the Part 10 history, version and audit requirements.
 
-**M4D3-POP-007** Re-running the population pass with identical inputs (same
-`FormulationVersion`, same active FDA release, same `AssessmentSnapshot`) shall
-produce no new `ChecklistResponseHistory` rows.
+**M4D3-PST-008** For executions in `submitted_for_review`, `approved`, `rejected`,
+`cancelled` or `superseded`, the API shall expose the **persisted** applicability state
+only. No read-time recomputation shall occur and no live FDA or IID data shall
+influence the displayed historical applicability.
 
-**M4D3-POP-008** Re-running with identical calculation inputs shall not increment
-`ChecklistResponse.version`.
+**M4D3-PST-009** The derived read-only field `applicability_outcome` shall be computed
+from persisted state as follows: `is_not_applicable = True` → `not_applicable`;
+`not_applicable_reason` starting with `REVIEW_REQUIRED:` → `review_required`; a
+rule-governed response with neither → `applicable`; no rule → `no_rule`.
 
-**M4D3-POP-009** Re-running with identical inputs shall not emit any audit event.
+**M4D3-PST-010** No serialized payload shall simultaneously report
+`is_not_applicable = false` and `applicability_outcome = "not_applicable"`; the derivation
+in M4D3-PST-009 makes this combination unreachable.
 
-**M4D3-POP-010** Re-running with identical inputs shall not modify
-`CalculationOutcome.inputs`, `input_provenance`, or `source_assessment_snapshot_public_id`.
+**M4D3-PST-011** In editable states, a live evaluation result that differs from the
+persisted state is advisory until the governed service persists it; the API shall never
+present an unpersisted live result as the record's applicability.
 
-### 7.4 Audit Events
+**M4D3-PST-012** The governed evaluation pass shall persist the evaluated outcome
+before an execution may be submitted, so every submitted execution carries a persisted
+applicability state for every rule-governed response.
 
-**M4D3-POP-011** For each `FDA_DERIVED_DEFAULT` question that received a non-null
-`raw_value` from the population pass, a single audit event
-`iig_checklist.response.fda_populated` shall be emitted via `transaction.on_commit()`.
-
-**M4D3-POP-012** No `iig_checklist.response.entered` event shall be emitted for
-system-populated answers. The distinction between system-generated and user-entered
-values must be auditable through the event type alone.
-
-**M4D3-POP-013** For each `SYSTEM_CALCULATED` question whose `CalculationOutcome`
-is updated from `"data_required"` to a new status, a single audit event
-`iig_checklist.calculation.completed` (status = `"complete"`),
-`iig_checklist.calculation.data_required` (status = `"data_required"` with reason),
-or `iig_checklist.calculation.error` (status = `"error"` with reason) shall be
-emitted via `transaction.on_commit()`.
+**M4D3-PST-013** `applicability_outcome` shall be read-only in every serializer and
+shall never be writable by any client.
 
 ---
 
-## Part 8 — Cascade Recalculation
+## Part 10 — Applicability re-evaluation and history (M-D)
 
-**M4D3-RCL-001** The 4D-3 implementation shall extend `enter_response()` to trigger
-cascade recalculation on every `USER_REQUIRED` or `EVIDENCE_DERIVED` answer update
+### 10.1 Triggers
+
+**M4D3-REV-001** Applicability re-evaluation shall occur at exactly these points:
+initial execution creation; a governed response update whose changed response is a
+declared applicability dependency; and an explicitly triggered authorized recalculation
 on a `draft` or `returned` execution.
 
-**M4D3-RCL-002** The recalculation sequence within `enter_response()` shall:
+**M4D3-REV-002** No applicability re-evaluation shall occur automatically for
+`submitted_for_review` or any terminal execution.
 
-1. Acquire `select_for_update()` on the `ChecklistExecution` row before reading any
-   `ChecklistResponse` values used as calculation inputs.
-2. Write and validate the triggering `USER_REQUIRED`/`EVIDENCE_DERIVED` response.
-3. Using the `CALCULATION_BINDING_REGISTRY`, identify all `SYSTEM_CALCULATED`
-   questions whose declared `dependencies` include the updated question code.
-4. Process affected questions in stable topological order (M4D3-DAG-004).
-5. Re-run the calculation and translation for each affected question.
-6. Call `full_clean()` and update the `CalculationOutcome` row in place.
-7. All writes shall be inside a single `transaction.atomic()`.
-8. Emit audit events via `transaction.on_commit()` after the transaction commits.
+**M4D3-REV-003** No FDA or IID source refresh shall itself trigger re-evaluation; a
+refresh takes effect only through an explicitly authorized recalculation in an editable
+state.
 
-**M4D3-RCL-003** A recalculation audit event `iig_checklist.calculation.recalculated`
-shall be emitted for each `CalculationOutcome` that changes value or status.
-No event shall be emitted if the result is identical to the prior outcome.
+**M4D3-REV-004** A governed applicability service shall own re-evaluation and be the
+sole writer of `is_not_applicable`, `not_applicable_reason` and the reserved marker.
 
-**M4D3-RCL-004** The recalculation loop shall include a defensive visited-set cycle
-check. If the loop attempts to visit a question already in the visited set, it shall
-set that question's `CalculationOutcome.status = "error"`,
-`reason_code = "CYCLE_DETECTED"`, and stop further cascade.
+**M4D3-REV-005** 4D-3 shall not introduce any system-only background recalculation that
+lacks an authenticated triggering actor.
+
+### 10.2 History
+
+**M4D3-HST-001** `ChecklistResponseHistory` was introduced for reviewer-conclusion
+amendments; its docstring states one row per amendment and never on first entry. 4D-3
+extends its governed reuse to persisted applicability transitions. This reuse shall be
+documented in the model docstring update accompanying implementation.
+
+**M4D3-HST-002** At initial execution creation no history row shall be written, because
+responses are created with `raw_value = null` and `is_not_applicable = False` and no
+prior state exists.
+
+**M4D3-HST-003** When the persisted applicability state of an existing response changes,
+a `ChecklistResponseHistory` row shall be created in the same transaction, populating
+every required field: `response`, `prior_raw_value`, `new_raw_value`,
+`prior_is_not_applicable`, `new_is_not_applicable`, `prior_not_applicable_reason`,
+`new_not_applicable_reason`, `prior_version`, `new_version`, `correction_reason`,
+`amended_by`, `source_classification_snapshot`.
+
+**M4D3-HST-004** `amended_by` shall be the authenticated actor who triggered the
+governed response update or the authorized recalculation. `execution.created_by` shall
+never be recorded as the actor unless that user actually triggered the operation.
+
+**M4D3-HST-005** `correction_reason` shall be the server-generated code
+`APPLICABILITY_REEVALUATED` for system applicability transitions. A fabricated
+human-authored correction reason shall never be written.
+
+**M4D3-HST-006** `source_classification_snapshot` shall be set from the response's
+existing `data_source_type_snapshot`.
+
+**M4D3-HST-007** `prior_version` shall be the pre-update version and `new_version` the
+incremented value; the response version shall increment on every persisted applicability
+transition.
+
+**M4D3-HST-008** History creation and the response update shall be atomic; no history
+row shall be visible without its corresponding response state, and neither shall persist
+if the transaction rolls back.
+
+**M4D3-HST-009** `ChecklistResponseHistory` rows shall remain append-only; the existing
+`GovernedHistoryMutationForbidden` guards shall not be bypassed.
+
+### 10.3 N/A raw-value behavior
+
+**M4D3-NA-001** When a response transitions to `NOT_APPLICABLE`, `raw_value` shall be
+set to `null`, because `ChecklistResponse.clean()` rule 2 forbids a non-null
+`raw_value` when `is_not_applicable` is true.
+
+**M4D3-NA-002** The prior `raw_value` shall be preserved in
+`ChecklistResponseHistory.prior_raw_value` before it is cleared, so no regulated value
+is silently lost.
+
+**M4D3-NA-003** `not_applicable_reason` shall be set from `ApplicabilityRule.reason_code`
+on a `NOT_APPLICABLE` transition, satisfying `clean()` rule 3.
+
+**M4D3-NA-004** When a response transitions from `NOT_APPLICABLE` back to `APPLICABLE`,
+`raw_value` shall not be automatically restored from history; the response returns to a
+data-required or governed population state and subsequent population follows the normal
+source rules.
+
+**M4D3-NA-005** On a transition back to `APPLICABLE`, `is_not_applicable` shall be set
+false and `not_applicable_reason` cleared, with the prior values recorded in history.
 
 ---
 
-## Part 9 — Transactions and Locking
+## Part 11 — Completeness gate (M-A)
 
-**M4D3-TXN-001** The required lock acquisition order is:
-1. `ChecklistExecution` row (via `select_for_update()`).
-2. Affected `ChecklistResponse` rows in ascending primary-key order.
-3. `CalculationOutcome` rows in ascending primary-key order.
+**M4D3-CMP-001** The existing `_check_execution_completeness()` requires a non-null
+`raw_value` for every required response not marked N/A. Because `SYSTEM_CALCULATED`
+responses keep `raw_value` null permanently (M4D3-MDL-006), a required calculated
+question can never satisfy the current gate. The gate shall be extended by 4D-3.
 
-This order shall be respected without exception to prevent deadlocks.
+**M4D3-CMP-002** A required `SYSTEM_CALCULATED` response shall be considered complete
+only when all of: its persisted applicability outcome is `applicable`; a
+`CalculationOutcome` row exists; `status = "complete"`; and `value` is non-null.
 
-**M4D3-TXN-002** The user response update and all dependent `CalculationOutcome`
-updates shall occur inside the same `transaction.atomic()` block.
+**M4D3-CMP-003** A required `SYSTEM_CALCULATED` response shall be considered incomplete
+when `status` is `data_required`, `error`, or `calculating`; when no outcome row exists;
+when `value` is null; or when its persisted applicability outcome is `review_required`.
+The structured error shall name the question code and the outcome `reason_code`.
 
-**M4D3-TXN-003** A stale `expected_version` value on an `enter_response()` call
-(optimistic lock check: `ChecklistResponse.version != expected_version`) shall be
-rejected with `error_code = "stale_version"` / 409 before any write occurs. No
-partial state shall be committed on a stale-version rejection.
+**M4D3-CMP-004** A required `FDA_DERIVED_DEFAULT` response shall be considered complete
+only when the server-populated `raw_value` is non-null and no `REVIEW_REQUIRED` marker
+is present.
 
-**M4D3-TXN-004** If any step of the recalculation raises an exception after the
-triggering response has been written, the full `transaction.atomic()` block shall
-roll back — both the response update and all `CalculationOutcome` updates.
+**M4D3-CMP-005** Responses persisted as `NOT_APPLICABLE` shall continue to satisfy the
+gate under the existing rule requiring a non-empty `not_applicable_reason`.
 
-**M4D3-TXN-005** Audit events shall be emitted via `transaction.on_commit()`.
-No success audit event shall fire after a transaction rollback.
-
-**M4D3-TXN-006** History and outcome writes shall be atomic with the response
-update. No history row shall be visible without its corresponding response state.
-
-**M4D3-TXN-007** Concurrent `enter_response()` calls on the same execution shall
-be serialized by the `select_for_update()` on `ChecklistExecution`. A second call
-must wait for the first to commit before it can acquire the lock.
+**M4D3-CMP-006** The completeness gate shall evaluate persisted state only; it shall
+never trigger a live recomputation.
 
 ---
 
-## Part 10 — Dependency Graph
+## Part 12 — Submission gate for REVIEW_REQUIRED (M-B)
 
-### 10.1 Numeric Limits
+**M4D3-SUB-001** An execution shall not transition to `submitted_for_review` while any
+response carries an unresolved `REVIEW_REQUIRED` marker.
 
-**M4D3-DAG-001** The following concrete limits shall be enforced. Rationale: the
-approved registry contains six formulas with known, bounded input patterns; a depth
-of 5 accommodates any plausible chain while protecting against runaway cascade; a
-cascade node count of 10 accommodates all six formulas with buffer.
+**M4D3-SUB-002** The gate shall apply regardless of `question.required`. An optional
+question in `REVIEW_REQUIRED` state shall block submission exactly as a required one
+does.
 
-| Constant | Value | Enforced at |
-|---|---|---|
-| `MAX_DEPENDENCY_DEPTH` | 5 | `ChecklistVersion` activation |
-| `MAX_CASCADE_NODES` | 10 | `ChecklistVersion` activation; runtime defensive check |
+**M4D3-SUB-003** A blocked submission shall return a structured validation error with
+`error_code = "review_required_unresolved"` and HTTP 400, listing the affected response
+public UUIDs and the governing `ApplicabilityRule.code` values.
 
-**M4D3-DAG-002** A `ChecklistVersion` whose dependency graph has any path longer
-than `MAX_DEPENDENCY_DEPTH` shall be rejected at activation with
+**M4D3-SUB-004** The error payload shall not include raw regulated answer values.
+
+**M4D3-SUB-005** A blocked submission shall produce no status transition and no success
+audit event.
+
+**M4D3-SUB-006** Because override and reviewer confirmation are deferred to 4D-4,
+`REVIEW_REQUIRED` is a terminal blocking state within 4D-3: the execution remains in
+`draft` or `returned`, no automatic population or calculation occurs for the affected
+response, and no approval is possible. 4D-3 shall not present any manual resolution
+path.
+
+**M4D3-SUB-007** The only 4D-3 resolution is correction of the governing source or
+context followed by an authorized recalculation in an editable state.
+
+---
+
+## Part 13 — Dependency graph
+
+**M4D3-DAG-001** The limits shall be named `CALCULATION_MAX_DEPENDENCY_DEPTH = 5` and
+`CALCULATION_MAX_CASCADE_NODES = 10`, defined in
+`backend/iig_checklist/calculation_registry.py`. These names shall be used to avoid
+collision with `applicability.MAX_RECURSION_DEPTH = 5`, which bounds condition-tree
+nesting and is unrelated.
+
+**M4D3-DAG-002** The specification records these as a **governance decision, not an
+empirical measurement**: the six approved calculations have shallow direct dependencies
+and no current chain exceeds one calculated dependency level, so depth 5 and 10 affected
+nodes provide bounded headroom. The values shall be revisited through a governed
+specification change if real checklist content approaches them.
+
+**M4D3-DAG-003** A dependency graph whose longest path exceeds
+`CALCULATION_MAX_DEPENDENCY_DEPTH` shall be rejected at activation with
 `error_code = "DEPENDENCY_DEPTH_EXCEEDED"`.
 
-**M4D3-DAG-003** A `ChecklistVersion` whose dependency graph has more than
-`MAX_CASCADE_NODES` total `SYSTEM_CALCULATED` nodes reachable from any single
-question shall be rejected at activation with
-`error_code = "CASCADE_NODE_COUNT_EXCEEDED"`.
+**M4D3-DAG-004** A graph exceeding `CALCULATION_MAX_CASCADE_NODES` reachable calculated
+nodes from any single question shall be rejected at activation with
+`error_code = "CASCADE_NODE_LIMIT_EXCEEDED"`.
 
-### 10.2 DAG Validation
+**M4D3-DAG-005** Topological ordering shall use Kahn's algorithm or an equivalent
+iterative algorithm; unbounded recursion is prohibited.
 
-**M4D3-DAG-004** Stable topological ordering shall be produced using Kahn's algorithm
-(or equivalent iterative algorithm; no recursion without a depth bound). Where two
-nodes have equal topological precedence (no dependency between them), alphabetical
-`code` order shall be the tiebreaker, ensuring deterministic output across repeated
-invocations with identical graphs.
+**M4D3-DAG-006** Nodes of equal topological precedence shall be ordered by ascending
+`ChecklistQuestion.code`, producing identical output across repeated invocations.
 
-**M4D3-DAG-005** A cycle in the dependency graph shall be rejected at activation with
-`error_code = "DEPENDENCY_CYCLE"` naming the questions involved.
+**M4D3-DAG-007** A cycle shall be rejected at activation with
+`error_code = "DEPENDENCY_CYCLE"`, naming the questions involved.
 
-**M4D3-DAG-006** A declared dependency referencing a `ChecklistQuestion.code` that
-does not exist in the same `ChecklistVersion` shall be rejected at activation with
+**M4D3-DAG-008** A dependency referencing a question code absent from the same
+`ChecklistVersion` shall be rejected at activation with
 `error_code = "UNKNOWN_DEPENDENCY_CODE"`.
 
-**M4D3-DAG-007** Cross-version dependency references (a dependency code that exists
-in a different `ChecklistVersion`) are prohibited. Only question codes within the
-same version are valid dependencies.
+**M4D3-DAG-009** Cross-version dependency references are prohibited.
 
-**M4D3-DAG-008** At runtime, the recalculation loop shall maintain a `visited` set.
-Entering a node already in `visited` triggers the cycle-detected error (M4D3-RCL-004).
-This defensive check applies even after activation-time validation passes.
+**M4D3-DAG-010** The runtime cascade shall maintain a visited set; re-entering a visited
+node shall set that outcome to `status = "error"`,
+`reason_code = "DEPENDENCY_CYCLE"`, and halt further cascade.
 
 ---
 
-## Part 11 — FDA Source Resolution
+## Part 14 — FDA source resolution
 
-**M4D3-SRC-001** At population time, the system shall call `run_preview()` against
-the currently active FDA release for the current `(FormulationComponent,
-active_release)` tuple (live-first design; OQ-4 resolved).
+**M4D3-SRC-001** The active FDA release shall be resolved as the single
+`FDADataSourceRelease` with `dataset_type = "fda_iid"` and `status = "active"`.
+Determinism is guaranteed by the existing partial unique constraint
+`unique_active_release_per_dataset_type`.
 
-**M4D3-SRC-002** Every `AssessmentSnapshot` lookup shall include
-`tenant = execution.tenant` as a mandatory filter. A snapshot belonging to another
-tenant shall never be used as the source for any calculation.
+**M4D3-SRC-002** If no active release exists, the calculation shall fail closed with
+`status = "error"` and `reason_code = "FDA_VALUE_UNAVAILABLE"`. No population shall
+occur.
 
-**M4D3-SRC-003** The result of `run_preview()` shall be frozen as an
-`AssessmentSnapshot` (reusing an exact existing match for this
-`(FormulationComponent, active_release, tenant)` tuple if one exists; creating a new
-one otherwise). `CalculationOutcome.source_assessment_snapshot_public_id` shall be
-set to the resulting snapshot's `public_id` unconditionally.
+**M4D3-SRC-003** The release UUID shall never be supplied by a client; it shall be
+resolved server-side on every call.
 
-**M4D3-SRC-004** If `run_preview()` returns no match (`None` or empty candidates),
-the relevant calculation inputs shall be `None`. The calculation shall proceed
-(returning `DATA_REQUIRED` or `INGREDIENT_UNRESOLVED`); the snapshot shall still be
-created (recording the no-match result).
+**M4D3-SRC-004** `run_preview()` arguments shall be resolved as follows:
+`active_release_public_id` from M4D3-SRC-001; `route_code` and `dosage_form_code` from
+the execution's `FormulationVersion.product`; `proposed_quantity_per_unit` and
+`proposed_quantity_unit` from the `FormulationComponent`;
+`total_dosage_unit_weight` and `total_dosage_unit_weight_unit` from the
+`FormulationVersion`; `maximum_dosage_units_per_day` from the `FormulationVersion` where
+present; and substance identity fields from the `FormulationComponent`.
 
-**M4D3-SRC-005** If `run_preview()` returns multiple candidates, the governed
-precedent-selection logic from `iid_assessment` shall select the active record. 4D-3
-shall not implement its own selection logic.
+**M4D3-SRC-005** Any required `run_preview()` argument that cannot be resolved shall
+produce `status = "data_required"` and `reason_code = "DATA_REQUIRED"` for the affected
+outcome, without raising.
 
-**M4D3-SRC-006** Once an execution is submitted for review or moves to a terminal or
-locked status, `CalculationOutcome.source_assessment_snapshot_public_id` shall not
-be updated even if the underlying FDA release changes.
+**M4D3-SRC-006** If any resolver above is not deterministically available in the current
+`formulations` schema at implementation time, that gap shall be treated as a **blocking
+implementation requirement** and raised for governed specification amendment rather than
+resolved by an implementer's assumption.
 
-**M4D3-SRC-007** A change to the active FDA release after population shall not
-automatically recalculate any existing `ChecklistExecution`. Only explicit
-re-population (on a `draft` or `returned` execution, initiated by an authorized
-actor) shall update the snapshot reference.
+**M4D3-SRC-007** All `AssessmentSnapshot` reads and writes shall filter by
+`tenant = execution.tenant`.
 
-**M4D3-SRC-008** FDA data models (`fda_data` app) are platform-level. The
-import-linter contract (`iig_checklist` may import `fda_data` read-only services)
-shall remain unchanged. No 4D-3 code shall write to `fda_data` models.
+**M4D3-SRC-008** `run_preview()` returning no match shall yield null calculation inputs;
+the calculation shall still run and report `DATA_REQUIRED` or `INGREDIENT_UNRESOLVED`.
 
----
+**M4D3-SRC-009** Multiple candidate precedent records shall be resolved by the existing
+governed selection logic in `iid_assessment`; 4D-3 shall not implement its own.
 
-## Part 12 — Reproducibility Chain (M-1 Resolution)
+**M4D3-SRC-010** A withdrawn, superseded or non-active source record shall map through
+the translation table to `REGULATORY_REVIEW_REQUIRED`.
 
-**M4D3-PRV-001** **[M-1 resolved.]** No new database column shall be added for
-registry versioning. The approved reproducibility chain for each `CalculationOutcome`
-consists of:
+**M4D3-SRC-011** Once an execution leaves `draft`/`returned`,
+`source_assessment_snapshot_public_id` shall not be updated.
 
-1. `CalculationOutcome.calculation_name` — identifies the approved function.
-2. `CalculationOutcome.formula_version` — captures the mathematical formula version
-   (from `iid_assessment.calculations.FORMULA_VERSION`).
-3. `CalculationOutcome.inputs` — exact inputs passed to the calculation function,
-   keyed by kwarg name.
-4. `CalculationOutcome.input_provenance` — source descriptors for each input,
-   including `"_registry_binding_version"` (M4D3-REG-003).
-5. `CalculationOutcome.rounding_rule` — rounding descriptor from the registry entry.
-6. `CalculationOutcome.generated_at` — timezone-aware UTC datetime of computation.
-7. `CalculationOutcome.source_assessment_snapshot_public_id` — UUID of the
-   `AssessmentSnapshot` used (where applicable).
-8. Immutable deployed code version from source control and release metadata.
+**M4D3-SRC-012** A change to the active FDA release shall never automatically
+recalculate an existing execution.
 
-**M4D3-PRV-002** `input_provenance` shall always include:
-
-```json
-{
-  "_registry_binding_version": "<binding_version from registry entry>",
-  "<kwarg_name>": {
-    "source": "question" | "formulation",
-    "question_code": "<code>" | null,
-    "field": "<field_name>" | null
-  },
-  ...
-}
-```
-
-**M4D3-PRV-003** A missing or unrecognized `_registry_binding_version` in
-`input_provenance` at read time shall be logged as a data-integrity warning. It
-shall not cause a runtime error on read, but shall be flagged in monitoring.
-
-**M4D3-PRV-004** Changing `input_resolvers` or `dependencies` for a registry entry
-requires incrementing `binding_version`. This constraint shall be documented in the
-registry module docstring and enforced by code review. No database-level enforcement
-is required.
+**M4D3-SRC-013** No 4D-3 code shall write to `fda_data` models.
 
 ---
 
-## Part 13 — Serialization
+## Part 15 — AssessmentSnapshot ownership
 
-### 13.1 `CalculationOutcome` Read-Only Nested Representation
+**M4D3-SNP-001** `iig_checklist` may consume `iid_assessment` preview and calculation
+services. The import direction remains one-way and no reverse import shall be
+introduced.
 
-**M4D3-SER-001** The `CalculationOutcome` shall be serialized as a read-only nested
-object in the execution response-list and response-detail API. The exact approved
-fields are:
+**M4D3-SNP-002** `iig_checklist` shall not construct, save, or update `iid_assessment`
+model classes directly.
 
-| API field | Source | Notes |
-|---|---|---|
-| `public_id` | `CalculationOutcome.public_id` | UUID |
-| `calculation_name` | `CalculationOutcome.calculation_name` | Governed function name |
-| `formula_version` | `CalculationOutcome.formula_version` | e.g. `"1.0.0"` |
-| `status` | `CalculationOutcome.status` | One of the four stored values |
-| `value` | `CalculationOutcome.value` | `null` when not complete |
-| `unit` | `CalculationOutcome.unit` | May be blank |
-| `reason_code` | `CalculationOutcome.reason_code` | Blank when complete |
-| `rounding_rule` | `CalculationOutcome.rounding_rule` | |
-| `generated_at` | `CalculationOutcome.generated_at` | ISO-8601 UTC string or `null` |
-| `source_assessment_snapshot_public_id` | `CalculationOutcome.source_assessment_snapshot_public_id` | UUID or `null` |
-| `provenance_summary` | derived | See M4D3-SER-002 |
-| `registry_binding_version` | from `input_provenance["_registry_binding_version"]` | String or `null` |
+**M4D3-SNP-003** Governed snapshot creation shall occur only through an approved
+`iid_assessment` service or helper function that owns the write.
 
-**M4D3-SER-002** `provenance_summary` shall be a server-assembled read-only object
-containing only sanitized, approved labels:
+**M4D3-SNP-004** If no such service exists, adding one inside `iid_assessment` is part
+of 4D-3's implementation surface; it shall not be replaced by a direct cross-app model
+write.
 
-```json
-{
-  "formula_version": "<version>",
-  "registry_binding_version": "<version>",
-  "source_snapshot_id": "<uuid or null>",
-  "input_labels": {
-    "<kwarg_name>": "<source label, e.g. 'from question Q_QUANTITY_PER_UNIT'>"
-  }
-}
-```
+**M4D3-SNP-005** `AssessmentSnapshot.created_by` shall be the authenticated actor who
+triggered execution creation or the authorized recalculation. It shall be null only
+where existing approved snapshot conventions explicitly allow a null creator.
 
-`inputs` and `input_provenance` raw dicts shall **not** be exposed to the client.
-Internal IDs, storage paths, registry function references, and cross-tenant metadata
-shall not appear.
+**M4D3-SNP-006** `CalculationOutcome.source_assessment_snapshot_public_id` shall be set
+to the resulting snapshot's `public_id`.
 
-**M4D3-SER-003** The `CalculationOutcome` serializer shall be read-only. No
-`create`, `update`, or `partial_update` method shall be defined on it.
-
-**M4D3-SER-004** `applicability_outcome` shall be included as a derived read-only
-field in the `ChecklistResponse` serialized representation. See M4D3-APP-010.
-
-**M4D3-SER-005** Frontend DTO mapping shall remain centralized in a single mapper
-module. No calculation value shall be locally recomputed or overridden on the client
-side. No generic calculation PATCH endpoint shall be exposed.
-
-**M4D3-SER-006** The OpenAPI schema for `CalculationOutcome.status` shall enumerate
-only the four stored choices: `"data_required"`, `"calculating"`, `"complete"`,
-`"error"`. Engine strings shall not appear in the schema.
+**M4D3-SNP-007** Scope exclusion SCOPE-OUT-19 forbids direct model writes by
+`iig_checklist`; it does not forbid governed snapshot creation through an
+`iid_assessment` service, and shall not be read as doing so.
 
 ---
 
-## Part 14 — Audit Events
+## Part 16 — Population and recalculation
 
-**M4D3-AUD-001** All 4D-3 audit events shall be dispatched via
-`transaction.on_commit()`. No audit event shall be emitted before the enclosing
-transaction commits.
+**M4D3-POP-001** The population pass at execution creation shall run inside a single
+`transaction.atomic()` in this order: create execution and pre-create response and
+outcome rows (with registry-resolved `calculation_name` per M4D3-REG-013); assemble the
+applicability context; evaluate and persist applicability for each rule-governed
+question; populate eligible `FDA_DERIVED_DEFAULT` answers; compute eligible
+`SYSTEM_CALCULATED` answers; translate engine results; `full_clean()` and save each
+outcome; and dispatch audit via `transaction.on_commit()`.
 
-**M4D3-AUD-002** Audit payloads shall include:
-- Execution `public_id`
-- Response `public_id`
-- `CalculationOutcome.public_id` (where applicable)
-- Prior and new `ChecklistResponse.version`
-- `calculation_name`
-- `formula_version`
-- `registry_binding_version` (from `input_provenance`)
-- Stored `status` (model enum value, not engine string)
-- `reason_code`
-- `source_assessment_snapshot_public_id` (where applicable)
+**M4D3-POP-002** All FDA-derived population shall complete before any calculation
+begins.
 
-**M4D3-AUD-003** Audit payloads shall exclude:
-- Raw `raw_value` answer text
-- Full `inputs` dict
-- Full `input_provenance` dict
-- Internal database PKs
-- Storage paths
-- Cross-tenant metadata
+**M4D3-POP-003** A persisted `not_applicable` or `review_required` outcome shall block
+both population and calculation for that question.
 
-**M4D3-AUD-004** Defined event names and trigger conditions:
+**M4D3-POP-004** A persisted `applicable` outcome, or the absence of a rule, shall
+permit population and calculation.
 
-| Event name | Trigger |
-|---|---|
-| `iig_checklist.response.fda_populated` | FDA_DERIVED_DEFAULT answer written by population pass |
-| `iig_checklist.calculation.completed` | `CalculationOutcome.status` transitions to `"complete"` |
-| `iig_checklist.calculation.data_required` | `CalculationOutcome.status` set/remains `"data_required"` with a `reason_code` |
-| `iig_checklist.calculation.error` | `CalculationOutcome.status` set to `"error"` |
-| `iig_checklist.calculation.recalculated` | `CalculationOutcome` updated during cascade recalculation with any changed field |
-| `iig_checklist.response.applicability_changed` | `is_not_applicable` transitions (NOT_APPLICABLE outcome) |
-| `iig_checklist.response.review_required` | Applicability evaluator returns `"review_required"` |
+**M4D3-POP-005** An uncaught exception at any step shall roll back the entire
+transaction; no partial population shall be committed.
 
-**M4D3-AUD-005** No audit event shall be emitted for a recalculation that produces
-no change to `status`, `value`, `reason_code`, or `generated_at`.
+**M4D3-POP-006** Population and recalculation shall be rejected for executions outside
+`draft` and `returned` with `error_code = "execution_not_recalculable"`.
 
----
+**M4D3-POP-007** Re-running population with identical inputs shall create no history
+row, shall not increment any response version, shall emit no audit event, and shall not
+modify `inputs`, `input_provenance` or `source_assessment_snapshot_public_id`.
 
-## Part 15 — API and Frontend
+**M4D3-POP-008** A `FDA_DERIVED_DEFAULT` resolver returning `None` shall leave
+`raw_value` null with no error and no N/A marking.
 
-### 15.1 API Requirements
+**M4D3-RCL-001** The governed response-update service shall trigger cascade
+recalculation when the updated response is a declared dependency of any
+`SYSTEM_CALCULATED` question in the same execution.
 
-**M4D3-API-001** No new generic write endpoint for `CalculationOutcome` shall be
-introduced. Any request to PATCH or PUT a `CalculationOutcome` resource shall return
-404 or 405.
+**M4D3-RCL-002** Affected questions shall be processed in the stable topological order
+of M4D3-DAG-006.
 
-**M4D3-API-002** The existing execution response-list and response-detail endpoints
-shall be extended to include the nested `CalculationOutcome` serialization (M4D3-SER-001)
-and the `applicability_outcome` derived field (M4D3-SER-004).
+**M4D3-RCL-003** Recalculation shall update existing outcome rows in place, calling
+`full_clean()` before each save.
 
-**M4D3-API-003** Tenant lookup shall filter by `execution.tenant` before any
-`CalculationOutcome` or `AssessmentSnapshot` is accessed. Cross-tenant access shall
-return 404 (not 403) to avoid tenant-existence probing.
+**M4D3-RCL-004** Recalculation shall produce no audit event and no version change when
+`status`, `value`, `reason_code` and `generated_at` are all unchanged.
 
-**M4D3-API-004** Requests from an in-tenant actor without the required permission
-shall return 403, consistent with the existing 4D-2 pattern.
-
-**M4D3-API-005** Terminal-status executions (`approved`, `rejected`, `cancelled`,
-`superseded`) shall be read-only. PATCH requests on response rows of terminal
-executions shall return 400 with `error_code = "response_immutable"`.
-
-**M4D3-API-006** Stale `expected_version` on `enter_response()` shall return 409
-with `error_code = "stale_version"`.
-
-**M4D3-API-007** Pagination contract shall remain unchanged. No new pagination
-parameters are introduced.
-
-### 15.2 Frontend Requirements
-
-**M4D3-FE-001** The frontend shall display each question's answer with its
-`data_source_type_snapshot` provenance label:
-- `FDA_DERIVED_DEFAULT` → "FDA-derived" badge (read-only).
-- `SYSTEM_CALCULATED` → see M4D3-FE-002.
-- `USER_REQUIRED` with `prefill_source` → "Pre-filled from formulation" hint (editable).
-- `REVIEWER_CONFIRMED` → "Reviewer confirmed" label.
-
-**M4D3-FE-002** For `SYSTEM_CALCULATED` questions:
-- When `CalculationOutcome.status = "complete"`: display `value` and `unit`.
-- When `status = "data_required"` or `"error"`: display the `reason_code` string
-  with a user-legible label. Never display `0`, blank, or the word `"complete"`.
-
-**M4D3-FE-003** When `applicability_outcome = "review_required"`: display "Review
-required" label. The question shall not be shown as applicable or not-applicable.
-No population value shall be displayed.
-
-**M4D3-FE-004** No frontend component shall implement any of the six calculation
-formulas. A CI lint rule shall verify that none of the six calculation function
-names (`calculate_percentage_w_w`, `calculate_daily_exposure`,
-`calculate_percentage_of_potency`, `calculate_difference_from_potency`,
-`calculate_percentage_of_mde`, `calculate_difference_from_mde`) appear in any
-frontend source file.
-
-**M4D3-FE-005** After a user edits a `USER_REQUIRED` field, the frontend shall
-reload the execution response list from the server. It shall not compute any
-calculation result locally.
-
-**M4D3-FE-006** The frontend DTO mapper shall be centralized. No calculation-related
-mapping shall be duplicated across components.
+**M4D3-RCL-005** Terminal and submitted executions shall never be recalculated
+automatically.
 
 ---
 
-## Part 16 — Security Requirements
+## Part 17 — Transactions and locking
 
-**M4D3-SEC-001** No `eval`, `exec`, `importlib.import_module()` from a registry key,
-`getattr()` from an untrusted string, SQL fragment, or arbitrary expression shall
-appear in any 4D-3 service, resolver, evaluator, or registry lookup.
+**M4D3-TXN-001** Lock order shall be: the `ChecklistExecution` row via
+`select_for_update()`; then affected `ChecklistResponse` rows in ascending primary-key
+order; then `CalculationOutcome` rows in ascending primary-key order. This order shall
+be observed without exception.
 
-**M4D3-SEC-002** Tenant isolation shall be enforced at every data access point: all
-`AssessmentSnapshot`, `ChecklistExecution`, `ChecklistResponse`, and
-`CalculationOutcome` queries shall include a tenant filter.
+**M4D3-TXN-002** The triggering response write and all dependent outcome updates shall
+occur inside one `transaction.atomic()`.
 
-**M4D3-SEC-003** `enter_response()` shall reject any `raw_value` for a
-`FDA_DERIVED_DEFAULT` question from a non-override actor at the service layer. The
-serializer-level check is insufficient alone.
+**M4D3-TXN-003** `expected_version` shall be validated against the **locked** response
+row, after the lock is acquired and before any write.
 
-**M4D3-SEC-004** No calculation result stored as `status = "complete"` shall result
-from a translation path that passes through any unknown or unrecognized engine status.
+**M4D3-TXN-004** An exception after the response write shall roll back both the response
+update and every outcome update.
 
-**M4D3-SEC-005** The `_registry_binding_version` key in `input_provenance` is
-server-controlled. Any request that supplies or modifies this key shall be rejected.
+**M4D3-TXN-005** All audit events shall be dispatched via `transaction.on_commit()`;
+no success audit shall fire after a rollback.
 
-**M4D3-SEC-006** The import-linter contracts from 4D-1 and 4D-2 shall remain
-unchanged: `iig_checklist` may import from `fda_data`, `formulations`,
-`iid_assessment`, and `documents` (read-only services). None of those four apps
-may import back into `iig_checklist`.
+**M4D3-TXN-006** Concurrent governed updates on one execution shall serialize on the
+execution lock.
 
 ---
 
-## Part 17 — Migration and Compatibility
+## Part 18 — Serialization
 
-**M4D3-MIG-001** No Django migration shall be created by 4D-3.
+**M4D3-SER-001** `CalculationOutcome` shall be serialized as a read-only nested object
+exposing exactly: `public_id`, `calculation_name`, `formula_version`, `status`, `value`,
+`unit`, `reason_code`, `rounding_rule`, `generated_at`,
+`source_assessment_snapshot_public_id`, `registry_binding_version`, and
+`provenance_summary`.
 
-**M4D3-MIG-002** No new database field shall be added by 4D-3.
+**M4D3-SER-002** `provenance_summary` shall be a server-assembled object containing only
+`formula_version`, `registry_binding_version`, `source_snapshot_id`, and sanitized
+per-input source labels.
 
-**M4D3-MIG-003** No backfill of existing `CalculationOutcome` rows shall be
-performed during deployment.
+**M4D3-SER-003** The raw `inputs` and `input_provenance` dictionaries shall never be
+exposed to any client.
 
-**M4D3-MIG-004** Existing 4D-2 `CalculationOutcome` rows with
-`status = "data_required"` are valid and remain compatible.
+**M4D3-SER-004** No internal database primary key, storage path, registry function
+reference, or cross-tenant metadata shall appear in any serialized payload.
 
-**M4D3-MIG-005** Deployment of 4D-3 shall not automatically recalculate any
-existing `ChecklistExecution`.
+**M4D3-SER-005** The `CalculationOutcome` serializer shall define no `create`, `update`
+or `partial_update` method.
 
-**M4D3-MIG-006** Historical `approved`, `rejected`, `cancelled`, and `superseded`
-executions shall be unchanged by the 4D-3 deployment.
+**M4D3-SER-006** `applicability_outcome` shall be included as a derived read-only field
+on the response representation, computed per M4D3-PST-009.
 
-**M4D3-MIG-007** An unknown legacy `calculation_binding_identifier` on an existing
-`ChecklistQuestion` (e.g. from a pre-4D-3 record that was never activation-validated)
-shall fail closed at runtime with `status = "error"`,
-`reason_code = "UNKNOWN_REGISTRY_IDENTIFIER"`. It shall not raise an unhandled
-exception.
+**M4D3-SER-007** The `REVIEW_REQUIRED:` marker shall not be exposed verbatim; the API
+shall expose the derived `applicability_outcome` and the governing rule
+`reason_code` separately.
 
-**M4D3-MIG-008** A registry key rename in a new deployment requires a compatibility
-alias (M4D3-REG-013) or a governed admin operation. Silent reinterpretation is
-prohibited.
+**M4D3-SER-008** The OpenAPI schema for `status` shall enumerate only the four stored
+values.
 
-**M4D3-MIG-009** Rollback of the 4D-3 deployment requires no data transformation.
-The 4D-2 schema is unchanged; reverting to the 4D-2 codebase restores the prior
-behavior.
-
-**M4D3-MIG-010** The API remains backward compatible. No existing 4D-2 response
-field is removed or renamed. New nested fields are additions only.
+**M4D3-SER-009** Pagination behavior shall remain unchanged.
 
 ---
 
-## Part 18 — Test Gates
+## Part 19 — Audit
 
-### 18.1 Mandatory Test Requirements
+**M4D3-AUD-001** All 4D-3 audit events shall be dispatched via `transaction.on_commit()`.
 
-**M4D3-TST-001** Translation function: 100% branch coverage. Every engine status
-string (including all aliases) has a dedicated unit test.
+**M4D3-AUD-002** Defined events: `iig_checklist.response.fda_populated`;
+`iig_checklist.calculation.completed`; `iig_checklist.calculation.data_required`;
+`iig_checklist.calculation.error`; `iig_checklist.calculation.recalculated`;
+`iig_checklist.response.applicability_changed`;
+`iig_checklist.response.review_required`; `iig_checklist.execution.submission_blocked`.
 
-**M4D3-TST-002** Unknown engine status → `"error"` / `"UNKNOWN_ENGINE_STATUS"`. Must
-never produce `"complete"`.
+**M4D3-AUD-003** Payloads shall include execution and response public UUIDs, outcome
+public UUID where applicable, prior and new response version, `calculation_name`,
+`formula_version`, `registry_binding_version`, stored `status`, `reason_code`, and
+`source_assessment_snapshot_public_id` where applicable.
 
-**M4D3-TST-003** Direct assignment of any engine string to `CalculationOutcome.status`
-followed by `full_clean()` raises `ValidationError`.
+**M4D3-AUD-004** Payloads shall exclude raw answer values, the full `inputs` and
+`input_provenance` dictionaries, internal primary keys, storage paths, and cross-tenant
+metadata.
 
-**M4D3-TST-004** `full_clean()` on a translated `"complete"` outcome does not raise
-`ValidationError`. Same for `"error"` and `"data_required"` outcomes.
+**M4D3-AUD-005** System-populated answers shall never emit
+`iig_checklist.response.entered`; the event type alone shall distinguish system-generated
+from user-entered values.
 
-**M4D3-TST-005** `value = null` for all non-`"complete"` translated outcomes.
+**M4D3-AUD-006** No audit event shall be emitted for an unchanged recalculation result.
 
-**M4D3-TST-006** `"calculating"` is never produced by any 4D-3 code path.
-
-**M4D3-TST-007** Evaluator: APPLICABLE → population proceeds; `is_not_applicable`
-remains `False`.
-
-**M4D3-TST-008** Evaluator: NOT_APPLICABLE → `is_not_applicable = True`;
-`not_applicable_reason = rule.reason_code`; population skipped.
-
-**M4D3-TST-009** Evaluator: REVIEW_REQUIRED → `is_not_applicable` remains `False`;
-`raw_value` unchanged; population skipped; API returns
-`applicability_outcome = "review_required"`.
-
-**M4D3-TST-010** REVIEW_REQUIRED cannot be forged: client PATCH cannot produce
-`applicability_outcome = "review_required"`. The field is read-only and derived.
-
-**M4D3-TST-011** **[M-3 resolved.]** Activation of a `ChecklistVersion` whose
-dependency graph exceeds `MAX_DEPENDENCY_DEPTH = 5` is rejected with
-`error_code = "DEPENDENCY_DEPTH_EXCEEDED"`.
-
-**M4D3-TST-012** Activation of a `ChecklistVersion` with a cycle is rejected with
-`error_code = "DEPENDENCY_CYCLE"`.
-
-**M4D3-TST-013** Activation of a `ChecklistVersion` with an unknown
-`calculation_binding_identifier` is rejected.
-
-**M4D3-TST-014** Activation of a `ChecklistVersion` with a dependency referencing a
-non-existent question code is rejected.
-
-**M4D3-TST-015** **[M-4 resolved.]** A known multi-node, multi-branch dependency
-graph (at least three nodes with equal-priority alternatives) produces identical
-stable topological ordering across at least 10 repeated invocations of the ordering
-function with identical inputs.
-
-**M4D3-TST-016** **[M-5 resolved.]** When an existing `ChecklistResponse` with a
-non-null `raw_value` transitions to `NOT_APPLICABLE` (applicability rule returns
-`"not_applicable"`): a `ChecklistResponseHistory` row is created within the same
-transaction; the prior `raw_value` is preserved in `prior_raw_value`; the prior
-`version` is preserved; the response `is_not_applicable = True` and
-`not_applicable_reason = rule.reason_code` in the same transaction; no regulated
-value is lost; audit is emitted via `transaction.on_commit()`.
-
-**M4D3-TST-017** **[stale expected_version test.]** A PATCH to `enter_response()`
-with `expected_version` that does not match the current `ChecklistResponse.version`
-returns 409 / `error_code = "stale_version"`. No response row is modified.
-
-**M4D3-TST-018** Registry binding version stored in
-`input_provenance["_registry_binding_version"]` after a successful computation.
-
-**M4D3-TST-019** Malformed `generated_at` string from calculation result produces
-`CalculationOutcome.status = "error"`, `reason_code = "INVALID_GENERATED_AT"`,
-`generated_at = null`.
-
-**M4D3-TST-020** Naive datetime string (no UTC offset) from calculation result
-produces the same error outcome as M4D3-TST-019.
-
-**M4D3-TST-021** FDA_DERIVED_DEFAULT resolver returns non-null; `entered_by = null`;
-audit event `iig_checklist.response.fda_populated` emitted after commit.
-
-**M4D3-TST-022** FDA_DERIVED_DEFAULT resolver returns `None`; `raw_value = null`;
-no `is_not_applicable` set; no error.
-
-**M4D3-TST-023** SYSTEM_CALCULATED population: valid inputs → `status = "complete"`;
-`reason_code = ""`; `value = non-null Decimal`; `formula_version` set.
-
-**M4D3-TST-024** SYSTEM_CALCULATED population: missing upstream input →
-`status = "data_required"`; `reason_code = "DATA_REQUIRED"`; `value = null`.
-
-**M4D3-TST-025** Source snapshot belongs to the correct tenant; a snapshot from
-another tenant is not reused.
-
-**M4D3-TST-026** Re-running population with identical inputs produces no new
-`ChecklistResponseHistory` rows and does not increment `ChecklistResponse.version`.
-
-**M4D3-TST-027** USER_REQUIRED value not overwritten by population pass.
-
-**M4D3-TST-028** Population pass rejected on `submitted_for_review` execution with
-`error_code = "execution_not_recalculable"`.
-
-**M4D3-TST-029** No partial population committed if population pass raises mid-pass.
-
-**M4D3-TST-030** Cascade recalculation: USER_REQUIRED update triggers SYSTEM_CALCULATED
-update in same transaction; `status = "complete"` and `value` non-null.
-
-**M4D3-TST-031** Concurrent `enter_response()` calls serialized by execution lock;
-no duplicate `CalculationOutcome` state.
-
-**M4D3-TST-032** Atomic rollback: if calculation step raises after response write,
-neither response nor `CalculationOutcome` is committed.
-
-**M4D3-TST-033** Recalculation emits no audit event when outcome is unchanged.
-
-**M4D3-TST-034** Historical approved execution is unchanged after FDA source refresh.
-
-**M4D3-TST-035** API: `GET` on response detail returns `CalculationOutcome` nested
-with all M4D3-SER-001 fields present.
-
-**M4D3-TST-036** API: `PATCH` to `CalculationOutcome` resource returns 404 or 405.
-
-**M4D3-TST-037** Frontend: no calculation formula name appears in any frontend source
-file (CI lint assertion).
-
-**M4D3-TST-038** `full_clean()` guard reachable: direct invalid `CalculationOutcome`
-save raises `ValidationError`.
-
-**M4D3-TST-039** Planted-failure suite: every engine result string has one test
-verifying correct stored `(status, reason_code, value)` triple including that
-`value = null` for all non-complete rows (see §5 of the test strategy).
-
-**M4D3-TST-040** Import-linter: all existing contracts pass after 4D-3 additions;
-no new reverse imports.
-
-### 18.2 Implementation Sign-Off Gates
-
-Before any 4D-3 implementation PR may be opened, all of the following must pass in
-CI:
-
-1. Targeted new 4D-3 backend test suite (M4D3-TST-001 through M4D3-TST-039).
-2. Full existing backend test suite (no regressions).
-3. Backend coverage ≥ 55% overall; new 4D-3 code ≈ 90%+ on new lines.
-4. Translation function: 100% branch coverage.
-5. Import-linter (M4D3-TST-040).
-6. Ruff lint and format (zero suppressions without explanatory comments).
-7. Frontend unit tests (Vitest + React Testing Library + jest-axe).
-8. TypeScript strict-mode compilation.
-9. ESLint (no formula names; M4D3-TST-037).
-10. Playwright E2E smoke tests.
-11. Docker integration smoke test.
+**M4D3-AUD-007** Operational failure audit, where emitted, shall be clearly
+distinguished from success audit and shall never be dispatched through
+`transaction.on_commit()` of a rolled-back transaction.
 
 ---
 
-## Part 19 — Acceptance Matrix
+## Part 20 — API, frontend, security, migration
 
-| Req ID | Component | Test | Expected result | Control |
+### 20.1 API
+
+**M4D3-API-001** No generic write endpoint for `CalculationOutcome` shall exist; PATCH
+or PUT shall return 404 or 405.
+
+**M4D3-API-002** Existing response-list and response-detail endpoints shall include the
+nested read-only outcome and the derived `applicability_outcome`.
+
+**M4D3-API-003** Tenant-scoped lookup shall precede object disclosure; cross-tenant
+identifiers shall return 404.
+
+**M4D3-API-004** An in-tenant actor lacking permission shall receive 403.
+
+**M4D3-API-005** Responses on executions outside `draft`/`returned` shall reject writes
+with `error_code = "response_immutable"` and HTTP 400.
+
+### 20.2 Frontend
+
+**M4D3-FE-001** Provenance labels shall be displayed per `data_source_type_snapshot`:
+FDA-derived (read-only), calculated, pre-filled, reviewer-confirmed.
+
+**M4D3-FE-002** For calculated questions, the value and unit shall be shown when
+`status = "complete"`; otherwise a legible label derived from `reason_code` shall be
+shown. Zero, blank, or the word "complete" shall never stand in for a blocked
+calculation.
+
+**M4D3-FE-003** `applicability_outcome = "review_required"` shall render a "Review
+required" state; the question shall not be shown as applicable or not-applicable, and no
+populated value shall be displayed.
+
+**M4D3-FE-004** A blocked submission shall surface the affected questions returned by
+M4D3-SUB-003.
+
+**M4D3-FE-005** The frontend shall send `expected_version` on every governed response
+update and handle 409 per M4D3-VER-007.
+
+**M4D3-FE-006** No frontend source file shall contain any of the six calculation
+function names; a CI lint rule shall enforce this.
+
+**M4D3-FE-007** The frontend shall reload from the server after an edit and shall never
+compute a calculation result locally.
+
+**M4D3-FE-008** DTO mapping shall remain centralized in the existing
+`execution-mappers.ts` module.
+
+**M4D3-FE-009** New and changed UI states shall satisfy the project's accessibility
+checks, including accessible names for the review-required and calculation-error states.
+
+### 20.3 Security
+
+**M4D3-SEC-001** No `eval`, `exec`, dynamic import from a registry key, `getattr` from
+an untrusted string, SQL fragment, or arbitrary expression shall appear in any 4D-3
+module.
+
+**M4D3-SEC-002** Every query touching executions, responses, outcomes or snapshots
+shall be tenant-filtered.
+
+**M4D3-SEC-003** No translation path passing through an unknown engine status shall
+yield `status = "complete"`.
+
+**M4D3-SEC-004** `input_provenance` keys beginning with an underscore are
+server-controlled; any request supplying one shall be rejected.
+
+**M4D3-SEC-005** The existing import-linter contracts shall continue to pass;
+`iig_checklist` may import `fda_data`, `formulations`, `iid_assessment` and `documents`,
+and none of those may import `iig_checklist`.
+
+### 20.4 Reproducibility
+
+**M4D3-PRV-001** The reproducibility chain shall consist of `calculation_name`,
+`formula_version`, `inputs`, `input_provenance`, `rounding_rule`, `generated_at`,
+`source_assessment_snapshot_public_id`, and the deployed code version. No new database
+column shall be added.
+
+**M4D3-PRV-002** `input_provenance` shall always include the reserved key
+`_registry_binding_version` set to the resolved entry's `binding_version`, alongside a
+per-input source descriptor.
+
+**M4D3-PRV-003** A missing or unrecognized `_registry_binding_version` at read time
+shall be logged as a data-integrity warning without raising.
+
+**M4D3-PRV-004** `formula_version` and `binding_version` shall be governed
+independently; a change to resolvers or dependencies requires a `binding_version`
+increment even when `formula_version` is unchanged.
+
+### 20.5 Migration and compatibility
+
+**M4D3-MIG-001** No Django migration, no new database field, and no data backfill shall
+be introduced by 4D-3.
+
+**M4D3-MIG-002** Existing 4D-2 `CalculationOutcome` and `ChecklistResponse` rows shall
+remain valid; historical rows require no transformation.
+
+**M4D3-MIG-003** Deployment shall not automatically recalculate any existing execution;
+approved, rejected, cancelled and superseded executions shall be unchanged.
+
+**M4D3-MIG-004** The introduction of required `expected_version` is a **breaking API
+contract change**. The specification shall not describe 4D-3's API changes as additions
+only.
+
+**M4D3-MIG-005** Backend and frontend shall deploy together; old clients shall receive
+a structured validation error rather than silently overwriting.
+
+**M4D3-MIG-006** The contract change shall be recorded in release notes and the API
+contract documentation.
+
+**M4D3-MIG-007** Rollback requires a coordinated backend and frontend rollback; no data
+transformation is required because the schema is unchanged.
+
+**M4D3-MIG-008** A legacy `calculation_binding_identifier` absent from the registry
+shall fail closed per M4D3-REG-014 at creation and M4D3-REG-016 at runtime, never with
+an unhandled exception.
+
+---
+
+## Part 21 — Acceptance matrix
+
+Every normative requirement identifier appears exactly once below.
+
+| Req ID | Implementation component | Test | Expected result | Controlled risk |
 |---|---|---|---|---|
-| M4D3-TRL-002 | `calculation_translation.py` | M4D3-TST-001 | All 9 engine results map to correct stored values | Data integrity |
-| M4D3-TRL-002 | `calculation_translation.py` | M4D3-TST-002 | Unknown status → `"error"`, never `"complete"` | Security |
-| M4D3-M-014 | `CalculationOutcome.clean()` | M4D3-TST-003/TST-038 | `ValidationError` on invalid status | Data integrity |
-| M4D3-TRL-004 | Translation layer | M4D3-TST-019/TST-020 | Malformed/naive `generated_at` → error outcome | Data integrity |
-| M4D3-APP-004 | `evaluate_applicability()` | M4D3-TST-007/TST-008/TST-009 | Correct branch outcome returned | Regulatory |
-| M4D3-APP-010 | Response serializer | M4D3-TST-009/TST-010 | `applicability_outcome` derived; not forgeable | Security |
-| M4D3-REG-011 | Activation service | M4D3-TST-011/TST-012/TST-013/TST-014 | Invalid version rejected with structured error | Security |
-| M4D3-DAG-004 | Topological sort | M4D3-TST-015 | Identical order across 10 invocations | Correctness |
-| M4D3-APP-007 | Population pass | M4D3-TST-016 | History row created on N/A transition with prior value | Regulatory |
-| M4D3-TXN-003 | `enter_response()` | M4D3-TST-017 | Stale version → 409; no partial write | Data integrity |
-| M4D3-PRV-002 | `input_provenance` writer | M4D3-TST-018 | `_registry_binding_version` in provenance | Reproducibility |
-| M4D3-POP-007 | Population service | M4D3-TST-026 | Idempotent re-run; no new history or version bump | Regulatory |
-| M4D3-POP-004 | Population service | M4D3-TST-027 | USER_REQUIRED never overwritten | Regulatory |
-| M4D3-POP-006 | Population service | M4D3-TST-028 | Non-recalculable execution rejected | Data integrity |
-| M4D3-TXN-002 | Transaction | M4D3-TST-029 | Mid-pass exception → full rollback | Data integrity |
-| M4D3-TXN-007 | Concurrency | M4D3-TST-031 | Concurrent calls serialized | Data integrity |
-| M4D3-TXN-004 | Transaction | M4D3-TST-032 | Calculation failure → full rollback | Data integrity |
-| M4D3-AUD-005 | Audit emitter | M4D3-TST-033 | Unchanged outcome → no audit event | Regulatory |
-| M4D3-SRC-006 | Source resolver | M4D3-TST-034 | Historical execution unchanged | Regulatory |
-| M4D3-SER-003 | Response serializer | M4D3-TST-036 | No PATCH on `CalculationOutcome` | Security |
-| M4D3-FE-004 | CI lint | M4D3-TST-037 | No formula names in frontend | Security |
-| M4D3-SEC-006 | Import-linter | M4D3-TST-040 | No reverse imports | Architecture |
-| M4D3-TRL-002 | Planted-failure suite | M4D3-TST-039 | Every engine result: correct triple | Security/Regulatory |
+| M4D3-MDL-001 | `ChecklistQuestion` usage | TST-101 | Identifier stores registry key only | Injection |
+| M4D3-MDL-002 | Response services | TST-102 | Snapshot never modified | Data integrity |
+| M4D3-MDL-003 | Guard predicates | TST-103 | Guards test `answer_type` | Correctness |
+| M4D3-MDL-004 | Population service | TST-104 | Reviewer/approval rows untouched | Regulatory |
+| M4D3-MDL-005 | Population service | TST-105 | User value never overwritten | Regulatory |
+| M4D3-MDL-006 | Population service | TST-106 | Calculated `raw_value` stays null | Data integrity |
+| M4D3-MDL-007 | Outcome writer | TST-107 | Only four stored statuses; never `calculating` | Data integrity |
+| M4D3-MDL-008 | Outcome writer | TST-108 | Engine string rejected by `full_clean()` | Data integrity |
+| M4D3-MDL-009 | Outcome writer | TST-109 | No client content in inputs/provenance | Security |
+| M4D3-MDL-010 | Population service | TST-110 | Rows updated, never created | Data integrity |
+| M4D3-MDL-011 | Evaluator | TST-111 | Runtime grammar honored | Correctness |
+| M4D3-MDL-012 | Static check | TST-112 | No `condition_checksum` reference | Correctness |
+| M4D3-MDL-013 | Evaluator | TST-113 | Outcomes read from rule fields | Regulatory |
+| M4D3-REG-001 | `create_execution()` | TST-114 | Documented defect corrected | Correctness |
+| M4D3-REG-002 | Registry module | TST-115 | Three concepts distinct | Correctness |
+| M4D3-REG-003 | `create_execution()` | TST-116 | Identifier never written to `calculation_name` | Data integrity |
+| M4D3-REG-004 | Registry module | TST-117 | Module-level immutable dict | Security |
+| M4D3-REG-005 | Registry module | TST-118 | All entry fields present | Correctness |
+| M4D3-REG-006 | Registry module | TST-119 | Identifier format and length valid | Data integrity |
+| M4D3-REG-007 | Registry module | TST-120 | Exact identifier→name mapping | Correctness |
+| M4D3-REG-008 | Registry module | TST-121 | Binding version immutable | Reproducibility |
+| M4D3-REG-009 | Import-time self-check | TST-122 | Invalid entry raises at import | Data integrity |
+| M4D3-REG-010 | Input resolvers | TST-123 | Only two resolver forms | Security |
+| M4D3-REG-011 | Input resolvers | TST-124 | No dynamic evaluation | Security |
+| M4D3-REG-012 | Registry lookup | TST-125 | Explicit `None` handling | Robustness |
+| M4D3-REG-013 | `create_execution()` | TST-126 | Entry resolved before outcome creation | Correctness |
+| M4D3-REG-014 | `create_execution()` | TST-127 | Unknown key aborts atomically, no rows remain | Data integrity |
+| M4D3-REG-015 | `create_execution()` | TST-128 | Invalid `calculation_name` aborts atomically | Data integrity |
+| M4D3-REG-016 | Population service | TST-129 | Runtime unknown key fails closed | Security |
+| M4D3-REG-017 | Registry alias | TST-130 | Alias semantics identical; no reinterpretation | Regulatory |
+| M4D3-REG-018 | Activation service | TST-131 | All activation checks enforced | Security |
+| M4D3-REG-019 | Activation service | TST-132 | Structured rejection; status unchanged | Data integrity |
+| M4D3-SVC-001 | Documentation | TST-133 | No `enter_response()` claimed | Correctness |
+| M4D3-SVC-002 | New service | TST-134 | Governed service exists | Architecture |
+| M4D3-SVC-003 | New service | TST-135 | All responsibilities owned | Architecture |
+| M4D3-SVC-004 | View adapter | TST-136 | View contains no business logic | Architecture |
+| M4D3-SVC-005 | New service | TST-137 | Server-controlled value PATCH → 403 | Security |
+| M4D3-SVC-006 | New service | TST-138 | Override fields untouched | Scope |
+| M4D3-SVC-007 | `answer_sources.py` | TST-139 | Explicit dispatch, no reflection | Security |
+| M4D3-SVC-008 | `answer_sources.py` | TST-140 | Resolvers pure | Correctness |
+| M4D3-VER-001 | Documentation | TST-141 | Breaking change acknowledged | Compatibility |
+| M4D3-VER-002 | Request serializer | TST-142 | Field required | Data integrity |
+| M4D3-VER-003 | Deployment | TST-143 | Atomic deploy documented | Compatibility |
+| M4D3-VER-004 | New service | TST-144 | Missing → 400, no write | Data integrity |
+| M4D3-VER-005 | New service | TST-145 | Stale → 409, no write/history/audit | Data integrity |
+| M4D3-VER-006 | New service | TST-146 | Version increments by one | Data integrity |
+| M4D3-VER-007 | Frontend | TST-147 | 409 reloads, no auto-retry | Correctness |
+| M4D3-VER-008 | OpenAPI/release notes | TST-148 | Schema regenerated | Compatibility |
+| M4D3-OUT-001 | Outcome writer | TST-149 | `full_clean()` before every save | Data integrity |
+| M4D3-OUT-002 | Test suite | TST-150 | No bare-save validation assertion | Correctness |
+| M4D3-OUT-003 | Documentation | TST-151 | No uniqueness claimed | Correctness |
+| M4D3-OUT-004 | New service | TST-152 | Update-in-place under lock | Data integrity |
+| M4D3-OUT-005 | New service | TST-153 | Duplicate rows fail closed | Data integrity |
+| M4D3-OUT-006 | Repository check | TST-154 | No migration added | Compatibility |
+| M4D3-OUT-007 | Documentation | TST-155 | Not claimed as model invariant | Correctness |
+| M4D3-OUT-008 | Outcome writer | TST-156 | Non-complete with value rejected | Data integrity |
+| M4D3-TRL-001 | Translation module | TST-157 | Pure function, no DB access | Architecture |
+| M4D3-TRL-002 | Translation module | TST-158 | Full table; 100% branch coverage | Security |
+| M4D3-TRL-003 | Translation module | TST-159 | Aliases canonicalize by value | Correctness |
+| M4D3-TRL-004 | Translation module | TST-160 | Valid UTC/offset parsed tz-aware | Data integrity |
+| M4D3-TRL-005 | Translation module | TST-161 | Empty/malformed/naive → error outcome | Data integrity |
+| M4D3-TRL-006 | Translation module | TST-162 | No client timestamp accepted | Security |
+| M4D3-RSN-001 | Translation module | TST-163 | Allow-list contains the 15 codes | Data integrity |
+| M4D3-RSN-002 | Translation module | TST-164 | Casing and length valid | Data integrity |
+| M4D3-RSN-003 | New service | TST-165 | Unknown code rejected | Data integrity |
+| M4D3-RSN-004 | Request serializers | TST-166 | Client cannot supply reason code | Security |
+| M4D3-RSN-005 | Outcome writer | TST-167 | No exception text stored | Security |
+| M4D3-APP-001 | Evaluator | TST-168 | Pure, no dynamic evaluation | Security |
+| M4D3-APP-002 | Evaluator | TST-169 | Grammar and operators match validator | Correctness |
+| M4D3-APP-003 | Evaluator | TST-170 | Malformed node raises `RuntimeError` | Robustness |
+| M4D3-APP-004 | Evaluator | TST-171 | Correct branch outcome returned | Regulatory |
+| M4D3-APP-005 | Evaluator | TST-172 | Missing field treated as absent | Correctness |
+| M4D3-APP-006 | Context assembly | TST-173 | Exactly the six registry fields | Correctness |
+| M4D3-APP-007 | Context assembly | TST-174 | Context never persisted | Data integrity |
+| M4D3-APP-008 | Applicability service | TST-175 | Fields server-owned | Security |
+| M4D3-APP-009 | New service | TST-176 | Client write → 403 | Security |
+| M4D3-APP-010 | New service | TST-177 | Non-rule N/A still permitted | Usability |
+| M4D3-APP-011 | New service | TST-178 | Reserved prefix rejected | Security |
+| M4D3-APP-012 | Population service | TST-179 | User N/A preserved | Regulatory |
+| M4D3-APP-013 | Population service | TST-180 | All eligibility checks applied | Correctness |
+| M4D3-PST-001 | Documentation | TST-181 | Model compatibility verified | Correctness |
+| M4D3-PST-002 | Applicability service | TST-182 | Marker persisted correctly | Regulatory |
+| M4D3-PST-003 | Applicability service | TST-183 | Marker ≤ 200 chars | Data integrity |
+| M4D3-PST-004 | Activation service | TST-184 | Over-long marker rejected | Data integrity |
+| M4D3-PST-005 | Applicability service | TST-185 | Sole writer; `full_clean()` called | Security |
+| M4D3-PST-006 | New service | TST-186 | Client cannot write/clear marker | Security |
+| M4D3-PST-007 | Applicability service | TST-187 | Editable states recompute | Correctness |
+| M4D3-PST-008 | Serializer | TST-188 | Submitted/terminal use persisted state only | Regulatory |
+| M4D3-PST-009 | Serializer | TST-189 | Derivation rules correct | Correctness |
+| M4D3-PST-010 | Serializer | TST-190 | Contradictory payload unreachable | Data integrity |
+| M4D3-PST-011 | Serializer | TST-191 | Live result never presented as record | Regulatory |
+| M4D3-PST-012 | Submission gate | TST-192 | State persisted before submission | Regulatory |
+| M4D3-PST-013 | Serializer | TST-193 | Field read-only | Security |
+| M4D3-REV-001 | Applicability service | TST-194 | Exactly three triggers | Correctness |
+| M4D3-REV-002 | Applicability service | TST-195 | No submitted/terminal re-evaluation | Regulatory |
+| M4D3-REV-003 | Applicability service | TST-196 | Source refresh alone does not trigger | Regulatory |
+| M4D3-REV-004 | Applicability service | TST-197 | Sole writer enforced | Security |
+| M4D3-REV-005 | Architecture | TST-198 | No actorless background recalculation | Regulatory |
+| M4D3-HST-001 | Model docstring | TST-199 | Governed reuse documented | Correctness |
+| M4D3-HST-002 | Population service | TST-200 | No history at creation | Correctness |
+| M4D3-HST-003 | Applicability service | TST-201 | All twelve fields populated | Regulatory |
+| M4D3-HST-004 | Applicability service | TST-202 | `amended_by` is triggering actor | Regulatory |
+| M4D3-HST-005 | Applicability service | TST-203 | `APPLICABILITY_REEVALUATED` used | Regulatory |
+| M4D3-HST-006 | Applicability service | TST-204 | Classification snapshot copied | Correctness |
+| M4D3-HST-007 | Applicability service | TST-205 | Versions recorded and incremented | Data integrity |
+| M4D3-HST-008 | Applicability service | TST-206 | Atomic with response update | Data integrity |
+| M4D3-HST-009 | History model | TST-207 | Append-only guards intact | Regulatory |
+| M4D3-NA-001 | Applicability service | TST-208 | `raw_value` nulled on N/A | Data integrity |
+| M4D3-NA-002 | Applicability service | TST-209 | Prior value preserved in history | Regulatory |
+| M4D3-NA-003 | Applicability service | TST-210 | Reason set from rule | Regulatory |
+| M4D3-NA-004 | Applicability service | TST-211 | No auto-restore on return to applicable | Regulatory |
+| M4D3-NA-005 | Applicability service | TST-212 | Flags cleared and recorded | Data integrity |
+| M4D3-CMP-001 | Completeness gate | TST-213 | Gate extended | Correctness |
+| M4D3-CMP-002 | Completeness gate | TST-214 | Complete only on all four conditions | Regulatory |
+| M4D3-CMP-003 | Completeness gate | TST-215 | Every incomplete case blocks | Regulatory |
+| M4D3-CMP-004 | Completeness gate | TST-216 | FDA-derived completeness rule | Regulatory |
+| M4D3-CMP-005 | Completeness gate | TST-217 | N/A rule preserved | Compatibility |
+| M4D3-CMP-006 | Completeness gate | TST-218 | Persisted state only | Regulatory |
+| M4D3-SUB-001 | Submission gate | TST-219 | Unresolved marker blocks submission | Regulatory |
+| M4D3-SUB-002 | Submission gate | TST-220 | Blocks regardless of `required` | Regulatory |
+| M4D3-SUB-003 | Submission gate | TST-221 | Structured 400 with UUIDs and rule codes | Usability |
+| M4D3-SUB-004 | Submission gate | TST-222 | No raw values in error | Security |
+| M4D3-SUB-005 | Submission gate | TST-223 | No transition, no success audit | Data integrity |
+| M4D3-SUB-006 | Submission gate | TST-224 | No manual resolution path offered | Scope |
+| M4D3-SUB-007 | Recalculation | TST-225 | Correction + recalculation is the only path | Regulatory |
+| M4D3-DAG-001 | Registry module | TST-226 | Constants named and located | Correctness |
+| M4D3-DAG-002 | Documentation | TST-227 | Rationale stated as governance decision | Correctness |
+| M4D3-DAG-003 | Activation service | TST-228 | Depth > 5 rejected | Security |
+| M4D3-DAG-004 | Activation service | TST-229 | Node count > 10 rejected | Security |
+| M4D3-DAG-005 | Ordering function | TST-230 | Iterative algorithm, no unbounded recursion | Robustness |
+| M4D3-DAG-006 | Ordering function | TST-231 | Deterministic across 10 runs | Correctness |
+| M4D3-DAG-007 | Activation service | TST-232 | Cycle rejected, questions named | Security |
+| M4D3-DAG-008 | Activation service | TST-233 | Unknown dependency rejected | Data integrity |
+| M4D3-DAG-009 | Activation service | TST-234 | Cross-version dependency rejected | Data integrity |
+| M4D3-DAG-010 | Recalculation | TST-235 | Runtime cycle fails closed | Robustness |
+| M4D3-SRC-001 | Source resolver | TST-236 | Single active release resolved | Correctness |
+| M4D3-SRC-002 | Source resolver | TST-237 | No active release fails closed | Data integrity |
+| M4D3-SRC-003 | Source resolver | TST-238 | Release UUID never client-supplied | Security |
+| M4D3-SRC-004 | Source resolver | TST-239 | Every argument resolved | Correctness |
+| M4D3-SRC-005 | Source resolver | TST-240 | Unresolvable input → `DATA_REQUIRED` | Robustness |
+| M4D3-SRC-006 | Governance | TST-241 | Gap escalated, not assumed | Regulatory |
+| M4D3-SRC-007 | Source resolver | TST-242 | Tenant filter on all snapshot access | Security |
+| M4D3-SRC-008 | Source resolver | TST-243 | No match handled without raising | Robustness |
+| M4D3-SRC-009 | Source resolver | TST-244 | Existing selection logic reused | Correctness |
+| M4D3-SRC-010 | Translation | TST-245 | Superseded → regulatory review | Regulatory |
+| M4D3-SRC-011 | Source resolver | TST-246 | Snapshot frozen after draft | Regulatory |
+| M4D3-SRC-012 | Deployment | TST-247 | Release change does not recalculate | Regulatory |
+| M4D3-SRC-013 | Static check | TST-248 | No `fda_data` writes | Architecture |
+| M4D3-SNP-001 | Import-linter | TST-249 | One-way import preserved | Architecture |
+| M4D3-SNP-002 | Static check | TST-250 | No direct cross-app model write | Architecture |
+| M4D3-SNP-003 | Snapshot service | TST-251 | Creation via approved service | Architecture |
+| M4D3-SNP-004 | Snapshot service | TST-252 | Service added if absent | Architecture |
+| M4D3-SNP-005 | Snapshot service | TST-253 | `created_by` is triggering actor | Regulatory |
+| M4D3-SNP-006 | Outcome writer | TST-254 | Snapshot UUID recorded | Reproducibility |
+| M4D3-SNP-007 | Documentation | TST-255 | Scope exclusion clarified | Correctness |
+| M4D3-POP-001 | Population service | TST-256 | Exact ordered pass in one transaction | Data integrity |
+| M4D3-POP-002 | Population service | TST-257 | FDA population precedes calculation | Correctness |
+| M4D3-POP-003 | Population service | TST-258 | N/A and review-required block both | Regulatory |
+| M4D3-POP-004 | Population service | TST-259 | Applicable permits progression | Correctness |
+| M4D3-POP-005 | Population service | TST-260 | Mid-pass exception rolls back fully | Data integrity |
+| M4D3-POP-006 | Population service | TST-261 | Non-editable execution rejected | Data integrity |
+| M4D3-POP-007 | Population service | TST-262 | Idempotent re-run | Regulatory |
+| M4D3-POP-008 | Population service | TST-263 | `None` resolver leaves null, no error | Robustness |
+| M4D3-RCL-001 | New service | TST-264 | Dependency change triggers cascade | Correctness |
+| M4D3-RCL-002 | New service | TST-265 | Topological order respected | Correctness |
+| M4D3-RCL-003 | New service | TST-266 | In-place update with `full_clean()` | Data integrity |
+| M4D3-RCL-004 | New service | TST-267 | Unchanged result: no audit, no version change | Regulatory |
+| M4D3-RCL-005 | New service | TST-268 | Terminal never auto-recalculated | Regulatory |
+| M4D3-TXN-001 | New service | TST-269 | Lock order observed | Data integrity |
+| M4D3-TXN-002 | New service | TST-270 | Single atomic block | Data integrity |
+| M4D3-TXN-003 | New service | TST-271 | Version checked against locked row | Data integrity |
+| M4D3-TXN-004 | New service | TST-272 | Full rollback on failure | Data integrity |
+| M4D3-TXN-005 | Audit dispatch | TST-273 | No audit after rollback | Regulatory |
+| M4D3-TXN-006 | New service | TST-274 | Concurrent updates serialize | Data integrity |
+| M4D3-SER-001 | Outcome serializer | TST-275 | Exactly the approved fields | Security |
+| M4D3-SER-002 | Outcome serializer | TST-276 | Sanitized summary only | Security |
+| M4D3-SER-003 | Outcome serializer | TST-277 | Raw dicts never exposed | Security |
+| M4D3-SER-004 | Outcome serializer | TST-278 | No internal identifiers leaked | Security |
+| M4D3-SER-005 | Outcome serializer | TST-279 | No write methods defined | Security |
+| M4D3-SER-006 | Response serializer | TST-280 | Derived field present | Correctness |
+| M4D3-SER-007 | Response serializer | TST-281 | Marker not exposed verbatim | Security |
+| M4D3-SER-008 | OpenAPI schema | TST-282 | Four stored values only | Correctness |
+| M4D3-SER-009 | Response list view | TST-283 | Pagination unchanged | Compatibility |
+| M4D3-AUD-001 | Audit dispatch | TST-284 | All events post-commit | Regulatory |
+| M4D3-AUD-002 | Audit dispatch | TST-285 | All eight events defined | Regulatory |
+| M4D3-AUD-003 | Audit payloads | TST-286 | Required metadata present | Regulatory |
+| M4D3-AUD-004 | Audit payloads | TST-287 | Prohibited content absent | Security |
+| M4D3-AUD-005 | Population service | TST-288 | System population distinguishable | Regulatory |
+| M4D3-AUD-006 | Recalculation | TST-289 | No event when unchanged | Regulatory |
+| M4D3-AUD-007 | Audit dispatch | TST-290 | Failure audit distinct from success | Regulatory |
+| M4D3-API-001 | URL configuration | TST-291 | PATCH/PUT → 404/405 | Security |
+| M4D3-API-002 | Response views | TST-292 | Nested outcome and derived field returned | Correctness |
+| M4D3-API-003 | Response views | TST-293 | Cross-tenant → 404 | Security |
+| M4D3-API-004 | Response views | TST-294 | Unauthorized in-tenant → 403 | Security |
+| M4D3-API-005 | Response views | TST-295 | Immutable execution → 400 | Data integrity |
+| M4D3-FE-001 | Execution detail UI | TST-296 | Provenance labels rendered | Usability |
+| M4D3-FE-002 | Execution detail UI | TST-297 | Value or reason, never a fabricated pass | Regulatory |
+| M4D3-FE-003 | Execution detail UI | TST-298 | Review-required state rendered | Regulatory |
+| M4D3-FE-004 | Submission UI | TST-299 | Blocked submission surfaced | Usability |
+| M4D3-FE-005 | API client | TST-300 | Sends version; handles 409 | Data integrity |
+| M4D3-FE-006 | CI lint | TST-301 | No formula names in frontend | Security |
+| M4D3-FE-007 | Execution detail UI | TST-302 | Server reload, no local computation | Regulatory |
+| M4D3-FE-008 | `execution-mappers.ts` | TST-303 | Mapping centralized | Maintainability |
+| M4D3-FE-009 | Accessibility tests | TST-304 | New states accessible | Accessibility |
+| M4D3-SEC-001 | Static check | TST-305 | No dynamic evaluation anywhere | Security |
+| M4D3-SEC-002 | All queries | TST-306 | Tenant filter present | Security |
+| M4D3-SEC-003 | Translation module | TST-307 | Unknown never yields complete | Security |
+| M4D3-SEC-004 | Request serializers | TST-308 | Underscore keys rejected | Security |
+| M4D3-SEC-005 | Import-linter | TST-309 | Contracts pass | Architecture |
+| M4D3-PRV-001 | Outcome writer | TST-310 | Chain complete, no new column | Reproducibility |
+| M4D3-PRV-002 | Outcome writer | TST-311 | Binding version in provenance | Reproducibility |
+| M4D3-PRV-003 | Serializer | TST-312 | Missing version warns, does not raise | Robustness |
+| M4D3-PRV-004 | Registry governance | TST-313 | Versions governed independently | Reproducibility |
+| M4D3-MIG-001 | Repository check | TST-314 | No migration, field or backfill | Compatibility |
+| M4D3-MIG-002 | Compatibility test | TST-315 | Existing rows valid | Compatibility |
+| M4D3-MIG-003 | Deployment test | TST-316 | Historical executions unchanged | Regulatory |
+| M4D3-MIG-004 | Documentation | TST-317 | Breaking change stated | Compatibility |
+| M4D3-MIG-005 | Deployment | TST-318 | Old client gets structured error | Compatibility |
+| M4D3-MIG-006 | Release notes | TST-319 | Contract change recorded | Compatibility |
+| M4D3-MIG-007 | Rollback plan | TST-320 | Coordinated rollback, no transformation | Compatibility |
+| M4D3-MIG-008 | Population service | TST-321 | Legacy identifier fails closed | Security |
+
+Matrix reconciliation is reported in the test strategy, §11.
 
 ---
 
-## Part 20 — Implementation Sequence
+## Part 22 — Implementation sequence
 
-The following order is recommended. No step may be started before the preceding
-step's code review is complete. This document does **not** authorize implementation;
-that authorization is a separate gate.
+Implementation remains unauthorized. When authorized, the order shall be:
 
-1. **Constants and registry** — `execution_constants.py` additions (if any),
-   `calculation_registry.py` with all six entries and their binding versions.
-2. **Translation function** — `calculation_translation.py` with all mappings and
-   the `INVALID_GENERATED_AT` error path.
-3. **Applicability evaluator** — `evaluate_applicability()` in `applicability.py`.
-4. **FDA source resolver** — `answer_sources.py` with resolver functions, tenant
-   filter on all snapshot lookups.
-5. **Population service** — `backend/iig_checklist/population_service.py` (or
-   equivalent module), covering the full pass sequence (M4D3-POP-001), non-overwrite
-   rules, idempotency, and audit event scheduling.
-6. **Recalculation integration** — extend `enter_response()` in the execution
-   service, adding lock acquisition, cascade identification, topological ordering,
-   and the defensive cycle check.
-7. **Serializers** — extend existing response serializers to include nested
-   `CalculationOutcome` (M4D3-SER-001) and derived `applicability_outcome`
-   (M4D3-SER-004); add `provenance_summary` (M4D3-SER-002).
-8. **Frontend mapper and display** — centralized DTO mapper; `applicability_outcome`
-   display; `SYSTEM_CALCULATED` status display; no formula code; lint rule.
-9. **Backend tests** — full coverage of M4D3-TST-001 through M4D3-TST-040.
-10. **Frontend tests** — Vitest unit tests; Playwright E2E for population flow and
-    recalculation feedback.
-11. **Docker smoke** — extend `docker-integration.yml` with 4D-3 smoke step.
-12. **Independent implementation review** — second adversarial review of the
-    implementation PR before merge.
+1. `calculation_registry.py` — registry entries, identifier→`calculation_name` mapping,
+   binding versions, `CALCULATION_MAX_DEPENDENCY_DEPTH`, `CALCULATION_MAX_CASCADE_NODES`,
+   import-time self-check.
+2. **`services.py` correction** — `create_execution()` resolves the registry entry and
+   writes `entry["calculation_name"]`; unknown or invalid entries abort atomically.
+3. `calculation_translation.py` — translation function, `ALLOWED_REASON_CODES`,
+   `INVALID_GENERATED_AT` path.
+4. `update_checklist_response()` governed service in `services.py`, and reduction of
+   `ChecklistResponseUpdateView.patch()` in `views.py` to a thin adapter.
+5. `expected_version` on the governed request serializer, with the 400 and 409 contracts.
+6. Governed applicability service and persisted `REVIEW_REQUIRED:` marker, including
+   `evaluate_applicability()` in `applicability.py`.
+7. **`services.py` completeness-gate extension** in `_check_execution_completeness()`.
+8. **Submission gate** for unresolved `REVIEW_REQUIRED` in `transition_execution()`.
+9. Population service, calculation translation wiring and outcome updates.
+10. FDA source resolver in `answer_sources.py` and the governed `iid_assessment`
+    snapshot service.
+11. Serializers — nested read-only outcome, `provenance_summary`,
+    `applicability_outcome`.
+12. Frontend — `execution-mappers.ts`, display states, `expected_version`, 409 handling,
+    CI lint rule.
+13. Backend and frontend tests per the test strategy.
+14. Docker integration smoke extension.
+15. Independent adversarial implementation review before merge.
+
+Steps 2, 4, 7 and 8 modify existing 4D-2 runtime code and shall not be omitted.
 
 ---
 
-## Part 21 — Gate Status
+## Part 23 — Gate status
 
-**Specification: COMPLETE. Pending adversarial specification review.**
-
-**Ready for adversarial specification review: YES**
-**Ready to write implementation code: NO — requires adversarial specification review and separate explicit authorization**
-**Ready to create PR: NO**
-**Migration required: NO**
-**New database field required: NO**
+**Ready for adversarial specification review:** YES
+**Ready to write implementation code:** NO — requires a passing specification review and separate explicit authorization
+**Ready to create a PR:** NO
+**Migration required:** NO
+**New database field required:** NO
+**Breaking API contract change:** YES — `expected_version` (Part 5, M4D3-MIG-004)
