@@ -276,6 +276,29 @@ Location: `backend/iig_checklist/tests/test_update_checklist_response.py`
 Tests for the cascade recalculation path triggered by the governed service
 `update_checklist_response()` on `draft` executions (S-03, S-04, OQ-3 resolved).
 
+**Terminology.** Two distinct sets govern these tests and must not be conflated:
+
+- **`recalculation_triggers`** — governed responses whose change starts a recalculation.
+  Includes Form A `question_response` inputs and component-selector responses. These are
+  **external trigger nodes**, not graph nodes.
+- **`calculation_dependencies`** — Form E `calculation_outcome` edges between
+  `SYSTEM_CALCULATED` responses. These form the directed graph used for ordering, depth,
+  cascade-node limits and cycle detection.
+
+No test shall assert or imply that only Form E question codes are recalculation triggers.
+
+Required cases:
+
+| Case | Scenario | Expected |
+|---|---|---|
+| A | Form A user-response change | The direct calculation consuming it recalculates, even though no graph edge exists from the user input |
+| B | Form A user-response change with a downstream Form E dependant | Both the direct and the downstream calculated outcomes recalculate |
+| C | Component-reference selector change | Component rebinding runs and every affected calculation recalculates (§10.19) |
+| D | Form E upstream calculated outcome changes | Downstream calculated outcomes recalculate in topological order |
+| E | An unrelated response listed in no `recalculation_triggers` set changes | No recalculation, no version change on any calculated response, no audit |
+| F | Registry `recalculation_triggers` does not match the entry's Form A and selector declarations | Activation rejected, `REGISTRY_VALIDATION_FAILED` |
+| G | Registry `calculation_dependencies` does not match the entry's Form E declarations | Activation rejected, `REGISTRY_VALIDATION_FAILED` |
+
 The governed service is the only runtime owner of `transaction.atomic()`, the execution
 lock, the response lock, `expected_version` validation, response validation,
 applicability re-evaluation, dependent recalculation, history creation, the response
@@ -997,6 +1020,54 @@ Required negative controls:
 The test shall be data-driven from the specification table so that adding a detail code
 without a mapping fails the suite.
 
+### 10.19 Component rebinding (MAJ-F)
+
+**Test file:** `backend/iig_checklist/tests/test_component_rebinding.py`
+
+Fixture: an execution in `draft` with a component-reference response bound to inactive
+component **A**, a `calculate_daily_exposure` question listing that selector in
+`recalculation_triggers`, and `calculate_percentage_of_mde` / `calculate_difference_from_mde`
+depending on it through `calculation_dependencies`.
+
+| Test ID | Case | Expected |
+|---|---|---|
+| TST-464a | Selector changed A → B | Direct `daily_exposure` outcome recalculates against B |
+| TST-464b | Same change | Both downstream MDE outcomes recalculate |
+| TST-468 | Current provenance | References component B only — new component UUID, new selector-response UUID, new quantity/unit, new conversion provenance |
+| TST-469a | Current snapshot | `source_assessment_snapshot_public_id` belongs to a snapshot whose `formulation_component_public_id` is B |
+| TST-464c | Prior result | Component A's value is not retained as current on any affected outcome |
+| TST-469b | Historical evidence | Component A's `AssessmentSnapshot` row still exists, unmutated |
+| TST-467a | Version | The component-reference response version increments by exactly one |
+| TST-467b | History | A `ChecklistResponseHistory` row records the prior and new component-reference `raw_value` |
+| TST-467c | Audit | Success audit emits only after commit |
+| TST-465a | Stale `expected_version` | HTTP 409; zero changes to reference, outcomes, provenance or snapshot |
+| TST-471a | Component from another `FormulationVersion` | Full rollback; prior binding and prior outcomes remain current |
+| TST-471b | Component from another tenant | Tenant-safe error; full rollback; no provenance leakage |
+| TST-471c | `component_type = "active"` where `inactive` required | Full rollback |
+| TST-471d | Snapshot creation fails | Full rollback; no orphan snapshot row persists |
+| TST-471e | Structural calculation failure requiring rollback | All prior state restored exactly |
+| TST-472 | Input-resolution failure with a row in the M4D3-IFV-003 table | Rebinding **commits**; affected outcomes persist with the mapped status, canonical reason code, null value and new-component provenance |
+| TST-466 | Rebinding attempted after submission | Rejected, `response_immutable` / 400 |
+| TST-470 | Selector re-submitted with the identical component | No recalculation, no version increment, no history row, no audit |
+| TST-467d | Two calculated questions bound to the same selector | Both recalculate |
+| TST-467e | Downstream ordering | Graph nodes processed in stable topological order |
+| TST-469c | Provenance sweep | No prior-component UUID and no prior snapshot UUID remains anywhere in current `input_provenance` |
+
+### 10.20 Trigger and selector configuration
+
+| Test ID | Assertion |
+|---|---|
+| TST-451 | `calculation_dependencies` contains only Form E targets |
+| TST-452 | `recalculation_triggers` contains every Form A question code and every component-selector question code |
+| TST-453 | Both sets are declared independently and may overlap without being interchangeable |
+| TST-455 | A resolver reading a response absent from `recalculation_triggers` fails activation |
+| TST-456 | Both sets are validated against resolver declarations at activation |
+| TST-457 | An unknown trigger question code fails activation with `UNKNOWN_TRIGGER_CODE` |
+| TST-458 | The graph contains only `SYSTEM_CALCULATED` response nodes; trigger nodes are excluded from cycle detection and depth |
+| TST-461 | A registry entry declaring `registry_component_code` is rejected at activation with `component_selector_form_disabled` |
+| TST-462 | `response_reference` is the only selector form that activates successfully |
+| TST-463 | Static check: no component code is derived from `ingredient_name`, `resolved_unii`, `display_order`, pk or creation order |
+
 ---
 
 ## 11. Acceptance Matrix Reconciliation
@@ -1007,20 +1078,20 @@ acceptance matrix.
 
 | Metric | Value |
 |---|---|
-| Normative requirement IDs defined | 350 |
-| Acceptance matrix IDs | 350 |
+| Normative requirement IDs defined | 374 |
+| Acceptance matrix IDs | 374 |
 | Missing (defined but absent from matrix) | 0 |
 | Duplicate requirement definitions | 0 |
 | Duplicate matrix rows | 0 |
 | Orphan matrix IDs (in matrix but undefined) | 0 |
 | Matrix rows missing a required cell | 0 |
 
-Per-block counts: API 5, APP 13, AUD 7, CAR 8, CMP 6, DAG 10, DEP 11, FCR 11, FE 9,
+Per-block counts: API 5, APP 13, AUD 7, CAR 10, CMP 6, DAG 10, DEP 12, FCR 14, FE 9,
 HST 9, IFV 7, INP 15, MAP 10, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13,
-RCL 5, REG 19, REV 5, RFV 7, RSN 10, RTE 6, SEC 5, SER 9, SNO 12, SNP 7, SRC 14, SUB 7,
-SVC 8, TRL 6, TXN 6, UNC 11, VER 8.
+RBD 9, RCL 7, REG 19, REV 5, RFV 7, RSN 10, RTE 6, SEC 5, SER 9, SNO 12, SNP 7, SRC 14,
+SUB 7, SVC 8, TRG 7, TRL 6, TXN 6, UNC 11, VER 8.
 
-Seventeen rows are classified **Review assertion** in the specification's Part 21 preamble:
+Nineteen rows are classified **Review assertion** in the specification's Part 21 preamble:
 they record verified source facts and map to source-inspection evidence rather than an
 executable test. All remaining rows are normative controls requiring implementation.
 

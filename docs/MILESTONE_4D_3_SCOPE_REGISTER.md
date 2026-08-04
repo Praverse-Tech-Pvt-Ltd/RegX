@@ -46,6 +46,10 @@ additional in-scope items identified during adversarial review are documented he
 | S-29 | Governed `AssessmentSnapshot` creation, one new immutable snapshot per calculation event | 4D-3 spec Part 3A.6 |
 | S-30 | Transaction-scoped snapshot context carried in memory; no broad re-query | 4D-3 spec M4D3-SNO-007/008 |
 | S-31 | Deterministic one-to-one resolver failure mapping to stored status and canonical reason code | 4D-3 spec M4D3-IFV-003 |
+| S-32 | Separate `calculation_dependencies` (graph edges) and `recalculation_triggers` (change triggers) | 4D-3 spec M4D3-TRG-001/002 |
+| S-33 | Component-reference rebinding with governed downstream recalculation | 4D-3 spec Part 3A.2.4 |
+| S-34 | Current-provenance replacement after rebinding; no prior component result remains current | 4D-3 spec M4D3-RBD-005/006 |
+| S-35 | Activation rejection of the `registry_component_code` selector form | 4D-3 spec M4D3-FCR-012 |
 
 ---
 
@@ -79,6 +83,19 @@ additional in-scope items identified during adversarial review are documented he
 | X-24 | Aggregate multi-component calculation in a single response | Never |
 | X-25 | `AssessmentSnapshot` uniqueness migration | Not in 4D-3 — determinism achieved by transaction-scoped creation |
 | X-26 | Generic snapshot deduplication framework | Not in 4D-3 |
+| X-27 | Automatic assessment of every inactive ingredient in an arbitrary formulation | Not in 4D-3 — see the product-boundary note below |
+| X-28 | Enablement of the `registry_component_code` selector form | Not in 4D-3 — rejected at activation; requires a governed amendment and schema support |
+| X-29 | Schema change adding an immutable unique component code | Not in 4D-3 |
+
+### Product boundary — component coverage
+
+4D-3 supports **explicitly configured subject-component assessments** only. A checklist
+author configures a component-reference question and its bound calculated question group
+for each component to be assessed. 4D-3 does **not** promise that every inactive
+ingredient in an arbitrary formulation is assessed automatically, and static question
+groups shall not be described as providing such coverage. This boundary is accepted for
+4D-3 (M4D3-CAR-009); broader all-component automation may be evaluated in a later
+milestone with its own discovery and schema review.
 
 ---
 
