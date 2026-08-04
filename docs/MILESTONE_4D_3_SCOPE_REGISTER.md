@@ -1,13 +1,13 @@
 # Milestone 4D-3 Scope Register
 
-**Status: DISCOVERY. Open questions unresolved. Not approved for implementation.**
+**Status: DISCOVERY COMPLETE. All open questions resolved. Pending second adversarial review before implementation specification.**
 
 **Discovery document:** `docs/MILESTONE_4D_3_DISCOVERY.md`
 **Branch:** `regx/feat/milestone-4d-3-discovery`
 
 This register is the single authoritative list of 4D-3 scope inclusions, exclusions, and
-open questions. Every entry must be resolvable before the implementation specification
-is finalized.
+open questions. All four open questions are resolved. The resolved decisions and the
+additional in-scope items identified during adversarial review are documented here.
 
 ---
 
@@ -18,19 +18,30 @@ is finalized.
 | S-01 | `FDA_DERIVED_DEFAULT` population at execution creation | 4D design §10; 4D-2 discovery §1 |
 | S-02 | `SYSTEM_CALCULATED` computation at execution creation | 4D design §10; 4D-2 discovery §1 |
 | S-03 | In-draft cascade recalculation on `enter_response()` for USER_REQUIRED/EVIDENCE_DERIVED updates | 4D design §8b; 4D-2 discovery §6d |
-| S-04 | `CalculationOutcome` rows updated from DATA_REQUIRED to real values | 4D-2 implementation spec §9; models.py comment |
-| S-05 | `source_assessment_snapshot_public_id` populated when snapshot is the source | 4D design §9 |
-| S-06 | Applicability runtime evaluator (pure function, no eval/exec) | 4D-3 discovery §5; field_registry.py + applicability.py already validate |
+| S-04 | `CalculationOutcome` rows updated from `"data_required"` to `"complete"` or `"error"` (via translation layer) | 4D-2 implementation spec §9; models.py comment; adversarial review CR-1 |
+| S-05 | `source_assessment_snapshot_public_id` populated via live-first `run_preview()` with tenant filter | 4D design §9; OQ-4 resolved |
+| S-06 | Applicability runtime evaluator — pure function, no eval/exec, returns `ApplicabilityOutcome` | 4D-3 discovery §5; field_registry.py + applicability.py |
 | S-07 | Applicability context assembly from FormulationVersion + FDA match result | 4D-3 discovery §5a |
-| S-08 | `NOT_APPLICABLE` state set for questions whose rule evaluates false | 4D design §3a; 4D-3 discovery §5c |
-| S-09 | New audit event `iig_checklist.response.fda_populated` (distinct from response.entered) | 4D-3 discovery §10 |
+| S-08 | `NOT_APPLICABLE`, `APPLICABLE`, and `REVIEW_REQUIRED` outcome consumption from `ApplicabilityRule.outcome_if_true/false` | 4D design §3a; 4D-3 discovery §5c; adversarial review CR-10 |
+| S-09 | New audit event `iig_checklist.response.fda_populated` (distinct from `response.entered`) | 4D-3 discovery §10 |
 | S-10 | Frontend: per-question display with provenance labels in execution detail | 4D-2 discovery §15; 4D-3 discovery §8 |
-| S-11 | Frontend: SYSTEM_CALCULATED answer display (value + status code, no fabricated value) | 4D design §11; 4D-3 discovery §8 |
+| S-11 | Frontend: `SYSTEM_CALCULATED` answer display — `value` when `status = "complete"`, `reason_code` when `status = "error"` or `"data_required"` | 4D design §11; 4D-3 discovery §8 |
 | S-12 | Frontend: recalculation feedback via server reload after PATCH, no client formula evaluation | 4D-3 discovery §8 |
-| S-13 | Reuse all six calculation functions from iid_assessment.calculations verbatim | 4D design §20; IID_CALCULATION_RULES.md |
-| S-14 | Reuse resolve_substance_identity() and find_iid_candidates() verbatim | 4D design §4 |
-| S-15 | No new database models or migrations | 4D-3 discovery §7 |
-| S-16 | full_clean() enforced on every CalculationOutcome update (AssessmentSnapshot defect must not recur) | 4D design §7/§18; 4D-2 implementation spec §3 |
+| S-13 | Reuse all six calculation functions from `iid_assessment.calculations` verbatim | 4D design §20; IID_CALCULATION_RULES.md |
+| S-14 | Reuse `resolve_substance_identity()` and `find_iid_candidates()` verbatim | 4D design §4 |
+| S-15 | No new database models or migrations — `calculation_binding_identifier` used as registry key (existing CharField) | 4D-3 discovery §7; OQ-2 resolved |
+| S-16 | `full_clean()` enforced on every `CalculationOutcome` update (AssessmentSnapshot defect must not recur) | 4D design §7/§18; 4D-2 implementation spec §3 |
+| S-17 | `CalculationStatus` translation layer — maps engine result strings to `iig_checklist.enums.CalculationStatus` stored values | Adversarial review CR-1; 4D-3 discovery §4e |
+| S-18 | `CALCULATION_BINDING_REGISTRY` — server-side Python dict mapping `calculation_binding_identifier` keys to function references and input resolvers | OQ-2 resolved; 4D-3 discovery §4c |
+| S-19 | Registry validation at `ChecklistVersion` activation — unknown identifiers, missing dependencies, cycle detection | 4D-3 discovery §4c, §14 |
+| S-20 | Dependency graph DAG validation — topological ordering, bounded depth, cycle rejection at activation | 4D-3 discovery §14; adversarial review CR-8 |
+| S-21 | `generated_at` ISO string parsed to timezone-aware `datetime` before `CalculationOutcome.generated_at` assignment | Adversarial review CR-9; 4D-3 discovery §4f |
+| S-22 | Read-only `CalculationOutcome` serialization nested in response-list/detail API; no generic PATCH endpoint | 4D-3 discovery §15 |
+| S-23 | Module-level resolver functions in `iig_checklist/answer_sources.py` (OQ-1 resolved) | OQ-1 resolved; 4D-3 discovery §4b |
+| S-24 | Synchronous in-transaction recalculation with defined lock order: execution → response rows → CalculationOutcome rows | OQ-3 resolved; 4D-3 discovery §4d |
+| S-25 | Idempotency — unchanged inputs produce no duplicate history, no version increment, no misleading audit events | 4D-3 discovery §4a |
+| S-26 | Non-overwrite rules — USER_REQUIRED, REVIEWER_CONCLUSION, and APPROVAL_METADATA never overwritten by population pass | 4D-3 discovery §4a |
+| S-27 | T-10 threat coverage — status translation failure unit tests; blocked status never maps to `"complete"` | 4D-3 threat model T-10 |
 
 ---
 
@@ -41,167 +52,96 @@ is finalized.
 | X-01 | Override/deviation workflow | 4D-4 |
 | X-02 | Controlled JSON/CSV export | 4D-4 |
 | X-03 | SHA-256 checksum on export | 4D-4 |
-| X-04 | Promotion of _csv_safe_cell() to common | 4D-4 |
-| X-05 | EVIDENCE_DERIVED attachment-confirmation enforcement at submission | 4D-4 |
-| X-06 | Real regulatory checklist content (any ChecklistDefinition template) | Regulatory-content gate (pre-4D-4) |
+| X-04 | Promotion of `_csv_safe_cell()` to common | 4D-4 |
+| X-05 | `EVIDENCE_DERIVED` attachment-confirmation enforcement at submission | 4D-4 |
+| X-06 | Real regulatory checklist content (any `ChecklistDefinition` template) | Regulatory-content gate (pre-4D-4) |
 | X-07 | PDF/Word export | Explicitly deferred beyond 4D |
 | X-08 | New calculation formulas | Not in scope for any 4D stage |
 | X-09 | Electronic signatures, 21 CFR Part 11 compliance | Not in scope for any 4D stage |
 | X-10 | Auto-approval based on population result | Never — structural prohibition |
 | X-11 | Formula logic in the frontend | Never — backend only |
-| X-12 | Any modification to iid_assessment, fda_data, formulations, or documents app models | Confirmed: 4D-3 is a consumer only |
-| X-13 | New calculation formulas beyond the six in iid_assessment.calculations | Not in scope |
+| X-12 | Any modification to `iid_assessment`, `fda_data`, `formulations`, or `documents` app models | Confirmed: 4D-3 is a consumer only |
+| X-13 | New calculation formulas beyond the six in `iid_assessment.calculations` | Not in scope |
+| X-14 | Asynchronous calculation execution | The `CalculationStatus.CALCULATING` value is reserved; 4D-3 uses synchronous computation only |
+| X-15 | New database field for calculation binding JSON schema | Not required — `calculation_binding_identifier` CharField is the approved approach |
+| X-16 | Arbitrary formula builder / user-authored calculation logic | Never — tenant users cannot inject executable logic |
+| X-17 | Manual override of calculated values | 4D-4 |
+| X-18 | Staleness-avoidance logic for existing `AssessmentSnapshot` records | Eliminated by OQ-4 live-first design |
+| X-19 | New model for `REVIEW_REQUIRED` state persisted representation | Deferred to implementation spec; must use existing fields where possible |
+| X-20 | Generic `PATCH`/`PUT` endpoint for `CalculationOutcome` | Never — write path is server-controlled only |
 
 ---
 
-## Part C — Open Questions (must resolve before implementation spec)
+## Part C — Open Questions (all resolved)
 
 ### OQ-1: `ChecklistAnswerSource` — functions vs. class
 
-**What it governs:** The shape of the resolver layer that calls existing FDA/IID services
-during the population pass (§4b of the discovery document).
+**RESOLVED — module-level functions.**
 
-**Option A — module-level functions:**
-```
-# iig_checklist/answer_sources.py
-def resolve_fda_derived(question, formulation_version, context): ...
-def resolve_identity_match(question, formulation_version): ...
-```
-Pros: simpler, no unnecessary state, consistent with how `iid_assessment.calculations`
-functions are already structured. Cons: slightly harder to mock in tests (requires
-`unittest.mock.patch` at the module level).
+Rationale: functions are sufficient for deterministic source resolution; dependencies can
+be passed explicitly; this matches existing service-layer conventions; it avoids
+unnecessary state and lifecycle complexity.
 
-**Option B — class with injected services:**
-```
-class ChecklistAnswerSource:
-    def __init__(self, substance_resolver, iid_matcher): ...
-    def resolve(self, question, formulation_version, context): ...
-```
-Pros: explicit dependency injection makes unit testing without hitting the database
-easier. Cons: adds an object where a function would do; the existing codebase uses
-functions for calculation services, not classes.
+Implementation: new module `iig_checklist/answer_sources.py` with module-level
+resolver functions. See `docs/MILESTONE_4D_3_DISCOVERY.md §4b`.
 
-**Recommendation (for reviewer to accept or override):** Option A, with targeted
-`patch` in tests. The codebase consistently uses module-level functions for services.
-
-**Resolution required by:** before implementation spec is written.
-**Status:** OPEN
+**Status: RESOLVED**
 
 ---
 
-### OQ-2: `calculation_binding` JSON schema
+### OQ-2: `calculation_binding` binding approach
 
-**What it governs:** `ChecklistQuestion.calculation_binding` is a `JSONField` that
-tells the population pass which calculation function to invoke and where to source the
-numeric inputs. The 4D discovery document describes the concept (§9) but does not define
-the normative JSON schema.
+**RESOLVED — `ChecklistQuestion.calculation_binding_identifier` stores a short registry key;
+server-side `CALCULATION_BINDING_REGISTRY` contains function and input mapping; no
+migration required.**
 
-**Proposed schema:**
-```json
-{
-  "function": "calculate_percentage_w_w",
-  "inputs": {
-    "quantity_per_unit_grams": {
-      "source": "question",
-      "question_code": "Q4",
-      "unit_conversion": "to_grams"
-    },
-    "total_dosage_unit_weight_grams": {
-      "source": "formulation_version",
-      "field": "total_dosage_unit_weight",
-      "unit_conversion": "to_grams"
-    }
-  }
-}
-```
+The field `ChecklistQuestion.calculation_binding_identifier` is an existing
+`CharField(max_length=100, blank=True)`. It stores a short, governed identifier string
+(e.g. `"percentage_w_w"`) that the population pass resolves against the server-side
+`CALCULATION_BINDING_REGISTRY`. It is not a `JSONField` and does not store a JSON
+calculation schema. The previous discovery description of this field as a `JSONField`
+was incorrect and has been removed.
 
-`source` values: `"question"` (from another `ChecklistResponse.raw_value`) or
-`"formulation_version"` (from a `FormulationVersion` field). `unit_conversion` is
-optional; when present, names a conversion function from `iid_assessment.unit_conversion`.
+The `CALCULATION_BINDING_REGISTRY` is defined in server-side version-controlled Python
+code (not a database table). See `docs/MILESTONE_4D_3_DISCOVERY.md §4c` for the registry
+design requirements.
 
-**Concerns:**
-- Unit conversion logic lives in `iid_assessment.unit_conversion`. The binding schema
-  must reference a controlled vocabulary of conversion identifiers, not arbitrary
-  function names.
-- `question_code` must be validated at `ChecklistVersion` activation time to confirm
-  the referenced question exists in the same version.
-- Cross-version references (a binding that references a question in a different version)
-  must be rejected.
+No new field, no new model, no migration is required.
 
-**Recommendation:** Adopt the proposed schema with the controlled `unit_conversion`
-vocabulary defined in the implementation spec. A reviewer must confirm the schema is
-expressive enough to represent all six calculation formulas against IIG checklist
-question shapes before the implementation spec is written.
-
-**Resolution required by:** before implementation spec is written.
-**Status:** OPEN
+**Status: RESOLVED**
 
 ---
 
 ### OQ-3: Cascade recalculation — in-transaction vs. post-commit
 
-**What it governs:** When `enter_response()` writes a `USER_REQUIRED` answer on a
-`draft` execution, every dependent `SYSTEM_CALCULATED` answer must be recomputed.
-The question is whether this cascade runs inside the same `transaction.atomic()` block
-as the response write, or deferred to `transaction.on_commit()`.
+**RESOLVED — synchronous recalculation in the same database transaction.**
 
-**Option A — in-transaction (same atomic block):**
-- Pros: atomic consistency; a reader always sees `USER_REQUIRED` and `SYSTEM_CALCULATED`
-  in sync; simpler error handling (rollback covers everything).
-- Cons: longer transactions; if the calculation itself calls external services
-  (it does not — all six functions are pure and Decimal-only), it could block the
-  transaction.
+Rationale: the six calculation functions are pure, fast, and Decimal-only. Transaction
+duration is not a concern. Consistency is paramount.
 
-**Option B — post-commit (deferred):**
-- Pros: shorter transactions; `USER_REQUIRED` write commits fast.
-- Cons: a window exists where the execution is committed with the new `USER_REQUIRED`
-  value but stale `CalculationOutcome` rows; a concurrent reader in that window would see
-  an inconsistent state; error handling for failed recalculation after commit is
-  significantly more complex.
+Required lock order: `ChecklistExecution` → affected `ChecklistResponse` rows → `CalculationOutcome`
+rows (in stable pk order within each tier). All writes in a single `transaction.atomic()` block.
+Audit events via `transaction.on_commit()`.
 
-**Recommendation:** Option A. The six calculation functions are pure, fast, and Decimal-
-only (no I/O, no external calls). Transaction duration is not a concern. Consistency is
-paramount.
+See `docs/MILESTONE_4D_3_DISCOVERY.md §4d`.
 
-**Resolution required by:** before implementation spec is written.
-**Status:** OPEN
+**Status: RESOLVED**
 
 ---
 
 ### OQ-4: `AssessmentSnapshot` source — snapshot-first vs. live-first
 
-**What it governs:** When the population pass computes `SYSTEM_CALCULATED` answers that
-mirror an IID assessment result, should it prefer an existing `AssessmentSnapshot` for
-the `FormulationComponent` or always call `run_preview()` live and freeze a new snapshot?
+**RESOLVED — live-first source resolution followed by persisted snapshot.**
 
-**Option A — snapshot-first:**
-Find the most recent non-stale `AssessmentSnapshot` for the `FormulationComponent` /
-`FormulationVersion` combination. Use its frozen values if found. Call `run_preview()`
-only if no suitable snapshot exists. Set `source_assessment_snapshot_public_id` to the
-found or newly created snapshot.
+At population time, the system always calls `run_preview()` against the currently active
+FDA release. The result is frozen as an `AssessmentSnapshot` (reusing an existing exact
+match for this `(FormulationComponent, active_release)` tuple if one exists). Any
+`AssessmentSnapshot` lookup must filter by `tenant = execution.tenant`. Historical
+approved and terminal executions are never automatically recalculated.
 
-Pros: avoids redundant computation; reuses already-verified assessment data.
-Cons: introduces a "freshness" question — what makes an existing snapshot "non-stale"?
-An existing snapshot may reference a superseded FDA release. Requires a staleness check
-against the current active release, adding complexity.
+See `docs/MILESTONE_4D_3_DISCOVERY.md §6`.
 
-**Option B — live-first (always create a new snapshot):**
-Always call `run_preview()` at population time against the currently active FDA release.
-Freeze the result as a new `AssessmentSnapshot` if none exists for this `(FormulationComponent,
-active_release)` tuple, or reuse an existing exact match. Set
-`source_assessment_snapshot_public_id` unconditionally.
-
-Pros: population always uses the current active release; `source_assessment_snapshot_public_id`
-is always set; reproducibility is unconditional; no staleness logic needed.
-Cons: creates a new snapshot per execution creation if no matching one exists; slightly
-more expensive at population time.
-
-**Recommendation:** Option B. Reproducibility should be unconditional. The cost of one
-`run_preview()` call per execution creation is negligible versus the risk of silently
-using a stale snapshot. Staleness avoidance code is a maintenance liability.
-
-**Resolution required by:** before implementation spec is written.
-**Status:** OPEN
+**Status: RESOLVED**
 
 ---
 
@@ -214,8 +154,9 @@ using a stale snapshot. Staleness avoidance code is a maintenance liability.
     ChecklistExecution / ChecklistResponse / CalculationOutcome (4D-2 models)
     execution_transitions.py / enter_response() service
     applicability.validate_condition_json() / field_registry.py (4D-1)
+    iig_checklist.enums.CalculationStatus (4 values: data_required, calculating, complete, error)
   iid_assessment (4A-4C)
-    calculations.py (six functions, CalculationResult, CalculationStatus)
+    calculations.py (six functions, CalculationResult, CalculationStatus engine class)
     matching.find_iid_candidates()
     assess.run_preview()
     AssessmentSnapshot model
@@ -228,22 +169,25 @@ using a stale snapshot. Staleness avoidance code is a maintenance liability.
 4D-4 depends on 4D-3:
   override/deviation workflow assumes calculation answers are populated
   export assumes CalculationOutcome.value is non-null for approved executions
+  deviation path assumes CalculationOutcome.status and reason_code are set
 ```
 
 ---
 
-## Part E — Acceptance Criteria (for design review)
+## Part E — Acceptance Criteria (for implementation specification)
 
-The 4D-3 design is ready for implementation specification when:
+The 4D-3 implementation specification may be written when:
 
-1. OQ-1 through OQ-4 are formally resolved with a single chosen option and documented
-   rationale.
-2. The `calculation_binding` JSON schema (OQ-2) has been confirmed expressive enough to
-   represent all six calculation formula bindings for at least the synthetic
-   paracetamol/acetaminophen worked example (4D design §19).
-3. No new database models or migrations are required (confirmed: all needed columns exist
-   in 4D-2).
-4. A human reviewer with domain authority has read this register and the discovery
+1. OQ-1 through OQ-4 are formally resolved — **DONE** (see Part C above).
+2. The `CalculationStatus` translation layer (S-17) is specified exhaustively — the
+   implementation spec must include the full mapping table from §4e of the discovery
+   document and must include tests for every engine status string.
+3. The `CALCULATION_BINDING_REGISTRY` design (S-18) satisfies all requirements in
+   `docs/MILESTONE_4D_3_DISCOVERY.md §4c`.
+4. No new database models or migrations are required (confirmed for the registry-key
+   approach — S-15 satisfied).
+5. A human reviewer with domain authority has read this register and the discovery
    document and confirmed scope boundaries.
-5. No item from Part B (Out of Scope) has been silently added to any proposed
+6. No item from Part B (Out of Scope) has been silently added to any proposed
    implementation description.
+7. The second adversarial discovery review passes with no Critical or Major findings.
