@@ -63,35 +63,43 @@ ALLOWED_RESOLVER_SOURCES: frozenset[str] = frozenset(
 )
 
 # Exact permitted keys per form.  Anything else is rejected (M4D3-INP-003..008).
-_RESOLVER_KEYS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
-    # source: (required keys, optional keys)
-    SOURCE_QUESTION_RESPONSE: (
-        frozenset({"source", "question_code", "value_field", "expected_type"}),
-        frozenset({"required_unit", "unit_source"}),
-    ),
-    SOURCE_FORMULATION_FIELD: (
-        frozenset({"source", "object", "field", "expected_type"}),
-        frozenset({"unit_field", "required_unit", "component_selector",
-                   "required_component_type"}),
-    ),
-    SOURCE_MAXIMUM_DAILY_UNITS: (
-        frozenset({"source", "resolver_version", "expected_type"}),
-        frozenset(),
-    ),
-    SOURCE_ASSESSMENT_SNAPSHOT: (
-        frozenset({"source", "field", "expected_type"}),
-        frozenset({"unit_field", "required_unit"}),
-    ),
-    SOURCE_CALCULATION_OUTCOME: (
-        frozenset({"source", "question_code", "field", "required_status",
-                   "expected_type"}),
-        frozenset({"required_unit", "unit_source"}),
-    ),
-    SOURCE_CONSTANT: (
-        frozenset({"source", "value", "type", "binding_version"}),
-        frozenset(),
-    ),
-}
+#
+# The dict literal is wrapped immediately, so no mutable alias is ever bound:
+# the outer mapping is read-only and each key set is already a frozenset, so no
+# caller can add a resolver form or widen an existing one.
+_RESOLVER_KEYS: MappingProxyType[str, tuple[frozenset[str], frozenset[str]]] = (
+    MappingProxyType(
+        {
+            # source: (required keys, optional keys)
+            SOURCE_QUESTION_RESPONSE: (
+                frozenset({"source", "question_code", "value_field", "expected_type"}),
+                frozenset({"required_unit", "unit_source"}),
+            ),
+            SOURCE_FORMULATION_FIELD: (
+                frozenset({"source", "object", "field", "expected_type"}),
+                frozenset({"unit_field", "required_unit", "component_selector",
+                           "required_component_type"}),
+            ),
+            SOURCE_MAXIMUM_DAILY_UNITS: (
+                frozenset({"source", "resolver_version", "expected_type"}),
+                frozenset(),
+            ),
+            SOURCE_ASSESSMENT_SNAPSHOT: (
+                frozenset({"source", "field", "expected_type"}),
+                frozenset({"unit_field", "required_unit"}),
+            ),
+            SOURCE_CALCULATION_OUTCOME: (
+                frozenset({"source", "question_code", "field", "required_status",
+                           "expected_type"}),
+                frozenset({"required_unit", "unit_source"}),
+            ),
+            SOURCE_CONSTANT: (
+                frozenset({"source", "value", "type", "binding_version"}),
+                frozenset(),
+            ),
+        }
+    )
+)
 
 FORMULATION_OBJECTS: frozenset[str] = frozenset(
     {"formulation_version", "formulation_component"}

@@ -28,6 +28,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from types import MappingProxyType
+from typing import TypeGuard
 
 SOURCE_FORMULATION_VERSION = "formulation_version"
 SOURCE_DOSING_REGIMEN = "dosing_regimen"
@@ -61,8 +62,12 @@ class MaxDailyUnitsSelection:
     provenance: MappingProxyType[str, object]
 
 
-def _is_valid_decimal(value: object) -> bool:
-    """Decimal only.  ``bool`` is rejected even though it subclasses ``int``."""
+def _is_valid_decimal(value: object) -> TypeGuard[Decimal]:
+    """Decimal only.  ``bool`` is rejected even though it subclasses ``int``.
+
+    Declared as a ``TypeGuard`` so callers narrow to ``Decimal`` naturally, with
+    no need for a type-checker suppression at the assignment sites.
+    """
     if isinstance(value, bool) or not isinstance(value, Decimal):
         return False
     if value.is_nan() or value.is_infinite():
@@ -89,16 +94,15 @@ def select_maximum_daily_units(
     version_candidate: Decimal | None = None
     if version_scalar is not None:
         if _is_valid_decimal(version_scalar):
-            version_candidate = version_scalar  # type: ignore[assignment]
+            version_candidate = version_scalar
         else:
             invalid.append(SOURCE_FORMULATION_VERSION)
 
     valid_regimens: list[tuple[Decimal, DosingRegimenCandidate]] = []
     for candidate in regimen_candidates:
-        if _is_valid_decimal(candidate.maximum_units_per_day):
-            valid_regimens.append(
-                (candidate.maximum_units_per_day, candidate)  # type: ignore[arg-type]
-            )
+        units = candidate.maximum_units_per_day
+        if _is_valid_decimal(units):
+            valid_regimens.append((units, candidate))
         else:
             invalid.append(candidate.public_id)
 

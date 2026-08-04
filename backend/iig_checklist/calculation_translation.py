@@ -396,18 +396,28 @@ class VocabularyConfigurationError(RuntimeError):
     """Raised when a closed vocabulary or mapping is internally inconsistent."""
 
 
-def _validate_vocabularies() -> None:
-    code_pattern_ok = lambda c: (  # noqa: E731 - local predicate, not exported
-        isinstance(c, str) and c and c == c.upper() and c.replace("_", "").isalnum()
+def is_canonical_code(candidate: object) -> bool:
+    """True when ``candidate`` is a canonical governed code.
+
+    Canonical means a non-empty ASCII string of uppercase letters, digits and
+    underscores -- the shape every closed vocabulary in 4D-3 must satisfy.
+    """
+    return (
+        isinstance(candidate, str)
+        and bool(candidate)
+        and candidate == candidate.upper()
+        and candidate.replace("_", "").isalnum()
     )
 
+
+def _validate_vocabularies() -> None:
     for name, vocab in (
         ("ALLOWED_REASON_CODES", ALLOWED_REASON_CODES),
         ("ALLOWED_RESOLVER_DETAIL_CODES", ALLOWED_RESOLVER_DETAIL_CODES),
         ("ALLOWED_INPUT_FAILURE_CODES", ALLOWED_INPUT_FAILURE_CODES),
     ):
         for code in vocab:
-            if not code_pattern_ok(code):
+            if not is_canonical_code(code):
                 raise VocabularyConfigurationError(
                     f"{name} contains a non-canonical code: {code!r}"
                 )
