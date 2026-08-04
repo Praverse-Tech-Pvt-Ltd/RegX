@@ -94,7 +94,7 @@ All match the approved specification exactly. Nothing was silently adjusted.
 
 | Gate | Command | Result |
 |---|---|---|
-| Database-free unit tests | `python -m pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **153 passed** |
+| Database-free unit tests | `python -m pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **182 passed** |
 | Existing DB-free regression | `python -m pytest common/tests/test_guards.py iig_checklist/tests/test_compatibility.py iid_assessment/tests -k "not django_db" --no-cov -q` | **172 passed, 36 deselected** — no regression |
 | Ruff | `python -m ruff check <six modules + test file>` | **All checks passed** |
 | Import-linter | `.venv\Scripts\lint-imports.exe` | **7 contracts kept, 0 broken** |
@@ -150,6 +150,9 @@ Deliberately **not** implemented in this run, per the stop condition:
 - `CalculationOutcome` persistence and provenance writing.
 - History helper persistence and component rebinding.
 - Serializers, API representation and all frontend work.
+- **Activation-time validation of registry question codes** against an approved
+  `ChecklistVersion` (M4D3-REG-018) — see note 1 in §6. Mandatory before any
+  registry entry may be activated.
 
 No fake repository, stub or mock was introduced as a production stand-in.
 
@@ -157,11 +160,33 @@ No fake repository, stub or mock was introduced as a production stand-in.
 
 ## 6. Implementation notes for the next reviewer
 
-1. **Registry question codes.** `Q_SUBJECT_COMPONENT` and `Q_DAILY_EXPOSURE` are
-   structural binding points, not regulatory checklist content (which remains
-   out of scope). Activation validates that each code exists in the
-   `ChecklistVersion` being activated (M4D3-REG-018). If real approved checklist
-   content uses different codes, only these two constants change.
+1. **Registry question codes — activation validation is DEFERRED, not
+   implemented.** `Q_SUBJECT_COMPONENT` and `Q_DAILY_EXPOSURE` are structural
+   governed binding constants in the pure registry. They are **not** mandated by
+   the approved specification and have **not** been verified against any
+   existing checklist fixture or approved `ChecklistVersion`.
+
+   Accurate current state:
+
+   - No production consumer activates or executes the registry — grep confirms
+     nothing outside the six foundation modules imports them, so they are inert.
+   - The foundation validates **only internal declaration consistency**: that
+     `calculation_dependencies` match the form E resolvers and that
+     `recalculation_triggers` match the form A resolvers plus component
+     selectors (M4D3-TRG-006).
+   - Activation-time validation against an approved `ChecklistVersion`
+     (M4D3-REG-018) is **deferred to the ORM/service implementation phase**. It
+     does not exist yet and must not be described as passing.
+   - When implemented, that activation service **shall fail closed** if any
+     referenced question code is absent from the version, duplicated, of the
+     wrong `answer_type`, of the wrong `data_source_classification`, or
+     otherwise incompatible.
+   - This deferred control is **mandatory** before any registry entry can become
+     active. Until it exists, no registry entry may be activated.
+
+   If real approved checklist content uses different codes, only these two
+   constants change — but the activation check is what makes that safe, and it
+   is not yet built.
 
 2. **A real defect the import-time self-check caught.** The first draft declared
    `recalculation_triggers = (Q_SUBJECT_COMPONENT, Q_DAILY_EXPOSURE)` on both MDE
@@ -175,7 +200,23 @@ No fake repository, stub or mock was introduced as a production stand-in.
    `1E+3`. Provenance in a regulated record must stay readable, so the adapter
    formats the factor with `f"{…:f}"` to force plain notation.
 
-4. **`makemigrations` attempts a database connection** even with
+4. **Graph boundary coverage.** The six-entry production registry has a maximum
+   chain depth of 2 and cannot express a depth-6 or 11-node graph, so
+   `TestGraphDepthBoundary` and `TestGraphCascadeBoundary` build synthetic
+   registry entries from an approved entry and drive them through the public
+   graph API. A mutation probe confirmed the tests are meaningful: loosening the
+   limits to 99 in memory makes five of them fail with `DID NOT RAISE`, while
+   the intact guard passes 10/10.
+
+5. **No suppressions remain in 4D-3 code.** The former `# noqa: E731` lambda is
+   now the named predicate `is_canonical_code()`, directly covered by
+   `TestCanonicalCodePredicate`. The two `# type: ignore` comments in
+   `max_daily_units.py` were removed by declaring `_is_valid_decimal()` as a
+   `TypeGuard[Decimal]`, which narrows properly at both call sites. The two in
+   the test file were removed as inert — no type checker is configured in this
+   repository.
+
+6. **`makemigrations` attempts a database connection** even with
    `--check --dry-run`. It is slow rather than blocked: the connection attempt
    times out with a `RuntimeWarning`, then the command completes its model-state
    comparison normally. Allow roughly two minutes for it in an environment with
