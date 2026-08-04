@@ -15,10 +15,10 @@ import uuid
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
 from .enums import AnswerType
 from .execution_constants import FDA_RECORD_TYPES, MAX_FREE_TEXT_CHARS, MAX_SELECT_OPTIONS
+
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 _DECIMAL_STRING_RE_CHARS = frozenset("0123456789.-")
 
@@ -86,9 +86,7 @@ def _validate_decimal(value):
 
 
 def _validate_quantity_with_unit(value, *, question):
-    _require_exact_keys(
-        value, {"value", "unit"}, "quantity_with_unit requires {'value', 'unit'}."
-    )
+    _require_exact_keys(value, {"value", "unit"}, "quantity_with_unit requires {'value', 'unit'}.")
     _require_decimal_string(value["value"], "quantity_with_unit value must be a decimal string.")
     unit = value["unit"]
     allowed = list(question.allowed_units) if question is not None else []
@@ -273,8 +271,8 @@ _SIMPLE_VALIDATORS = {
             v, execution=execution
         )
     ),
-    AnswerType.EVIDENCE_ATTACHMENT_REFERENCE: lambda v, *, tenant=None, **_: _validate_attachment_reference(
-        v, tenant=tenant
+    AnswerType.EVIDENCE_ATTACHMENT_REFERENCE: (
+        lambda v, *, tenant=None, **_: _validate_attachment_reference(v, tenant=tenant)
     ),
 }
 
@@ -295,7 +293,9 @@ def validate_raw_value_shape(answer_type, raw_value, *, question=None, execution
         _fail(f"{answer_type} does not accept a client-supplied raw_value.")
 
     if answer_type == AnswerType.REVIEWER_CONCLUSION:
-        _fail("reviewer_conclusion raw_value must be submitted via the reviewer-conclusion endpoint.")
+        _fail(
+            "reviewer_conclusion raw_value must be submitted via the reviewer-conclusion endpoint."
+        )
 
     validator = _SIMPLE_VALIDATORS.get(answer_type)
     if validator is None:

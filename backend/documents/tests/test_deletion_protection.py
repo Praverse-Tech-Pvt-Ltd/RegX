@@ -3,10 +3,9 @@
 import pytest
 
 from documents.deletion_protection import (
-    DocumentVersionDeleteForbidden,
     DeletionProtectionRegistry,
+    DocumentVersionDeleteForbidden,
 )
-
 
 # ---------------------------------------------------------------------------
 # Registry unit tests (no DB required)
@@ -100,7 +99,6 @@ class TestDeletionProtectionRegistry:
 
 
 def _make_document_version(tenant, user):
-    import uuid
     from documents.models import Document, DocumentVersion
 
     doc = Document.objects.create(
@@ -189,13 +187,9 @@ class TestDocumentVersionQuerySetDelete:
         with DeletionProtectionRegistry._isolated():
             blocked_dv = _make_document_version(tenant_a, user_a)
             allowed_dv = _make_document_version(tenant_a, user_a)
-            DeletionProtectionRegistry.register(
-                "block_one", lambda dv: dv.pk == blocked_dv.pk
-            )
+            DeletionProtectionRegistry.register("block_one", lambda dv: dv.pk == blocked_dv.pk)
             with pytest.raises(DocumentVersionDeleteForbidden):
-                DocumentVersion.objects.filter(
-                    pk__in=[blocked_dv.pk, allowed_dv.pk]
-                ).delete()
+                DocumentVersion.objects.filter(pk__in=[blocked_dv.pk, allowed_dv.pk]).delete()
             # Fails closed: neither row is removed when any row is blocked.
             assert DocumentVersion.objects.filter(pk=blocked_dv.pk).exists()
             assert DocumentVersion.objects.filter(pk=allowed_dv.pk).exists()
@@ -203,9 +197,7 @@ class TestDocumentVersionQuerySetDelete:
 
 @pytest.mark.django_db
 class TestDocumentDeleteCascade:
-    def test_document_instance_delete_blocked_when_version_referenced(
-        self, tenant_a, user_a
-    ):
+    def test_document_instance_delete_blocked_when_version_referenced(self, tenant_a, user_a):
         from documents.models import DocumentVersion
 
         with DeletionProtectionRegistry._isolated():
@@ -225,9 +217,7 @@ class TestDocumentDeleteCascade:
             dv.document.delete()
             assert not Document.objects.filter(pk=doc_pk).exists()
 
-    def test_document_queryset_delete_blocked_when_version_referenced(
-        self, tenant_a, user_a
-    ):
+    def test_document_queryset_delete_blocked_when_version_referenced(self, tenant_a, user_a):
         from documents.models import Document, DocumentVersion
 
         with DeletionProtectionRegistry._isolated():

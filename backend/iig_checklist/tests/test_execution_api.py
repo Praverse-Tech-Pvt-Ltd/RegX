@@ -3,7 +3,6 @@
 import pytest
 from django.urls import reverse
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -170,9 +169,7 @@ class TestExecutionListCreate:
 
 @pytest.mark.django_db
 class TestExecutionDetail:
-    def test_get_own_tenant_execution(
-        self, api_client_doer, tenant_a, tenant_definition, user_a
-    ):
+    def test_get_own_tenant_execution(self, api_client_doer, tenant_a, tenant_definition, user_a):
         cv = _make_active_cv(tenant_definition, user_a)
         product = _make_product(tenant_a, user_a)
         fv = _make_fv(product, user_a)
@@ -186,8 +183,6 @@ class TestExecutionDetail:
     def test_cross_tenant_returns_404(
         self, api_client_doer, tenant_b, tenant_a, tenant_definition, user_a
     ):
-        from tenancy.models import Tenant
-
         other_user = _make_user_b()
         product = _make_product(tenant_b, other_user)
         fv = _make_fv(product, other_user)
@@ -213,9 +208,7 @@ class TestExecutionDetail:
         resp = api_client_doer.get(url)
         assert resp.status_code == 404
 
-    def test_status_not_patchable(
-        self, api_client_doer, tenant_a, tenant_definition, user_a
-    ):
+    def test_status_not_patchable(self, api_client_doer, tenant_a, tenant_definition, user_a):
         cv = _make_active_cv(tenant_definition, user_a)
         product = _make_product(tenant_a, user_a)
         fv = _make_fv(product, user_a)
@@ -315,9 +308,7 @@ class TestExecutionActions:
         ex.save()
 
         url = reverse("iig_checklist:execution-approve", kwargs={"public_id": ex.public_id})
-        resp = api_client_vp.post(
-            url, {"reviewer_conclusion_note": "Approved."}, format="json"
-        )
+        resp = api_client_vp.post(url, {"reviewer_conclusion_note": "Approved."}, format="json")
         assert resp.status_code == 200
         assert resp.data["status"] == "approved"
 

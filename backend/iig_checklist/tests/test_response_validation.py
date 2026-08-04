@@ -33,7 +33,11 @@ def _accepts(answer_type, raw_value, **kwargs):
 
 def test_none_raw_value_always_accepted():
     for answer_type in (
-        "short_text", "integer", "yes_no", "single_select", "calculated_value",
+        "short_text",
+        "integer",
+        "yes_no",
+        "single_select",
+        "calculated_value",
     ):
         _accepts(answer_type, None)
 

@@ -84,8 +84,7 @@ class Document(PublicIDModel, TimeStampedModel):
         blocked = [dv for dv in self.versions.all() if DeletionProtectionRegistry.check(dv)]
         if blocked:
             raise DocumentVersionDeleteForbidden(
-                "This document has versions referenced by governed content "
-                "and cannot be deleted."
+                "This document has versions referenced by governed content and cannot be deleted."
             )
         return super().delete(using=using, keep_parents=keep_parents)
 
@@ -174,7 +173,7 @@ class DocumentVersion(PublicIDModel, TimeStampedModel):
         return f"{self.document.title} v{self.version_number}"
 
     def delete(self, using=None, keep_parents=False):
-        from .deletion_protection import DocumentVersionDeleteForbidden, DeletionProtectionRegistry
+        from .deletion_protection import DeletionProtectionRegistry, DocumentVersionDeleteForbidden
 
         blocking = DeletionProtectionRegistry.check(self)
         if blocking:

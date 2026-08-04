@@ -387,29 +387,49 @@ class ReviewerConclusionSerializer(serializers.Serializer):
         raw_value = attrs.get("raw_value")
         if not isinstance(raw_value, dict):
             raise serializers.ValidationError(
-                {"error_code": "reviewer_conclusion_invalid_payload", "detail": "raw_value must be an object."}
+                {
+                    "error_code": "reviewer_conclusion_invalid_payload",
+                    "detail": "raw_value must be an object.",
+                }
             )
         if set(raw_value.keys()) != {"value"}:
             raise serializers.ValidationError(
-                {"error_code": "reviewer_conclusion_invalid_payload", "detail": "raw_value must contain only a 'value' key."}
+                {
+                    "error_code": "reviewer_conclusion_invalid_payload",
+                    "detail": "raw_value must contain only a 'value' key.",
+                }
             )
         value_str = raw_value.get("value")
         if not isinstance(value_str, str):
             raise serializers.ValidationError(
-                {"error_code": "reviewer_conclusion_invalid_payload", "detail": "raw_value.value must be a string."}
+                {
+                    "error_code": "reviewer_conclusion_invalid_payload",
+                    "detail": "raw_value.value must be a string.",
+                }
             )
         if not value_str.strip():
             raise serializers.ValidationError(
-                {"error_code": "reviewer_conclusion_empty", "detail": "Reviewer conclusion must not be empty."}
+                {
+                    "error_code": "reviewer_conclusion_empty",
+                    "detail": "Reviewer conclusion must not be empty.",
+                }
             )
         if len(value_str) > MAX_REVIEWER_CONCLUSION_CHARS:
             raise serializers.ValidationError(
-                {"error_code": "reviewer_conclusion_too_long", "detail": f"Reviewer conclusion exceeds {MAX_REVIEWER_CONCLUSION_CHARS} characters."}
+                {
+                    "error_code": "reviewer_conclusion_too_long",
+                    "detail": (
+                        f"Reviewer conclusion exceeds {MAX_REVIEWER_CONCLUSION_CHARS} characters."
+                    ),
+                }
             )
         payload_size = len(json.dumps(raw_value).encode("utf-8"))
         if payload_size > MAX_RAW_VALUE_BYTES:
             raise serializers.ValidationError(
-                {"error_code": "reviewer_conclusion_payload_too_large", "detail": "Payload exceeds byte limit."}
+                {
+                    "error_code": "reviewer_conclusion_payload_too_large",
+                    "detail": "Payload exceeds byte limit.",
+                }
             )
         return attrs
 
@@ -441,7 +461,10 @@ class ApproveSerializer(serializers.Serializer):
             )
         if not attrs.get("reviewer_conclusion_note", "").strip():
             raise serializers.ValidationError(
-                {"error_code": "reviewer_conclusion_required", "detail": "reviewer_conclusion_note is required."}
+                {
+                    "error_code": "reviewer_conclusion_required",
+                    "detail": "reviewer_conclusion_note is required.",
+                }
             )
         return attrs
 

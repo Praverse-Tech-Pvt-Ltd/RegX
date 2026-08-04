@@ -3,7 +3,6 @@
 import pytest
 from django.urls import reverse
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -71,7 +70,6 @@ def _make_reviewer_conclusion_question(cv, user):
 
 def _create_execution_submitted(tenant, tenant_definition, user, submitter):
     """Create and submit an execution, return (execution, rc_response)."""
-    from iig_checklist.models import ChecklistExecution
 
     cv = _make_active_cv(tenant_definition, user)
     _make_reviewer_conclusion_question(cv, user)
@@ -83,9 +81,7 @@ def _create_execution_submitted(tenant, tenant_definition, user, submitter):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=submitter)
-    role, _ = Role.objects.get_or_create(
-        tenant=tenant, name="doer", defaults={"is_system": True}
-    )
+    role, _ = Role.objects.get_or_create(tenant=tenant, name="doer", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     from iig_checklist.services import create_execution
@@ -100,9 +96,7 @@ def _create_execution_submitted(tenant, tenant_definition, user, submitter):
     ex.submitted_by = submitter
     ex.save()
 
-    rc_response = ex.responses.filter(
-        question__answer_type="reviewer_conclusion"
-    ).first()
+    rc_response = ex.responses.filter(question__answer_type="reviewer_conclusion").first()
     return ex, rc_response
 
 
@@ -123,9 +117,7 @@ class TestReviewerConclusionFirstEntry:
         reviewer_membership,
         doer_membership,
     ):
-        ex, rc_response = _create_execution_submitted(
-            tenant_a, tenant_definition, user_a, user_a
-        )
+        ex, rc_response = _create_execution_submitted(tenant_a, tenant_definition, user_a, user_a)
 
         url = reverse(
             "iig_checklist:execution-reviewer-conclusion",
@@ -157,9 +149,7 @@ class TestReviewerConclusionFirstEntry:
         reviewer_membership,
         doer_membership,
     ):
-        ex, rc_response = _create_execution_submitted(
-            tenant_a, tenant_definition, user_a, user_a
-        )
+        ex, rc_response = _create_execution_submitted(tenant_a, tenant_definition, user_a, user_a)
         url = reverse(
             "iig_checklist:execution-reviewer-conclusion",
             kwargs={
@@ -183,9 +173,7 @@ class TestReviewerConclusionFirstEntry:
         reviewer_membership,
         doer_membership,
     ):
-        ex, rc_response = _create_execution_submitted(
-            tenant_a, tenant_definition, user_a, user_a
-        )
+        ex, rc_response = _create_execution_submitted(tenant_a, tenant_definition, user_a, user_a)
         url = reverse(
             "iig_checklist:execution-reviewer-conclusion",
             kwargs={
@@ -223,9 +211,7 @@ class TestReviewerConclusionAmendment:
     ):
         from iig_checklist.models import ChecklistResponseHistory
 
-        ex, rc_response = _create_execution_submitted(
-            tenant_a, tenant_definition, user_a, user_a
-        )
+        ex, rc_response = _create_execution_submitted(tenant_a, tenant_definition, user_a, user_a)
         url = reverse(
             "iig_checklist:execution-reviewer-conclusion",
             kwargs={
@@ -268,9 +254,7 @@ class TestReviewerConclusionAmendment:
         reviewer_membership,
         doer_membership,
     ):
-        ex, rc_response = _create_execution_submitted(
-            tenant_a, tenant_definition, user_a, user_a
-        )
+        ex, rc_response = _create_execution_submitted(tenant_a, tenant_definition, user_a, user_a)
         url = reverse(
             "iig_checklist:execution-reviewer-conclusion",
             kwargs={
@@ -318,9 +302,7 @@ class TestReviewerConclusionStaleVersion:
         reviewer_membership,
         doer_membership,
     ):
-        ex, rc_response = _create_execution_submitted(
-            tenant_a, tenant_definition, user_a, user_a
-        )
+        ex, rc_response = _create_execution_submitted(tenant_a, tenant_definition, user_a, user_a)
         url = reverse(
             "iig_checklist:execution-reviewer-conclusion",
             kwargs={
@@ -370,9 +352,7 @@ class TestReviewerConclusionWrongState:
             formulation_version_public_id=str(fv.public_id),
             actor=user_a,
         )
-        rc_response = ex.responses.filter(
-            question__answer_type="reviewer_conclusion"
-        ).first()
+        rc_response = ex.responses.filter(question__answer_type="reviewer_conclusion").first()
 
         url = reverse(
             "iig_checklist:execution-reviewer-conclusion",

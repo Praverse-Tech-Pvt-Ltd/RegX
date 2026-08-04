@@ -34,10 +34,7 @@ class _ProtectedDocumentQuerySet(models.QuerySet):
         )
 
         blocked = [
-            dv
-            for doc in self
-            for dv in doc.versions.all()
-            if DeletionProtectionRegistry.check(dv)
+            dv for doc in self for dv in doc.versions.all() if DeletionProtectionRegistry.check(dv)
         ]
         if blocked:
             raise DocumentVersionDeleteForbidden(

@@ -294,9 +294,9 @@ def _get_applicable_questions(checklist_version, formulation_version):
     checklist_version. 4D-2 scope: no dynamic applicability evaluation -- all
     questions in the version are considered applicable."""
     return list(
-        checklist_version.sections.prefetch_related("questions").values_list(
-            "questions", flat=True
-        ).exclude(questions=None)
+        checklist_version.sections.prefetch_related("questions")
+        .values_list("questions", flat=True)
+        .exclude(questions=None)
     )
 
 
@@ -321,12 +321,10 @@ def create_execution(
     Step ordering matches §16 of the approved specification exactly.
     Tenant guard runs before status guard (DR-2-34, DR-2-03).
     """
-    import json
 
     from django.db import transaction as db_transaction
 
     from .enums import AnswerType, CalculationStatus, DataSourceClassification, ExecutionStatus
-    from .execution_constants import MAX_RAW_VALUE_BYTES
     from .models import (
         CalculationOutcome,
         ChecklistExecution,
@@ -343,7 +341,7 @@ def create_execution(
     except ChecklistVersion.DoesNotExist:
         from rest_framework.exceptions import NotFound
 
-        raise NotFound()
+        raise NotFound() from None
     if checklist_version.status != "active":
         raise ChecklistVersionNotActive()
 
@@ -355,7 +353,7 @@ def create_execution(
     except FormulationVersion.DoesNotExist:
         from rest_framework.exceptions import NotFound
 
-        raise NotFound()
+        raise NotFound() from None
 
     if fv.product.tenant_id != getattr(tenant, "id", None):
         raise FormulationVersionTenantMismatch()
@@ -379,11 +377,16 @@ def create_execution(
     with db_transaction.atomic():
         locked_version = ChecklistVersion.objects.select_for_update().get(pk=checklist_version.pk)
 
-        existing = ChecklistExecution.objects.select_for_update().filter(
-            tenant=tenant,
-            checklist_version=locked_version,
-            formulation_version=fv,
-        ).exclude(status__in=["rejected", "cancelled", "superseded"]).first()
+        existing = (
+            ChecklistExecution.objects.select_for_update()
+            .filter(
+                tenant=tenant,
+                checklist_version=locked_version,
+                formulation_version=fv,
+            )
+            .exclude(status__in=["rejected", "cancelled", "superseded"])
+            .first()
+        )
         if existing:
             raise ExecutionAlreadyActive()
 
@@ -436,13 +439,11 @@ def create_execution(
 
 def transition_execution(*, execution, action, actor, tenant, **kwargs):
     """Generic execution lifecycle transition service (§17)."""
-    import json
 
     from django.db import transaction as db_transaction
     from django.utils import timezone
 
-    from .enums import ExecutionStatus
-    from .execution_transitions import IllegalExecutionTransition, validate_execution_transition
+    from .execution_transitions import validate_execution_transition
     from .models import ChecklistExecution
     from .permissions import (
         PERM_APPROVE_EXECUTION,
@@ -599,13 +600,11 @@ def enter_reviewer_conclusion(
     # Phase A -- non-mutating validation.
 
     try:
-        execution = ChecklistExecution.objects.visible_to(tenant).get(
-            public_id=execution_public_id
-        )
+        execution = ChecklistExecution.objects.visible_to(tenant).get(public_id=execution_public_id)
     except ChecklistExecution.DoesNotExist:
         from rest_framework.exceptions import NotFound
 
-        raise NotFound()
+        raise NotFound() from None
 
     if execution.status != ExecutionStatus.SUBMITTED_FOR_REVIEW:
         raise ReviewerConclusionInvalidState()
@@ -621,7 +620,7 @@ def enter_reviewer_conclusion(
     except ChecklistResponse.DoesNotExist:
         from rest_framework.exceptions import NotFound
 
-        raise NotFound()
+        raise NotFound() from None
 
     if response.question.answer_type != AnswerType.REVIEWER_CONCLUSION:
         raise ReviewerConclusionWrongAnswerType()

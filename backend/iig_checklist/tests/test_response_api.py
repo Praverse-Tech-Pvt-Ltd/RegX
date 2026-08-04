@@ -3,7 +3,6 @@
 import pytest
 from django.urls import reverse
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -61,33 +60,29 @@ def _make_question(cv, user, answer_type="yes_no", code="Q-1", required=False, *
             "criticality": "low",
         },
     )
-    fields = dict(
-        section=section,
-        code=code,
-        question_text="Question text",
-        display_order=ChecklistQuestion.objects.filter(section=section).count() + 1,
-        answer_type=answer_type,
-        data_source_classification=extra.pop("data_source_classification", "user_required"),
-        criticality="low",
-        required=required,
-    )
+    fields = {
+        "section": section,
+        "code": code,
+        "question_text": "Question text",
+        "display_order": ChecklistQuestion.objects.filter(section=section).count() + 1,
+        "answer_type": answer_type,
+        "data_source_classification": extra.pop("data_source_classification", "user_required"),
+        "criticality": "low",
+        "required": required,
+    }
     fields.update(extra)
     return ChecklistQuestion.objects.create(**fields)
 
 
 def _make_execution_with_responses(tenant, cv, fv, user):
     """Create execution; responses are created by create_execution service."""
-    from iig_checklist.services import create_execution
-    from iig_checklist.permissions import PERM_CREATE_EXECUTION
-
     # Grant permission inline by inserting a membership.
     from authorization.models import MembershipRole, Role
+    from iig_checklist.services import create_execution
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
-    role, _ = Role.objects.get_or_create(
-        tenant=tenant, name="doer", defaults={"is_system": True}
-    )
+    role, _ = Role.objects.get_or_create(tenant=tenant, name="doer", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     return create_execution(
@@ -158,9 +153,7 @@ def _make_other_user(email):
     from django.contrib.auth import get_user_model
 
     User = get_user_model()
-    return User.objects.create_user(
-        email=email, password="TestPass1234!", full_name="Other User"
-    )
+    return User.objects.create_user(email=email, password="TestPass1234!", full_name="Other User")
 
 
 # ---------------------------------------------------------------------------
@@ -187,9 +180,7 @@ class TestResponseUpdate:
             "iig_checklist:execution-response-update",
             kwargs={"public_id": ex.public_id, "response_public_id": response.public_id},
         )
-        resp = api_client_doer.patch(
-            url, {"raw_value": {"value": True}}, format="json"
-        )
+        resp = api_client_doer.patch(url, {"raw_value": {"value": True}}, format="json")
         assert resp.status_code == 200
 
     def test_patch_version_rejected(
@@ -251,7 +242,5 @@ class TestResponseUpdate:
             "iig_checklist:execution-response-update",
             kwargs={"public_id": ex.public_id, "response_public_id": response.public_id},
         )
-        resp = api_client_doer.patch(
-            url, {"raw_value": {"value": False}}, format="json"
-        )
+        resp = api_client_doer.patch(url, {"raw_value": {"value": False}}, format="json")
         assert resp.status_code in (400, 422, 409)

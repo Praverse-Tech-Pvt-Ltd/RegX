@@ -1024,7 +1024,11 @@ class ChecklistExecutionListCreateView(APIView):
             return Response(
                 {
                     "error_code": "execution_invalid_quantity_unit_config",
-                    "detail": f"Question {exc} has answer_type quantity_with_unit but allowed_units is empty. Contact the checklist administrator to correct the definition version before creating an execution.",
+                    "detail": (
+                        f"Question {exc} has answer_type quantity_with_unit but allowed_units is"
+                        " empty. Contact the checklist administrator to correct the definition"
+                        " version before creating an execution."
+                    ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1185,13 +1189,15 @@ class ChecklistResponseUpdateView(APIView):
                 execution=execution,
             )
         except ChecklistResponse.DoesNotExist:
-            raise NotFound()
+            raise NotFound() from None
 
         if response.question.answer_type == AnswerType.REVIEWER_CONCLUSION:
             return Response(
                 {
                     "error_code": "reviewer_conclusion_wrong_answer_type",
-                    "detail": "Use the /reviewer-conclusion/ endpoint for reviewer_conclusion questions.",
+                    "detail": (
+                        "Use the /reviewer-conclusion/ endpoint for reviewer_conclusion questions."
+                    ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -1216,7 +1222,9 @@ class ChecklistResponseUpdateView(APIView):
             response.full_clean()
             response.save()
         except DjangoValidationError as exc:
-            raise ValidationError({"error_code": "invalid_raw_value_shape", "detail": str(exc)})
+            raise ValidationError(
+                {"error_code": "invalid_raw_value_shape", "detail": str(exc)}
+            ) from exc
 
         event_type = (
             IigChecklistEvent.RESPONSE_UPDATED
@@ -1274,7 +1282,7 @@ class ChecklistReviewerConclusionView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
         except ReviewerConclusionPermissionDenied:
-            raise PermissionDenied()
+            raise PermissionDenied() from None
         except ReviewerConclusionWrongAnswerType:
             return Response(
                 {
@@ -1319,7 +1327,10 @@ class ChecklistReviewerConclusionView(APIView):
             return Response(
                 {
                     "error_code": "reviewer_conclusion_correction_reason_required",
-                    "detail": "correction_reason is required when amending an existing reviewer conclusion.",
+                    "detail": (
+                        "correction_reason is required when amending"
+                        " an existing reviewer conclusion."
+                    ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

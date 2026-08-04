@@ -10,8 +10,9 @@ New Milestone 4D-2 infrastructure -- not present in earlier milestones.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from documents.models import DocumentVersion
@@ -41,7 +42,7 @@ class DeletionProtectionRegistry:
         cls._checkers.pop(key, None)
 
     @classmethod
-    def check(cls, document_version: "DocumentVersion") -> list[str]:
+    def check(cls, document_version: DocumentVersion) -> list[str]:
         """Returns a list of blocking reason keys (empty if unblocked).
 
         Iterates checkers in sorted-key order for deterministic behaviour.

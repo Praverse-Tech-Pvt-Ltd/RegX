@@ -2,22 +2,22 @@ import json
 import os
 from decimal import Decimal
 
-RUN_TAG = os.urandom(4).hex()
-
 from django.contrib.auth import get_user_model
 from django.test import Client
 
 from authorization.models import MembershipRole, Role
-from tenancy.models import Tenant, TenantMembership
 from formulations.models import FormulationVersion, ProductDevelopmentRecord
 from iig_checklist.models import (
     ChecklistDefinition,
-    ChecklistExecution as CLE,
+    ChecklistExecution,
     ChecklistQuestion,
     ChecklistResponseHistory,
     ChecklistSection,
     ChecklistVersion,
 )
+from tenancy.models import Tenant, TenantMembership
+
+RUN_TAG = os.urandom(4).hex()
 
 User = get_user_model()
 BASE = "/api/regx/v1"
@@ -112,7 +112,7 @@ resp = doer_client.post(
     ),
     **H,
 )
-assert resp.status_code == 201, "STEP 3 FAIL: %s %s" % (resp.status_code, resp.content)
+assert resp.status_code == 201, f"STEP 3 FAIL: {resp.status_code} {resp.content}"
 ex = resp.json()
 assert ex["status"] == "draft"
 assert "id" not in ex and "pk" not in ex
@@ -129,50 +129,38 @@ resp2 = doer_client.post(
     ),
     **H,
 )
-assert resp2.status_code == 409, "STEP 4 FAIL: %s" % resp2.status_code
+assert resp2.status_code == 409, f"STEP 4 FAIL: {resp2.status_code}"
 print("STEP 4 duplicate active execution rejected with 409: OK")
 
-resp = doer_client.post(
-    BASE + "/iig-checklists/executions/%s/submit-review/" % epub, **H
-)
+resp = doer_client.post(f"{BASE}/iig-checklists/executions/{epub}/submit-review/", **H)
 assert resp.status_code == 200 and resp.json()["status"] == "submitted_for_review", (
-    "STEP 5 FAIL: %s %s" % (resp.status_code, resp.content)
+    f"STEP 5 FAIL: {resp.status_code} {resp.content}"
 )
 print("STEP 5 execution submitted for review: OK")
 
-resp_list = reviewer_client.get(
-    BASE + "/iig-checklists/executions/%s/responses/" % epub, **H
-)
-assert resp_list.status_code == 200, "STEP 5b FAIL status: %s" % resp_list.status_code
+resp_list = reviewer_client.get(f"{BASE}/iig-checklists/executions/{epub}/responses/", **H)
+assert resp_list.status_code == 200, f"STEP 5b FAIL status: {resp_list.status_code}"
 rl = resp_list.json()
-assert "results" in rl and "count" in rl, (
-    "STEP 5b FAIL: not paginated, keys=%s" % list(rl.keys())
-)
+assert "results" in rl and "count" in rl, f"STEP 5b FAIL: not paginated, keys={list(rl.keys())}"
 print("STEP 5b response list paginated (count + results): OK")
 
-from iig_checklist.models import ChecklistQuestion
 rc_question = ChecklistQuestion.objects.get(section=section, answer_type="reviewer_conclusion")
 rc_question_pub = str(rc_question.public_id)
-rc_resp = next(
-    r for r in rl["results"]
-    if str(r.get("question_public_id")) == rc_question_pub
-)
+rc_resp = next(r for r in rl["results"] if str(r.get("question_public_id")) == rc_question_pub)
 rc_pid = rc_resp["public_id"]
 rc_ver = rc_resp["version"]
 
 resp_rc = reviewer_client.post(
-    BASE + "/iig-checklists/executions/%s/responses/%s/reviewer-conclusion/" % (epub, rc_pid),
-    data=json.dumps(
-        {"raw_value": {"value": "Initial CI conclusion."}, "expected_version": rc_ver}
-    ),
+    f"{BASE}/iig-checklists/executions/{epub}/responses/{rc_pid}/reviewer-conclusion/",
+    data=json.dumps({"raw_value": {"value": "Initial CI conclusion."}, "expected_version": rc_ver}),
     **H,
 )
-assert resp_rc.status_code == 200, "STEP 5c FAIL: %s %s" % (resp_rc.status_code, resp_rc.content)
+assert resp_rc.status_code == 200, f"STEP 5c FAIL: {resp_rc.status_code} {resp_rc.content}"
 rc_ver = resp_rc.json()["version"]
 print("STEP 5c reviewer conclusion first entry: OK")
 
 resp_rc2 = reviewer_client.post(
-    BASE + "/iig-checklists/executions/%s/responses/%s/reviewer-conclusion/" % (epub, rc_pid),
+    f"{BASE}/iig-checklists/executions/{epub}/responses/{rc_pid}/reviewer-conclusion/",
     data=json.dumps(
         {
             "raw_value": {"value": "Amended."},
@@ -182,68 +170,76 @@ resp_rc2 = reviewer_client.post(
     ),
     **H,
 )
-assert resp_rc2.status_code == 200, "STEP 5d FAIL: %s %s" % (resp_rc2.status_code, resp_rc2.content)
-actual_ex = CLE.objects.get(public_id=epub)
+assert resp_rc2.status_code == 200, f"STEP 5d FAIL: {resp_rc2.status_code} {resp_rc2.content}"
+actual_ex = ChecklistExecution.objects.get(public_id=epub)
 rc_response_obj = actual_ex.responses.get(public_id=rc_pid)
 hist = ChecklistResponseHistory.objects.filter(response=rc_response_obj).count()
-assert hist == 1, "STEP 5d FAIL: expected 1 history row, got %d" % hist
+assert hist == 1, f"STEP 5d FAIL: expected 1 history row, got {hist}"
 rc_ver = resp_rc2.json()["version"]
 print("STEP 5d reviewer conclusion amendment + 1 history row: OK")
 
 resp_stale = reviewer_client.post(
-    BASE + "/iig-checklists/executions/%s/responses/%s/reviewer-conclusion/" % (epub, rc_pid),
+    f"{BASE}/iig-checklists/executions/{epub}/responses/{rc_pid}/reviewer-conclusion/",
     data=json.dumps(
-        {"raw_value": {"value": "Stale."}, "expected_version": rc_ver + 99, "correction_reason": "x"}
+        {
+            "raw_value": {"value": "Stale."},
+            "expected_version": rc_ver + 99,
+            "correction_reason": "x",
+        }
     ),
     **H,
 )
 assert resp_stale.status_code in (400, 409, 422), (
-    "STEP 5e FAIL: stale got %s" % resp_stale.status_code
+    f"STEP 5e FAIL: stale got {resp_stale.status_code}"
 )
 hist_after = ChecklistResponseHistory.objects.filter(response=rc_response_obj).count()
-assert hist_after == 1, "STEP 5e FAIL: stale created history, now %d" % hist_after
+assert hist_after == 1, f"STEP 5e FAIL: stale created history, now {hist_after}"
 print("STEP 5e stale version no history created: OK")
 
 resp = reviewer_client.post(
-    BASE + "/iig-checklists/executions/%s/return/" % epub,
+    f"{BASE}/iig-checklists/executions/{epub}/return/",
     data=json.dumps({"return_reason": "Review needed."}),
     **H,
 )
 assert resp.status_code == 200 and resp.json()["status"] == "returned", (
-    "STEP 6 FAIL: %s %s" % (resp.status_code, resp.content)
+    f"STEP 6 FAIL: {resp.status_code} {resp.content}"
 )
 print("STEP 6 execution returned with reason: OK")
 
-doer_client.post(BASE + "/iig-checklists/executions/%s/submit-review/" % epub, **H)
+doer_client.post(f"{BASE}/iig-checklists/executions/{epub}/submit-review/", **H)
 resp = vp_client.post(
-    BASE + "/iig-checklists/executions/%s/approve/" % epub,
+    f"{BASE}/iig-checklists/executions/{epub}/approve/",
     data=json.dumps({"reviewer_conclusion_note": "CI v2 approved."}),
     **H,
 )
 assert resp.status_code == 200 and resp.json()["status"] == "approved", (
-    "STEP 7 FAIL: %s %s" % (resp.status_code, resp.content)
+    f"STEP 7 FAIL: {resp.status_code} {resp.content}"
 )
 print("STEP 7 execution approved by VP: OK")
 
 resp_imm = reviewer_client.post(
-    BASE + "/iig-checklists/executions/%s/responses/%s/reviewer-conclusion/" % (epub, rc_pid),
+    f"{BASE}/iig-checklists/executions/{epub}/responses/{rc_pid}/reviewer-conclusion/",
     data=json.dumps(
-        {"raw_value": {"value": "Post-approval."}, "expected_version": rc_ver, "correction_reason": "x"}
+        {
+            "raw_value": {"value": "Post-approval."},
+            "expected_version": rc_ver,
+            "correction_reason": "x",
+        }
     ),
     **H,
 )
 assert resp_imm.status_code in (400, 409, 422), (
-    "STEP 7b FAIL: approved state not immutable, got %s %s" % (resp_imm.status_code, resp_imm.content)
+    f"STEP 7b FAIL: approved state not immutable, got {resp_imm.status_code} {resp_imm.content}"
 )
 print("STEP 7b terminal (approved) reviewer_conclusion immutable: OK")
 
 resp_patch = reviewer_client.patch(
-    BASE + "/iig-checklists/executions/%s/responses/%s/" % (epub, rc_pid),
+    f"{BASE}/iig-checklists/executions/{epub}/responses/{rc_pid}/",
     data=json.dumps({"raw_value": {"value": "Patch attempt."}}),
     **H,
 )
 assert resp_patch.status_code in (400, 403), (
-    "STEP 7c FAIL: generic PATCH got %s" % resp_patch.status_code
+    f"STEP 7c FAIL: generic PATCH got {resp_patch.status_code}"
 )
 print("STEP 7c generic PATCH cannot edit reviewer_conclusion: OK")
 
@@ -262,11 +258,11 @@ MembershipRole.objects.get_or_create(membership=other_membership, role=other_rol
 other_client = Client(SERVER_NAME="localhost")
 other_client.force_login(other_user)
 resp_cross = other_client.get(
-    BASE + "/iig-checklists/executions/%s/" % epub,
+    f"{BASE}/iig-checklists/executions/{epub}/",
     HTTP_X_TENANT_SLUG="docker-ci-4d2-other",
 )
 assert resp_cross.status_code == 404, (
-    "STEP 8 FAIL: cross-tenant got %s (expected 404)" % resp_cross.status_code
+    f"STEP 8 FAIL: cross-tenant got {resp_cross.status_code} (expected 404)"
 )
 print("STEP 8 cross-tenant execution detail returns 404: OK")
 
@@ -300,15 +296,15 @@ resp_new = doer_client.post(
 )
 assert resp_new.status_code == 201
 epub2 = resp_new.json()["public_id"]
-doer_client.post(BASE + "/iig-checklists/executions/%s/submit-review/" % epub2, **H)
+doer_client.post(f"{BASE}/iig-checklists/executions/{epub2}/submit-review/", **H)
 
 resp_403 = reviewer_client.post(
-    BASE + "/iig-checklists/executions/%s/approve/" % epub2,
+    f"{BASE}/iig-checklists/executions/{epub2}/approve/",
     data=json.dumps({"reviewer_conclusion_note": "x"}),
     **H,
 )
 assert resp_403.status_code == 403, (
-    "STEP 8b FAIL: reviewer got %s (expected 403)" % resp_403.status_code
+    f"STEP 8b FAIL: reviewer got {resp_403.status_code} (expected 403)"
 )
 print("STEP 8b in-tenant reviewer (no approve perm) gets 403: OK")
 
