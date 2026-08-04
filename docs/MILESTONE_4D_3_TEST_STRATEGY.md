@@ -872,9 +872,20 @@ entry restates the selection logic.
 | No snapshot for the execution | `ASSESSMENT_SNAPSHOT_MISSING` → `data_required` |
 | Snapshot with a different `tenant` | `INPUT_TENANT_MISMATCH` → `error`; no field value leaks |
 | Snapshot present but field null/blank | `ASSESSMENT_FIELD_MISSING` → `data_required` |
-| Snapshot whose source release is not active | Engine canonical `REGULATORY_REVIEW_REQUIRED` |
-| Client-supplied snapshot UUID in the request | Rejected; resolver uses only the execution's own snapshot |
+| Client-supplied snapshot UUID in the request | Rejected; resolver uses only the transaction-scoped object |
 | Live IID row changed after snapshot creation | Resolved value still comes from the snapshot |
+
+`AssessmentSnapshot` has **no** stale or review-required status field, so no test shall
+assert one. The former "stale/review-required snapshot" case is replaced by these
+real-field conditions:
+
+| Case | Field actually checked | Expected |
+|---|---|---|
+| Snapshot `iid_release_public_id` ≠ selected active release | `iid_release_public_id` | `ASSESSMENT_SNAPSHOT_RELEASE_MISMATCH` → `error` / `SNAPSHOT_RESOLUTION_FAILED` |
+| Snapshot `formulation_component_public_id` ≠ resolved subject component | `formulation_component_public_id` | `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` → `error` / `SNAPSHOT_RESOLUTION_FAILED` |
+| Snapshot `tenant` ≠ `execution.tenant` | `tenant` | `ASSESSMENT_SNAPSHOT_TENANT_MISMATCH` → `error` / `TENANT_ISOLATION_VIOLATION` |
+| Required IID field null | `iid_potency_amount` / `iid_mde` | `ASSESSMENT_FIELD_MISSING` → `data_required` |
+| Required unit field blank | `iid_potency_unit` / `iid_mde_unit` | `INPUT_UNIT_MISSING` → `data_required` |
 
 **Form E — prior calculation outcome (TST-366)**
 
@@ -922,6 +933,70 @@ payload can introduce or override one.
 read occurs after the snapshot step; a forced rollback discards both snapshot and
 outcomes; snapshot-dependent calculations run after their Form E upstream.
 
+### 10.16 Subject component selection (MAJ-B)
+
+**Test file:** `backend/iig_checklist/tests/test_component_selection.py`
+
+| Test ID | Case | Expected |
+|---|---|---|
+| TST-415 | Valid component reference in the same execution and formulation | Resolved; provenance carries the component public UUID |
+| TST-417a | Referenced component belongs to another `FormulationVersion` | `FORMULATION_COMPONENT_WRONG_FORMULATION` → `error` / `FORMULATION_COMPONENT_RESOLUTION_FAILED` |
+| TST-417b | Referenced component belongs to another tenant | `FORMULATION_COMPONENT_TENANT_MISMATCH` → `error` / `TENANT_ISOLATION_VIOLATION` |
+| TST-417c | `component_type = "active"` where `inactive` required | `FORMULATION_COMPONENT_TYPE_MISMATCH` → `error` / `FORMULATION_COMPONENT_RESOLUTION_FAILED` |
+| TST-419a | Component-reference response missing | `FORMULATION_COMPONENT_MISSING` → `data_required` |
+| TST-419b | Component-reference `raw_value` null | `FORMULATION_COMPONENT_MISSING` → `data_required` |
+| TST-415b | Malformed or non-UUID `public_id` | `FORMULATION_COMPONENT_REFERENCE_INVALID` → `error` |
+| TST-420a | Registry component code matching two components | `FORMULATION_COMPONENT_AMBIGUOUS` → `error`; no component chosen |
+| TST-420b | Duplicate component code within one formulation | Rejected at activation |
+| TST-427 | One execution, two calculated questions bound to two different inactive components | Two distinct outcomes, each with its own component provenance |
+| TST-430 | Formulation with five inactive components | No question is created or expanded automatically |
+| TST-418 | Formulation with several inactive components and no selector | Fails closed; never selects the first row, lowest pk, or `display_order` head |
+| TST-421 | Provenance | Contains the correct component public UUID, `component_type`, selector type and selector-source response UUID |
+| TST-423a | Failed component resolution | Calculation function is never invoked |
+| TST-423b | Failed component resolution | No partial `CalculationOutcome` and no success audit |
+
+### 10.17 Snapshot determinism (MAJ-C)
+
+| Test ID | Case | Expected |
+|---|---|---|
+| TST-440 | Two successive governed recalculations | Two distinct `AssessmentSnapshot` rows; neither reuses the other |
+| TST-441 | Resolver invocation | Reads the in-memory object; no `AssessmentSnapshot` query is issued during resolution |
+| TST-442 | Query audit | No broad lookup by tenant/component/release after creation; no `.first()` on that model |
+| TST-443 | Ordering | The nine steps of M4D3-SNO-009 occur in order |
+| TST-444 | Consistency checks | Tenant, component and release each verified before use |
+| TST-445 | Client payload carrying a snapshot UUID | Rejected |
+| TST-446a | Downstream calculation raises | Snapshot and all outcomes roll back together |
+| TST-446b | Transaction | The `iid_assessment` helper joins the outer transaction and does not commit independently |
+| TST-439 | Pre-existing duplicate snapshots in the database | Resolution is unaffected, because no lookup occurs |
+
+### 10.18 Failure-mapping matrix (MAJ-D)
+
+A single parameterized test shall cover **every** entry of the M4D3-IFV-003 table.
+
+**Test file:** `backend/iig_checklist/tests/test_resolver_failure_mapping.py`
+**Test name:** `test_resolver_detail_code_maps_deterministically`
+
+For each of the 28 mapped detail codes, assert: the stored `status` equals the table's
+value; the stored `reason_code` equals the table's value; `value` is null for every
+non-complete outcome; the exact detail code appears in server-side provenance; no raw
+exception text or stack frame is stored anywhere; `full_clean()` passes; the status is
+never `complete`; and no client input can substitute any of these values.
+
+Required negative controls:
+
+| Test ID | Assertion |
+|---|---|
+| TST-450a | `INPUT_TENANT_MISMATCH` never yields `NOT_COMPARABLE` — it yields `TENANT_ISOLATION_VIOLATION` |
+| TST-450b | `FORMULATION_COMPONENT_TENANT_MISMATCH` and `ASSESSMENT_SNAPSHOT_TENANT_MISMATCH` likewise |
+| TST-449a | `UPSTREAM_CALCULATION_DUPLICATE` never yields `DATA_REQUIRED` — it yields `DUPLICATE_UPSTREAM_OUTCOME` |
+| TST-449b | `ASSESSMENT_SNAPSHOT_DUPLICATE` yields `SNAPSHOT_RESOLUTION_FAILED`, distinct from `ASSESSMENT_SNAPSHOT_MISSING` → `DATA_REQUIRED` |
+| TST-447 | `INPUT_VALUE_INVALID` (malformed) and `INPUT_VALUE_NOT_COMPARABLE` (scientific) map to different canonical codes |
+| TST-448 | An undefined internal condition yields `UNKNOWN_INTERNAL_FAILURE` → `INPUT_RESOLUTION_FAILED`, never `complete` |
+| TST-450c | `INPUT_RESOLVER_UNKNOWN` yields `INPUT_RESOLUTION_FAILED`, not `UNKNOWN_REGISTRY_IDENTIFIER` |
+
+The test shall be data-driven from the specification table so that adding a detail code
+without a mapping fails the suite.
+
 ---
 
 ## 11. Acceptance Matrix Reconciliation
@@ -932,20 +1007,20 @@ acceptance matrix.
 
 | Metric | Value |
 |---|---|
-| Normative requirement IDs defined | 311 |
-| Acceptance matrix IDs | 311 |
+| Normative requirement IDs defined | 350 |
+| Acceptance matrix IDs | 350 |
 | Missing (defined but absent from matrix) | 0 |
 | Duplicate requirement definitions | 0 |
 | Duplicate matrix rows | 0 |
 | Orphan matrix IDs (in matrix but undefined) | 0 |
 | Matrix rows missing a required cell | 0 |
 
-Per-block counts: API 5, APP 13, AUD 7, CMP 6, DAG 10, DEP 6, FE 9, HST 9, IFV 6,
-INP 14, MAP 8, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13, RCL 5, REG 19,
-REV 5, RFV 7, RSN 8, RTE 6, SEC 5, SER 9, SNO 4, SNP 7, SRC 14, SUB 7, SVC 8, TRL 6,
-TXN 6, UNC 11, VER 8.
+Per-block counts: API 5, APP 13, AUD 7, CAR 8, CMP 6, DAG 10, DEP 11, FCR 11, FE 9,
+HST 9, IFV 7, INP 15, MAP 10, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13,
+RCL 5, REG 19, REV 5, RFV 7, RSN 10, RTE 6, SEC 5, SER 9, SNO 12, SNP 7, SRC 14, SUB 7,
+SVC 8, TRL 6, TXN 6, UNC 11, VER 8.
 
-Sixteen rows are classified **Review assertion** in the specification's Part 21 preamble:
+Seventeen rows are classified **Review assertion** in the specification's Part 21 preamble:
 they record verified source facts and map to source-inspection evidence rather than an
 executable test. All remaining rows are normative controls requiring implementation.
 

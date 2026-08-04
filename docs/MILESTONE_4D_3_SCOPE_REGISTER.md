@@ -42,6 +42,10 @@ additional in-scope items identified during adversarial review are documented he
 | S-25 | Idempotency — unchanged inputs produce no duplicate history, no version increment, no misleading audit events | 4D-3 discovery §4a |
 | S-26 | Non-overwrite rules — USER_REQUIRED, REVIEWER_CONCLUSION, and APPROVAL_METADATA never overwritten by population pass | 4D-3 discovery §4a |
 | S-27 | T-10 threat coverage — status translation failure unit tests; blocked status never maps to `"complete"` | 4D-3 threat model T-10 |
+| S-28 | Deterministic per-response formulation-component binding via a governed registry selector | 4D-3 spec Part 3A.2.2 |
+| S-29 | Governed `AssessmentSnapshot` creation, one new immutable snapshot per calculation event | 4D-3 spec Part 3A.6 |
+| S-30 | Transaction-scoped snapshot context carried in memory; no broad re-query | 4D-3 spec M4D3-SNO-007/008 |
+| S-31 | Deterministic one-to-one resolver failure mapping to stored status and canonical reason code | 4D-3 spec M4D3-IFV-003 |
 
 ---
 
@@ -69,6 +73,12 @@ additional in-scope items identified during adversarial review are documented he
 | X-18 | Staleness-avoidance logic for existing `AssessmentSnapshot` records | Eliminated by OQ-4 live-first design |
 | X-19 | New model for `REVIEW_REQUIRED` state persisted representation | Deferred to implementation spec; must use existing fields where possible |
 | X-20 | Generic `PATCH`/`PUT` endpoint for `CalculationOutcome` | Never — write path is server-controlled only |
+| X-21 | Automatic creation or expansion of checklist questions for every formulation component | Never in 4D-3 — dynamic question generation is out of scope |
+| X-22 | New execution-to-component join model or field | Never in 4D-3 — binding is per response via the registry selector |
+| X-23 | Per-component child execution model | Never in 4D-3 |
+| X-24 | Aggregate multi-component calculation in a single response | Never |
+| X-25 | `AssessmentSnapshot` uniqueness migration | Not in 4D-3 — determinism achieved by transaction-scoped creation |
+| X-26 | Generic snapshot deduplication framework | Not in 4D-3 |
 
 ---
 
