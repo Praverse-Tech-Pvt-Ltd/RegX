@@ -100,6 +100,16 @@ Prior head `448b3f7` was reviewed **FAIL** (0 Critical, 1 Major, 2 Minor).
 | Minor 1 stale "28 mapped detail codes" and no named test for the 29th | Count corrected to 29 and TST-450d added for `UPSTREAM_CALCULATION_COMPONENT_MISMATCH` | Test strategy §10.18 |
 | Minor 2 `identifier` required but absent from the field table | Mapping key declared the sole identifier representation, with an import-time check rejecting a nested `identifier` key | M4D3-REG-005, M4D3-REG-020 |
 
+## Seventh revision note — findings resolved after the latest final review
+
+Prior head `07aa727` was reviewed **FAIL** (0 Critical, 1 Major, 1 Minor).
+
+| Finding | Resolution | Part |
+|---|---|---|
+| MAJ-H case 1: rebinding while the selector is N/A was undefined | Rebinding **prohibited** unless the selector is applicable, holds an existing component reference and carries no review-required marker; rejection code, HTTP mapping, check ordering and no-mutation guarantees defined; `null` → component classified as an initial entry, never a rebinding | M4D3-RBD-011…018 |
+| MAJ-H case 2: the selector's own applicability change during rebinding was undefined | Selector applicability **frozen** for the transaction; exactly one `COMPONENT_REBOUND` row; never both codes; other responses still receive their own `APPLICABILITY_REEVALUATED` rows | M4D3-RBD-019…024, M4D3-HST-017 |
+| Minor: `M4D3-IFV-001` said "twenty-six codes" while listing 29 | Textual cardinality removed; the enumeration is authoritative and the mechanically verified size is recorded once in the test strategy | M4D3-IFV-001 |
+
 ---
 
 ## Part 1 — Scope
@@ -531,7 +541,44 @@ status is `draft` or `returned`; the response's `question.answer_type` is
 `FORMULATION_COMPONENT_REFERENCE`; the new reference passes
 `_validate_formulation_component_reference()`; and the new component satisfies
 M4D3-FCR-005 (same `FormulationVersion`, same tenant, matching
-`required_component_type`).
+`required_component_type`). The selector-state preconditions of M4D3-RBD-011 apply in
+addition.
+
+**M4D3-RBD-011** Component rebinding is **prohibited** unless all of the following hold
+on the selector response at transaction start:
+
+- `is_not_applicable` is `False`;
+- `raw_value` contains a valid existing `FORMULATION_COMPONENT_REFERENCE` payload — that
+  is, a non-null `{"public_id": "<uuid>"}` resolving to a governed component;
+- `not_applicable_reason` carries no `REVIEW_REQUIRED:` marker;
+- the derived `applicability_outcome` is `applicable`.
+
+Rationale, grounded in verified model behavior: `ChecklistResponse.clean()` rule 2 forces
+`raw_value = null` whenever `is_not_applicable` is true, so an N/A selector holds no
+component reference to rebind. `COMPONENT_REBOUND` semantically asserts a move from one
+existing component to another, and M4D3-HST-015 requires a truthful `prior_raw_value`.
+Permitting rebinding directly from N/A would conflate an applicability transition with a
+component rebinding and would require fabricating a prior component payload.
+
+**M4D3-RBD-012** A precondition failure under M4D3-RBD-011 shall be rejected with the
+service-detail code `COMPONENT_REBINDING_NOT_ALLOWED_WHILE_NOT_APPLICABLE`, surfaced as a
+structured validation failure with HTTP 400 and
+`error_code = "component_rebinding_not_allowed"`, consistent with the existing
+invalid-response-state convention (`response_immutable`,
+`invalid_raw_value_shape`). It shall never map to the scientific code `NOT_COMPARABLE`.
+
+**M4D3-RBD-013** The check occurs **before any mutation**, in this exact order:
+tenant-safe lookup; permission check; execution-state check; lock the
+`ChecklistExecution`; lock the selector `ChecklistResponse`; validate `expected_version`
+against the locked row; verify the M4D3-RBD-011 selector preconditions; validate the new
+component reference; then proceed with the rebinding transaction of M4D3-RBD-004. Locks
+are acquired before the precondition check so the state examined is the committed state,
+consistent with the Part 17 lock order.
+
+**M4D3-RBD-014** A rejection under M4D3-RBD-012 shall leave the response version
+unchanged and produce no history row, no `AssessmentSnapshot`, no recalculation, no
+`CalculationOutcome` mutation and no success audit. Because rebinding never begins, no
+error `CalculationOutcome` is created either.
 
 **M4D3-RBD-003** Rebinding shall be prohibited once the execution leaves `draft` or
 `returned`, rejected with `error_code = "response_immutable"` and HTTP 400.
@@ -573,6 +620,66 @@ row, no new `AssessmentSnapshot` and no audit event.
 **M4D3-RBD-010** A history `full_clean()` or persistence failure is a structural failure
 under M4D3-RBD-008 and shall roll the rebinding back entirely, consistent with
 M4D3-HST-011.
+
+**M4D3-RBD-015** Three selector-update shapes are distinguished normatively and shall
+never be conflated:
+
+| Shape | Prior `raw_value` | New `raw_value` | Classification |
+|---|---|---|---|
+| Initial component-reference entry | `null` | valid component payload | **Not** a rebinding |
+| Component rebinding | valid component **A** | valid, different component **B** | Rebinding |
+| Unchanged reference | component A | the same component A | No-op |
+
+**M4D3-RBD-016** An **initial component-reference entry** (`null` → component) follows the
+ordinary governed response-update path: the value is written, the version increments
+once, and calculation population proceeds under M4D3-RCL-001 because the selector appears
+in `recalculation_triggers`. It shall **not** be recorded as `COMPONENT_REBOUND`, and no
+prior component payload shall be fabricated. Within 4D-3 scope, first entry of a value
+creates no `ChecklistResponseHistory` row, consistent with M4D3-HST-002 and the model
+docstring's "never on first entry"; history is reserved for the governed persisted-state
+transitions of M4D3-HST-001.
+
+**M4D3-RBD-017** An **unchanged reference** (identical `public_id`) shall produce no
+version increment, no history row, no `AssessmentSnapshot`, no recalculation and no audit
+event, as already required by M4D3-RBD-007.
+
+**M4D3-RBD-018** A selector currently marked N/A shall return to service only through the
+governed applicability service: that service transitions the response from
+`NOT_APPLICABLE` to `APPLICABLE`, writing an `APPLICABILITY_REEVALUATED` history row per
+M4D3-HST-014, after which `raw_value` remains `null` under M4D3-NA-004. A later governed
+response update may then set the component reference — an initial entry under
+M4D3-RBD-016, never a rebinding.
+
+### 3A.2.5 Selector applicability during rebinding
+
+**M4D3-RBD-019** The selector response's **own** applicability state shall be **frozen**
+for the duration of a component-rebinding transaction. The rebinding path shall not
+re-evaluate applicability for the selector response itself.
+
+**M4D3-RBD-020** Throughout and after a successful rebinding the selector response shall
+retain `is_not_applicable = False` and an unchanged `not_applicable_reason`; its history
+row records those unchanged prior and new values (M4D3-HST-015).
+
+**M4D3-RBD-021** The selector response shall receive **exactly one** history row per
+rebinding transaction, carrying `COMPONENT_REBOUND`. It shall never receive both
+`COMPONENT_REBOUND` and `APPLICABILITY_REEVALUATED` in the same transaction, and never an
+`APPLICABILITY_REEVALUATED` row for a rebinding.
+
+**M4D3-RBD-022** Applicability re-evaluation triggered by the new component context may
+still apply to **other** responses in the execution; each such response whose persisted
+applicability state changes receives its own `APPLICABILITY_REEVALUATED` row under
+M4D3-HST-016, sharing the transaction and the authenticated actor, and all rows roll back
+together on failure.
+
+**M4D3-RBD-023** After a successful rebinding the selector remains `applicable` with the
+new component reference as its current `raw_value`, and its own applicability is not
+recomputed as part of that operation.
+
+**M4D3-RBD-024** 4D-3 boundary: should the selector question itself need to become
+`NOT_APPLICABLE` as a consequence of the newly selected component, that shall occur only
+through a **separate** governed applicability operation, which would null the selector's
+`raw_value` under M4D3-NA-001 and write `APPLICABILITY_REEVALUATED` history. It is never
+combined with `COMPONENT_REBOUND` within 4D-3.
 
 **M4D3-RBD-008** Structural and transactional failures shall roll back the entire
 rebinding: the component-reference change is discarded; the response version is unchanged;
@@ -943,7 +1050,10 @@ import.
 ### 3A.7 Resolver failure vocabulary
 
 **M4D3-IFV-001** A closed vocabulary `ALLOWED_INPUT_FAILURE_CODES` shall be defined
-alongside the pipeline, containing exactly these twenty-six codes:
+alongside the pipeline, containing exactly the following closed enumeration. No textual
+cardinality is stated here: the enumeration is authoritative, and its mechanically
+verified size is recorded once in the test strategy so that adding a code through a
+governed specification change cannot leave stale wording behind.
 `INPUT_RESPONSE_MISSING`, `INPUT_RESPONSE_NOT_APPLICABLE`, `INPUT_REVIEW_REQUIRED`,
 `INPUT_VALUE_INVALID`, `INPUT_VALUE_NOT_COMPARABLE`, `INPUT_UNIT_MISSING`,
 `INPUT_UNIT_UNSUPPORTED`, `INPUT_UNIT_DIMENSION_MISMATCH`, `INPUT_DENSITY_REQUIRED`,
@@ -1209,7 +1319,8 @@ component resolution fault, respectively. Each is at most 100 characters and fit
 existing meanings and shall not be reused for configuration, security or data-integrity
 faults.
 
-**M4D3-RSN-011** Three vocabularies exist and shall never be mixed:
+**M4D3-RSN-011** Four vocabularies exist and shall never be mixed
+(`ALLOWED_SERVICE_DETAIL_CODES` is defined in M4D3-RSN-012):
 `ALLOWED_REASON_CODES` governs `CalculationOutcome.reason_code`;
 `ALLOWED_RESOLVER_DETAIL_CODES` governs the detail codes recorded in `input_provenance`;
 and `ALLOWED_HISTORY_REASON_CODES` (M4D3-HST-005) governs
@@ -1236,6 +1347,13 @@ defined in the same module for governed detail codes recorded in `input_provenan
 It shall contain exactly: `MAX_DAILY_UNITS_REQUIRED`, `MAX_DAILY_UNITS_SOURCE_INVALID`,
 `MAX_DAILY_UNITS_SOURCE_AMBIGUOUS`, `MAX_DAILY_UNITS_SOURCE_DISAGREEMENT`,
 `ROUTE_NOT_PROVIDED`, `DOSAGE_FORM_NOT_PROVIDED`.
+
+**M4D3-RSN-012** A fourth closed vocabulary `ALLOWED_SERVICE_DETAIL_CODES` shall hold
+governed service-level rejection codes that occur **before** any calculation begins and
+therefore never reach a `CalculationOutcome`. It shall contain exactly
+`COMPONENT_REBINDING_NOT_ALLOWED_WHILE_NOT_APPLICABLE`. These codes are surfaced in the
+structured API error and shall never be written to `CalculationOutcome.reason_code`,
+`input_provenance`, or `ChecklistResponseHistory.correction_reason`.
 
 **M4D3-RSN-007** Detail codes are provenance metadata only. They shall never be written
 to `CalculationOutcome.reason_code`, shall never appear in
@@ -1507,10 +1625,10 @@ values:
 | `response` | the component-reference `ChecklistResponse` being changed |
 | `prior_raw_value` | the complete prior governed component-reference payload, `{"public_id": "<component A uuid>"}` |
 | `new_raw_value` | the complete new governed component-reference payload, `{"public_id": "<component B uuid>"}` |
-| `prior_is_not_applicable` | copied from the response state before rebinding |
-| `new_is_not_applicable` | copied from the response state after rebinding — unchanged for a pure rebinding |
+| `prior_is_not_applicable` | `False` — guaranteed by the M4D3-RBD-011 precondition |
+| `new_is_not_applicable` | `False` — the selector's applicability is frozen (M4D3-RBD-019/020) |
 | `prior_not_applicable_reason` | copied from the prior response state |
-| `new_not_applicable_reason` | copied from the new response state — unchanged for a pure rebinding |
+| `new_not_applicable_reason` | copied unchanged from the prior value |
 | `prior_version` | the version before the update |
 | `new_version` | `prior_version + 1` |
 | `correction_reason` | `COMPONENT_REBOUND` |
@@ -1526,6 +1644,13 @@ not one combined row: the selector response receives one row with
 its own row with `APPLICABILITY_REEVALUATED`. All such rows share the same transaction
 and the same authenticated actor, and each shall pass `full_clean()`. No implementer
 choice is permitted.
+
+**M4D3-HST-017** The selector response itself is excluded from that rule: its
+applicability is frozen during rebinding (M4D3-RBD-019), so it receives exactly one
+`COMPONENT_REBOUND` row and never an `APPLICABILITY_REEVALUATED` row in the same
+transaction. The M4D3-HST-015 table therefore presumes an applicable selector holding an
+existing component reference, and rebinding shall never start from an N/A selector
+(M4D3-RBD-011).
 
 ### 10.3 N/A raw-value behavior
 
@@ -2179,10 +2304,11 @@ constraint, an existing constant or migration fact, or the breaking nature of an
 change. Their evidence is source inspection recorded in the review checklist, not an
 executable test, and no fabricated runtime test shall be authored for them. Every other
 row remains a normative control requiring implementation and executable coverage. The
-review-assertion rows are exactly these nineteen: M4D3-SVC-001, M4D3-VER-001,
+review-assertion rows are exactly these twenty: M4D3-SVC-001, M4D3-VER-001,
 M4D3-OUT-003, M4D3-OUT-007, M4D3-PST-001, M4D3-SRC-014, M4D3-RTE-001, M4D3-DAG-002,
 M4D3-SNP-007, M4D3-MIG-004, M4D3-INP-001, M4D3-INP-015, M4D3-MDU-022, M4D3-MDU-023,
-M4D3-DEP-004, M4D3-FCR-001, M4D3-SNO-005, M4D3-CAR-009 and M4D3-CAR-010.
+M4D3-DEP-004, M4D3-FCR-001, M4D3-SNO-005, M4D3-CAR-009, M4D3-CAR-010 and
+M4D3-RBD-024.
 
 M4D3-REG-001 and M4D3-MDU-001 are **not** review assertions: each records a verified fact
 *and* imposes a normative obligation (correcting `create_execution()`, and prohibiting a
@@ -2305,6 +2431,22 @@ scalar-only resolution rule), so both retain an executable implementation compon
 | M4D3-HST-015 | Rebinding service | TST-480 | All twelve rebinding field values correct | Regulatory |
 | M4D3-HST-016 | Rebinding service | TST-481 | Two distinct rows; no code misapplied | Regulatory |
 | M4D3-RBD-010 | Rebinding service | TST-482 | History failure is a structural rollback | Data integrity |
+| M4D3-RBD-011 | Rebinding service | TST-485 | Four selector preconditions enforced before mutation | Regulatory |
+| M4D3-RBD-012 | Rebinding service | TST-486 | Rejection code and 400; never `NOT_COMPARABLE` | Data integrity |
+| M4D3-RBD-013 | Rebinding service | TST-487 | Check after locks, before any mutation | Data integrity |
+| M4D3-RBD-014 | Rebinding service | TST-488 | Rejection leaves version, history, snapshot, outcomes and audit untouched | Data integrity |
+| M4D3-RBD-015 | Rebinding service | TST-489 | Three update shapes classified correctly | Correctness |
+| M4D3-RBD-016 | Response-update service | TST-490 | Initial entry is not a rebinding; no fabricated prior | Regulatory |
+| M4D3-RBD-017 | Rebinding service | TST-491 | Identical reference is a full no-op | Regulatory |
+| M4D3-RBD-018 | Applicability service | TST-492 | N/A selector returns via applicability service only | Regulatory |
+| M4D3-RBD-019 | Rebinding service | TST-493 | Selector applicability not re-evaluated during rebinding | Regulatory |
+| M4D3-RBD-020 | Rebinding service | TST-494 | Selector N/A fields unchanged and recorded | Data integrity |
+| M4D3-RBD-021 | Rebinding service | TST-495 | Exactly one selector row; never both codes | Regulatory |
+| M4D3-RBD-022 | Applicability service | TST-496 | Other responses receive their own rows | Regulatory |
+| M4D3-RBD-023 | Rebinding service | TST-497 | Selector stays applicable with the new reference | Correctness |
+| M4D3-RBD-024 | Review assertion | TST-498 | Selector N/A transition is a separate operation | Scope |
+| M4D3-HST-017 | Rebinding service | TST-499 | Selector excluded from the two-row rule | Regulatory |
+| M4D3-RSN-012 | Response-update service | TST-500 | Service-detail vocabulary kept out of stored fields | Data integrity |
 | M4D3-REG-020 | Import-time self-check | TST-483 | No nested `identifier` key permitted | Correctness |
 | M4D3-NA-001 | Applicability service | TST-208 | `raw_value` nulled on N/A | Data integrity |
 | M4D3-NA-002 | Applicability service | TST-209 | Prior value preserved in history | Regulatory |
@@ -2611,6 +2753,13 @@ Implementation remains unauthorized. When authorized, the order shall be:
    invalidation and recalculation, downstream graph recalculation, provenance
    replacement, history and audit, with the rollback-versus-governed-outcome split of
    M4D3-RBD-008/009.
+4b-i. **Selector preconditions and update classification** in
+   `backend/iig_checklist/services.py` and the response-update serializer/view — the
+   M4D3-RBD-011 applicability precondition checked after locks and before any mutation,
+   the `COMPONENT_REBINDING_NOT_ALLOWED_WHILE_NOT_APPLICABLE` rejection, the
+   initial-entry / rebinding / no-op classification of M4D3-RBD-015, and the frozen
+   selector applicability of M4D3-RBD-019. Returning an N/A selector to service remains
+   the applicability service's responsibility (M4D3-RBD-018).
 4c. **History event vocabulary and row factory** in `backend/iig_checklist/services.py` —
    `ALLOWED_HISTORY_REASON_CODES` (`APPLICABILITY_REEVALUATED`, `COMPONENT_REBOUND`) and a
    shared helper that builds a complete `ChecklistResponseHistory` row for any governed
