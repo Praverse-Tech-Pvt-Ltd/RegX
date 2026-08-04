@@ -77,6 +77,19 @@ Prior head `84b6dd9` was reviewed **FAIL** (0 Critical, 3 Major, 3 Minor).
 | Minor 2 cross-app transaction mechanics asserted, not specified | Verified single `"default"` PostgreSQL database with no routers; helper joins the outer transaction | M4D3-SNO-012 |
 | Minor 3 Form D omitted the unit fields it needed | `iid_potency_unit` and `iid_mde_unit` added to the permitted field list | M4D3-INP-006 |
 
+## Fifth revision note — findings resolved after the re-issued final review
+
+Prior head `dc6479e` was reviewed **FAIL** (0 Critical, 2 Major, 3 Minor). The review was
+re-issued against an unchanged head and returned the same result.
+
+| Finding | Resolution | Part |
+|---|---|---|
+| MAJ-E `dependencies` defined twice, incompatibly; Form A changes triggered no recalculation | Split into `calculation_dependencies` (Form E graph edges) and `recalculation_triggers` (Form A inputs plus component selectors); M4D3-RCL-001 re-keyed to the trigger set; the unqualified term is banned | Part 3A.5, M4D3-TRG-001…007, M4D3-RCL-001/006/007 |
+| MAJ-F component-reference change left stale outcomes | Governed rebinding event with a sixteen-step transaction, fresh snapshot, downstream recalculation, provenance replacement, history, and an explicit rollback-versus-governed-outcome split | Part 3A.2.4, M4D3-RBD-001…009 |
+| Minor 1 `registry_component_code` verified absence unrecorded | Form B **disabled**; activation rejects it; verified field inventory recorded; `response_reference` is the only enabled selector | M4D3-FCR-004, FCR-012…014 |
+| Minor 2 DEP-011 conditional wording | Replaced by a three-row deterministic table; new detail code `UPSTREAM_CALCULATION_COMPONENT_MISMATCH` added and mapped | M4D3-DEP-011, M4D3-IFV-001/003 |
+| Minor 3 test strategy §3 contradicted the narrow definition | §3 rewritten around the trigger/dependency distinction with seven required cases | Test strategy §3 |
+
 ---
 
 ## Part 1 — Scope
@@ -227,7 +240,8 @@ database table and shall not be mutable at runtime.
 | `formula_version` | `str` | Must equal `iid_assessment.calculations.FORMULA_VERSION` |
 | `binding_version` | `str` | Immutable binding version (M4D3-REG-008) |
 | `input_resolvers` | `dict[str, InputResolver]` | Function kwarg name → resolver specification |
-| `dependencies` | `list[str]` | `ChecklistQuestion.code` values feeding this calculation |
+| `calculation_dependencies` | `list[str]` | `ChecklistQuestion.code` values of upstream **`SYSTEM_CALCULATED`** questions referenced through Form E resolvers; these create graph edges (M4D3-TRG-001) |
+| `recalculation_triggers` | `list[str]` | `ChecklistQuestion.code` values of every governed mutable response whose change may alter this outcome (M4D3-TRG-002) |
 | `required_units` | `dict[str, str]` | Expected unit per unit-bearing input |
 | `output_unit` | `str` | Expected result unit; may be empty |
 | `rounding_rule` | `str` | Rounding descriptor written to the outcome |
@@ -435,11 +449,29 @@ the component identified by that response's `raw_value`. The existing validator
 re-verify it, never bypass it.
 
 **M4D3-FCR-004** Selector form B — registry component code:
-`{"type": "registry_component_code", "component_code": ...}`. This form is permitted only
-where the approved checklist definition uniquely identifies one governed component, and
-only if the code is immutable, unique within the `FormulationVersion`, and validated at
-`ChecklistVersion` activation. Where the repository provides no immutable per-component
-code satisfying that constraint, selector form A shall be used.
+`{"type": "registry_component_code", "component_code": ...}` — is **DISABLED for 4D-3**.
+
+Verified schema fact: `FormulationComponent` has **no** immutable unique component-code
+field. Its fields are `formulation_version`, `component_type`, `ingredient_name`,
+`resolved_ingredient_public_id`, `resolved_unii`, `function`, `grade`,
+`quantity_per_dosage_unit`, `quantity_unit`, `percentage_w_w_snapshot`,
+`quantity_per_batch`, `batch_quantity_unit`, `overage_amount`, `justification`,
+`specification_reference`, `evidence_document_reference` and `display_order`; its only
+`Meta.constraints` entry is `formulation_component_quantity_positive`. No uniqueness
+constraint of any kind exists, and `resolved_unii` is blank-able and non-unique.
+
+**M4D3-FCR-012** `ChecklistVersion` activation shall reject any registry entry declaring
+a `registry_component_code` selector with
+`error_code = "component_selector_form_disabled"`.
+
+**M4D3-FCR-013** `response_reference` (M4D3-FCR-003) is the **only** enabled
+subject-component selector in 4D-3.
+
+**M4D3-FCR-014** Implementers shall not derive a component code from `ingredient_name`,
+`resolved_unii`, `display_order`, the primary key, creation order, or any other
+non-unique field. Form B remains documented solely as a possible future governed
+extension; enabling it requires a governed specification amendment and, where needed,
+schema support.
 
 **M4D3-FCR-005** The resolved component shall satisfy all of: it belongs to
 `execution.formulation_version`; its tenant resolves through
@@ -471,6 +503,70 @@ that has not been resolved to a governed component identity.
 **M4D3-FCR-011** A failed component resolution shall prevent invocation of the
 calculation function, leave no partial `CalculationOutcome`, and emit no success audit.
 
+### 3A.2.4 Component rebinding (MAJ-F)
+
+**M4D3-RBD-001** Changing a component-reference response in `draft` or `returned` is a
+governed **rebinding event**. It shall never leave a prior component's value, provenance
+or snapshot UUID as the current result of any dependent `CalculationOutcome`.
+
+**M4D3-RBD-002** Preconditions: the update occurs through
+`update_checklist_response()`; `expected_version` is supplied and current; the execution
+status is `draft` or `returned`; the response's `question.answer_type` is
+`FORMULATION_COMPONENT_REFERENCE`; the new reference passes
+`_validate_formulation_component_reference()`; and the new component satisfies
+M4D3-FCR-005 (same `FormulationVersion`, same tenant, matching
+`required_component_type`).
+
+**M4D3-RBD-003** Rebinding shall be prohibited once the execution leaves `draft` or
+`returned`, rejected with `error_code = "response_immutable"` and HTTP 400.
+
+**M4D3-RBD-004** The rebinding transaction shall, in order: lock the
+`ChecklistExecution`; lock the component-reference `ChecklistResponse`; lock every
+calculated response listing that selector response in `recalculation_triggers`; lock every
+downstream calculated response reachable through `calculation_dependencies`; lock all
+affected `CalculationOutcome` rows in ascending primary-key order; write a
+`ChecklistResponseHistory` row preserving the prior component reference; update the
+component-reference response and increment its version by one; resolve the new subject
+component; discard the prior component-specific resolved input context; create a fresh
+`AssessmentSnapshot` for the new component per M4D3-SNO-006; re-resolve every calculation
+input through `resolve_calculation_inputs()`; recalculate every directly and transitively
+affected outcome; replace each outcome's `value`, `status`, `reason_code`,
+`input_provenance` and `source_assessment_snapshot_public_id`; commit atomically; and emit
+success audit via `transaction.on_commit()`.
+
+**M4D3-RBD-005** After a successful rebinding, the current `input_provenance` of every
+affected outcome shall contain **only** the newly resolved context: the new component
+public UUID; the new selector-response public UUID; the `FormulationVersion` public UUID;
+the new quantity and source unit; the new conversion provenance; the new
+`AssessmentSnapshot` public UUID; the current `binding_version` and `resolver_version`;
+and the new upstream outcome UUIDs where applicable.
+
+**M4D3-RBD-006** No element of the prior component's provenance shall remain in the
+current `CalculationOutcome.input_provenance`. Historical evidence remains available in
+`ChecklistResponseHistory`, append-only audit events and the prior immutable
+`AssessmentSnapshot` rows, which shall not be deleted or mutated.
+
+**M4D3-RBD-007** A rebinding that changes nothing — the submitted component reference
+equals the current one — shall perform no recalculation, no version increment, no history
+row and no audit event.
+
+**M4D3-RBD-008** Structural and transactional failures shall roll back the entire
+rebinding: the component-reference change is discarded; the response version is unchanged;
+the prior component reference remains current; every prior outcome `value`, `status`,
+`provenance` and snapshot UUID remains current; no new snapshot row persists; no history
+row persists; and no success audit is emitted. The structural failures are exactly:
+invalid component UUID, wrong formulation, wrong tenant, wrong component type, missing
+component, ambiguous registry selector, failed snapshot creation, duplicate
+`CalculationOutcome` rows, dependency-graph failure, and stale `expected_version`.
+
+**M4D3-RBD-009** By contrast, an **input-resolution or calculation failure that maps to a
+governed outcome** under M4D3-IFV-003 does not roll back the rebinding. The new component
+reference is committed and each affected outcome is persisted with its mapped
+`status = "data_required"` or `status = "error"`, the canonical `reason_code`, `value =
+null`, and provenance recording the new component. This distinction is normative and
+admits no implementer choice: a failure that has a row in the M4D3-IFV-003 table persists
+as a governed outcome; a failure in the list of M4D3-RBD-008 rolls the operation back.
+
 ### 3A.2.3 Per-component cardinality (MAJ-B)
 
 **M4D3-CAR-001** A `ChecklistExecution` remains scoped to one `FormulationVersion`. No
@@ -495,6 +591,19 @@ responses, one per component. Dynamic question generation is outside 4D-3.
 
 **M4D3-CAR-007** No checklist question shall be created, expanded or cloned automatically
 from the number of formulation components.
+
+**M4D3-CAR-009** Approved 4D-3 product boundary, recorded normatively: 4D-3 supports
+**explicitly configured subject-component assessments**. It does not promise automatic
+assessment of every inactive ingredient in an arbitrary formulation. Checklist authors
+shall configure the required component-reference question and its bound calculated
+question group explicitly. Automatic all-component coverage, dynamic question generation
+and per-component child executions remain outside 4D-3. This boundary is **acceptable for
+4D-3** and is not an unresolved implementation blocker; no repository roadmap or
+authoritative 4D scope statement requires automatic all-component assessment.
+
+**M4D3-CAR-010** Observation for later planning, carrying no 4D-3 obligation: broader
+all-component automation may be evaluated in a future product milestone, which would
+require its own discovery, scope decision and schema review.
 
 **M4D3-CAR-008** No new database model, field or migration is introduced by Part 3A.2.2
 or Part 3A.2.3.
@@ -639,12 +748,53 @@ resolves but performs no write.
 
 ### 3A.5 Dependency edges
 
-**M4D3-DEP-001** The dependency graph shall be **derived from resolver declarations**,
-not authored separately. A registry entry's `dependencies` shall equal the set of
-`question_code` values appearing in its Form E resolvers.
+**M4D3-TRG-001** `calculation_dependencies` is the set of `SYSTEM_CALCULATED`
+response/question identities referenced through Form E `calculation_outcome` resolvers.
+It creates the directed graph edges and is the **only** set used for topological
+ordering, depth measurement, cascade-node limits and cycle detection. It shall not
+contain Form A question-response inputs, and shall not contain component-selector
+responses unless those selectors are themselves `SYSTEM_CALCULATED` outcomes.
+
+**M4D3-TRG-002** `recalculation_triggers` is the set of every governed response or
+question whose change may alter the calculated outcome. It shall include every
+`question_code` referenced through a Form A `question_response` resolver; every
+component-selector `response_reference` question code (M4D3-FCR-003); and any other
+governed mutable response input explicitly declared by the registry entry. It does not
+itself create a calculation graph edge.
+
+**M4D3-TRG-003** The two sets are independent and shall be declared separately on every
+registry entry. They may overlap — a `SYSTEM_CALCULATED` upstream is both a dependency
+and a trigger — but they are never interchangeable.
+
+**M4D3-TRG-004** The unqualified term "dependencies" shall not appear in any normative
+requirement. Every reference shall name either `calculation_dependencies` or
+`recalculation_triggers`.
+
+**M4D3-TRG-005** Undeclared mutable response inputs are prohibited: every response the
+pipeline reads shall appear in `recalculation_triggers`.
+
+**M4D3-TRG-006** Activation validation shall confirm both sets exactly match the entry's
+resolver declarations — `calculation_dependencies` against Form E resolvers, and
+`recalculation_triggers` against Form A resolvers plus component selectors. A mismatch in
+either direction shall be rejected with `error_code = "REGISTRY_VALIDATION_FAILED"`.
+
+**M4D3-TRG-007** An unknown `recalculation_triggers` question code shall fail activation
+with `error_code = "UNKNOWN_TRIGGER_CODE"`.
+
+**M4D3-DEP-001** The calculation graph shall be **derived from resolver declarations**,
+not authored separately. A registry entry's `calculation_dependencies` shall equal the set
+of `question_code` values appearing in its Form E resolvers.
 
 **M4D3-DEP-002** Form A, B, C, D and F resolvers shall create no calculation-to-calculation
-edge.
+edge. Question-response inputs and component-reference selectors are **external trigger
+nodes**, not calculation graph nodes: they start recalculation but do not participate in
+cycle detection, depth measurement or cascade-node counting unless they are themselves
+`SYSTEM_CALCULATED` responses referenced through Form E.
+
+**M4D3-DEP-012** The directed calculation graph shall contain only `SYSTEM_CALCULATED`
+response nodes. An edge exists from an upstream calculated response to a downstream
+calculated response if and only if the downstream registry entry contains a Form E
+resolver naming the upstream response.
 
 **M4D3-DEP-003** The actual graph for the approved registry is:
 
@@ -689,9 +839,14 @@ between two instances of the same function bound to different components is stil
 detected.
 
 **M4D3-DEP-011** A Form E resolver shall resolve the upstream outcome for the **same
-subject component** as the dependent calculation. An upstream outcome bound to a different
-component shall fail closed with `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` where a snapshot
-is involved, or `UPSTREAM_CALCULATION_MISSING` where no matching upstream node exists.
+subject component** as the dependent calculation. The three conditions are distinct and
+each has exactly one mapping, with no contextual choice:
+
+| Condition | Resolver detail code |
+|---|---|
+| No upstream outcome row exists for the named question | `UPSTREAM_CALCULATION_MISSING` |
+| An upstream outcome exists but is bound to a different subject component | `UPSTREAM_CALCULATION_COMPONENT_MISMATCH` |
+| The resolved snapshot's `formulation_component_public_id` differs from the resolved subject component | `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` |
 
 ### 3A.6 Snapshot ordering
 
@@ -776,7 +931,8 @@ alongside the pipeline, containing exactly these twenty-six codes:
 `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH`, `ASSESSMENT_SNAPSHOT_RELEASE_MISMATCH`,
 `ASSESSMENT_FIELD_MISSING`, `UPSTREAM_CALCULATION_MISSING`,
 `UPSTREAM_CALCULATION_INCOMPLETE`, `UPSTREAM_CALCULATION_DUPLICATE`,
-`INPUT_TENANT_MISMATCH`, plus `INPUT_RESOLVER_UNKNOWN` and `UNKNOWN_INTERNAL_FAILURE`.
+`INPUT_TENANT_MISMATCH`, `UPSTREAM_CALCULATION_COMPONENT_MISMATCH`, plus
+`INPUT_RESOLVER_UNKNOWN` and `UNKNOWN_INTERNAL_FAILURE`.
 
 **M4D3-IFV-002** Failure codes are provenance metadata. They shall never be written to
 `CalculationOutcome.reason_code` and shall never appear in `ALLOWED_REASON_CODES`.
@@ -809,6 +965,7 @@ language is permitted anywhere in the failure mapping.
 | `FORMULATION_COMPONENT_TENANT_MISMATCH` | `error` | `TENANT_ISOLATION_VIOLATION` | null |
 | `ASSESSMENT_SNAPSHOT_TENANT_MISMATCH` | `error` | `TENANT_ISOLATION_VIOLATION` | null |
 | `UPSTREAM_CALCULATION_DUPLICATE` | `error` | `DUPLICATE_UPSTREAM_OUTCOME` | null |
+| `UPSTREAM_CALCULATION_COMPONENT_MISMATCH` | `error` | `INPUT_RESOLUTION_FAILED` | null |
 | `ASSESSMENT_SNAPSHOT_DUPLICATE` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
 | `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
 | `ASSESSMENT_SNAPSHOT_RELEASE_MISMATCH` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
@@ -1665,8 +1822,23 @@ modify `inputs`, `input_provenance` or `source_assessment_snapshot_public_id`.
 `raw_value` null with no error and no N/A marking.
 
 **M4D3-RCL-001** The governed response-update service shall trigger cascade
-recalculation when the updated response is a declared dependency of any
-`SYSTEM_CALCULATED` question in the same execution.
+recalculation when the updated response's question identity appears in the
+`recalculation_triggers` of any `SYSTEM_CALCULATED` question in the same execution. It
+shall **not** key on `calculation_dependencies`: a Form A user input creates no graph
+edge, yet changing it must still recalculate the outcomes that consume it.
+
+**M4D3-RCL-006** The recalculation sequence shall be: resolve the changed response's
+question identity; locate every `SYSTEM_CALCULATED` response listing that identity in
+`recalculation_triggers` (the **directly affected** set); expand through
+`calculation_dependencies` to add every downstream calculated response (the
+**transitively affected** set); process the union in stable topological order; lock every
+affected response and `CalculationOutcome` in the Part 17 order; recalculate inside the
+same transaction; update provenance and snapshot references; write history where required;
+and emit success audit only after commit.
+
+**M4D3-RCL-007** A response whose question identity appears in no
+`recalculation_triggers` set shall trigger no recalculation, no version change on any
+calculated response, and no audit event.
 
 **M4D3-RCL-002** Affected questions shall be processed in the stable topological order
 of M4D3-DAG-006.
@@ -1900,10 +2072,10 @@ constraint, an existing constant or migration fact, or the breaking nature of an
 change. Their evidence is source inspection recorded in the review checklist, not an
 executable test, and no fabricated runtime test shall be authored for them. Every other
 row remains a normative control requiring implementation and executable coverage. The
-review-assertion rows are exactly these seventeen: M4D3-SVC-001, M4D3-VER-001,
+review-assertion rows are exactly these nineteen: M4D3-SVC-001, M4D3-VER-001,
 M4D3-OUT-003, M4D3-OUT-007, M4D3-PST-001, M4D3-SRC-014, M4D3-RTE-001, M4D3-DAG-002,
 M4D3-SNP-007, M4D3-MIG-004, M4D3-INP-001, M4D3-INP-015, M4D3-MDU-022, M4D3-MDU-023,
-M4D3-DEP-004, M4D3-FCR-001 and M4D3-SNO-005.
+M4D3-DEP-004, M4D3-FCR-001, M4D3-SNO-005, M4D3-CAR-009 and M4D3-CAR-010.
 
 M4D3-REG-001 and M4D3-MDU-001 are **not** review assertions: each records a verified fact
 *and* imposes a normative obligation (correcting `create_execution()`, and prohibiting a
@@ -2151,6 +2323,30 @@ scalar-only resolution rule), so both retain an executable implementation compon
 | M4D3-IFV-008 | Input pipeline | TST-448 | Undefined condition → `UNKNOWN_INTERNAL_FAILURE`, never complete | Security |
 | M4D3-RSN-009 | Translation module | TST-449 | Five new codes, one meaning each, ≤ 100 chars | Data integrity |
 | M4D3-RSN-010 | Translation module | TST-450 | Scientific codes not reused for config/security faults | Regulatory |
+| M4D3-TRG-001 | Registry entry | TST-451 | `calculation_dependencies` is Form E only | Correctness |
+| M4D3-TRG-002 | Registry entry | TST-452 | `recalculation_triggers` covers Form A and component selectors | Correctness |
+| M4D3-TRG-003 | Registry entry | TST-453 | Both sets declared independently | Correctness |
+| M4D3-TRG-004 | Static check | TST-454 | No unqualified "dependencies" in normative text | Correctness |
+| M4D3-TRG-005 | Registry validation | TST-455 | Undeclared mutable input rejected | Data integrity |
+| M4D3-TRG-006 | Activation service | TST-456 | Both sets validated against resolvers | Data integrity |
+| M4D3-TRG-007 | Activation service | TST-457 | Unknown trigger code rejected | Data integrity |
+| M4D3-DEP-012 | Dependency graph | TST-458 | Graph holds only calculated response nodes | Correctness |
+| M4D3-RCL-006 | New service | TST-459 | Trigger-keyed cascade, expanded through dependencies | Correctness |
+| M4D3-RCL-007 | New service | TST-460 | Non-trigger response causes no recalculation | Regulatory |
+| M4D3-FCR-012 | Activation service | TST-461 | Form B rejected with `component_selector_form_disabled` | Security |
+| M4D3-FCR-013 | Registry entry | TST-462 | `response_reference` is the only enabled selector | Correctness |
+| M4D3-FCR-014 | Static check | TST-463 | No code derived from non-unique fields | Regulatory |
+| M4D3-RBD-001 | Rebinding service | TST-464 | No prior component result remains current | Regulatory |
+| M4D3-RBD-002 | Rebinding service | TST-465 | All preconditions enforced | Security |
+| M4D3-RBD-003 | Rebinding service | TST-466 | Rebinding after submission rejected | Regulatory |
+| M4D3-RBD-004 | Rebinding service | TST-467 | Sixteen-step transaction observed in order | Data integrity |
+| M4D3-RBD-005 | Rebinding service | TST-468 | Current provenance holds only new context | Reproducibility |
+| M4D3-RBD-006 | Rebinding service | TST-469 | No prior provenance remains current; history preserved | Regulatory |
+| M4D3-RBD-007 | Rebinding service | TST-470 | Unchanged reference is a no-op | Regulatory |
+| M4D3-RBD-008 | Rebinding service | TST-471 | Structural failures roll back completely | Data integrity |
+| M4D3-RBD-009 | Rebinding service | TST-472 | Mapped calculation failures persist as governed outcomes | Regulatory |
+| M4D3-CAR-009 | Review assertion | TST-473 | Product boundary recorded as acceptable | Scope |
+| M4D3-CAR-010 | Review assertion | TST-474 | Future automation noted without 4D-3 obligation | Scope |
 | M4D3-MDU-001 | Dosage resolver | TST-323 | Both sources considered; scalar-only rule absent | Regulatory |
 | M4D3-MDU-002 | Dosage resolver | TST-324 | Version candidate only when non-null and positive | Data integrity |
 | M4D3-MDU-003 | Dosage resolver | TST-325 | All related regimens are candidates; no invented lifecycle filter | Correctness |
@@ -2274,7 +2470,11 @@ Implementation remains unauthorized. When authorized, the order shall be:
    binding versions, `CALCULATION_MAX_DEPENDENCY_DEPTH`, `CALCULATION_MAX_CASCADE_NODES`,
    import-time self-check including full kwarg coverage (M4D3-INP-002).
 1a. **Resolver vocabulary** — the six allow-listed forms of Part 3A.2 and the complete
-   kwarg mappings of Part 3A.2.1.
+   kwarg mappings of Part 3A.2.1, including the subject-component selector of Part 3A.2.2
+   with form B rejected at activation (M4D3-FCR-012).
+1a-i. **Registry set split** — `calculation_dependencies` and `recalculation_triggers`
+   declared separately per entry, with activation validation of both against resolver
+   declarations (M4D3-TRG-006/007).
 1b. **Unit-conversion layer** — governed wrapper over
    `iid_assessment/unit_conversion.py`, canonical target units, and the failure mapping
    of M4D3-UNC-008.
@@ -2287,6 +2487,12 @@ Implementation remains unauthorized. When authorized, the order shall be:
    `ALLOWED_RESOLVER_DETAIL_CODES`, `INVALID_GENERATED_AT` path.
 4. `update_checklist_response()` governed service in `services.py`, and reduction of
    `ChecklistResponseUpdateView.patch()` in `views.py` to a thin adapter.
+4a. **Trigger-keyed recalculation** in `services.py` — cascade keyed on
+   `recalculation_triggers`, expanded through `calculation_dependencies` (M4D3-RCL-001/006).
+4b. **Component-rebinding path** in `services.py` — governed component-reference update,
+   fresh snapshot for the new component, affected-outcome invalidation and recalculation,
+   downstream graph recalculation, provenance replacement, history and audit, with the
+   rollback-versus-governed-outcome split of M4D3-RBD-008/009.
 5. `expected_version` on the governed request serializer, with the 400 and 409 contracts.
 6. Governed applicability service and persisted `REVIEW_REQUIRED:` marker, including
    `evaluate_applicability()` in `applicability.py`.
@@ -2300,9 +2506,11 @@ Implementation remains unauthorized. When authorized, the order shall be:
     `applicability_outcome`.
 13. Frontend — `execution-mappers.ts`, display states, `expected_version`, 409 handling,
     CI lint rule.
-14. Backend targeted and full test suites per the test strategy.
-15. Frontend unit and Playwright test suites.
-16. Docker integration smoke extension.
+14. Backend targeted and full test suites per the test strategy, including the
+    component-rebinding suite of test-strategy §10.19.
+15. Frontend unit and Playwright test suites, including conflict and loading behavior for
+    a component-reference change.
+16. Docker integration smoke extension, including a component-rebinding smoke step.
 17. Independent adversarial implementation review before merge.
 
 Steps 2, 4, 7 and 8 modify existing 4D-2 runtime code and shall not be omitted.
