@@ -54,6 +54,10 @@ additional in-scope items identified during adversarial review are documented he
 | S-37 | `COMPONENT_REBOUND` correction-reason code, distinct from `APPLICABILITY_REEVALUATED` | 4D-3 spec M4D3-HST-005 |
 | S-38 | Complete history-field population with `full_clean()` before save | 4D-3 spec M4D3-HST-003/010/015 |
 | S-39 | Atomic rollback of the whole operation on history validation or persistence failure | 4D-3 spec M4D3-HST-011, M4D3-RBD-010 |
+| S-40 | Selector must be APPLICABLE with an existing component reference before rebinding | 4D-3 spec M4D3-RBD-011 |
+| S-41 | `null` → component classified as initial entry; component A → B classified as rebinding | 4D-3 spec M4D3-RBD-015/016 |
+| S-42 | Selector's own applicability frozen for the duration of a rebinding transaction | 4D-3 spec M4D3-RBD-019 |
+| S-43 | Other responses may receive separate `APPLICABILITY_REEVALUATED` history in the same transaction | 4D-3 spec M4D3-RBD-022, M4D3-HST-016 |
 
 ---
 
@@ -94,6 +98,10 @@ additional in-scope items identified during adversarial review are documented he
 | X-31 | Schema migration adding new `ChecklistResponseHistory` fields | Not in 4D-3 |
 | X-32 | Client-authored correction reasons | Never — the vocabulary is closed and server-controlled |
 | X-33 | Editable or deletable history rows | Never — append-only guards remain unchanged |
+| X-34 | Combined selector rebinding and selector applicability transition in one operation | Not in 4D-3 — the selector's applicability is frozen during rebinding |
+| X-35 | Automatic selector N/A transition inside the rebinding path | Not in 4D-3 — only the governed applicability service may transition it |
+| X-36 | Fabricating a prior component payload for an N/A selector | Never — rebinding from N/A is prohibited |
+| X-37 | Generic initial-entry history framework | Not in 4D-3 — first entry of a value writes no history row |
 
 ### Product boundary — component coverage
 

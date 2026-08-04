@@ -1000,7 +1000,15 @@ A single parameterized test shall cover **every** entry of the M4D3-IFV-003 tabl
 **Test file:** `backend/iig_checklist/tests/test_resolver_failure_mapping.py`
 **Test name:** `test_resolver_detail_code_maps_deterministically`
 
-For each of the **29** mapped detail codes, assert: the stored `status` equals the table's
+**Mechanically verified vocabulary size — the single place a count is recorded.**
+`ALLOWED_INPUT_FAILURE_CODES` currently contains **29** codes, matching the 29 rows of
+the M4D3-IFV-003 mapping table exactly. The specification itself states no textual
+cardinality (M4D3-IFV-001), so this figure is asserted here and nowhere else. The test
+below shall derive its parameters from the specification enumeration, so a code added
+without a mapping — or a mapping added without a code — fails the suite and forces this
+number to be updated.
+
+For each of the mapped detail codes, assert: the stored `status` equals the table's
 value; the stored `reason_code` equals the table's value; `value` is null for every
 non-complete outcome; the exact detail code appears in server-side provenance; no raw
 exception text or stack frame is stored anywhere; `full_clean()` passes; the status is
@@ -1099,6 +1107,47 @@ state to change within the same governed operation.
 | TST-481g | A downstream failure rolls back both rows |
 | TST-481h | Neither code is applied to the other event type |
 
+### 10.19.3 Selector preconditions and update classification
+
+**Test file:** `backend/iig_checklist/tests/test_component_rebinding.py`
+
+| Test ID | Case | Expected |
+|---|---|---|
+| TST-485a | Selector `is_not_applicable = True` | Rebinding rejected |
+| TST-485b | Selector `raw_value = null` | Rebinding rejected |
+| TST-485c | Selector carries a `REVIEW_REQUIRED:` marker | Rebinding rejected |
+| TST-485d | Selector `applicability_outcome != "applicable"` | Rebinding rejected |
+| TST-486 | Any rejection above | HTTP 400, `error_code = "component_rebinding_not_allowed"`, detail `COMPONENT_REBINDING_NOT_ALLOWED_WHILE_NOT_APPLICABLE`; never `NOT_COMPARABLE` |
+| TST-487 | Ordering | The precondition check runs after the execution and selector locks and after `expected_version`, and before any mutation |
+| TST-488a | After rejection | Response version unchanged |
+| TST-488b | After rejection | No `COMPONENT_REBOUND` history row |
+| TST-488c | After rejection | No `APPLICABILITY_REEVALUATED` history row |
+| TST-488d | After rejection | No `AssessmentSnapshot` created |
+| TST-488e | After rejection | No `CalculationOutcome` changed and no error outcome created |
+| TST-488f | After rejection | No success audit emitted |
+| TST-492 | N/A selector returned to service | The applicability service transitions N/A → applicable and writes `APPLICABILITY_REEVALUATED`; `raw_value` remains null |
+| TST-490 | `null` → component B after that transition | Treated as an **initial entry**: ordinary update path, version increments, calculation population runs, **no** `COMPONENT_REBOUND` row, and no prior component payload is fabricated |
+| TST-489 | Classification | The three shapes of M4D3-RBD-015 are classified correctly: initial entry, rebinding, no-op |
+| TST-491 | Identical `public_id` submitted | No version increment, no history, no snapshot, no recalculation, no audit |
+
+### 10.19.4 Selector applicability freeze
+
+| Test ID | Case | Expected |
+|---|---|---|
+| TST-493 | A → B rebinding where the selector question has an applicability rule sensitive to the component | The selector's own applicability is **not** re-evaluated during the rebinding |
+| TST-494a | After rebinding | Selector `is_not_applicable` remains `False` |
+| TST-494b | After rebinding | Selector `not_applicable_reason` is unchanged, and the history row records the unchanged prior/new values |
+| TST-495a | After rebinding | The selector has **exactly one** history row |
+| TST-495b | After rebinding | That row's `correction_reason` is `COMPONENT_REBOUND` |
+| TST-495c | After rebinding | The selector has **no** `APPLICABILITY_REEVALUATED` row in that transaction |
+| TST-496a | Another response's applicability changes because of the new component | That response receives its own `APPLICABILITY_REEVALUATED` row |
+| TST-496b | Both rows | Same authenticated actor, same transaction, both pass `full_clean()` |
+| TST-496c | Downstream failure | Both rows roll back |
+| TST-497 | After rebinding | Selector remains `applicable` with component B as its current `raw_value` |
+| TST-498 | Later separate applicability operation on the selector | Handled independently, writing `APPLICABILITY_REEVALUATED` and nulling `raw_value`; never combined with `COMPONENT_REBOUND` |
+| TST-499 | Two-row rule | The selector is excluded from M4D3-HST-016's other-response rule |
+| TST-500 | Vocabulary | `COMPONENT_REBINDING_NOT_ALLOWED_WHILE_NOT_APPLICABLE` never appears in `CalculationOutcome.reason_code`, `input_provenance` or `correction_reason` |
+
 ### 10.20 Trigger and selector configuration
 
 | Test ID | Assertion |
@@ -1125,8 +1174,8 @@ acceptance matrix.
 
 | Metric | Value |
 |---|---|
-| Normative requirement IDs defined | 384 |
-| Acceptance matrix IDs | 384 |
+| Normative requirement IDs defined | 400 |
+| Acceptance matrix IDs | 400 |
 | Missing (defined but absent from matrix) | 0 |
 | Duplicate requirement definitions | 0 |
 | Duplicate matrix rows | 0 |
@@ -1134,11 +1183,11 @@ acceptance matrix.
 | Matrix rows missing a required cell | 0 |
 
 Per-block counts: API 5, APP 13, AUD 7, CAR 10, CMP 6, DAG 10, DEP 12, FCR 14, FE 9,
-HST 16, IFV 7, INP 15, MAP 10, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13,
-RBD 10, RCL 7, REG 20, REV 5, RFV 7, RSN 11, RTE 6, SEC 5, SER 9, SNO 12, SNP 7, SRC 14,
+HST 17, IFV 7, INP 15, MAP 10, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13,
+RBD 24, RCL 7, REG 20, REV 5, RFV 7, RSN 12, RTE 6, SEC 5, SER 9, SNO 12, SNP 7, SRC 14,
 SUB 7, SVC 8, TRG 7, TRL 6, TXN 6, UNC 11, VER 8.
 
-Nineteen rows are classified **Review assertion** in the specification's Part 21 preamble:
+Twenty rows are classified **Review assertion** in the specification's Part 21 preamble:
 they record verified source facts and map to source-inspection evidence rather than an
 executable test. All remaining rows are normative controls requiring implementation.
 
