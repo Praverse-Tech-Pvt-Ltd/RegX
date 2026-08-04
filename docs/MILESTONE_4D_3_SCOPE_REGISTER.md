@@ -50,6 +50,10 @@ additional in-scope items identified during adversarial review are documented he
 | S-33 | Component-reference rebinding with governed downstream recalculation | 4D-3 spec Part 3A.2.4 |
 | S-34 | Current-provenance replacement after rebinding; no prior component result remains current | 4D-3 spec M4D3-RBD-005/006 |
 | S-35 | Activation rejection of the `registry_component_code` selector form | 4D-3 spec M4D3-FCR-012 |
+| S-36 | Governed `ChecklistResponseHistory` reuse for component-reference rebinding | 4D-3 spec §10.2.2 |
+| S-37 | `COMPONENT_REBOUND` correction-reason code, distinct from `APPLICABILITY_REEVALUATED` | 4D-3 spec M4D3-HST-005 |
+| S-38 | Complete history-field population with `full_clean()` before save | 4D-3 spec M4D3-HST-003/010/015 |
+| S-39 | Atomic rollback of the whole operation on history validation or persistence failure | 4D-3 spec M4D3-HST-011, M4D3-RBD-010 |
 
 ---
 
@@ -86,6 +90,10 @@ additional in-scope items identified during adversarial review are documented he
 | X-27 | Automatic assessment of every inactive ingredient in an arbitrary formulation | Not in 4D-3 — see the product-boundary note below |
 | X-28 | Enablement of the `registry_component_code` selector form | Not in 4D-3 — rejected at activation; requires a governed amendment and schema support |
 | X-29 | Schema change adding an immutable unique component code | Not in 4D-3 |
+| X-30 | Generic universal history framework for unrelated response types | Not in 4D-3 — reuse is limited to the two governed persisted-state transitions |
+| X-31 | Schema migration adding new `ChecklistResponseHistory` fields | Not in 4D-3 |
+| X-32 | Client-authored correction reasons | Never — the vocabulary is closed and server-controlled |
+| X-33 | Editable or deletable history rows | Never — append-only guards remain unchanged |
 
 ### Product boundary — component coverage
 

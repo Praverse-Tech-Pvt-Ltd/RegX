@@ -781,6 +781,7 @@ not by calling the service directly.
 | TST-165 | A reason code outside the allow-list is rejected by the governed service |
 | TST-166 | No request serializer accepts a `reason_code` field |
 | TST-167 | No stored `reason_code` contains exception text, a stack frame, or a file path |
+| TST-484 | The three vocabularies stay separate: no `ALLOWED_HISTORY_REASON_CODES` member is ever written to `CalculationOutcome.reason_code`, and no `ALLOWED_REASON_CODES` member is ever written to `ChecklistResponseHistory.correction_reason` |
 
 ### 10.12 Maximum dosage units resolver
 
@@ -999,7 +1000,7 @@ A single parameterized test shall cover **every** entry of the M4D3-IFV-003 tabl
 **Test file:** `backend/iig_checklist/tests/test_resolver_failure_mapping.py`
 **Test name:** `test_resolver_detail_code_maps_deterministically`
 
-For each of the 28 mapped detail codes, assert: the stored `status` equals the table's
+For each of the **29** mapped detail codes, assert: the stored `status` equals the table's
 value; the stored `reason_code` equals the table's value; `value` is null for every
 non-complete outcome; the exact detail code appears in server-side provenance; no raw
 exception text or stack frame is stored anywhere; `full_clean()` passes; the status is
@@ -1016,6 +1017,7 @@ Required negative controls:
 | TST-447 | `INPUT_VALUE_INVALID` (malformed) and `INPUT_VALUE_NOT_COMPARABLE` (scientific) map to different canonical codes |
 | TST-448 | An undefined internal condition yields `UNKNOWN_INTERNAL_FAILURE` → `INPUT_RESOLUTION_FAILED`, never `complete` |
 | TST-450c | `INPUT_RESOLVER_UNKNOWN` yields `INPUT_RESOLUTION_FAILED`, not `UNKNOWN_REGISTRY_IDENTIFIER` |
+| TST-450d | **`UPSTREAM_CALCULATION_COMPONENT_MISMATCH`** (29th row): an upstream outcome exists but is bound to a different subject component → `status = "error"`, `reason_code = "INPUT_RESOLUTION_FAILED"`, `value = null`, the detail code retained in server-side provenance, `full_clean()` passes, and neither `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` nor `UPSTREAM_CALCULATION_MISSING` is used |
 
 The test shall be data-driven from the specification table so that adding a detail code
 without a mapping fails the suite.
@@ -1053,6 +1055,50 @@ depending on it through `calculation_dependencies`.
 | TST-467e | Downstream ordering | Graph nodes processed in stable topological order |
 | TST-469c | Provenance sweep | No prior-component UUID and no prior snapshot UUID remains anywhere in current `input_provenance` |
 
+### 10.19.1 Rebinding history row
+
+**Test file:** `backend/iig_checklist/tests/test_component_rebinding.py`
+
+| Test ID | Assertion |
+|---|---|
+| TST-480a | A successful A → B rebinding creates **exactly one** history row against the selector response |
+| TST-480b | `correction_reason == "COMPONENT_REBOUND"` |
+| TST-480c | `amended_by` equals the authenticated updater, and not `execution.created_by` when a different user performed the update |
+| TST-480d | `prior_raw_value == {"public_id": "<component A uuid>"}` |
+| TST-480e | `new_raw_value == {"public_id": "<component B uuid>"}` |
+| TST-480f | `prior_version` is the pre-update version and `new_version == prior_version + 1` |
+| TST-480g | `prior_is_not_applicable` and `new_is_not_applicable` are both populated and unchanged for a pure rebinding |
+| TST-480h | `prior_not_applicable_reason` and `new_not_applicable_reason` are both populated and unchanged for a pure rebinding |
+| TST-480i | `source_classification_snapshot` equals the response's `data_source_type_snapshot` |
+| TST-475 | The constructed row passes `full_clean()` before `save()` |
+| TST-480j | `correction_reason` is never empty — an empty value fails `full_clean()` |
+| TST-479a | `APPLICABILITY_REEVALUATED` is **not** used for a rebinding |
+| TST-476 | A forced history `full_clean()`/persistence failure rolls back the selector change, version, snapshot and every outcome, and emits no audit |
+| TST-470b | An unchanged component reference creates no history row and no new snapshot |
+| TST-466b | A rebinding attempt after submission creates no history row |
+| TST-471f | A wrong-tenant or wrong-formulation reference creates no history row |
+| TST-478 | The audit payload for a rebinding carries no full raw response content |
+| TST-477 | History payload contains only the `{public_id}` shape — no internal database identifier, cross-tenant metadata or unrestricted component text |
+| TST-207b | Attempting to mutate or delete the rebinding history row raises `GovernedHistoryMutationForbidden` |
+
+### 10.19.2 Combined rebinding and applicability transition
+
+**Test name:** `test_rebinding_with_separate_applicability_transition_writes_two_rows`
+
+Fixture: a rebinding that also causes a **different** response's persisted applicability
+state to change within the same governed operation.
+
+| Test ID | Assertion |
+|---|---|
+| TST-481a | The selector response receives one row with `correction_reason = "COMPONENT_REBOUND"` |
+| TST-481b | The affected applicability response receives its own row with `correction_reason = "APPLICABILITY_REEVALUATED"` |
+| TST-481c | Two distinct rows exist — never one combined row |
+| TST-481d | Both rows carry the same authenticated actor |
+| TST-481e | Both rows pass `full_clean()` |
+| TST-481f | Both rows are written in the same transaction |
+| TST-481g | A downstream failure rolls back both rows |
+| TST-481h | Neither code is applied to the other event type |
+
 ### 10.20 Trigger and selector configuration
 
 | Test ID | Assertion |
@@ -1067,6 +1113,7 @@ depending on it through `calculation_dependencies`.
 | TST-461 | A registry entry declaring `registry_component_code` is rejected at activation with `component_selector_form_disabled` |
 | TST-462 | `response_reference` is the only selector form that activates successfully |
 | TST-463 | Static check: no component code is derived from `ingredient_name`, `resolved_unii`, `display_order`, pk or creation order |
+| TST-483 | The import-time self-check rejects any mapped entry containing a nested `identifier` key; the mapping key is the sole identifier representation |
 
 ---
 
@@ -1078,8 +1125,8 @@ acceptance matrix.
 
 | Metric | Value |
 |---|---|
-| Normative requirement IDs defined | 374 |
-| Acceptance matrix IDs | 374 |
+| Normative requirement IDs defined | 384 |
+| Acceptance matrix IDs | 384 |
 | Missing (defined but absent from matrix) | 0 |
 | Duplicate requirement definitions | 0 |
 | Duplicate matrix rows | 0 |
@@ -1087,8 +1134,8 @@ acceptance matrix.
 | Matrix rows missing a required cell | 0 |
 
 Per-block counts: API 5, APP 13, AUD 7, CAR 10, CMP 6, DAG 10, DEP 12, FCR 14, FE 9,
-HST 9, IFV 7, INP 15, MAP 10, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13,
-RBD 9, RCL 7, REG 19, REV 5, RFV 7, RSN 10, RTE 6, SEC 5, SER 9, SNO 12, SNP 7, SRC 14,
+HST 16, IFV 7, INP 15, MAP 10, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13,
+RBD 10, RCL 7, REG 20, REV 5, RFV 7, RSN 11, RTE 6, SEC 5, SER 9, SNO 12, SNP 7, SRC 14,
 SUB 7, SVC 8, TRG 7, TRL 6, TXN 6, UNC 11, VER 8.
 
 Nineteen rows are classified **Review assertion** in the specification's Part 21 preamble:
