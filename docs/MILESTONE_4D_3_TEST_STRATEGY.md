@@ -828,6 +828,100 @@ one-to-many per version with no lifecycle field. All fixtures are synthetic.
 | TST-348 | Resolver | No fallback or default controlled term is substituted |
 | TST-344 | Documentation | Blank-capable fields recorded as verified |
 
+### 10.15 Input-resolver test matrix
+
+Resolves MAJ-A. All fixtures synthetic. Canonical units are full words (`gram`,
+`milligram`) per `iid_assessment/unit_conversion.py`.
+
+**Test file:** `backend/iig_checklist/tests/test_calculation_input_resolution.py`
+
+**Form A — question response (TST-362)**
+
+| Case | Expected |
+|---|---|
+| Valid decimal response | Resolved as `Decimal` |
+| Missing response | `INPUT_RESPONSE_MISSING` → `data_required` |
+| `is_not_applicable` response | `INPUT_RESPONSE_NOT_APPLICABLE` → `data_required` |
+| `REVIEW_REQUIRED:` marker present | `INPUT_REVIEW_REQUIRED` → `data_required` |
+| Non-numeric `raw_value` | `INPUT_VALUE_INVALID` → `error` |
+| Response on another tenant's execution | `INPUT_TENANT_MISMATCH` → `error` |
+| Form A pointed at a `SYSTEM_CALCULATED` question | Rejected at activation; `raw_value` is never accepted as a calculation result |
+
+**Form B — formulation field (TST-363)**
+
+| Case | Expected |
+|---|---|
+| Valid `FormulationComponent.quantity_per_dosage_unit` | Resolved and converted |
+| Valid `FormulationVersion.total_dosage_unit_weight` | Resolved and converted to `gram` |
+| Missing component | `FORMULATION_COMPONENT_MISSING` → `data_required` |
+| Blank `quantity_unit` | `INPUT_UNIT_MISSING` → `data_required` |
+| Unit outside the allow-list | `INPUT_UNIT_UNSUPPORTED` → `error`, `reason_code = UNIT_MISMATCH` |
+| Mass field with a volume target and no density | `DENSITY_REQUIRED` → `error`, `reason_code = NOT_COMPARABLE` |
+| Component under another tenant | `INPUT_TENANT_MISMATCH` → `error` |
+
+**Form C — maximum daily units (TST-364)** — all branches of §10.12 retained; additionally
+assert the resolver is invoked through `resolve_calculation_inputs()` and that no registry
+entry restates the selection logic.
+
+**Form D — assessment snapshot (TST-365)**
+
+| Case | Expected |
+|---|---|
+| Valid `iid_potency_amount` | Resolved |
+| Valid `iid_mde` | Resolved |
+| No snapshot for the execution | `ASSESSMENT_SNAPSHOT_MISSING` → `data_required` |
+| Snapshot with a different `tenant` | `INPUT_TENANT_MISMATCH` → `error`; no field value leaks |
+| Snapshot present but field null/blank | `ASSESSMENT_FIELD_MISSING` → `data_required` |
+| Snapshot whose source release is not active | Engine canonical `REGULATORY_REVIEW_REQUIRED` |
+| Client-supplied snapshot UUID in the request | Rejected; resolver uses only the execution's own snapshot |
+| Live IID row changed after snapshot creation | Resolved value still comes from the snapshot |
+
+**Form E — prior calculation outcome (TST-366)**
+
+| Case | Expected |
+|---|---|
+| Exactly one `complete` outcome with non-null value | Resolved |
+| Zero outcome rows | `UPSTREAM_CALCULATION_MISSING` → `data_required` |
+| Two rows for the same response and `calculation_name` | `UPSTREAM_CALCULATION_DUPLICATE` → `error`; no arbitrary pick |
+| Upstream `data_required` | `UPSTREAM_CALCULATION_INCOMPLETE` → `data_required` |
+| Upstream `error` | `UPSTREAM_CALCULATION_INCOMPLETE` → `data_required` |
+| `complete` with null `value` | `UPSTREAM_CALCULATION_INCOMPLETE` → `data_required` |
+| Upstream unit not convertible to `required_unit` | `INPUT_UNIT_DIMENSION_MISMATCH` → `error`, `UNIT_MISMATCH` |
+| Upstream outcome on another tenant's execution | `INPUT_TENANT_MISMATCH` → `error` |
+| Dependency ordering | Upstream resolved before dependants in every run |
+
+**Form F — constant (TST-367)** — a registry-declared constant resolves; no request
+payload can introduce or override one.
+
+**Unit conversion (TST-377 … TST-387)**
+
+| Case | Expected |
+|---|---|
+| `gram` → `milligram` | ×1000 exactly, `Decimal` |
+| `milligram` → `gram` | ÷1000 exactly, `Decimal` |
+| Same-unit pass-through | Value unchanged, still `Decimal` |
+| Unknown unit | `UNIT_UNKNOWN` → `UNIT_MISMATCH` |
+| Mass → volume without density | `DENSITY_REQUIRED` → `NOT_COMPARABLE` |
+| Missing unit | `VALUE_MISSING`/`INPUT_UNIT_MISSING` → `DATA_REQUIRED` |
+| Precision and rounding | Deterministic, repeatable, no float anywhere on the path |
+| Provenance | Original value, original unit, converted value, converted unit and rule version recorded |
+
+**End-to-end (TST-388 … TST-392, TST-369 … TST-376)**
+
+| Case | Expected |
+|---|---|
+| All six functions | Receive fully resolved kwargs matching M4D3-INP-001 names exactly |
+| Missing-kwarg `TypeError` | Unreachable — the pipeline blocks invocation before the call |
+| Representative synthetic inputs | Correct result for each of the six functions |
+| Any resolver failure | Calculation function is not invoked |
+| Provenance | Contains every source and every conversion applied |
+| `calculate_daily_exposure` outcome | Stored `unit` is `gram` per day, giving Form E an explicit source unit |
+| Dependency graph | Derived graph equals the documented graph: daily_exposure → {percentage_of_mde, difference_from_mde}; the two MDE calculations do not depend on each other |
+
+**Snapshot ordering (TST-399 … TST-402)** — the six-step order is observed; no live IID
+read occurs after the snapshot step; a forced rollback discards both snapshot and
+outcomes; snapshot-dependent calculations run after their Form E upstream.
+
 ---
 
 ## 11. Acceptance Matrix Reconciliation
@@ -838,17 +932,22 @@ acceptance matrix.
 
 | Metric | Value |
 |---|---|
-| Normative requirement IDs defined | 259 |
-| Acceptance matrix IDs | 259 |
+| Normative requirement IDs defined | 311 |
+| Acceptance matrix IDs | 311 |
 | Missing (defined but absent from matrix) | 0 |
 | Duplicate requirement definitions | 0 |
 | Duplicate matrix rows | 0 |
 | Orphan matrix IDs (in matrix but undefined) | 0 |
 | Matrix rows missing a required cell | 0 |
 
-Per-block counts: API 5, APP 13, AUD 7, CMP 6, DAG 10, FE 9, HST 9, MDL 13, MDU 21,
-MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13, RCL 5, REG 19, REV 5, RFV 7, RSN 8, RTE 6,
-SEC 5, SER 9, SNP 7, SRC 14, SUB 7, SVC 8, TRL 6, TXN 6, VER 8.
+Per-block counts: API 5, APP 13, AUD 7, CMP 6, DAG 10, DEP 6, FE 9, HST 9, IFV 6,
+INP 14, MAP 8, MDL 13, MDU 24, MIG 8, NA 5, OUT 8, POP 8, PRV 4, PST 13, RCL 5, REG 19,
+REV 5, RFV 7, RSN 8, RTE 6, SEC 5, SER 9, SNO 4, SNP 7, SRC 14, SUB 7, SVC 8, TRL 6,
+TXN 6, UNC 11, VER 8.
+
+Sixteen rows are classified **Review assertion** in the specification's Part 21 preamble:
+they record verified source facts and map to source-inspection evidence rather than an
+executable test. All remaining rows are normative controls requiring implementation.
 
 This reconciliation shall be re-run and the table updated whenever either document
 changes.

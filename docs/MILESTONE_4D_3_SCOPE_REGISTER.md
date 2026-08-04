@@ -17,7 +17,7 @@ additional in-scope items identified during adversarial review are documented he
 |---|---|---|
 | S-01 | `FDA_DERIVED_DEFAULT` population at execution creation | 4D design §10; 4D-2 discovery §1 |
 | S-02 | `SYSTEM_CALCULATED` computation at execution creation | 4D design §10; 4D-2 discovery §1 |
-| S-03 | In-draft cascade recalculation on `enter_response()` for USER_REQUIRED/EVIDENCE_DERIVED updates | 4D design §8b; 4D-2 discovery §6d |
+| S-03 | In-draft cascade recalculation in the new governed `update_checklist_response()` service for USER_REQUIRED/EVIDENCE_DERIVED updates | 4D design §8b; 4D-2 discovery §6d |
 | S-04 | `CalculationOutcome` rows updated from `"data_required"` to `"complete"` or `"error"` (via translation layer) | 4D-2 implementation spec §9; models.py comment; adversarial review CR-1 |
 | S-05 | `source_assessment_snapshot_public_id` populated via live-first `run_preview()` with tenant filter | 4D design §9; OQ-4 resolved |
 | S-06 | Applicability runtime evaluator — pure function, no eval/exec, returns `ApplicabilityOutcome` | 4D-3 discovery §5; field_registry.py + applicability.py |
@@ -60,7 +60,7 @@ additional in-scope items identified during adversarial review are documented he
 | X-09 | Electronic signatures, 21 CFR Part 11 compliance | Not in scope for any 4D stage |
 | X-10 | Auto-approval based on population result | Never — structural prohibition |
 | X-11 | Formula logic in the frontend | Never — backend only |
-| X-12 | Any modification to `iid_assessment`, `fda_data`, `formulations`, or `documents` app models | Confirmed: 4D-3 is a consumer only |
+| X-12 | New or altered `iid_assessment`, `fda_data`, `formulations`, or `documents` **model classes**, and any direct model write into those apps by `iig_checklist` | See the X-12 clarification below |
 | X-13 | New calculation formulas beyond the six in `iid_assessment.calculations` | Not in scope |
 | X-14 | Asynchronous calculation execution | The `CalculationStatus.CALCULATING` value is reserved; 4D-3 uses synchronous computation only |
 | X-15 | New database field for calculation binding JSON schema | Not required — `calculation_binding_identifier` CharField is the approved approach |
@@ -69,6 +69,27 @@ additional in-scope items identified during adversarial review are documented he
 | X-18 | Staleness-avoidance logic for existing `AssessmentSnapshot` records | Eliminated by OQ-4 live-first design |
 | X-19 | New model for `REVIEW_REQUIRED` state persisted representation | Deferred to implementation spec; must use existing fields where possible |
 | X-20 | Generic `PATCH`/`PUT` endpoint for `CalculationOutcome` | Never — write path is server-controlled only |
+
+---
+
+### X-12 clarification — governed snapshot creation
+
+The earlier "4D-3 is a consumer only" gloss was ambiguous: it could be read as forbidding
+the governed `AssessmentSnapshot` creation that Milestone 4D-3 requires. The precise
+boundary is:
+
+- 4D-3 shall **not** add new `iid_assessment` model classes, nor alter existing ones, nor
+  create any migration in that app.
+- `iig_checklist` shall **not** import or write `iid_assessment` model classes directly.
+- 4D-3 **may** call an approved `iid_assessment` service or helper to create a governed
+  `AssessmentSnapshot`, and adding that service inside `iid_assessment` is within 4D-3's
+  implementation surface.
+- This remains a governed consumer relationship with the `iid_assessment` domain API.
+- The import direction stays one-way; no reverse import is introduced, and the existing
+  import-linter contract forbidding `iid_assessment → iig_checklist` remains unchanged.
+
+See `docs/MILESTONE_4D_3_IMPLEMENTATION_SPEC.md` Part 15 (M4D3-SNP-001 … M4D3-SNP-007)
+and Part 3A.6 for the normative requirements.
 
 ---
 
@@ -152,7 +173,10 @@ See `docs/MILESTONE_4D_3_DISCOVERY.md §6`.
   iig_checklist (4D-1, 4D-2)
     ChecklistDefinition / ChecklistVersion / ChecklistSection / ChecklistQuestion
     ChecklistExecution / ChecklistResponse / CalculationOutcome (4D-2 models)
-    execution_transitions.py / enter_response() service
+    execution_transitions.py / create_execution() / transition_execution() /
+      enter_reviewer_conclusion() services
+    ChecklistResponseUpdateView.patch() -- the current ordinary-response write path;
+      no enter_response() service exists (4D-3 introduces update_checklist_response())
     applicability.validate_condition_json() / field_registry.py (4D-1)
     iig_checklist.enums.CalculationStatus (4 values: data_required, calculating, complete, error)
   iid_assessment (4A-4C)
