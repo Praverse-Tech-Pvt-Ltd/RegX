@@ -1,6 +1,6 @@
 # Milestone 4D-3 — Implementation Evidence
 
-**Status: FOUNDATION LAYER ONLY. ORM, service, API and frontend layers deferred.**
+**Status: FOUNDATION LAYER + REGISTRY ACTIVATION VALIDATION. Runtime calculation, response-update, snapshot, outcome, rebinding and frontend layers deferred.**
 
 **Approved specification head:** `97653c09456d04fd194d060d29765f052a721405`
 **Implementation branch:** `regx/feat/milestone-4d-3`
@@ -150,9 +150,14 @@ Deliberately **not** implemented in this run, per the stop condition:
 - `CalculationOutcome` persistence and provenance writing.
 - History helper persistence and component rebinding.
 - Serializers, API representation and all frontend work.
-- **Activation-time validation of registry question codes** against an approved
-  `ChecklistVersion` (M4D3-REG-018) — see note 1 in §6. Mandatory before any
-  registry entry may be activated.
+
+~~Activation-time validation of registry question codes~~ — **delivered in §6A.**
+This was the mandatory prerequisite; it is no longer deferred.
+
+**Next layer:** ORM-backed `resolve_calculation_inputs()`. Until it exists, a
+successfully activated checklist still has no runtime 4D-3 consumer — activation
+proves the bindings are sound, but nothing yet resolves or executes them. That is
+the expected state at the end of this run.
 
 No fake repository, stub or mock was introduced as a production stand-in.
 
@@ -223,6 +228,122 @@ No fake repository, stub or mock was introduced as a production stand-in.
    no reachable database.
 
 ---
+
+## 6A. ORM phase 1 — registry activation validation
+
+### Environment change
+
+PostgreSQL became available part-way through the milestone. **Rancher Desktop**
+(already installed, container engine `moby`) exposes the standard
+`npipe:////./pipe/docker_engine`, so `docker`, `docker compose`, `compose.yaml`
+and CI all work unchanged — **no repository change and no per-device
+configuration was required**. The project's own compose stack was already
+running: `regx-postgres-1` (`postgres:16-alpine`, healthy, 5432) and
+`regx-redis-1` (healthy, 6379).
+
+Every earlier "BLOCKED — PostgreSQL unavailable" entry in this document refers to
+the earlier database-free runs and is superseded from this section onward.
+
+### Pre-change baseline (before any production code was touched)
+
+| Check | Command | Result |
+|---|---|---|
+| System check | `manage.py check` | **no issues (0 silenced)** |
+| Migration state | `manage.py makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `manage.py migrate --check` (real `regx` DB) | **exit 0**, zero unapplied |
+| Full backend suite | `pytest -q` | **1102 passed**, 0 failed |
+| Coverage | same run | **90.13%** against a 55% floor |
+| Duration | same run | 332.6 s |
+
+The baseline was green, so implementation proceeded.
+
+### Integration point
+
+`backend/iig_checklist/views.py` —
+`_ChecklistVersionActionViewBase.post()`, the `VersionAction.ACTIVATE` branch.
+This is the existing governed lifecycle transition; **no parallel activation
+pathway was created** and no new lifecycle state was invented.
+
+Validation is placed after the tenant-safe `select_for_update()` lookup, the
+`_authorize_mutation()` permission check, `validate_version_transition()` and the
+`effective_date` check — and **before** the first mutation, which is the
+supersede-prior-active block. A failure therefore cannot supersede a prior active
+version, cannot write lifecycle fields and cannot emit a success audit.
+
+### Validator
+
+`backend/iig_checklist/activation_validation.py` — read-only, opens no
+transaction, emits no audit. Returns immutable, ordered `ValidationFinding`
+records; `format_activation_errors()` shapes them into the structured
+`REGISTRY_VALIDATION_FAILED` body.
+
+**Verified schema fact driving the duplicate control:** question codes are unique
+per **section** (`unique_iig_question_code_per_section`), *not* per version, so
+one version may legitimately contain the same code in two sections. Every lookup
+therefore collects **all** matches and fails on anything other than exactly one.
+There is no `.first()` and no arbitrary selection anywhere in the module.
+
+Controls enforced per referenced registry entry:
+
+| Control | Code |
+|---|---|
+| Identifier resolves to an approved registry entry | `UNKNOWN_REGISTRY_IDENTIFIER` |
+| Referenced question exists in this version | `QUESTION_CODE_MISSING` |
+| Referenced code resolves to exactly one question | `QUESTION_CODE_DUPLICATE` |
+| Bound question answer type matches the entry | `WRONG_ANSWER_TYPE` |
+| Bound question classification matches the entry | `WRONG_SOURCE_CLASSIFICATION` |
+| Form E target is `SYSTEM_CALCULATED` | `DEPENDENCY_NOT_CALCULATED` |
+| Component selector is `FORMULATION_COMPONENT_REFERENCE` | `SELECTOR_WRONG_ANSWER_TYPE` |
+| `registry_component_code` selector rejected | `DISABLED_SELECTOR_FORM` |
+| `calculation_dependencies` match form E resolvers | `DEPENDENCY_MISMATCH` |
+| `recalculation_triggers` match form A + selector resolvers | `TRIGGER_MISMATCH` |
+
+Only identifiers actually referenced by the version's questions are validated;
+unreferenced registry entries never block activation.
+
+### Deferred activation control — now IMPLEMENTED
+
+The control recorded in §6 note 1 as deferred and **mandatory before any registry
+entry can become active** is delivered by this section. Registry question codes
+are no longer unvalidated against real checklist content: an activation
+referencing a code that is absent, duplicated, of the wrong answer type or of the
+wrong source classification now fails closed with zero mutation.
+
+### Tests
+
+`backend/iig_checklist/tests/test_4d3_activation_validation.py` — **26 tests,
+real PostgreSQL**, no mocked QuerySets or managers. Covers valid activation and
+success audit; missing selector, form E dependency and trigger questions;
+duplicate codes across sections; wrong answer type; wrong classification;
+non-calculated form E target; unknown identifier; the full
+`daily_exposure → percentage_of_iid_mde` chain; cross-version and cross-tenant
+isolation; permission denial; deterministic ordering; zero mutation on failure;
+no success audit on failure; no supersede on failure; and sanitized structured
+errors carrying public UUIDs only.
+
+### Post-change gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **26 passed** |
+| Existing lifecycle / clone / platform-auth / execution API | `pytest test_lifecycle.py test_clone_api.py test_platform_mutation_authorization.py test_execution_api.py --no-cov -q` | **101 passed** |
+| Database-free foundation | `pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **182 passed** |
+| Full backend suite | `pytest -q` | **1128 passed**, 0 failed, 335.9 s |
+| Coverage | same run | **92.59%** against a 55% floor |
+| Ruff | `ruff check iig_checklist/` | **All checks passed** |
+| Import-linter | `lint-imports.exe` | **7 kept, 0 broken** |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | **exit 0** |
+
+Suite grew 1102 → 1128 (+26, the new activation tests) and coverage rose
+90.13% → 92.59%. No threshold was lowered and no test was skipped or weakened.
+
+**Two test defects were found and fixed in my own tests, not worked around.**
+The endpoint base path is `/api/regx/v1`, not the `/api/v1` I first assumed. And
+a cross-tenant isolation test initially used a reviewer, who is denied 403 by the
+DRF class-level permission *before* the view body runs; the meaningful test uses
+an actor who **does** hold activate permission but sits in another tenant, which
+correctly yields 404 and proves tenant scoping rather than permission denial.
 
 ## 7. Assertions
 
