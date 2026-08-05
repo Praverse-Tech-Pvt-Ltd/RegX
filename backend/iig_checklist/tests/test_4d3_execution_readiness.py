@@ -182,35 +182,26 @@ def _install(monkeypatch, mapping):
 
 
 class TestPlaceholderCalculationName:
-    def test_calculation_name_is_no_longer_the_blocker(self, execution_world):
-        """The binding identifier is gone from calculation_name.
+    def test_governed_path_creates_a_valid_placeholder(self, execution_world):
+        """The governed path now creates a valid placeholder end to end.
 
-        Placeholder creation still cannot complete, but no longer because of
-        the name: a *second*, independent model defect now owns the failure.
-        ``CalculationOutcome.inputs`` and ``input_provenance`` are
-        ``JSONField(default=dict)`` with ``blank=False``, and Django counts
-        ``{}`` among ``Field.empty_values``, so a row holding its own defaults
-        cannot pass ``full_clean()``. Correcting that needs ``blank=True`` on
-        both fields -- a model change and migration, neither authorised in this
-        run.
-
-        This test is the tripwire: it passes while the remaining defect stands
-        and fails the moment the model is corrected, at which point the
-        placeholder success assertions in this class's docstring should replace
-        it.
+        This replaces the tripwire that asserted the path was still blocked on
+        ``{"inputs", "input_provenance"}``. Both defects are fixed: the binding
+        identifier is no longer written into ``calculation_name``, and the two
+        JSONFields accept their own ``{}`` defaults.
         """
-        from django.core.exceptions import ValidationError as DjangoValidationError
+        from iig_checklist.models import CalculationOutcome, ChecklistResponse
 
         _calculated(execution_world["section"], "Q_PCT_WW", "percentage_w_w")
-        with pytest.raises(DjangoValidationError) as raised:
-            _create(execution_world)
+        execution = _create(execution_world)
 
-        rejected = set(raised.value.message_dict)
-        assert "calculation_name" not in rejected, (
-            "calculation_name should no longer be rejected -- the registry "
-            "lookup fix is what this asserts"
-        )
-        assert rejected == {"inputs", "input_provenance"}
+        response = ChecklistResponse.objects.get(execution=execution)
+        outcomes = list(CalculationOutcome.objects.filter(response=response))
+        assert len(outcomes) == 1
+        outcome = outcomes[0]
+        assert outcome.calculation_name == "calculate_percentage_w_w"
+        assert outcome.calculation_name != "percentage_w_w"
+        outcome.full_clean()  # the row the governed path just wrote is valid
 
     def test_registry_lookup_yields_the_approved_function_name(self):
         """The value create_execution() now writes, verified at the source.
@@ -397,11 +388,11 @@ class TestExecutionCreationUnchanged:
     def test_no_calculation_function_is_invoked(self, execution_world, monkeypatch):
         """Placeholder creation must never run the calculation itself.
 
-        A tripwire replaces the bound function; reaching the binding at all
-        would call it. The invalid-binding path is used because it is the
-        deepest point placeholder creation currently reaches.
+        A tripwire replaces the bound function, so any invocation would fail
+        the test loudly. The placeholder is created successfully and the
+        function stays untouched.
         """
-        from django.core.exceptions import ValidationError as DjangoValidationError
+        from iig_checklist.models import CalculationOutcome
 
         called = []
 
@@ -418,11 +409,9 @@ class TestExecutionCreationUnchanged:
             },
         )
         _calculated(execution_world["section"], "Q_PCT_WW", "percentage_w_w")
-        # Fails on the JSONField defect, not on the binding -- either way the
-        # bound function must never be called.
-        with pytest.raises(DjangoValidationError):
-            _create(execution_world)
+        _create(execution_world)
         assert called == []
+        assert CalculationOutcome.objects.get().value is None
 
 
 # ===========================================================================

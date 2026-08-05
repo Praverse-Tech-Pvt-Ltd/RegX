@@ -423,7 +423,6 @@ _CALCULATION_NAMES = frozenset(
     }
 )
 
-
 class ChecklistExecutionManager(models.Manager):
     def visible_to(self, tenant):
         """Tenant-scoped -- executions are never platform-scoped."""
@@ -727,8 +726,15 @@ class CalculationOutcome(PublicIDModel, TimeStampedModel):
     )
     value = models.DecimalField(null=True, blank=True, max_digits=20, decimal_places=10)
     unit = models.CharField(blank=True, max_length=50)
-    inputs = models.JSONField(default=dict)
-    input_provenance = models.JSONField(default=dict)
+    # blank=True because a placeholder legitimately holds {} until governed
+    # calculation execution fills it, and Django counts {} among
+    # Field.empty_values -- with blank=False a row holding its own defaults
+    # could not pass full_clean(), so no placeholder could be created at all.
+    # null stays False: the column is always a JSON object, never SQL NULL.
+    # The completed-outcome provenance requirements are enforced in clean()
+    # instead, where they can be applied only to the status that has them.
+    inputs = models.JSONField(default=dict, blank=True)
+    input_provenance = models.JSONField(default=dict, blank=True)
     rounding_rule = models.CharField(blank=True, max_length=100)
     reason_code = models.CharField(blank=True, max_length=100)
     generated_at = models.DateTimeField(null=True, blank=True)
