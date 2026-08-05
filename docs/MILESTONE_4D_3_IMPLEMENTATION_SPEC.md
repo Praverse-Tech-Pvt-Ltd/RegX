@@ -1065,7 +1065,8 @@ governed specification change cannot leave stale wording behind.
 `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH`, `ASSESSMENT_SNAPSHOT_RELEASE_MISMATCH`,
 `ASSESSMENT_FIELD_MISSING`, `UPSTREAM_CALCULATION_MISSING`,
 `UPSTREAM_CALCULATION_INCOMPLETE`, `UPSTREAM_CALCULATION_DUPLICATE`,
-`INPUT_TENANT_MISMATCH`, `UPSTREAM_CALCULATION_COMPONENT_MISMATCH`, plus
+`INPUT_TENANT_MISMATCH`, `UPSTREAM_CALCULATION_COMPONENT_MISMATCH`,
+`UPSTREAM_CALCULATION_NAME_MISMATCH`, plus
 `INPUT_RESOLVER_UNKNOWN` and `UNKNOWN_INTERNAL_FAILURE`.
 
 **M4D3-IFV-002** Failure codes are provenance metadata. They shall never be written to
@@ -1100,6 +1101,7 @@ language is permitted anywhere in the failure mapping.
 | `ASSESSMENT_SNAPSHOT_TENANT_MISMATCH` | `error` | `TENANT_ISOLATION_VIOLATION` | null |
 | `UPSTREAM_CALCULATION_DUPLICATE` | `error` | `DUPLICATE_UPSTREAM_OUTCOME` | null |
 | `UPSTREAM_CALCULATION_COMPONENT_MISMATCH` | `error` | `INPUT_RESOLUTION_FAILED` | null |
+| `UPSTREAM_CALCULATION_NAME_MISMATCH` | `error` | `INPUT_RESOLUTION_FAILED` | null |
 | `ASSESSMENT_SNAPSHOT_DUPLICATE` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
 | `ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
 | `ASSESSMENT_SNAPSHOT_RELEASE_MISMATCH` | `error` | `SNAPSHOT_RESOLUTION_FAILED` | null |
@@ -2263,6 +2265,52 @@ shall be logged as a data-integrity warning without raising.
 independently; a change to resolvers or dependencies requires a `binding_version`
 increment even when `formula_version` is unchanged.
 
+#### Subject-component provenance
+
+M4D3-DEP-011 requires a Form E resolver to reject an upstream outcome bound to a
+different subject component. That comparison needs the upstream outcome to state
+which component it was produced for, so the following defines the single
+normative representation. Reading the *current* selector instead is prohibited:
+it would silently accept a stale result computed for a different component.
+
+**M4D3-PRV-005** `input_provenance` shall record the subject component of every
+component-scoped calculated outcome under the reserved key
+`_subject_component_public_id`. The value shall be the canonical string form of
+the `FormulationComponent` `public_id` (`str(uuid.UUID)`, lowercase, hyphenated).
+A database primary key shall never be written.
+
+**M4D3-PRV-006** The key is server-generated and server-controlled. It begins
+with an underscore, so M4D3-SEC-004 already requires any request supplying it to
+be rejected; no client may provide or override it.
+
+**M4D3-PRV-007** A calculation is *component-scoped* when its registry entry
+declares a `component_selector` in any resolver. For such a calculation the key
+is **required**. For a calculation that is not component-scoped and inherits no
+component, the key shall be omitted rather than written empty or null.
+
+**M4D3-PRV-008** The governed calculation-execution and persistence service
+shall write the key when it creates the outcome's provenance, in the same
+transaction and subject to the same immutability rules as the rest of
+`input_provenance`. Downstream Form E resolution shall fail closed when the key
+is absent (`UPSTREAM_CALCULATION_COMPONENT_MISMATCH`), malformed
+(`INPUT_VALUE_INVALID`), names a component outside the execution's own
+`FormulationVersion` (`UPSTREAM_CALCULATION_COMPONENT_MISMATCH`), or disagrees
+with the subject component resolved for the dependent calculation
+(`UPSTREAM_CALCULATION_COMPONENT_MISMATCH`).
+
+**M4D3-PRV-009** The subject component recorded under this key, the component
+used to select the `AssessmentSnapshot`, and the component supplied to every
+component-scoped input of one calculation shall be the same component. Where a
+calculation both resolves a selector and consumes a component-scoped upstream
+outcome, the two identities shall be reconciled before any input is validated
+against either, and disagreement shall fail closed. Resolution shall not depend
+on resolver kwarg names, kwarg ordering or mapping insertion order.
+
+**M4D3-DEP-013** An upstream outcome whose `calculation_name` differs from the
+`calculation_name` of the registry entry bound to the upstream question shall be
+rejected with `UPSTREAM_CALCULATION_NAME_MISMATCH`. A result produced by a
+different calculation is a different quantity, however complete the row looks.
+
 ### 20.5 Migration and compatibility
 
 **M4D3-MIG-001** No Django migration, no new database field, and no data backfill shall
@@ -2590,6 +2638,7 @@ scalar-only resolution rule), so both retain an executable implementation compon
 | M4D3-TRG-006 | Activation service | TST-456 | Both sets validated against resolvers | Data integrity |
 | M4D3-TRG-007 | Activation service | TST-457 | Unknown trigger code rejected | Data integrity |
 | M4D3-DEP-012 | Dependency graph | TST-458 | Graph holds only calculated response nodes | Correctness |
+| M4D3-DEP-013 | Input resolution | TST-459 | Upstream outcome calculation_name must match its binding | Data integrity |
 | M4D3-RCL-006 | New service | TST-459 | Trigger-keyed cascade, expanded through dependencies | Correctness |
 | M4D3-RCL-007 | New service | TST-460 | Non-trigger response causes no recalculation | Regulatory |
 | M4D3-FCR-012 | Activation service | TST-461 | Form B rejected with `component_selector_form_disabled` | Security |
@@ -2708,6 +2757,11 @@ scalar-only resolution rule), so both retain an executable implementation compon
 | M4D3-PRV-002 | Outcome writer | TST-311 | Binding version in provenance | Reproducibility |
 | M4D3-PRV-003 | Serializer | TST-312 | Missing version warns, does not raise | Robustness |
 | M4D3-PRV-004 | Registry governance | TST-313 | Versions governed independently | Reproducibility |
+| M4D3-PRV-005 | Outcome writer / resolver | TST-314 | Subject component recorded under the reserved key, canonical UUID string | Reproducibility |
+| M4D3-PRV-006 | Request validation | TST-315 | Client-supplied reserved key rejected | Security |
+| M4D3-PRV-007 | Outcome writer | TST-316 | Required for component-scoped, omitted otherwise | Data integrity |
+| M4D3-PRV-008 | Input resolution | TST-317 | Absent, malformed, foreign or mismatched key fails closed | Data integrity |
+| M4D3-PRV-009 | Input resolution | TST-318 | One component across selector, snapshot and every input; order-independent | Correctness |
 | M4D3-MIG-001 | Repository check | TST-314 | No migration, field or backfill | Compatibility |
 | M4D3-MIG-002 | Compatibility test | TST-315 | Existing rows valid | Compatibility |
 | M4D3-MIG-003 | Deployment test | TST-316 | Historical executions unchanged | Regulatory |
