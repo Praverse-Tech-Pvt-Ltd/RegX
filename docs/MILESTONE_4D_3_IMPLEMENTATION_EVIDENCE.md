@@ -848,6 +848,139 @@ update, no `AssessmentSnapshot` creation, no response mutation, no applicability
 persistence, no component rebinding, no history persistence, no serializers, no
 frontend, no model and no migration.
 
+## 6F. Execution-readiness corrections
+
+The resolver-layer and specification-amendment gates both closed with
+**PASS WITH MINOR CORRECTIONS** (0 Critical, 0 Major, 1 Minor). This section
+records the two execution-readiness items that remained, and — importantly — a
+third defect discovered while fixing the second.
+
+### Minor — canonical subject-component UUID enforced
+
+**Finding.** M4D3-PRV-005 mandates the canonical lowercase hyphenated form for
+`_subject_component_public_id`. The resolver parsed with `uuid.UUID()` and
+compared identity, so an uppercase, braced, URN or compact spelling was silently
+accepted and normalised.
+
+**Change.** After parsing, the stored string must equal `str(parsed)` exactly;
+anything else fails with `INPUT_VALUE_INVALID`. The specification was **not**
+weakened to match the implementation — the implementation was tightened to match
+the specification. Accepting a second spelling would let two provenance values
+denote one component, which is exactly what a canonical form exists to prevent.
+
+Rejected and covered: uppercase, braced, compact 32-character, `urn:uuid:`,
+whitespace-padded, trailing-newline and malformed. A companion test proves every
+rejected spelling *does* parse cleanly through `uuid.UUID()`, so the canonical
+comparison — not UUID parsing — is what rejects them. A canonical UUID naming a
+different component remains a distinct component-mismatch failure, and a
+component outside this execution's formulation is still rejected without echoing
+its UUID.
+
+### Blocker — `create_execution()` placeholder calculation name
+
+**Finding.** `create_execution()` wrote `question.calculation_binding_identifier`
+into `CalculationOutcome.calculation_name`, while `CalculationOutcome.clean()`
+accepts only the six approved calculation **function** names.
+
+**Change.** The identifier is now resolved through the immutable registry and
+`entry.calculation_name` is written. No second registry implementation was
+introduced, and the raw binding string is not trusted: the entry must exist, its
+`allowed_answer_type` must match the question's answer type, and its
+`allowed_data_source` must match the question's classification. Any failure
+raises `InvalidCalculationBinding`, which aborts the whole transaction — no
+execution, no responses, no outcomes, no success audit — and surfaces through the
+existing view as a structured `execution_invalid_calculation_binding` 400 rather
+than a 500.
+
+### Newly discovered — placeholder creation is still blocked by the model
+
+Correcting the name exposed a **second, independent defect in the same path**.
+`CalculationOutcome.inputs` and `CalculationOutcome.input_provenance` are
+declared `JSONField(default=dict)` with `blank=False`. Django counts `{}` among
+`Field.empty_values`, so a row holding its own field defaults cannot pass
+`full_clean()`:
+
+```
+full_clean errors: {'inputs': ['This field cannot be blank.'],
+                    'input_provenance': ['This field cannot be blank.']}
+```
+
+`create_execution()` creates every governed row through `_create_validated()`,
+which always calls `full_clean()`. A calculated placeholder therefore still
+cannot be created — now for this reason rather than the name.
+
+**Not fixed here, deliberately.** The correct fix is `blank=True` on both fields,
+which is a model change and a migration; both are outside this run's
+authorisation. No workaround was applied: `full_clean()` was not bypassed, no
+field was excluded from validation, and no provenance was fabricated to dodge the
+blank check. Fabricating `inputs` or `input_provenance` content at placeholder
+time would also contradict §6D's placeholder contract.
+
+`test_calculation_name_is_no_longer_the_blocker` is the tripwire. It asserts that
+`calculation_name` is **absent** from the rejected fields and that the rejection
+set is exactly `{"inputs", "input_provenance"}` — so it proves the name fix
+landed, documents precisely what remains, and fails usefully the moment the model
+is corrected.
+
+Because the placeholder cannot yet be created, the corrected name is proven at
+its source instead: the registry mapping is asserted for every approved entry
+(identifier → `calculate_*`, never equal to the identifier), and
+`CalculationOutcome.clean()` is shown to accept every approved function name and
+reject every binding identifier.
+
+### Tests
+
+`backend/iig_checklist/tests/test_4d3_execution_readiness.py` — **25 tests, real
+PostgreSQL**. Placeholder name correction and its remaining blocker; fail-closed
+rollback for unknown identifier, blank identifier, wrong answer type and (via a
+synthetic entry) wrong source classification; no partial execution; unchanged
+behaviour of the uncalculated path including the on-commit created audit, tenant
+scoping and draft status; a tripwire proving no calculation function is invoked
+during placeholder creation; and the full canonical-UUID matrix with a zero-write,
+zero-audit assertion backed by SQL-verb capture.
+
+### Post-correction gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Execution readiness | `pytest iig_checklist/tests/test_4d3_execution_readiness.py --no-cov -q` | **25 passed**, 52.0 s |
+| Input resolvers | `pytest iig_checklist/tests/test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 173.1 s |
+| Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 135.1 s |
+| Database-free foundation | `pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **183 passed**, 0.24 s |
+| Lifecycle / clone / platform-auth / execution / response | `pytest …test_lifecycle.py …test_clone_api.py …test_platform_mutation_authorization.py …test_execution_api.py …test_execution_lifecycle.py …test_response_api.py --no-cov -q` | **127 passed**, 120.6 s |
+| Tenant / permission regression | `pytest …test_platform_authorization.py tenancy authorization --no-cov -q` | **46 passed**, 23.3 s |
+| Full backend suite | `pytest -q` | **1293 passed**, 0 failed, 0 skipped, 453.0 s, exit 0 |
+| Coverage | same run | **93.25%** against a 55% floor |
+| System check | `manage.py check` | no issues (0 silenced) |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check iig_checklist` | All checks passed, exit 0 |
+| Import-linter | `importlinter.cli lint` | exit 0, 7 contracts |
+
+Suite grew 1268 → 1293 (+25) and coverage rose 93.20% → 93.25%. Gates were run
+**serially**: they share one test database, and running them concurrently tears
+it down mid-run and produces spurious failures. No threshold was lowered, no file
+excluded, no test weakened, and no pragma, noqa, skip or xfail was added.
+
+### Open execution-phase blockers
+
+1. **`CalculationOutcome.inputs` / `input_provenance` must allow blank.**
+   `blank=True` on both fields, with the accompanying migration. Until then no
+   calculated placeholder can be created and governed calculation execution
+   cannot start. Requires model/migration authorisation.
+2. **The execution service must write** `_registry_binding_version`, per-input
+   source descriptors, `_subject_component_public_id` for component-scoped
+   outcomes, `calculation_name` equal to the approved function name, and
+   immutable provenance (M4D3-PRV-002, M4D3-PRV-005..008).
+
+Still **not** implemented: calculation execution, completed `CalculationOutcome`
+values, `AssessmentSnapshot` creation, response mutation, applicability
+persistence, component rebinding, response history, serializers and frontend. No
+model or migration changed.
+
+**Next layer:** governed calculation execution and persistence, once blocker 1 is
+authorised and cleared.
+
 ## 7. Assertions
 
 - Migrations created: **NO**
