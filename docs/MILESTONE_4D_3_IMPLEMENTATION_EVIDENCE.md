@@ -154,10 +154,9 @@ Deliberately **not** implemented in this run, per the stop condition:
 ~~Activation-time validation of registry question codes~~ — **delivered in §6A.**
 This was the mandatory prerequisite; it is no longer deferred.
 
-**Next layer:** ORM-backed `resolve_calculation_inputs()`. Until it exists, a
-successfully activated checklist still has no runtime 4D-3 consumer — activation
-proves the bindings are sound, but nothing yet resolves or executes them. That is
-the expected state at the end of this run.
+~~**Next layer:** ORM-backed `resolve_calculation_inputs()`~~ — **delivered in
+§6D.** Activation proves the bindings are sound; input resolution now reads them
+from persisted rows. Execution and persistence remain deferred.
 
 No fake repository, stub or mock was introduced as a production stand-in.
 
@@ -516,6 +515,170 @@ persistence, `CalculationOutcome` persistence, `update_checklist_response()`,
 component rebinding, applicability persistence, response-history persistence,
 serializers and frontend. This run remains activation validation only. No
 migration was created and no model was changed.
+
+## 6D. ORM Phase 2 — governed calculation input resolution
+
+The activation-layer gate is **CLOSED** (independently confirmed at
+`94ee23e4`). This section records the next authorized layer: reading each
+approved resolver declaration from persisted rows. Nothing is calculated,
+nothing is written.
+
+### Integration files
+
+| File | Role |
+|---|---|
+| `backend/iig_checklist/calculation_inputs.py` | `resolve_calculation_inputs()`, the immutable result structures and all six ORM resolver forms |
+| `backend/iig_checklist/tests/test_4d3_calculation_inputs.py` | 84 PostgreSQL-backed tests |
+
+No other production file changed. No migration, no model, no serializer, no
+view, no frontend, and the activation validator is untouched.
+
+### Contract
+
+```
+resolve_calculation_inputs(
+    *, execution, target_question, registry_identifier, actor=None,
+    locked_context=None,
+) -> ResolvedCalculationInputs
+```
+
+`locked_context` (`ResolutionContext`) carries server-owned objects the caller
+has already selected and locked — today the exact `AssessmentSnapshot` and,
+optionally, the IID release the caller chose. `actor` is accepted for symmetry
+with the governed services and deliberately unused: resolution reads no
+actor-dependent state and must return the same result for every caller.
+
+Structural caller-contract violations — a target question from another
+checklist version, a non-`SYSTEM_CALCULATED` target, a target whose answer type
+disagrees with its registry entry — raise `CalculationInputContractError`. These
+are server-side programming faults no client input can reach. Every *data*
+condition is returned as a governed `InputFailure`, never raised.
+
+### The six resolver forms
+
+| Form | Source | Reads | Key controls |
+|---|---|---|---|
+| A | `question_response` | `ChecklistResponse.raw_value` in this execution | exactly one question and one response; N/A and `REVIEW_REQUIRED:` marker both fail closed; shape validated through the existing `validate_raw_value_shape`; a `SYSTEM_CALCULATED` response can never be read as a result (M4D3-INP-003) |
+| B | `formulation_field` | `FormulationVersion` / subject `FormulationComponent` | closed accessor table — an unlisted field is `INPUT_RESOLVER_UNKNOWN`, never a dynamic `getattr`; the execution's formulation must belong to the execution's tenant |
+| C | `maximum_daily_units` | `FormulationVersion.maximum_dosage_units_per_day` + every `DosingRegimen` row | all rows collected and passed to the already-verified pure helper; conservative worst case; `patient_population` is provenance only, never a filter |
+| D | `assessment_snapshot` | the caller's exact snapshot object | **no lookup at all** — tenant, subject component and (when the caller states one) IID release must all agree |
+| E | `calculation_outcome` | the upstream response's `CalculationOutcome` | exactly one outcome per upstream response; `complete` status and non-null value; subject component proven from provenance |
+| F | `constant` | the immutable registry declaration | callables and mutable containers rejected; no client override, no runtime expression |
+
+### Subject component
+
+Resolved **only** through the enabled `response_reference` selector: the exact
+`{"public_id": "<uuid>"}` payload of the selector response, which must resolve
+to a component inside this execution's own formulation version, owned by this
+tenant, of the required component type. There is no ingredient-name match, no
+UNII fallback and no display-order or primary-key inference; a second component
+with an identical `ingredient_name` is proven not to interfere.
+`registry_component_code` remains disabled and is rejected at runtime as well as
+at activation.
+
+Where an entry declares no component of its own, the subject component is
+**inherited** from the upstream outcome it consumes (M4D3-MAP-010), and the
+snapshot is then checked against that inherited component. A component-scoped
+producer whose outcome records no subject component is rejected with
+`UPSTREAM_CALCULATION_COMPONENT_MISMATCH` rather than assumed to agree.
+
+### Failure contract
+
+Every emitted code is drawn from the existing `ALLOWED_INPUT_FAILURE_CODES`; no
+new vocabulary was introduced, and a test asserts the emitted set is a subset.
+The deterministic 29-row `INPUT_FAILURE_MAPPING` continues to own the
+status/reason/value translation — this service does not translate, because it
+creates no `CalculationOutcome`.
+
+`InputFailure` identity is the governed semantic key
+`(kwarg_name, failure_code, source_kind, source_question_code, source_public_uuid)`;
+`message` is `compare=False`, so wording can neither create nor hide a failure.
+Failures are deduplicated on that key and ordered by it, never by insertion
+order or primary key. Messages are authored from governed tokens only — no raw
+exception text, no traceback, no SQL, no model repr, no database id.
+
+**There is no partial success.** A single failed input empties the whole kwargs
+mapping, so a caller can never reach a calculation with some inputs filled.
+
+### Unit handling
+
+Conversion goes through the existing 4D-3 adapter: Decimal only, canonical
+units, plain-notation factor and rule version in provenance. Two observations
+carried forward from the activation review are addressed explicitly:
+
+- an absent source unit is `INPUT_UNIT_MISSING` — distinct from an unknown unit
+  (`INPUT_UNIT_UNSUPPORTED`) and from a dimension mismatch;
+- `SnapshotUnitRef` is resolved against the snapshot field it names rather than
+  compared as a string, so a component quantity is converted into the IID
+  reference unit and both sides of a comparison are like quantities.
+
+The activation-time **exact-equality** rule is not reused here. Activation
+compares two registry *declarations*, where equality is correct; runtime
+converts real values, which the specification authorises.
+
+### Locking and transaction boundary
+
+The service opens no transaction and commits nothing, so every read joins the
+caller's transaction. A future mutating caller must lock, in this order:
+
+1. the `ChecklistExecution`;
+2. the involved `ChecklistResponse` rows, ordered by `public_id`;
+3. the involved `CalculationOutcome` rows, ordered by `public_id`;
+4. the `AssessmentSnapshot` it selected or created.
+
+### Tests
+
+`test_4d3_calculation_inputs.py` — **84 tests, real PostgreSQL**, no mocked
+QuerySets or managers. All six forms; every missing, duplicate, wrong-tenant,
+wrong-execution, wrong-version, wrong-type and malformed condition; N/A and
+`REVIEW_REQUIRED`; missing, unknown and dimension-mismatched units; stable
+failure ordering; public-UUID-only provenance; and explicit proof that
+resolution writes nothing.
+
+Synthetic immutable registry entries are installed with `monkeypatch` for one
+test at a time to reach form A and form F, which **no approved production entry
+declares**. That is recorded here rather than presented as production coverage:
+those two branches are approved generic support (M4D3-INP-003/008) exercised
+synthetically. Production registry definitions are never mutated and
+immutability is not weakened.
+
+### Post-implementation gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Input resolvers | `pytest iig_checklist/tests/test_4d3_calculation_inputs.py --no-cov -q` | **84 passed**, 45.4 s |
+| Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 45.1 s |
+| Database-free foundation | `pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **182 passed**, 0.27 s |
+| Lifecycle / clone / platform-auth / execution | `pytest iig_checklist/tests/test_lifecycle.py iig_checklist/tests/test_clone_api.py iig_checklist/tests/test_platform_mutation_authorization.py iig_checklist/tests/test_execution_api.py --no-cov -q` | **101 passed**, 56.7 s |
+| Tenant / permission regression | `pytest iig_checklist/tests/test_platform_authorization.py tenancy authorization --no-cov -q` | **46 passed**, 21.5 s |
+| Full backend suite | `pytest -q` | **1245 passed**, 0 failed, 0 skipped, 459.5 s, exit 0 |
+| Coverage | same run | **93.10%** against a 55% floor |
+| `calculation_inputs.py` coverage | same run | **94%** (473 statements, 30 missed — defensive branches unreachable while the approved registry is in force) |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check iig_checklist` | All checks passed, exit 0 |
+| Import-linter | `importlinter.cli lint` | exit 0, 7 contracts |
+
+Suite grew 1161 → 1245 (+84) and coverage rose 92.82% → 93.10%. No threshold was
+lowered, no file excluded, no test skipped or weakened, no failure suppressed.
+
+### Boundary held
+
+Verified by grep over the committed module: no `save()`, `create()`,
+`update()`, `delete()`, `bulk_*`, `emit()`, `transaction.atomic` or task
+dispatch; no `.first()`, `.last()`, `.latest()` or `.earliest()`; and the
+registry entry's `function` is **never called**.
+
+Still **not** implemented, deliberately: calculation execution,
+`CalculationOutcome` persistence, `AssessmentSnapshot` creation,
+`update_checklist_response()`, the `expected_version` mutation path,
+applicability persistence, component rebinding, response history, serializers
+and frontend. The service is reachable only from tests and future services.
+
+**Next layer:** governed calculation execution and persistence — invoking the
+approved function with these resolved kwargs and writing the `CalculationOutcome`
+through the deterministic translation table.
 
 ## 7. Assertions
 
