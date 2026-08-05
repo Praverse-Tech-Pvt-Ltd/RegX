@@ -680,6 +680,174 @@ and frontend. The service is reachable only from tests and future services.
 approved function with these resolved kwargs and writing the `CalculationOutcome`
 through the deterministic translation table.
 
+## 6E. Remediation of the resolver review (FAIL → 2 Major, 4 Minor)
+
+An independent adversarial review of §6D returned **FAIL**: 0 Critical, 2 Major,
+4 Minor. This section records what was wrong, what changed, and how each finding
+is now proven.
+
+### Major 1 — snapshot component validation depended on kwarg ordering
+
+**Finding.** The effective subject component was established *inside* the single
+resolution loop, which iterates `sorted(entry.input_resolvers.items())`. A form D
+snapshot whose kwarg sorted before its form E dependency was therefore validated
+against a component that had not been established yet. The reviewer's probe built
+a consumer with `a_snapshot` and `z_upstream` and showed a snapshot describing a
+completely different component resolving cleanly: `resolved=True`, zero failures.
+The approved entries happened to be safe only because
+`converted_proposed_daily_exposure` sorts before `selected_iid_mde` — alphabetical
+accident, not design. The failure mode was a wrong regulated number, silently.
+
+**Change.** `resolve_calculation_inputs()` now runs four explicit phases:
+
+| Phase | Responsibility |
+|---|---|
+| A | validate the caller's objects; resolve the registry entry |
+| B | establish the subject component **once**, before any input uses it |
+| C | resolve every declared input against that finalized component |
+| D | build the immutable result |
+
+Phase B locates every form E upstream outcome first, collects each candidate
+component identity — the selector's where the entry declares one, plus the
+component recorded by every component-scoped upstream — and reconciles them in a
+single step. Disagreement fails closed with
+`UPSTREAM_CALCULATION_COMPONENT_MISMATCH`; no source silently wins, and there is
+no precedence order that could make one of two different components correct. The
+result cannot depend on kwarg names, kwarg ordering or mapping insertion order.
+
+Phase C then hands the *same* finalized component to form B and form D, so the
+snapshot check can no longer be skipped. This is a true pre-pass, not a post-pass
+revalidation: no unvalidated value ever exists.
+
+### Major 2 — the provenance key had no normative backing
+
+**Finding.** Form E rejected any component-scoped upstream outcome whose
+`input_provenance` lacked `subject_component_public_id` — a key this phase had
+invented. M4D3-PRV-002 mandates only `_registry_binding_version` plus "a
+per-input source descriptor", so the future execution layer had no obligation to
+write it, and would have had every outcome rejected.
+
+**Change.** The contract is now normative in the approved specification, and the
+key is renamed to the server-controlled spelling:
+
+- **M4D3-PRV-005** — reserved key `_subject_component_public_id`, canonical
+  lowercase hyphenated UUID string, never a database primary key.
+- **M4D3-PRV-006** — server-generated; the underscore prefix already makes
+  M4D3-SEC-004 reject any request supplying it.
+- **M4D3-PRV-007** — required for component-scoped calculations, omitted (not
+  null, not empty) otherwise.
+- **M4D3-PRV-008** — the execution/persistence service writes it; Form E fails
+  closed on absent, malformed, foreign or mismatched values.
+- **M4D3-PRV-009** — one component across selector, snapshot and every
+  component-scoped input, reconciled before validation, order-independent.
+- **M4D3-DEP-013** — an upstream outcome whose `calculation_name` differs from
+  its binding's is rejected.
+
+The key lives in one place, `calculation_translation.SUBJECT_COMPONENT_PROVENANCE_KEY`,
+in the database-free vocabulary module so the read side and the future write side
+bind to one spelling. `RESERVED_PROVENANCE_KEYS` and
+`REGISTRY_BINDING_VERSION_PROVENANCE_KEY` sit beside it. No alias for the old
+unprefixed spelling exists, and a test proves the old spelling does **not**
+satisfy Form E — no 4D-3 outcome rows are persisted yet, so no compatibility
+layer is warranted.
+
+### Minor 1 — nested provenance was mutable
+
+`provenance["considered_regimens"][0]["public_id"] = "TAMPERED"` succeeded: the
+top level was a `MappingProxyType` but the nested dicts from the pure
+maximum-daily-units helper were plain. A single `freeze()` helper now recurses —
+mappings to `MappingProxyType`, sequences to tuples, sets to frozensets — and is
+applied to every `ResolvedInput.provenance` and to the kwargs mapping. `Decimal`,
+`UUID` and `str` pass through unchanged, so structured provenance is never
+stringified.
+
+### Minor 2 — duplicate binding was reported as missing data
+
+A question code resolving to more than one question mapped to
+`INPUT_RESPONSE_MISSING` → `data_required`/`DATA_REQUIRED`. An ambiguous binding
+is a configuration fault, and M4D3-IFV-004/005 keep configuration and security
+faults out of that category. It now maps to `INPUT_VALUE_INVALID` →
+`error`/`INPUT_RESOLUTION_FAILED`. Zero matches and more-than-one matches remain
+distinct, and a test asserts the resulting categories directly.
+
+### Minor 3 — the upstream calculation name was unchecked
+
+Form E accepted the single outcome for the upstream response regardless of which
+calculation produced it. It now requires `outcome.calculation_name` to equal the
+`calculation_name` of the registry entry bound to the upstream question, and
+rejects a mismatch with the new `UPSTREAM_CALCULATION_NAME_MISMATCH`
+(`error`/`INPUT_RESOLUTION_FAILED`/null). The status and value checks run first,
+so an uncalculated placeholder still reports `UPSTREAM_CALCULATION_INCOMPLETE`
+rather than a confusing name error.
+
+The closed vocabulary therefore grows from 29 to 30 codes, with the mapping table
+and the foundation test's count assertions updated together.
+
+### Minor 4 — unused fixture
+
+`test_resolution_performs_no_writes` requested `django_assert_num_queries` and
+never used it. It now captures the executed SQL and asserts no `INSERT`,
+`UPDATE` or `DELETE` verb appears, keeping the before/after row counts and
+deliberately **not** asserting a brittle total query count. The same capture is
+applied to a failing resolution and to a component-mismatch failure.
+
+### Execution-phase write obligations
+
+The future governed calculation-execution and persistence service **must** write,
+in the same transaction as the outcome:
+
+1. `_registry_binding_version` — the resolved entry's `binding_version` (M4D3-PRV-002);
+2. per-input source descriptors (M4D3-PRV-002);
+3. `_subject_component_public_id` for every component-scoped outcome (M4D3-PRV-005/008);
+4. `calculation_name` equal to the approved calculation **function** name;
+5. immutable input provenance.
+
+**Pre-existing execution-phase blocker, unchanged by this run.**
+`create_execution()` writes `question.calculation_binding_identifier` into
+`CalculationOutcome.calculation_name`, while `CalculationOutcome.clean()` accepts
+only the six approved function names — verified directly: `'daily_exposure'` is
+rejected, `'calculate_daily_exposure'` is accepted. No placeholder can currently
+be created for a `SYSTEM_CALCULATED` question through the governed service, so
+Form E has never been exercised against a governed-path placeholder; the resolver
+tests construct outcome rows directly. This is a 4D-2 defect, was already listed
+as deferred in §5, and is **not** fixed here — it is a mandatory execution-phase
+correction before runtime result persistence.
+
+### Post-remediation gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Input resolvers | `pytest iig_checklist/tests/test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 76.0 s |
+| Database-free foundation | `pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **183 passed** |
+| Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **59 passed** |
+| Lifecycle / clone / platform-auth / execution | as in §6D | **101 passed** |
+| Tenant / permission regression | as in §6D | **46 passed** |
+| Full backend suite | `pytest -q` | **1268 passed**, 0 failed, 0 skipped, 389.5 s, exit 0 |
+| Coverage | same run | **93.20%** against a 55% floor |
+| `calculation_inputs.py` coverage | same run | **94%** (569 statements, 34 missed) |
+| System check | `manage.py check` | no issues (0 silenced) |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check iig_checklist` | All checks passed, exit 0 |
+| Import-linter | `importlinter.cli lint` | exit 0, 7 contracts |
+
+Targeted resolver tests grew 84 → 106 and the foundation suite 182 → 183 (the
+vocabulary is parametrized, so the new code adds one case). No threshold was
+lowered, no file excluded and no test weakened.
+
+One `# pragma: no cover` was added, on the selector-is-`None` guard in
+`_resolve_selector_component`: Phase B now passes only declarations that *have* a
+selector, so the branch is unreachable from its single call site. It is disclosed
+here rather than left to look like coverage that exists. No `noqa` was added
+anywhere.
+
+### Still out of scope
+
+Unchanged from §6D: no calculation execution, no `CalculationOutcome` creation or
+update, no `AssessmentSnapshot` creation, no response mutation, no applicability
+persistence, no component rebinding, no history persistence, no serializers, no
+frontend, no model and no migration.
+
 ## 7. Assertions
 
 - Migrations created: **NO**
