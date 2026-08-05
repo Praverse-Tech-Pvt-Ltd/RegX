@@ -70,6 +70,13 @@ TRIGGER_MISMATCH = "TRIGGER_MISMATCH"
 #: M4D3-REG-018 -- a SYSTEM_CALCULATED question with no binding at all.
 SYSTEM_CALCULATED_BINDING_MISSING = "SYSTEM_CALCULATED_BINDING_MISSING"
 
+#: M4D3-DEP-011 -- the upstream producer of a form E dependency.
+UPSTREAM_BINDING_IDENTIFIER_MISSING = "UPSTREAM_BINDING_IDENTIFIER_MISSING"
+UPSTREAM_REGISTRY_IDENTIFIER_UNKNOWN = "UPSTREAM_REGISTRY_IDENTIFIER_UNKNOWN"
+UPSTREAM_ANSWER_TYPE_MISMATCH = "UPSTREAM_ANSWER_TYPE_MISMATCH"
+UPSTREAM_OUTPUT_UNIT_MISMATCH = "UPSTREAM_OUTPUT_UNIT_MISMATCH"
+UPSTREAM_SOURCE_CLASSIFICATION_MISMATCH = "UPSTREAM_SOURCE_CLASSIFICATION_MISMATCH"
+
 #: M4D3-DEP-005 -- graph failures surfaced from calculation_graph.build_graph().
 CALCULATION_GRAPH_CYCLE = "CALCULATION_GRAPH_CYCLE"
 UNKNOWN_DEPENDENCY_CODE = "UNKNOWN_DEPENDENCY_CODE"
@@ -90,6 +97,11 @@ ALLOWED_VALIDATION_CODES: frozenset[str] = frozenset(
         DEPENDENCY_MISMATCH,
         TRIGGER_MISMATCH,
         SYSTEM_CALCULATED_BINDING_MISSING,
+        UPSTREAM_BINDING_IDENTIFIER_MISSING,
+        UPSTREAM_REGISTRY_IDENTIFIER_UNKNOWN,
+        UPSTREAM_ANSWER_TYPE_MISMATCH,
+        UPSTREAM_OUTPUT_UNIT_MISMATCH,
+        UPSTREAM_SOURCE_CLASSIFICATION_MISMATCH,
         CALCULATION_GRAPH_CYCLE,
         UNKNOWN_DEPENDENCY_CODE,
         DEPENDENCY_DEPTH_EXCEEDED,
@@ -235,6 +247,110 @@ def _resolve_unique(
     return matches[0]
 
 
+def _validate_upstream_producer(
+    *,
+    upstream,
+    upstream_code: str,
+    identifier: str,
+    declaration,
+    context: str,
+    findings: list[ValidationFinding],
+) -> None:
+    """M4D3-DEP-011 -- the form E producer must be structurally compatible.
+
+    Being ``SYSTEM_CALCULATED`` is necessary but not sufficient: the upstream
+    question must actually be bound to a registry entry whose declared output is
+    what this resolver expects to consume.  Without this, a question named as a
+    dependency could be bound to a completely different calculation and the
+    downstream consumer would silently read the wrong quantity.
+
+    Units are compared for **exact equality** against the producer's declared
+    ``output_unit``.  No conversion is attempted here: the approved
+    specification authorises unit conversion only inside the deferred runtime
+    resolver, never as an activation-time inference.
+    """
+    producer_identifier = (upstream.calculation_binding_identifier or "").strip()
+    public_id = str(upstream.public_id)
+
+    if not producer_identifier:
+        findings.append(
+            ValidationFinding(
+                question_code=upstream_code,
+                registry_identifier=identifier,
+                validation_code=UPSTREAM_BINDING_IDENTIFIER_MISSING,
+                message=(
+                    f"{context} depends on question {upstream_code!r}, which declares "
+                    "no calculation binding and therefore produces no outcome."
+                ),
+                question_public_id=public_id,
+            )
+        )
+        return
+
+    producer = get_entry(producer_identifier)
+    if producer is None:
+        findings.append(
+            ValidationFinding(
+                question_code=upstream_code,
+                registry_identifier=identifier,
+                validation_code=UPSTREAM_REGISTRY_IDENTIFIER_UNKNOWN,
+                message=(
+                    f"{context} depends on question {upstream_code!r}, whose binding "
+                    f"{producer_identifier!r} is not an approved registry entry."
+                ),
+                question_public_id=public_id,
+            )
+        )
+        return
+
+    if producer.allowed_data_source != DataSourceClassification.SYSTEM_CALCULATED:
+        findings.append(
+            ValidationFinding(
+                question_code=upstream_code,
+                registry_identifier=identifier,
+                validation_code=UPSTREAM_SOURCE_CLASSIFICATION_MISMATCH,
+                message=(
+                    f"{context} depends on question {upstream_code!r}, whose binding "
+                    f"{producer_identifier!r} produces "
+                    f"{producer.allowed_data_source!r} rather than system_calculated."
+                ),
+                question_public_id=public_id,
+            )
+        )
+
+    if upstream.answer_type != producer.allowed_answer_type:
+        findings.append(
+            ValidationFinding(
+                question_code=upstream_code,
+                registry_identifier=identifier,
+                validation_code=UPSTREAM_ANSWER_TYPE_MISMATCH,
+                message=(
+                    f"{context} depends on question {upstream_code!r} with answer type "
+                    f"{upstream.answer_type!r}; its binding {producer_identifier!r} "
+                    f"produces {producer.allowed_answer_type!r}."
+                ),
+                question_public_id=public_id,
+            )
+        )
+
+    expected_unit = declaration.get("unit_source")
+    if expected_unit is not None and producer.output_unit != expected_unit:
+        findings.append(
+            ValidationFinding(
+                question_code=upstream_code,
+                registry_identifier=identifier,
+                validation_code=UPSTREAM_OUTPUT_UNIT_MISMATCH,
+                message=(
+                    f"{context} expects upstream question {upstream_code!r} to be "
+                    f"expressed in {expected_unit!r}; its binding "
+                    f"{producer_identifier!r} produces "
+                    f"{producer.output_unit or 'no declared unit'!r}."
+                ),
+                question_public_id=public_id,
+            )
+        )
+
+
 def _validate_bound_question(question, grouped, findings: list[ValidationFinding]) -> None:
     """Validate one question that declares a calculation binding."""
     identifier = question.calculation_binding_identifier.strip()
@@ -330,6 +446,14 @@ def _validate_bound_question(question, grouped, findings: list[ValidationFinding
                     )
                 )
                 continue
+            _validate_upstream_producer(
+                upstream=upstream,
+                upstream_code=code,
+                identifier=identifier,
+                declaration=declaration,
+                context=context,
+                findings=findings,
+            )
 
         elif source == SOURCE_FORMULATION_FIELD:
             selector = declaration.get("component_selector")
