@@ -964,22 +964,154 @@ excluded, no test weakened, and no pragma, noqa, skip or xfail was added.
 
 ### Open execution-phase blockers
 
-1. **`CalculationOutcome.inputs` / `input_provenance` must allow blank.**
-   `blank=True` on both fields, with the accompanying migration. Until then no
-   calculated placeholder can be created and governed calculation execution
-   cannot start. Requires model/migration authorisation.
+1. ~~**`CalculationOutcome.inputs` / `input_provenance` must allow blank.**~~ —
+   **cleared in §6G.**
 2. **The execution service must write** `_registry_binding_version`, per-input
    source descriptors, `_subject_component_public_id` for component-scoped
    outcomes, `calculation_name` equal to the approved function name, and
-   immutable provenance (M4D3-PRV-002, M4D3-PRV-005..008).
+   immutable provenance (M4D3-PRV-002, M4D3-PRV-005..008). The model now
+   *enforces* all of these on a completed row (§6G); the service that writes
+   one remains unimplemented.
 
 Still **not** implemented: calculation execution, completed `CalculationOutcome`
 values, `AssessmentSnapshot` creation, response mutation, applicability
-persistence, component rebinding, response history, serializers and frontend. No
-model or migration changed.
+persistence, component rebinding, response history, serializers and frontend.
 
-**Next layer:** governed calculation execution and persistence, once blocker 1 is
-authorised and cleared.
+**Next layer:** governed calculation execution and persistence.
+
+## 6G. Placeholder model remediation and completion invariant
+
+The independent confirmation review closed the execution-readiness correction
+gate (PASS) and confirmed both the JSONField blocker and the sharp point that
+`blank=True` alone would be unsafe. This section records both halves of the
+remediation.
+
+### The blocker, and why `blank=True` alone was not enough
+
+`CalculationOutcome.inputs` and `input_provenance` were
+`JSONField(default=dict, blank=False, null=False)`. Django's
+`Field.empty_values` is `[None, '', [], (), {}]`, so `{}` counts as blank and a
+row holding its own defaults could not pass `full_clean()` — no calculated
+placeholder could be created at all.
+
+Relaxing to `blank=True` fixes that, but on its own it would also let a
+**completed** row carrying a real regulated number be saved with
+`input_provenance == {}`, because `clean()` validated only `calculation_name`
+and nothing status-dependent. That would violate M4D3-PRV-002 and
+M4D3-PRV-005/007. The relaxation therefore ships with an invariant that
+restores the guarantee at the status that actually needs it.
+
+### Model change and migration
+
+| Field | Before | After |
+|---|---|---|
+| `CalculationOutcome.inputs` | `JSONField(default=dict)` | `JSONField(default=dict, blank=True)` |
+| `CalculationOutcome.input_provenance` | `JSONField(default=dict)` | `JSONField(default=dict, blank=True)` |
+
+`null` stays `False` — the column is always a JSON object, never SQL NULL.
+Nothing else changed: no value nullability, no status choices, no
+`calculation_name`, no unit fields, no relationships, no indexes or constraints.
+
+`backend/iig_checklist/migrations/0003_alter_calculationoutcome_input_provenance_and_more.py`
+— two `AlterField` operations, dependency `('iig_checklist', '0002_execution')`,
+reversible, no `RunPython`, no data rewrite, no rename, no column-type change.
+`sqlmigrate` confirms it is a pure Django state change:
+
+```
+BEGIN;
+-- Alter field input_provenance on calculationoutcome
+-- (no-op)
+-- Alter field inputs on calculationoutcome
+-- (no-op)
+COMMIT;
+```
+
+### Completion invariant (M4D3-PRV-002/005/007)
+
+`CalculationOutcome.clean()` now applies status-dependent validation. It runs
+**only** for `status == complete`; `data_required`, `calculating` and `error`
+rows carry no value and are untouched, which a parametrized test asserts.
+
+For a completed outcome:
+
+| Requirement | Error field |
+|---|---|
+| `value` is non-null | `value` |
+| `input_provenance` is a mapping | `input_provenance` |
+| `_registry_binding_version` present, three-part numeric | `input_provenance` |
+| at least one per-input source descriptor beyond the reserved keys | `input_provenance` |
+| `calculation_name` resolves to an approved registry entry | `calculation_name` |
+| component-scoped entry records `_subject_component_public_id` | `_subject_component_public_id` |
+| recorded component is a canonical lowercase hyphenated UUID | `_subject_component_public_id` |
+| entry that neither selects nor inherits a component records none | `_subject_component_public_id` |
+
+Two judgment calls, both stated rather than buried:
+
+- **Binding version is checked for format, not equality with today's registry.**
+  Provenance is historical evidence: the version a result was produced under may
+  legitimately predate the current entry. Requiring equality would invalidate
+  every stored record the moment a `binding_version` is incremented, which is
+  the opposite of what a reproducibility chain is for. A test asserts an older
+  `0.9.3` still validates.
+- **"Component-scoped" means the entry declares a `component_selector`.** An
+  entry with no selector but with `calculation_dependencies` *inherits* its
+  component (M4D3-MAP-010), so it may record one but is not required to. Only an
+  entry that neither selects nor inherits is forbidden from recording one — a
+  branch no approved entry reaches, exercised through a synthetic entry.
+
+The registry lookup is a reverse scan by `calculation_name` over the immutable
+server registry; `_validate_registry()` guarantees the name is unique per entry,
+so it is unambiguous. No calculation function is invoked and no client-supplied
+data is consulted.
+
+### Governed placeholder creation now works
+
+`create_execution()` creates a valid placeholder end to end, proven against real
+PostgreSQL: one outcome per calculated response, `calculation_name` equal to the
+registry entry's function name (never the binding identifier), `status`
+`data_required`, `value` null, `inputs == {}`, `input_provenance == {}`, and
+`full_clean()` passing on the row the service just wrote. A tripwire replaces the
+bound calculation function and proves it is never called. Fail-closed rollback on
+unknown identifier, blank identifier, wrong answer type and wrong source
+classification is retained, and the existing created-audit behaviour is
+unchanged.
+
+The tripwire test that previously asserted the path was still blocked on
+`{"inputs", "input_provenance"}` is **replaced** by these success assertions, as
+the confirmation review required.
+
+### Post-remediation gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Execution readiness + outcome states | `pytest iig_checklist/tests/test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 29.2 s |
+| Execution models | `pytest iig_checklist/tests/test_execution_models.py --no-cov -q` | **15 passed** |
+| Execution API / lifecycle / response / reviewer conclusion | `pytest …test_execution_api.py …test_execution_lifecycle.py …test_response_api.py …test_reviewer_conclusion_api.py --no-cov -q` | **49 passed** |
+| Input resolvers | `pytest iig_checklist/tests/test_4d3_calculation_inputs.py --no-cov -q` | **106 passed** |
+| Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **59 passed** |
+| Database-free foundation | `pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **183 passed** |
+| Lifecycle / clone / platform auth / tenant / permission | `pytest …test_lifecycle.py …test_clone_api.py …test_platform_mutation_authorization.py …test_platform_authorization.py tenancy authorization --no-cov -q` | **131 passed** |
+| Full backend suite | `pytest -q` | **1327 passed**, 0 failed, 0 skipped, 539.0 s, exit 0 |
+| Coverage | same run | **93.33%** against a 55% floor |
+| System check | `manage.py check` | no issues (0 silenced) |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0, `0003` applied |
+| Ruff | `ruff check iig_checklist` | All checks passed, exit 0 |
+| Import-linter | `importlinter.cli lint` | exit 0, 7 contracts |
+
+Suite grew 1293 → 1327 (+34) and coverage rose 93.25% → 93.33%. Gates were run
+serially. No threshold was lowered, no file excluded, no test weakened, and no
+pragma, noqa, skip or xfail was added.
+
+### Boundary held
+
+No calculation function is invoked anywhere in this change; the completion
+invariant *validates* a hypothetical completed outcome but nothing creates one.
+Not implemented: the calculation-execution service, `CalculationOutcome`
+completion workflow, `AssessmentSnapshot` creation, response mutation,
+`expected_version` handling, applicability persistence, component rebinding,
+response history, serializers and frontend. The only model change is the two
+`blank=True` flags and the `clean()` invariant; the only migration is `0003`.
 
 ## 7. Assertions
 
