@@ -203,6 +203,54 @@ class TestPlaceholderCalculationName:
         assert outcome.calculation_name != "percentage_w_w"
         outcome.full_clean()  # the row the governed path just wrote is valid
 
+    def test_placeholder_carries_no_result(self, execution_world):
+        """A placeholder is a slot, not a result."""
+        from iig_checklist.models import CalculationOutcome
+
+        _calculated(execution_world["section"], "Q_PCT_WW", "percentage_w_w")
+        _create(execution_world)
+        outcome = CalculationOutcome.objects.get()
+        assert outcome.status == CalculationStatus.DATA_REQUIRED
+        assert outcome.value is None
+        assert outcome.unit == ""
+        assert outcome.inputs == {}
+        assert outcome.input_provenance == {}
+        assert outcome.generated_at is None
+        assert outcome.reason_code == ""
+        assert outcome.source_assessment_snapshot_public_id is None
+        # Completed-outcome provenance belongs to the execution phase.
+        assert SUBJECT_COMPONENT_PROVENANCE_KEY not in outcome.input_provenance
+        assert "_registry_binding_version" not in outcome.input_provenance
+
+    def test_two_calculated_questions_produce_two_valid_placeholders(
+        self, execution_world
+    ):
+        from iig_checklist.models import CalculationOutcome
+
+        _calculated(execution_world["section"], "Q_PCT_WW", "percentage_w_w", order=1)
+        _calculated(execution_world["section"], "Q_DAILY", "daily_exposure", order=2)
+        _create(execution_world)
+        outcomes = list(CalculationOutcome.objects.all())
+        assert len(outcomes) == 2
+        assert sorted(o.calculation_name for o in outcomes) == [
+            "calculate_daily_exposure",
+            "calculate_percentage_w_w",
+        ]
+        for outcome in outcomes:
+            outcome.full_clean()
+
+    def test_one_placeholder_per_calculated_response(self, execution_world):
+        from iig_checklist.models import CalculationOutcome, ChecklistResponse
+
+        _calculated(execution_world["section"], "Q_PCT_WW", "percentage_w_w", order=1)
+        _question(
+            execution_world["section"], "Q_PLAIN", answer_type=AnswerType.SHORT_TEXT,
+            classification=DataSourceClassification.USER_REQUIRED, order=2,
+        )
+        execution = _create(execution_world)
+        assert ChecklistResponse.objects.filter(execution=execution).count() == 2
+        assert CalculationOutcome.objects.count() == 1
+
     def test_registry_lookup_yields_the_approved_function_name(self):
         """The value create_execution() now writes, verified at the source.
 
@@ -626,3 +674,275 @@ class TestCanonicalComponentProvenance:
         ):
             assert uuid.UUID(spelling) == component_uuid
             assert spelling != str(component_uuid)
+
+
+# ===========================================================================
+# E. Completed-outcome invariant (M4D3-PRV-002/005/007)
+#
+# blank=True lets a placeholder hold {}. On its own that would also let a
+# COMPLETE row carrying a real regulated number be saved with no provenance at
+# all, so clean() gains a status-dependent invariant. These tests validate the
+# model directly; nothing here executes a calculation or completes an outcome
+# through a service, because no such service exists yet.
+# ===========================================================================
+
+BINDING_VERSION_KEY = "_registry_binding_version"
+
+#: percentage_w_w declares a component_selector -> component-scoped.
+COMPONENT_SCOPED_NAME = "calculate_percentage_w_w"
+#: percentage_of_iid_mde has no selector; it inherits from its form E upstream.
+INHERITING_NAME = "calculate_percentage_of_mde"
+
+
+def _outcome(**overrides):
+    from iig_checklist.models import CalculationOutcome
+
+    base = {
+        "calculation_name": COMPONENT_SCOPED_NAME,
+        "status": CalculationStatus.COMPLETE,
+        "value": Decimal("12.5000000000"),
+        "unit": "percent_w_w",
+        "input_provenance": {
+            BINDING_VERSION_KEY: "1.0.0",
+            "quantity_per_unit_grams": {"source": "formulation_component"},
+            SUBJECT_COMPONENT_PROVENANCE_KEY: str(uuid.uuid4()),
+        },
+    }
+    base.update(overrides)
+    return CalculationOutcome(**base)
+
+
+def _clean_errors(outcome):
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    try:
+        outcome.clean()
+    except DjangoValidationError as exc:
+        return set(exc.message_dict)
+    return set()
+
+
+class TestPlaceholderStatesRemainValid:
+    """The invariant must not touch statuses that carry no result."""
+
+    @pytest.mark.parametrize(
+        "status",
+        [
+            CalculationStatus.DATA_REQUIRED,
+            CalculationStatus.CALCULATING,
+            CalculationStatus.ERROR,
+        ],
+    )
+    def test_incomplete_statuses_accept_empty_provenance(self, status):
+        outcome = _outcome(
+            status=status, value=None, unit="", input_provenance={}, inputs={}
+        )
+        assert _clean_errors(outcome) == set()
+
+
+class TestCompletedOutcomeInvariant:
+    def test_valid_component_scoped_completed_outcome(self):
+        assert _clean_errors(_outcome()) == set()
+
+    def test_valid_inheriting_completed_outcome(self):
+        """An MDE calculation has no selector but inherits its component."""
+        outcome = _outcome(
+            calculation_name=INHERITING_NAME,
+            unit="percent_of_mde",
+            input_provenance={
+                BINDING_VERSION_KEY: "1.0.0",
+                "converted_proposed_daily_exposure": {"source": "calculation_outcome"},
+                SUBJECT_COMPONENT_PROVENANCE_KEY: str(uuid.uuid4()),
+            },
+        )
+        assert _clean_errors(outcome) == set()
+
+    def test_inheriting_outcome_may_omit_the_component(self):
+        outcome = _outcome(
+            calculation_name=INHERITING_NAME,
+            input_provenance={
+                BINDING_VERSION_KEY: "1.0.0",
+                "converted_proposed_daily_exposure": {"source": "calculation_outcome"},
+            },
+        )
+        assert _clean_errors(outcome) == set()
+
+    def test_null_value_is_rejected(self):
+        assert "value" in _clean_errors(_outcome(value=None))
+
+    def test_empty_provenance_is_rejected(self):
+        assert "input_provenance" in _clean_errors(_outcome(input_provenance={}))
+
+    def test_missing_binding_version_is_rejected(self):
+        outcome = _outcome(
+            input_provenance={
+                "quantity_per_unit_grams": {"source": "formulation_component"},
+                SUBJECT_COMPONENT_PROVENANCE_KEY: str(uuid.uuid4()),
+            }
+        )
+        assert "input_provenance" in _clean_errors(outcome)
+
+    @pytest.mark.parametrize(
+        "version", ["1.0", "1.0.0.0", "v1.0.0", "", "one.zero.zero", 100],
+        ids=["two-part", "four-part", "prefixed", "empty", "words", "non-string"],
+    )
+    def test_malformed_binding_version_is_rejected(self, version):
+        outcome = _outcome(
+            input_provenance={
+                BINDING_VERSION_KEY: version,
+                "quantity_per_unit_grams": {"source": "formulation_component"},
+                SUBJECT_COMPONENT_PROVENANCE_KEY: str(uuid.uuid4()),
+            }
+        )
+        assert "input_provenance" in _clean_errors(outcome)
+
+    def test_historical_binding_version_is_accepted(self):
+        """Provenance is evidence: an older binding stays valid after a bump.
+
+        The format is enforced; equality with today's registry deliberately is
+        not, or every historical record would be invalidated by a version
+        increment.
+        """
+        outcome = _outcome(
+            input_provenance={
+                BINDING_VERSION_KEY: "0.9.3",
+                "quantity_per_unit_grams": {"source": "formulation_component"},
+                SUBJECT_COMPONENT_PROVENANCE_KEY: str(uuid.uuid4()),
+            }
+        )
+        assert _clean_errors(outcome) == set()
+
+    def test_provenance_without_any_input_descriptor_is_rejected(self):
+        """Reserved keys alone record no inputs (M4D3-PRV-002)."""
+        outcome = _outcome(
+            input_provenance={
+                BINDING_VERSION_KEY: "1.0.0",
+                SUBJECT_COMPONENT_PROVENANCE_KEY: str(uuid.uuid4()),
+            }
+        )
+        assert "input_provenance" in _clean_errors(outcome)
+
+    def test_component_scoped_outcome_requires_the_component(self):
+        outcome = _outcome(
+            input_provenance={
+                BINDING_VERSION_KEY: "1.0.0",
+                "quantity_per_unit_grams": {"source": "formulation_component"},
+            }
+        )
+        assert SUBJECT_COMPONENT_PROVENANCE_KEY in _clean_errors(outcome)
+
+    @pytest.mark.parametrize(
+        "spelling",
+        [
+            pytest.param(lambda u: str(u).upper(), id="uppercase"),
+            pytest.param(lambda u: "{" + str(u) + "}", id="braced"),
+            pytest.param(lambda u: str(u).replace("-", ""), id="compact"),
+            pytest.param(lambda u: f"urn:uuid:{u}", id="urn"),
+            pytest.param(lambda u: "not-a-uuid", id="malformed"),
+            pytest.param(lambda u: 12345, id="non-string"),
+        ],
+    )
+    def test_non_canonical_component_uuid_is_rejected(self, spelling):
+        value = uuid.uuid4()
+        outcome = _outcome(
+            input_provenance={
+                BINDING_VERSION_KEY: "1.0.0",
+                "quantity_per_unit_grams": {"source": "formulation_component"},
+                SUBJECT_COMPONENT_PROVENANCE_KEY: spelling(value),
+            }
+        )
+        assert SUBJECT_COMPONENT_PROVENANCE_KEY in _clean_errors(outcome)
+
+    def test_component_key_prohibited_when_neither_selected_nor_inherited(
+        self, monkeypatch
+    ):
+        """Only reachable with a synthetic entry: every approved entry either
+        selects a component or inherits one."""
+        _install(
+            monkeypatch,
+            {
+                "standalone": _entry(
+                    calculation_name=COMPONENT_SCOPED_NAME,
+                    input_resolvers=MappingProxyType({}),
+                    calculation_dependencies=(),
+                )
+            },
+        )
+        outcome = _outcome(
+            input_provenance={
+                BINDING_VERSION_KEY: "1.0.0",
+                "some_input": {"source": "constant"},
+                SUBJECT_COMPONENT_PROVENANCE_KEY: str(uuid.uuid4()),
+            }
+        )
+        assert SUBJECT_COMPONENT_PROVENANCE_KEY in _clean_errors(outcome)
+
+    def test_unknown_calculation_name_is_rejected(self):
+        """The pre-existing non-field check still fires first, unchanged."""
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        with pytest.raises(DjangoValidationError, match="not one of the six"):
+            _outcome(calculation_name="calculate_something_else").clean()
+
+    def test_approved_name_that_no_longer_resolves_is_rejected(self, monkeypatch):
+        """An approved name absent from the registry fails on its own field.
+
+        Only reachable with a synthetic registry: the six approved names and
+        the six registry entries are the same set.
+        """
+        _install(monkeypatch, {"other": _entry(calculation_name="calculate_daily_exposure")})
+        outcome = _outcome(calculation_name=COMPONENT_SCOPED_NAME)
+        assert "calculation_name" in _clean_errors(outcome)
+
+    def test_non_mapping_provenance_is_rejected(self):
+        assert "input_provenance" in _clean_errors(_outcome(input_provenance=["a"]))
+
+    def test_no_database_id_appears_in_error_messages(self):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        try:
+            _outcome(value=None, input_provenance={}).clean()
+        except DjangoValidationError as exc:
+            for messages in exc.message_dict.values():
+                for message in messages:
+                    lowered = message.lower()
+                    assert "traceback" not in lowered
+                    assert "select " not in lowered
+                    assert "object at" not in lowered
+
+
+class TestCompletedOutcomePersistence:
+    """The invariant binds through full_clean(), not only a direct clean()."""
+
+    def test_valid_completed_outcome_saves(self, resolver_world):
+        from iig_checklist.models import CalculationOutcome
+
+        outcome = resolver_world["outcome"]
+        outcome.status = CalculationStatus.COMPLETE
+        outcome.value = Decimal("0.7500000000")
+        outcome.unit = "gram"
+        outcome.input_provenance = {
+            BINDING_VERSION_KEY: "1.0.0",
+            "quantity_per_dosage_unit": {"source": "formulation_component"},
+            SUBJECT_COMPONENT_PROVENANCE_KEY: str(
+                resolver_world["component"].public_id
+            ),
+        }
+        outcome.full_clean()
+        outcome.save()
+        assert CalculationOutcome.objects.get(pk=outcome.pk).value == Decimal(
+            "0.7500000000"
+        )
+
+    def test_completed_outcome_without_provenance_cannot_be_saved(
+        self, resolver_world
+    ):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        outcome = resolver_world["outcome"]
+        outcome.status = CalculationStatus.COMPLETE
+        outcome.value = Decimal("0.7500000000")
+        outcome.unit = "gram"
+        with pytest.raises(DjangoValidationError) as raised:
+            outcome.full_clean()
+        assert "input_provenance" in raised.value.message_dict
