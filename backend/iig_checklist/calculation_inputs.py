@@ -14,6 +14,20 @@ Approved specification: docs/MILESTONE_4D_3_IMPLEMENTATION_SPEC.md
   - M4D3-PST-002/009   REVIEW_REQUIRED marker representation
   - M4D3-UNC-001..011  governed unit conversion
 
+Resolution runs in four deterministic phases so that behaviour can never depend
+on what a resolver kwarg happens to be called:
+
+  A. validate the caller's objects and resolve the registry entry;
+  B. establish the effective subject component **once**, from the selector and
+     from every component-scoped upstream outcome, and fail if they disagree;
+  C. resolve every declared input against that finalized component;
+  D. build the immutable result.
+
+An earlier revision established the component inside the single resolution loop,
+so a form D snapshot whose kwarg sorted before its form E dependency was checked
+against a component that had not been established yet.  Phase B exists to make
+that class of defect structurally impossible.
+
 Deliberate boundaries, all enforced by tests:
 
 * **No writes.**  No ``save()``, ``create()``, ``update()`` or ``delete()``
@@ -111,14 +125,18 @@ SOURCE_KIND_ASSESSMENT_SNAPSHOT = "assessment_snapshot"
 SOURCE_KIND_CALCULATION_OUTCOME = "calculation_outcome"
 SOURCE_KIND_CONSTANT = "constant"
 
+#: Where a component identity came from, for reconciliation and provenance.
+COMPONENT_SOURCE_SELECTOR = "selector"
+COMPONENT_SOURCE_INHERITED = "inherited"
+
 
 class CalculationInputContractError(RuntimeError):
     """The caller passed objects that violate this service's contract.
 
     Reserved for server-side programming faults that no client input can
-    reach -- a target question from another checklist version, or an execution
-    whose tenant does not own it.  Data conditions are never raised; they are
-    returned as governed :class:`InputFailure` records.
+    reach -- a target question from another checklist version, or a target whose
+    answer type disagrees with its registry entry.  Data conditions are never
+    raised; they are returned as governed :class:`InputFailure` records.
     """
 
 
@@ -236,6 +254,7 @@ class ResolvedCalculationInputs:
     inputs: tuple[ResolvedInput, ...]
     failures: tuple[InputFailure, ...]
     subject_component_public_id: str | None = None
+    subject_component_sources: tuple[str, ...] = ()
     assessment_snapshot_public_id: str | None = None
     upstream_outcome_public_ids: tuple[str, ...] = ()
 
@@ -251,6 +270,21 @@ class ResolvedCalculationInputs:
     @property
     def failure_codes(self) -> tuple[str, ...]:
         return tuple(failure.failure_code for failure in self.failures)
+
+
+@dataclass(frozen=True, slots=True)
+class _ComponentResolution:
+    """Phase B result: the one subject component every input must agree with."""
+
+    state: str
+    public_id: str | None = None
+    component: Any = None
+    sources: tuple[str, ...] = ()
+
+
+STATE_NOT_REQUIRED = "not_required"
+STATE_RESOLVED = "resolved"
+STATE_FAILED = "failed"
 
 
 # ---------------------------------------------------------------------------
@@ -498,11 +532,31 @@ def _convert(
 
 
 # ---------------------------------------------------------------------------
-# Subject component (M4D3-FCR-002..014)
+# Phase B -- subject component (M4D3-FCR-002..014, M4D3-DEP-011)
 # ---------------------------------------------------------------------------
 
 
-def _resolve_subject_component(
+def _component_in_execution(execution, component_uuid):
+    """Return the component with ``component_uuid`` inside this execution.
+
+    Scoped to the execution's own formulation version, so a component belonging
+    to another formulation -- and therefore possibly another tenant -- can never
+    be returned, and its identity is never echoed back to the caller.
+    """
+    from formulations.models import FormulationComponent
+
+    matches = list(
+        FormulationComponent.objects.filter(
+            public_id=component_uuid,
+            formulation_version_id=execution.formulation_version_id,
+        ).select_related("formulation_version__product")
+    )
+    if len(matches) != 1:
+        return None
+    return matches[0]
+
+
+def _resolve_selector_component(
     execution, declaration, *, kwarg: str, failures: list[InputFailure]
 ):
     """Resolve the subject component through the enabled selector only.
@@ -514,7 +568,7 @@ def _resolve_subject_component(
     selector = declaration.get("component_selector")
     source_kind = SOURCE_KIND_FORMULATION_COMPONENT
 
-    if selector is None:
+    if selector is None:  # pragma: no cover - caller only passes selector decls
         _fail(
             failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
             message=f"{kwarg!r} reads a component but declares no selector.",
@@ -619,8 +673,236 @@ def _resolve_subject_component(
     return component
 
 
+@dataclass(frozen=True, slots=True)
+class _Upstream:
+    """A validated upstream calculated response and its single outcome."""
+
+    kwarg: str
+    code: str
+    response: Any
+    question: Any
+    outcome: Any
+
+
+def _locate_upstream(execution, kwarg, declaration, failures) -> _Upstream | None:
+    """Find and validate the one current outcome for a form E dependency.
+
+    ``create_execution()`` creates exactly one ``CalculationOutcome`` per
+    calculated response and M4D3-MDL-010 forbids additional rows, so "current"
+    is unambiguous: the single row for that response.  Anything else is a
+    data-integrity fault, never an arbitrary choice.
+    """
+    from .models import CalculationOutcome
+
+    source_kind = SOURCE_KIND_CALCULATION_OUTCOME
+    code = declaration["question_code"]
+
+    response, question = _resolve_response(
+        execution, code, kwarg=kwarg, source_kind=source_kind, failures=failures
+    )
+    if response is None:
+        return None
+
+    if question.data_source_classification != DataSourceClassification.SYSTEM_CALCULATED:
+        _fail(
+            failures, kwarg=kwarg, code=F_UPSTREAM_MISSING, source_kind=source_kind,
+            message=f"Upstream question {code!r} is not system_calculated.",
+            question_code=code, public_uuid=str(response.public_id),
+        )
+        return None
+
+    outcomes = list(
+        CalculationOutcome.objects.filter(response=response).order_by("public_id")
+    )
+    if not outcomes:
+        _fail(
+            failures, kwarg=kwarg, code=F_UPSTREAM_MISSING, source_kind=source_kind,
+            message=f"No calculation outcome exists for upstream question {code!r}.",
+            question_code=code, public_uuid=str(response.public_id),
+        )
+        return None
+    if len(outcomes) > 1:
+        _fail(
+            failures, kwarg=kwarg, code=F_UPSTREAM_DUPLICATE, source_kind=source_kind,
+            message=(
+                f"Upstream question {code!r} has {len(outcomes)} calculation outcomes; "
+                "the current result is ambiguous."
+            ),
+            question_code=code, public_uuid=str(response.public_id),
+        )
+        return None
+
+    outcome = outcomes[0]
+    outcome_uuid = str(outcome.public_id)
+    required_status = declaration.get("required_status", CalculationStatus.COMPLETE)
+    if outcome.status != required_status:
+        _fail(
+            failures, kwarg=kwarg, code=F_UPSTREAM_INCOMPLETE, source_kind=source_kind,
+            message=(
+                f"Upstream outcome for {code!r} is {outcome.status!r}, not "
+                f"{required_status!r}."
+            ),
+            question_code=code, public_uuid=outcome_uuid,
+        )
+        return None
+    if outcome.value is None:
+        _fail(
+            failures, kwarg=kwarg, code=F_UPSTREAM_INCOMPLETE, source_kind=source_kind,
+            message=f"Upstream outcome for {code!r} holds no value.",
+            question_code=code, public_uuid=outcome_uuid,
+        )
+        return None
+
+    return _Upstream(
+        kwarg=kwarg, code=code, response=response, question=question, outcome=outcome
+    )
+
+
+def _upstream_component_id(execution, upstream, failures) -> tuple[str | None, bool]:
+    """Read the subject component an upstream outcome was produced for.
+
+    M4D3-PRV-005..008: a component-scoped calculation records its subject
+    component under the reserved, server-controlled provenance key.  Absence is
+    a fault, never an assumption of agreement, and there is deliberately no
+    fallback to the current selector -- that would silently accept a stale
+    result computed for a different component.
+
+    Returns ``(public_id_or_None, ok)``.
+    """
+    source_kind = SOURCE_KIND_CALCULATION_OUTCOME
+    outcome_uuid = str(upstream.outcome.public_id)
+    entry = get_entry((upstream.question.calculation_binding_identifier or "").strip())
+    component_scoped = entry is not None and any(
+        declared.get("component_selector") is not None
+        for declared in entry.input_resolvers.values()
+    )
+
+    provenance = upstream.outcome.input_provenance
+    if not isinstance(provenance, dict):
+        provenance = {}
+    recorded = provenance.get(PROVENANCE_SUBJECT_COMPONENT)
+
+    if recorded is None:
+        if component_scoped:
+            _fail(
+                failures, kwarg=upstream.kwarg, code=F_UPSTREAM_COMPONENT_MISMATCH,
+                source_kind=source_kind,
+                message=(
+                    f"Upstream outcome for {upstream.code!r} records no subject "
+                    "component, so it cannot be proven to describe this component."
+                ),
+                question_code=upstream.code, public_uuid=outcome_uuid,
+            )
+            return None, False
+        return None, True
+
+    if not isinstance(recorded, str):
+        _fail(
+            failures, kwarg=upstream.kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            message=(
+                f"Upstream outcome for {upstream.code!r} records a malformed subject "
+                "component provenance value."
+            ),
+            question_code=upstream.code, public_uuid=outcome_uuid,
+        )
+        return None, False
+    try:
+        component_uuid = uuid.UUID(recorded)
+    except (ValueError, AttributeError, TypeError):
+        _fail(
+            failures, kwarg=upstream.kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            message=(
+                f"Upstream outcome for {upstream.code!r} records a subject component "
+                "value that is not a valid UUID."
+            ),
+            question_code=upstream.code, public_uuid=outcome_uuid,
+        )
+        return None, False
+
+    if _component_in_execution(execution, component_uuid) is None:
+        _fail(
+            failures, kwarg=upstream.kwarg, code=F_UPSTREAM_COMPONENT_MISMATCH,
+            source_kind=source_kind,
+            message=(
+                f"Upstream outcome for {upstream.code!r} names a subject component "
+                "that is not part of this execution's formulation version."
+            ),
+            question_code=upstream.code, public_uuid=outcome_uuid,
+        )
+        return None, False
+    return str(component_uuid), True
+
+
+def _resolve_subject_component(
+    execution, entry, upstreams: dict[str, _Upstream], failures: list[InputFailure]
+) -> _ComponentResolution:
+    """Phase B -- establish the one subject component, before any input uses it.
+
+    Every candidate identity is collected first and reconciled once: the
+    selector where the entry declares one, plus the component recorded by every
+    component-scoped upstream outcome it consumes.  Disagreement fails closed;
+    no source silently wins.  The result never depends on kwarg names, kwarg
+    ordering or dictionary insertion order.
+    """
+    candidates: dict[str, set[str]] = {}
+    failed = False
+
+    selector_declarations = [
+        (kwarg, declaration)
+        for kwarg, declaration in sorted(entry.input_resolvers.items())
+        if declaration.get("component_selector") is not None
+    ]
+    component_object = None
+    if selector_declarations:
+        first_kwarg, first_declaration = selector_declarations[0]
+        component_object = _resolve_selector_component(
+            execution, first_declaration, kwarg=first_kwarg, failures=failures
+        )
+        if component_object is None:
+            failed = True
+        else:
+            candidates.setdefault(str(component_object.public_id), set()).add(
+                COMPONENT_SOURCE_SELECTOR
+            )
+
+    for kwarg in sorted(upstreams):
+        component_id, ok = _upstream_component_id(execution, upstreams[kwarg], failures)
+        if not ok:
+            failed = True
+            continue
+        if component_id is not None:
+            candidates.setdefault(component_id, set()).add(COMPONENT_SOURCE_INHERITED)
+
+    if failed:
+        return _ComponentResolution(state=STATE_FAILED)
+    if not candidates:
+        return _ComponentResolution(state=STATE_NOT_REQUIRED)
+    if len(candidates) > 1:
+        # Every relevant source must agree; there is no precedence order that
+        # could make one of two different components the right answer.
+        _fail(
+            failures, kwarg="", code=F_UPSTREAM_COMPONENT_MISMATCH,
+            source_kind=SOURCE_KIND_FORMULATION_COMPONENT,
+            message=(
+                "The subject component identities implied by this calculation's "
+                "selector and its upstream outcomes disagree."
+            ),
+        )
+        return _ComponentResolution(state=STATE_FAILED)
+
+    public_id, sources = next(iter(candidates.items()))
+    if component_object is None:
+        component_object = _component_in_execution(execution, uuid.UUID(public_id))
+    return _ComponentResolution(
+        state=STATE_RESOLVED,
+        public_id=public_id,
+        component=component_object,
+        sources=tuple(sorted(sources)),
+    )
+
+
 # ---------------------------------------------------------------------------
-# Resolver forms
+# Phase C -- resolver forms
 # ---------------------------------------------------------------------------
 
 
@@ -778,8 +1060,8 @@ def _resolve_formulation_field(
     elif obj == "formulation_component":
         source_kind = SOURCE_KIND_FORMULATION_COMPONENT
         if subject_component is None:
-            # The selector already recorded its own governed failure; this kwarg
-            # cannot resolve without it.
+            # Phase B already recorded its own governed failure; this kwarg
+            # cannot resolve without a subject component.
             _fail(
                 failures, kwarg=kwarg, code=F_COMPONENT_MISSING, source_kind=source_kind,
                 message=f"{kwarg!r} needs a subject component, which did not resolve.",
@@ -917,7 +1199,8 @@ def _resolve_assessment_snapshot(
     The snapshot is supplied by the caller as an exact object.  This service
     performs **no** lookup: there is no query by tenant, component or release
     that could return "a" snapshot, so no client-supplied identifier can ever
-    steer the selection.
+    steer the selection.  The component it is checked against is the one Phase B
+    finalized, so this check cannot be skipped by kwarg ordering.
     """
     source_kind = SOURCE_KIND_ASSESSMENT_SNAPSHOT
     field_name = declaration["field"]
@@ -1015,122 +1298,30 @@ def _resolve_assessment_snapshot(
     )
 
 
-def _resolve_calculation_outcome(
-    execution, kwarg, declaration, snapshot, component_public_id, failures
+def _build_outcome_input(
+    upstream, declaration, snapshot, component_public_id, failures
 ):
-    """Form E -- M4D3-INP-007 / M4D3-DEP-011."""
-    from .models import CalculationOutcome
-
+    """Form E value assembly, using the outcome Phase B already validated."""
     source_kind = SOURCE_KIND_CALCULATION_OUTCOME
-    code = declaration["question_code"]
-
-    response, question = _resolve_response(
-        execution, code, kwarg=kwarg, source_kind=source_kind, failures=failures
-    )
-    if response is None:
-        return None, None
-
-    if question.data_source_classification != DataSourceClassification.SYSTEM_CALCULATED:
-        _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_MISSING, source_kind=source_kind,
-            message=f"Upstream question {code!r} is not system_calculated.",
-            question_code=code, public_uuid=str(response.public_id),
-        )
-        return None, None
-
-    outcomes = list(
-        CalculationOutcome.objects.filter(response=response).order_by("public_id")
-    )
-    if not outcomes:
-        _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_MISSING, source_kind=source_kind,
-            message=f"No calculation outcome exists for upstream question {code!r}.",
-            question_code=code, public_uuid=str(response.public_id),
-        )
-        return None, None
-    if len(outcomes) > 1:
-        _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_DUPLICATE, source_kind=source_kind,
-            message=(
-                f"Upstream question {code!r} has {len(outcomes)} calculation outcomes; "
-                "the current result is ambiguous."
-            ),
-            question_code=code, public_uuid=str(response.public_id),
-        )
-        return None, None
-
-    outcome = outcomes[0]
+    outcome = upstream.outcome
     outcome_uuid = str(outcome.public_id)
-    required_status = declaration.get("required_status", CalculationStatus.COMPLETE)
-    if outcome.status != required_status:
-        _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_INCOMPLETE, source_kind=source_kind,
-            message=(
-                f"Upstream outcome for {code!r} is {outcome.status!r}, not "
-                f"{required_status!r}."
-            ),
-            question_code=code, public_uuid=outcome_uuid,
-        )
-        return None, None
-    if outcome.value is None:
-        _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_INCOMPLETE, source_kind=source_kind,
-            message=f"Upstream outcome for {code!r} holds no value.",
-            question_code=code, public_uuid=outcome_uuid,
-        )
-        return None, None
-
-    # M4D3-DEP-011 -- the upstream outcome must describe the same subject
-    # component.  A component-scoped producer records it in its provenance;
-    # absence is a fault, never an assumption of agreement.
-    upstream_component = None
-    provenance = outcome.input_provenance if isinstance(outcome.input_provenance, dict) else {}
-    recorded = provenance.get(PROVENANCE_SUBJECT_COMPONENT)
-    if recorded is not None:
-        upstream_component = str(recorded)
-    upstream_entry = get_entry((question.calculation_binding_identifier or "").strip())
-    upstream_is_component_scoped = upstream_entry is not None and any(
-        declared.get("component_selector") is not None
-        for declared in upstream_entry.input_resolvers.values()
-    )
-    if upstream_is_component_scoped and upstream_component is None:
-        _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_COMPONENT_MISMATCH, source_kind=source_kind,
-            message=(
-                f"Upstream outcome for {code!r} records no subject component, so it "
-                "cannot be proven to describe this component."
-            ),
-            question_code=code, public_uuid=outcome_uuid,
-        )
-        return None, None
-    if (
-        component_public_id is not None
-        and upstream_component is not None
-        and upstream_component != str(component_public_id)
-    ):
-        _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_COMPONENT_MISMATCH, source_kind=source_kind,
-            message=(
-                f"Upstream outcome for {code!r} describes a different subject component."
-            ),
-            question_code=code, public_uuid=outcome_uuid,
-        )
-        return None, None
+    kwarg = upstream.kwarg
+    code = upstream.code
 
     source_unit = outcome.unit or declaration.get("unit_source")
     target, ok = _target_unit(
         declaration, snapshot, kwarg=kwarg, source_kind=source_kind, failures=failures
     )
     if not ok:
-        return None, None
+        return None
     converted, conversion = _convert(
         outcome.value, source_unit, target, kwarg=kwarg, source_kind=source_kind,
         failures=failures, question_code=code, public_uuid=outcome_uuid,
     )
     if converted is None:
-        return None, None
+        return None
 
-    resolved = ResolvedInput(
+    return ResolvedInput(
         kwarg_name=kwarg,
         value=converted,
         expected_type=declaration["expected_type"],
@@ -1143,15 +1334,14 @@ def _resolve_calculation_outcome(
         conversion_rule_version=conversion.get("conversion_rule_version"),
         provenance=MappingProxyType(
             {
-                "upstream_response_public_id": str(response.public_id),
+                "upstream_response_public_id": str(upstream.response.public_id),
                 "upstream_outcome_public_id": outcome_uuid,
                 "question_code": code,
-                PROVENANCE_SUBJECT_COMPONENT: upstream_component,
+                PROVENANCE_SUBJECT_COMPONENT: component_public_id,
                 **conversion,
             }
         ),
     )
-    return resolved, upstream_component
 
 
 def _resolve_constant(kwarg, declaration, failures):
@@ -1228,9 +1418,10 @@ def resolve_calculation_inputs(
     """Resolve every declared input for one calculated question.
 
     ``locked_context`` carries server-owned objects the caller has already
-    selected and locked -- today only ``assessment_snapshot``.  It is never
-    populated from client input: this service performs no snapshot lookup at
-    all, so an arbitrary snapshot UUID cannot be steered into a calculation.
+    selected and locked -- the exact ``AssessmentSnapshot`` and, optionally, the
+    IID release the caller chose.  It is never populated from client input: this
+    service performs no snapshot lookup at all, so an arbitrary snapshot UUID
+    cannot be steered into a calculation.
 
     ``actor`` is accepted for provenance symmetry with the governed services
     and is deliberately unused: resolution reads no actor-dependent state and
@@ -1241,6 +1432,7 @@ def resolve_calculation_inputs(
     """
     del actor  # resolution is actor-independent by construction
 
+    # -- Phase A: caller contract and registry entry -------------------------
     entry = get_entry(registry_identifier)
     failures: list[InputFailure] = []
 
@@ -1264,7 +1456,6 @@ def resolve_calculation_inputs(
             ),
         )
 
-    # -- caller-contract checks (server bugs, not data conditions) -----------
     if target_question.section.checklist_version_id != execution.checklist_version_id:
         raise CalculationInputContractError(
             "target_question does not belong to the execution's checklist version"
@@ -1281,30 +1472,22 @@ def resolve_calculation_inputs(
     snapshot = getattr(locked_context, "assessment_snapshot", None)
     expected_release = getattr(locked_context, "expected_iid_release_public_id", None)
 
-    # -- subject component, resolved once and shared -------------------------
-    subject_component = None
-    component_declarations = [
-        (kwarg, declaration)
-        for kwarg, declaration in sorted(entry.input_resolvers.items())
-        if declaration.get("component_selector") is not None
-    ]
-    if component_declarations:
-        first_kwarg, first_declaration = component_declarations[0]
-        subject_component = _resolve_subject_component(
-            execution, first_declaration, kwarg=first_kwarg, failures=failures
-        )
+    # -- Phase B: the subject component, established once ---------------------
+    upstreams: dict[str, _Upstream] = {}
+    for kwarg, declaration in sorted(entry.input_resolvers.items()):
+        if declaration.get("source") != SOURCE_CALCULATION_OUTCOME:
+            continue
+        located = _locate_upstream(execution, kwarg, declaration, failures)
+        if located is not None:
+            upstreams[kwarg] = located
 
+    component = _resolve_subject_component(execution, entry, upstreams, failures)
+    component_public_id = component.public_id
+    component_object = component.component
+
+    # -- Phase C: every remaining input, against the finalized component ------
     inputs: list[ResolvedInput] = []
     upstream_outcome_ids: list[str] = []
-
-    # The effective subject component: this entry's own selector where it has
-    # one, otherwise the component inherited from the upstream outcome it
-    # consumes (M4D3-MAP-010).  Form E resolvers sort before the form D
-    # resolvers that depend on them in every approved entry, so inheritance is
-    # established before the snapshot is checked against it.
-    effective_component_id: str | None = (
-        str(subject_component.public_id) if subject_component is not None else None
-    )
 
     for kwarg, declaration in sorted(entry.input_resolvers.items()):
         source = declaration.get("source")
@@ -1315,23 +1498,24 @@ def resolve_calculation_inputs(
             )
         elif source == SOURCE_FORMULATION_FIELD:
             resolved = _resolve_formulation_field(
-                execution, kwarg, declaration, subject_component, snapshot, failures
+                execution, kwarg, declaration, component_object, snapshot, failures
             )
         elif source == SOURCE_MAXIMUM_DAILY_UNITS:
             resolved = _resolve_maximum_daily_units(execution, kwarg, declaration, failures)
         elif source == SOURCE_ASSESSMENT_SNAPSHOT:
             resolved = _resolve_assessment_snapshot(
-                execution, kwarg, declaration, snapshot, effective_component_id,
+                execution, kwarg, declaration, snapshot, component_public_id,
                 expected_release, failures,
             )
         elif source == SOURCE_CALCULATION_OUTCOME:
-            resolved, upstream_component = _resolve_calculation_outcome(
-                execution, kwarg, declaration, snapshot, effective_component_id, failures
-            )
-            if resolved is not None:
-                upstream_outcome_ids.append(str(resolved.source_public_uuid))
-                if upstream_component is not None and effective_component_id is None:
-                    effective_component_id = upstream_component
+            upstream = upstreams.get(kwarg)
+            resolved = None
+            if upstream is not None:
+                resolved = _build_outcome_input(
+                    upstream, declaration, snapshot, component_public_id, failures
+                )
+                if resolved is not None:
+                    upstream_outcome_ids.append(str(resolved.source_public_uuid))
         elif source == SOURCE_CONSTANT:
             resolved = _resolve_constant(kwarg, declaration, failures)
         else:  # pragma: no cover - registry validates the source
@@ -1344,10 +1528,11 @@ def resolve_calculation_inputs(
         if resolved is not None:
             inputs.append(resolved)
 
-    ordered_failures = tuple(
-        sorted({failure.semantic_key: failure for failure in failures}.values(),
-               key=lambda item: item.semantic_key)
-    )
+    # -- Phase D: the immutable result ---------------------------------------
+    unique: dict[tuple[str, str, str, str, str], InputFailure] = {}
+    for failure in failures:
+        unique.setdefault(failure.semantic_key, failure)
+    ordered_failures = tuple(unique[key] for key in sorted(unique))
     ordered_inputs = tuple(sorted(inputs, key=lambda item: item.kwarg_name))
 
     return ResolvedCalculationInputs(
@@ -1360,7 +1545,8 @@ def resolve_calculation_inputs(
         ),
         inputs=ordered_inputs,
         failures=ordered_failures,
-        subject_component_public_id=effective_component_id,
+        subject_component_public_id=component_public_id,
+        subject_component_sources=component.sources,
         assessment_snapshot_public_id=(
             str(snapshot.public_id) if snapshot is not None else None
         ),
@@ -1372,14 +1558,12 @@ def resolve_calculation_inputs(
 class ResolutionContext:
     """Server-owned objects a caller has already selected and locked.
 
-    Deliberately minimal: only an exact ``AssessmentSnapshot`` instance, never
-    an identifier this service would look up.
+    Deliberately minimal: an exact ``AssessmentSnapshot`` instance, never an
+    identifier this service would look up, plus the IID release the caller
+    selected so the snapshot can be proven to come from it.
     """
 
     assessment_snapshot: Any = None
-    #: The IID release the caller selected.  When set, the snapshot must be the
-    #: one frozen from exactly that release; when absent no release claim is
-    #: made and none is checked.
     expected_iid_release_public_id: Any = None
 
 
