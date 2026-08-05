@@ -83,6 +83,7 @@ from .services import (
     FormulationVersionNotApproved,
     FormulationVersionTenantMismatch,
     IncompleteExecution,
+    InvalidCalculationBinding,
     InvalidQuantityUnitConfig,
     MissingReturnReason,
     ReviewerConclusionCorrectionReasonRequired,
@@ -1043,6 +1044,20 @@ class ChecklistExecutionListCreateView(APIView):
                         f"Question {exc} has answer_type quantity_with_unit but allowed_units is"
                         " empty. Contact the checklist administrator to correct the definition"
                         " version before creating an execution."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except InvalidCalculationBinding as exc:
+            return Response(
+                {
+                    "error_code": "execution_invalid_calculation_binding",
+                    "detail": (
+                        f"Question {exc} is system_calculated but its calculation binding is"
+                        " not an approved registry entry, or disagrees with the question's"
+                        " answer type or source classification. Contact the checklist"
+                        " administrator to correct the definition version before creating an"
+                        " execution."
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,

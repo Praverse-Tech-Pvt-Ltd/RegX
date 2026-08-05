@@ -9,6 +9,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Max
 
 from .audit import IigChecklistEvent, emit
+from .calculation_registry import get_entry
 from .codes import normalize_code
 from .enums import CLONABLE_SOURCE_VERSION_STATUSES, ChecklistVersionStatus
 from .models import ChecklistDefinition, ChecklistQuestion, ChecklistSection, ChecklistVersion
@@ -233,6 +234,18 @@ class InvalidQuantityUnitConfig(Exception):
     pass
 
 
+class InvalidCalculationBinding(Exception):
+    """A SYSTEM_CALCULATED question's binding cannot produce a placeholder.
+
+    Raised when the identifier is blank, is not an approved registry entry, or
+    declares an answer type or source classification the question does not
+    match. Activation already proves these for an active version; this is
+    defence in depth at the mutation boundary, and it fails the whole
+    ``create_execution()`` transaction rather than writing a placeholder that
+    could never be executed.
+    """
+
+
 class IncompleteExecution(Exception):
     pass
 
@@ -412,11 +425,23 @@ def create_execution(
                 is_not_applicable=False,
             )
             if q.data_source_classification == DataSourceClassification.SYSTEM_CALCULATED:
+                # The placeholder records the *calculation function name*, which
+                # is what CalculationOutcome.clean() accepts -- not the registry
+                # binding identifier, which it rejects. Resolve the identifier
+                # through the immutable registry rather than trusting the stored
+                # string; no second registry implementation is introduced.
+                entry = get_entry((q.calculation_binding_identifier or "").strip())
+                if entry is None:
+                    raise InvalidCalculationBinding(q.code)
+                if entry.allowed_answer_type != q.answer_type:
+                    raise InvalidCalculationBinding(q.code)
+                if entry.allowed_data_source != q.data_source_classification:
+                    raise InvalidCalculationBinding(q.code)
                 _create_validated(
                     CalculationOutcome,
                     response=response,
                     status=CalculationStatus.DATA_REQUIRED,
-                    calculation_name=q.calculation_binding_identifier or "",
+                    calculation_name=entry.calculation_name,
                 )
 
     # Step 6: post-commit audit.
