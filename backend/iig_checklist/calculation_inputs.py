@@ -872,6 +872,22 @@ def _upstream_component_id(execution, upstream, failures) -> tuple[str | None, b
         )
         return None, False
 
+    # M4D3-PRV-005 -- the canonical rendering is the stored form, so an
+    # uppercase, braced, URN or compact UUID is rejected rather than silently
+    # normalised.  Accepting a second spelling would let two provenance values
+    # denote one component, which is exactly what a canonical form exists to
+    # prevent in a regulated record.
+    if recorded != str(component_uuid):
+        _fail(
+            failures, kwarg=upstream.kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            message=(
+                f"Upstream outcome for {upstream.code!r} records a subject component "
+                "UUID that is not in canonical lowercase hyphenated form."
+            ),
+            question_code=upstream.code, public_uuid=outcome_uuid,
+        )
+        return None, False
+
     if _component_in_execution(execution, component_uuid) is None:
         _fail(
             failures, kwarg=upstream.kwarg, code=F_UPSTREAM_COMPONENT_MISMATCH,
