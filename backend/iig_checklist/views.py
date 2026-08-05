@@ -542,6 +542,21 @@ class _ChecklistVersionActionViewBase(APIView):
                 raise ValidationError("effective_date is required before activation.")
 
             if self.action == VersionAction.ACTIVATE:
+                # Milestone 4D-3 (M4D3-REG-018/019): every calculation-registry
+                # binding referenced by this version must resolve against its own
+                # persisted content before the version becomes executable.  This
+                # runs before any lifecycle mutation -- including superseding a
+                # prior active version -- so a failure leaves everything intact.
+                from .activation_validation import (
+                    format_activation_errors,
+                    validate_version_calculation_bindings,
+                )
+
+                binding_findings = validate_version_calculation_bindings(version)
+                if binding_findings:
+                    raise ValidationError(format_activation_errors(binding_findings))
+
+            if self.action == VersionAction.ACTIVATE:
                 other_active = (
                     ChecklistVersion.objects.select_for_update()
                     .filter(
