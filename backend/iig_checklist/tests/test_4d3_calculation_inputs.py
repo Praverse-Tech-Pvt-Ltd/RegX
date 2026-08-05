@@ -20,8 +20,8 @@ import pytest
 from iid_assessment import calculations as engine
 from iig_checklist import calculation_registry as registry_mod
 from iig_checklist.calculation_inputs import (
-    PROVENANCE_SUBJECT_COMPONENT,
     REVIEW_REQUIRED_MARKER,
+    SUBJECT_COMPONENT_PROVENANCE_KEY,
     CalculationInputContractError,
     ResolutionContext,
     resolve_calculation_inputs,
@@ -163,7 +163,7 @@ def _outcome(
 
     provenance = {}
     if component_public_id is not None:
-        provenance[PROVENANCE_SUBJECT_COMPONENT] = str(component_public_id)
+        provenance[SUBJECT_COMPONENT_PROVENANCE_KEY] = str(component_public_id)
     return CalculationOutcome.objects.create(
         response=response, calculation_name=name, status=status,
         value=Decimal(value) if value is not None else None, unit=unit,
@@ -417,7 +417,7 @@ class TestFormAQuestionResponse:
             )
             _response(world["execution"], question, raw={"value": "1.0"})
         result = _resolve(world, identifier="form_a")
-        assert _codes(result) == {"INPUT_RESPONSE_MISSING"}
+        assert _codes(result) == {"INPUT_VALUE_INVALID"}
         assert not result.resolved
 
     def test_not_applicable_response(self, world, monkeypatch):

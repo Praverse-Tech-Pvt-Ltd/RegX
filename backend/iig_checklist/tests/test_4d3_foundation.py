@@ -39,7 +39,7 @@ class TestVocabularies:
         assert len(translation.ALLOWED_RESOLVER_DETAIL_CODES) == 6
         assert len(vocab.ALLOWED_HISTORY_REASON_CODES) == 2
         assert len(vocab.ALLOWED_SERVICE_DETAIL_CODES) == 1
-        assert len(translation.ALLOWED_INPUT_FAILURE_CODES) == 29
+        assert len(translation.ALLOWED_INPUT_FAILURE_CODES) == 30
 
     def test_all_vocabularies_immutable(self):
         for vocabulary in (
@@ -98,7 +98,7 @@ class TestVocabularies:
 
 class TestFailureMapping:
     def test_mapping_has_one_row_per_code(self):
-        assert len(translation.INPUT_FAILURE_MAPPING) == 29
+        assert len(translation.INPUT_FAILURE_MAPPING) == 30
         assert set(translation.INPUT_FAILURE_MAPPING) == (
             translation.ALLOWED_INPUT_FAILURE_CODES
         )

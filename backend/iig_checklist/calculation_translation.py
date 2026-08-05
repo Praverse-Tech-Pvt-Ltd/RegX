@@ -112,6 +112,29 @@ ALLOWED_RESOLVER_DETAIL_CODES: frozenset[str] = frozenset(
 
 
 # ---------------------------------------------------------------------------
+# Reserved, server-controlled provenance keys (M4D3-PRV-002, M4D3-PRV-005..008)
+#
+# Defined here, in the database-free vocabulary module, so the read side
+# (calculation_inputs.resolve_calculation_inputs) and the future write side
+# (the governed calculation-execution service) bind to one spelling and can
+# never drift apart.  Both begin with an underscore, which M4D3-SEC-004 makes
+# server-controlled: a request supplying either is rejected.
+# ---------------------------------------------------------------------------
+
+#: M4D3-PRV-002 -- the resolved entry's ``binding_version``.
+REGISTRY_BINDING_VERSION_PROVENANCE_KEY = "_registry_binding_version"
+
+#: M4D3-PRV-005 -- the canonical string form of the ``FormulationComponent``
+#: public UUID a component-scoped calculation was produced for.  Form E
+#: resolution fails closed when it is absent, malformed or mismatched.
+SUBJECT_COMPONENT_PROVENANCE_KEY = "_subject_component_public_id"
+
+RESERVED_PROVENANCE_KEYS: frozenset[str] = frozenset(
+    {REGISTRY_BINDING_VERSION_PROVENANCE_KEY, SUBJECT_COMPONENT_PROVENANCE_KEY}
+)
+
+
+# ---------------------------------------------------------------------------
 # M4D3-IFV-001 -- closed input-failure vocabulary.
 #
 # No textual cardinality is stated here; the enumeration is authoritative and
@@ -146,6 +169,7 @@ ALLOWED_INPUT_FAILURE_CODES: frozenset[str] = frozenset(
         "UPSTREAM_CALCULATION_INCOMPLETE",
         "UPSTREAM_CALCULATION_DUPLICATE",
         "UPSTREAM_CALCULATION_COMPONENT_MISMATCH",
+        "UPSTREAM_CALCULATION_NAME_MISMATCH",
         "INPUT_TENANT_MISMATCH",
         "INPUT_RESOLVER_UNKNOWN",
         "UNKNOWN_INTERNAL_FAILURE",
@@ -209,6 +233,12 @@ INPUT_FAILURE_MAPPING: MappingProxyType[str, OutcomeMapping] = MappingProxyType(
             STATUS_ERROR, "INPUT_RESOLUTION_FAILED", VALUE_RULE_NULL
         ),
         "UPSTREAM_CALCULATION_COMPONENT_MISMATCH": OutcomeMapping(
+            STATUS_ERROR, "INPUT_RESOLUTION_FAILED", VALUE_RULE_NULL
+        ),
+        # M4D3-DEP-013: an outcome produced by a different calculation is a
+        # different quantity, however complete it looks -- a configuration
+        # fault, never missing data.
+        "UPSTREAM_CALCULATION_NAME_MISMATCH": OutcomeMapping(
             STATUS_ERROR, "INPUT_RESOLUTION_FAILED", VALUE_RULE_NULL
         ),
         # -- Genuine scientific non-comparability -----------------------------

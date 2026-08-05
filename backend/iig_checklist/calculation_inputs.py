@@ -11,6 +11,7 @@ Approved specification: docs/MILESTONE_4D_3_IMPLEMENTATION_SPEC.md
   - M4D3-MDU-001..024  conservative maximum-daily-units selection
   - M4D3-DEP-011       form E resolves the same subject component
   - M4D3-IFV-001..008  closed input-failure vocabulary, deterministic mapping
+  - M4D3-PRV-005..008  subject-component outcome provenance contract
   - M4D3-PST-002/009   REVIEW_REQUIRED marker representation
   - M4D3-UNC-001..011  governed unit conversion
 
@@ -55,6 +56,7 @@ Rows a future mutating caller must lock, in this order, before calling:
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from types import MappingProxyType
@@ -73,7 +75,10 @@ from .calculation_registry import (
     SnapshotUnitRef,
     get_entry,
 )
-from .calculation_translation import ALLOWED_INPUT_FAILURE_CODES
+from .calculation_translation import (
+    ALLOWED_INPUT_FAILURE_CODES,
+    SUBJECT_COMPONENT_PROVENANCE_KEY,
+)
 from .enums import AnswerType, CalculationStatus, DataSourceClassification
 from .max_daily_units import DosingRegimenCandidate, select_maximum_daily_units
 from .unit_adapter import CONVERSION_RULE_VERSION, convert_for_calculation
@@ -106,16 +111,12 @@ F_UPSTREAM_MISSING = "UPSTREAM_CALCULATION_MISSING"
 F_UPSTREAM_INCOMPLETE = "UPSTREAM_CALCULATION_INCOMPLETE"
 F_UPSTREAM_DUPLICATE = "UPSTREAM_CALCULATION_DUPLICATE"
 F_UPSTREAM_COMPONENT_MISMATCH = "UPSTREAM_CALCULATION_COMPONENT_MISMATCH"
+F_UPSTREAM_NAME_MISMATCH = "UPSTREAM_CALCULATION_NAME_MISMATCH"
 F_TENANT_MISMATCH = "INPUT_TENANT_MISMATCH"
 F_RESOLVER_UNKNOWN = "INPUT_RESOLVER_UNKNOWN"
 
 #: M4D3-PST-002 -- reserved marker prefix in ``not_applicable_reason``.
 REVIEW_REQUIRED_MARKER = "REVIEW_REQUIRED:"
-
-#: Provenance key under which a component-scoped calculation records its
-#: subject component.  Form E reads it back to prove the upstream outcome
-#: belongs to the same component (M4D3-DEP-011).
-PROVENANCE_SUBJECT_COMPONENT = "subject_component_public_id"
 
 SOURCE_KIND_QUESTION_RESPONSE = "question_response"
 SOURCE_KIND_FORMULATION_VERSION = "formulation_version"
@@ -193,6 +194,30 @@ _SNAPSHOT_UNIT_FIELDS: MappingProxyType[str, Any] = MappingProxyType(
 
 
 # ---------------------------------------------------------------------------
+# Deep immutability
+# ---------------------------------------------------------------------------
+
+
+def freeze(value: Any) -> Any:
+    """Return a recursively immutable view of ``value``.
+
+    Mappings become ``MappingProxyType``, sequences tuples and sets frozensets,
+    all the way down, so no nested structure inside provenance can be mutated
+    after the fact.  Scalars -- including ``Decimal``, ``UUID`` and ``str`` --
+    are returned unchanged, so structured provenance is never stringified.
+    """
+    if isinstance(value, str | bytes | bytearray):
+        return value
+    if isinstance(value, Mapping):
+        return MappingProxyType({key: freeze(item) for key, item in value.items()})
+    if isinstance(value, Set):
+        return frozenset(freeze(item) for item in value)
+    if isinstance(value, Sequence):
+        return tuple(freeze(item) for item in value)
+    return value
+
+
+# ---------------------------------------------------------------------------
 # Immutable result structures (M4D3-INP-009)
 # ---------------------------------------------------------------------------
 
@@ -212,7 +237,7 @@ class ResolvedInput:
     conversion_factor: str | None = None
     conversion_rule_version: str | None = None
     detail_code: str | None = None
-    provenance: MappingProxyType = field(default_factory=lambda: MappingProxyType({}))
+    provenance: Mapping = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,7 +275,7 @@ class ResolvedCalculationInputs:
     calculation_name: str
     formula_version: str
     binding_version: str
-    kwargs: MappingProxyType
+    kwargs: Mapping
     inputs: tuple[ResolvedInput, ...]
     failures: tuple[InputFailure, ...]
     subject_component_public_id: str | None = None
@@ -372,7 +397,9 @@ def _resolve_response(
     """Resolve exactly one applicable response for ``code`` in ``execution``.
 
     Returns ``(response, question)`` or ``(None, None)`` having recorded one
-    governed failure.  Never ``.first()``: zero and many are distinct faults.
+    governed failure.  Never ``.first()``: zero and many are distinct faults,
+    and many is a *configuration* fault rather than missing data, so it never
+    reaches the DATA_REQUIRED category (M4D3-IFV-004).
     """
     questions = _questions_with_code(execution, code)
     if not questions:
@@ -384,7 +411,7 @@ def _resolve_response(
         return None, None
     if len(questions) > 1:
         _fail(
-            failures, kwarg=kwarg, code=F_RESPONSE_MISSING, source_kind=source_kind,
+            failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
             message=(
                 f"Question code {code!r} resolves to {len(questions)} questions in this "
                 "execution's version; the binding is ambiguous."
@@ -404,7 +431,7 @@ def _resolve_response(
         return None, None
     if len(responses) > 1:  # pragma: no cover - unique constraint prevents this
         _fail(
-            failures, kwarg=kwarg, code=F_RESPONSE_MISSING, source_kind=source_kind,
+            failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
             message=f"Question {code!r} has more than one response in this execution.",
             question_code=code,
         )
@@ -753,6 +780,32 @@ def _locate_upstream(execution, kwarg, declaration, failures) -> _Upstream | Non
         )
         return None
 
+    # The stored result must have been produced by the calculation the registry
+    # declares for that question -- an outcome carrying a different calculation
+    # name is a different quantity, however complete it looks.
+    upstream_entry = get_entry((question.calculation_binding_identifier or "").strip())
+    if upstream_entry is None:
+        _fail(
+            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            message=(
+                f"Upstream question {code!r} declares a calculation binding that is "
+                "not an approved registry entry."
+            ),
+            question_code=code, public_uuid=outcome_uuid,
+        )
+        return None
+    if outcome.calculation_name != upstream_entry.calculation_name:
+        _fail(
+            failures, kwarg=kwarg, code=F_UPSTREAM_NAME_MISMATCH, source_kind=source_kind,
+            message=(
+                f"Upstream outcome for {code!r} records calculation "
+                f"{outcome.calculation_name!r}; its binding declares "
+                f"{upstream_entry.calculation_name!r}."
+            ),
+            question_code=code, public_uuid=outcome_uuid,
+        )
+        return None
+
     return _Upstream(
         kwarg=kwarg, code=code, response=response, question=question, outcome=outcome
     )
@@ -780,7 +833,7 @@ def _upstream_component_id(execution, upstream, failures) -> tuple[str | None, b
     provenance = upstream.outcome.input_provenance
     if not isinstance(provenance, dict):
         provenance = {}
-    recorded = provenance.get(PROVENANCE_SUBJECT_COMPONENT)
+    recorded = provenance.get(SUBJECT_COMPONENT_PROVENANCE_KEY)
 
     if recorded is None:
         if component_scoped:
@@ -993,7 +1046,7 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
             target_unit=target,
             conversion_factor=conversion.get("conversion_factor"),
             conversion_rule_version=conversion.get("conversion_rule_version"),
-            provenance=MappingProxyType(
+            provenance=freeze(
                 {
                     "response_public_id": str(response.public_id),
                     "question_code": code,
@@ -1015,7 +1068,7 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
             kwarg_name=kwarg, value=text, expected_type=expected_type,
             source_kind=source_kind, source_public_uuid=str(response.public_id),
             source_question_code=code,
-            provenance=MappingProxyType(
+            provenance=freeze(
                 {"response_public_id": str(response.public_id), "question_code": code}
             ),
         )
@@ -1138,7 +1191,7 @@ def _resolve_formulation_field(
         target_unit=target,
         conversion_factor=conversion.get("conversion_factor"),
         conversion_rule_version=conversion.get("conversion_rule_version"),
-        provenance=MappingProxyType(
+        provenance=freeze(
             {"object": obj, "field": field_name, "source_public_id": public_uuid, **conversion}
         ),
     )
@@ -1186,7 +1239,7 @@ def _resolve_maximum_daily_units(execution, kwarg, declaration, failures):
         source_kind=source_kind,
         source_public_uuid=str(formulation.public_id),
         detail_code=selection.detail_code,
-        provenance=MappingProxyType(dict(selection.provenance)),
+        provenance=freeze(selection.provenance),
     )
 
 
@@ -1292,7 +1345,7 @@ def _resolve_assessment_snapshot(
         target_unit=target,
         conversion_factor=conversion.get("conversion_factor"),
         conversion_rule_version=conversion.get("conversion_rule_version"),
-        provenance=MappingProxyType(
+        provenance=freeze(
             {"snapshot_public_id": public_uuid, "field": field_name, **conversion}
         ),
     )
@@ -1332,12 +1385,12 @@ def _build_outcome_input(
         target_unit=target,
         conversion_factor=conversion.get("conversion_factor"),
         conversion_rule_version=conversion.get("conversion_rule_version"),
-        provenance=MappingProxyType(
+        provenance=freeze(
             {
                 "upstream_response_public_id": str(upstream.response.public_id),
                 "upstream_outcome_public_id": outcome_uuid,
                 "question_code": code,
-                PROVENANCE_SUBJECT_COMPONENT: component_public_id,
+                SUBJECT_COMPONENT_PROVENANCE_KEY: component_public_id,
                 **conversion,
             }
         ),
@@ -1393,7 +1446,7 @@ def _resolve_constant(kwarg, declaration, failures):
         value=resolved_value,
         expected_type=declared_type,
         source_kind=source_kind,
-        provenance=MappingProxyType(
+        provenance=freeze(
             {
                 "constant_type": declared_type,
                 "binding_version": declaration["binding_version"],
@@ -1540,7 +1593,7 @@ def resolve_calculation_inputs(
         calculation_name=entry.calculation_name,
         formula_version=entry.formula_version,
         binding_version=entry.binding_version,
-        kwargs=MappingProxyType(
+        kwargs=freeze(
             {} if ordered_failures else {item.kwarg_name: item.value for item in ordered_inputs}
         ),
         inputs=ordered_inputs,
@@ -1569,12 +1622,13 @@ class ResolutionContext:
 
 __all__ = [
     "CONVERSION_RULE_VERSION",
-    "PROVENANCE_SUBJECT_COMPONENT",
     "REVIEW_REQUIRED_MARKER",
+    "SUBJECT_COMPONENT_PROVENANCE_KEY",
     "CalculationInputContractError",
     "InputFailure",
     "ResolutionContext",
     "ResolvedCalculationInputs",
     "ResolvedInput",
+    "freeze",
     "resolve_calculation_inputs",
 ]
