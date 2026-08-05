@@ -334,15 +334,57 @@ class TestServiceContract:
         assert not result.resolved
         assert set(result.failure_codes) <= ALLOWED_INPUT_FAILURE_CODES
 
-    def test_resolution_performs_no_writes(self, world, django_assert_num_queries):
+    def test_resolution_performs_no_writes(self, world):
+        """Row counts unchanged *and* no write SQL issued.
+
+        The query capture inspects the SQL verb rather than a total count, so
+        the assertion stays meaningful without becoming brittle about how many
+        SELECTs the resolver needs.
+        """
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from iid_assessment.models import AssessmentSnapshot
         from iig_checklist.models import CalculationOutcome, ChecklistResponse
 
-        before_responses = ChecklistResponse.objects.count()
-        before_outcomes = CalculationOutcome.objects.count()
-        result = _resolve(world)
+        before = (
+            ChecklistResponse.objects.count(),
+            CalculationOutcome.objects.count(),
+            AssessmentSnapshot.objects.count(),
+        )
+        with CaptureQueriesContext(connection) as captured:
+            result = _resolve(world)
         assert result.resolved
-        assert ChecklistResponse.objects.count() == before_responses
-        assert CalculationOutcome.objects.count() == before_outcomes
+
+        verbs = [q["sql"].strip().split(None, 1)[0].upper() for q in captured.captured_queries]
+        assert not {"INSERT", "UPDATE", "DELETE"} & set(verbs), verbs
+        assert "SELECT" in verbs
+
+        after = (
+            ChecklistResponse.objects.count(),
+            CalculationOutcome.objects.count(),
+            AssessmentSnapshot.objects.count(),
+        )
+        assert before == after
+
+    def test_failed_resolution_performs_no_writes(self, world):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        world["selector_response"].raw_value = {"public_id": "not-a-uuid"}
+        world["selector_response"].save(update_fields=["raw_value", "updated_at"])
+        with CaptureQueriesContext(connection) as captured:
+            result = _resolve(world)
+        assert not result.resolved
+        verbs = [q["sql"].strip().split(None, 1)[0].upper() for q in captured.captured_queries]
+        assert not {"INSERT", "UPDATE", "DELETE"} & set(verbs), verbs
+
+    def test_resolution_emits_no_audit(self, world):
+        from audit.models import AuditEvent
+
+        before = AuditEvent.objects.count()
+        _resolve(world)
+        assert AuditEvent.objects.count() == before
 
     def test_repeated_resolution_is_byte_stable(self, world):
         runs = {
@@ -407,7 +449,14 @@ class TestFormAQuestionResponse:
         assert _codes(result) == {"INPUT_RESPONSE_MISSING"}
 
     def test_duplicate_question_code_across_sections(self, world, monkeypatch):
-        """Codes are unique per section, so one version may hold two."""
+        """Codes are unique per section, so one version may hold two.
+
+        An ambiguous binding is a *configuration* fault, not missing data:
+        M4D3-IFV-004 keeps configuration faults out of the DATA_REQUIRED
+        category, so this must never translate to `data_required`.
+        """
+        from iig_checklist.calculation_translation import INPUT_FAILURE_MAPPING
+
         _form_a_registry(monkeypatch)
         second = _section(world["version"], code="S2", order=2)
         for section in (world["section"], second):
@@ -419,6 +468,19 @@ class TestFormAQuestionResponse:
         result = _resolve(world, identifier="form_a")
         assert _codes(result) == {"INPUT_VALUE_INVALID"}
         assert not result.resolved
+
+        mapping = INPUT_FAILURE_MAPPING["INPUT_VALUE_INVALID"]
+        assert mapping.status != "data_required"
+        assert mapping.reason_code not in {"DATA_REQUIRED", "NOT_COMPARABLE"}
+
+    def test_zero_and_duplicate_matches_stay_distinct(self, world, monkeypatch):
+        """Zero matches remains DATA_REQUIRED-mapped; many does not."""
+        from iig_checklist.calculation_translation import INPUT_FAILURE_MAPPING
+
+        _form_a_registry(monkeypatch)
+        missing = _resolve(world, identifier="form_a")
+        assert _codes(missing) == {"INPUT_RESPONSE_MISSING"}
+        assert INPUT_FAILURE_MAPPING["INPUT_RESPONSE_MISSING"].status == "data_required"
 
     def test_not_applicable_response(self, world, monkeypatch):
         _form_a_registry(monkeypatch)
@@ -1419,3 +1481,392 @@ class TestIsolationAndSanitization:
                 assert not key.endswith("_id") or key.endswith("_public_id")
                 if isinstance(value, str) and value:
                     assert "object at" not in value
+
+
+# ===========================================================================
+# K. Ordering independence (remediation of Major 1)
+#
+# The subject component is established in a dedicated pre-pass, so no
+# component-scoped input can be validated before it exists.  These tests build
+# the same declarations under kwarg names that sort in opposite orders and
+# require identical behaviour.
+# ===========================================================================
+
+
+def _mde_style_entry(snapshot_kwarg, upstream_kwarg):
+    """A consumer with one snapshot input and one upstream-outcome input.
+
+    Mirrors the approved MDE entries -- no component selector of its own, so its
+    subject component is inherited from the upstream outcome (M4D3-MAP-010).
+    """
+    return _entry(
+        input_resolvers=MappingProxyType(
+            {
+                snapshot_kwarg: MappingProxyType(
+                    {
+                        "source": registry_mod.SOURCE_ASSESSMENT_SNAPSHOT,
+                        "field": "iid_mde",
+                        "unit_field": "iid_mde_unit",
+                        "expected_type": "decimal",
+                    }
+                ),
+                upstream_kwarg: MappingProxyType(
+                    {
+                        "source": registry_mod.SOURCE_CALCULATION_OUTCOME,
+                        "question_code": registry_mod.Q_DAILY_EXPOSURE,
+                        "field": "value",
+                        "required_status": "complete",
+                        "unit_source": "gram",
+                        "expected_type": "decimal",
+                    }
+                ),
+            }
+        ),
+        calculation_dependencies=(registry_mod.Q_DAILY_EXPOSURE,),
+        recalculation_triggers=(registry_mod.Q_DAILY_EXPOSURE,),
+    )
+
+
+def _install_consumer(monkeypatch, snapshot_kwarg, upstream_kwarg):
+    _install(
+        monkeypatch,
+        {
+            **dict(registry_mod.CALCULATION_BINDING_REGISTRY),
+            "consumer": _mde_style_entry(snapshot_kwarg, upstream_kwarg),
+        },
+    )
+
+
+def _upstream_with_outcome(world, *, component_public_id, name="calculate_daily_exposure",
+                           provenance=None):
+    """Persist the upstream daily-exposure question, response and outcome."""
+    from iig_checklist.models import CalculationOutcome
+
+    upstream = _question(
+        world["section"], registry_mod.Q_DAILY_EXPOSURE,
+        answer_type=AnswerType.CALCULATED_VALUE,
+        classification=DataSourceClassification.SYSTEM_CALCULATED,
+        binding="daily_exposure", order=20,
+    )
+    response = _response(world["execution"], upstream)
+    recorded = provenance
+    if recorded is None:
+        recorded = {}
+        if component_public_id is not None:
+            recorded[SUBJECT_COMPONENT_PROVENANCE_KEY] = str(component_public_id)
+    CalculationOutcome.objects.create(
+        response=response, calculation_name=name,
+        status=CalculationStatus.COMPLETE, value=Decimal("0.750000"), unit="gram",
+        input_provenance=recorded,
+    )
+    return response
+
+
+def _consumer_target(world, order=21):
+    return _question(
+        world["section"], "Q_CONSUMER", answer_type=AnswerType.CALCULATED_VALUE,
+        classification=DataSourceClassification.SYSTEM_CALCULATED,
+        binding="consumer", order=order,
+    )
+
+
+def _resolve_consumer(world, target, snapshot):
+    return resolve_calculation_inputs(
+        execution=world["execution"], target_question=target,
+        registry_identifier="consumer", actor=world["user"],
+        locked_context=ResolutionContext(assessment_snapshot=snapshot),
+    )
+
+
+class TestOrderingIndependence:
+    @pytest.mark.parametrize(
+        ("snapshot_kwarg", "upstream_kwarg"),
+        [("a_snapshot", "z_upstream"), ("z_snapshot", "a_upstream")],
+        ids=["form-D-sorts-first", "form-E-sorts-first"],
+    )
+    def test_wrong_component_snapshot_rejected_either_order(
+        self, world, monkeypatch, snapshot_kwarg, upstream_kwarg
+    ):
+        """The exact defect the review found, proven in both orders."""
+        other = _component(world["formulation"], quantity="0.100000", order=8)
+        _upstream_with_outcome(world, component_public_id=world["component"].public_id)
+        target = _consumer_target(world)
+        _install_consumer(monkeypatch, snapshot_kwarg, upstream_kwarg)
+        wrong = _snapshot(world["tenant"], other, world["formulation"])
+        result = _resolve_consumer(world, target, wrong)
+        assert not result.resolved
+        assert "ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH" in _codes(result)
+
+    @pytest.mark.parametrize(
+        ("snapshot_kwarg", "upstream_kwarg"),
+        [("a_snapshot", "z_upstream"), ("z_snapshot", "a_upstream")],
+        ids=["form-D-sorts-first", "form-E-sorts-first"],
+    )
+    def test_right_component_snapshot_accepted_either_order(
+        self, world, monkeypatch, snapshot_kwarg, upstream_kwarg
+    ):
+        _upstream_with_outcome(world, component_public_id=world["component"].public_id)
+        target = _consumer_target(world)
+        _install_consumer(monkeypatch, snapshot_kwarg, upstream_kwarg)
+        right = _snapshot(world["tenant"], world["component"], world["formulation"])
+        result = _resolve_consumer(world, target, right)
+        assert result.resolved, result.failure_codes
+        assert result.subject_component_public_id == str(world["component"].public_id)
+
+    def test_kwarg_names_do_not_change_behaviour(self, world, monkeypatch):
+        """Identical declarations under opposite-sorting names agree exactly."""
+        other = _component(world["formulation"], quantity="0.100000", order=8)
+        _upstream_with_outcome(world, component_public_id=world["component"].public_id)
+        target = _consumer_target(world)
+        wrong = _snapshot(world["tenant"], other, world["formulation"])
+
+        _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
+        first = _resolve_consumer(world, target, wrong)
+        _install_consumer(monkeypatch, "z_snapshot", "a_upstream")
+        second = _resolve_consumer(world, target, wrong)
+
+        assert first.resolved is second.resolved is False
+        assert sorted({f.failure_code for f in first.failures}) == sorted(
+            {f.failure_code for f in second.failures}
+        )
+        assert first.subject_component_public_id == second.subject_component_public_id
+
+    def test_selector_and_upstream_conflict_is_rejected(self, world, monkeypatch):
+        """Selector says component A, upstream provenance says component B."""
+        other = _component(world["formulation"], quantity="0.100000", order=8)
+        _upstream_with_outcome(world, component_public_id=other.public_id)
+        conflicting = _entry(
+            input_resolvers=MappingProxyType(
+                {
+                    "a_quantity": MappingProxyType(
+                        {
+                            "source": registry_mod.SOURCE_FORMULATION_FIELD,
+                            "object": "formulation_component",
+                            "field": "quantity_per_dosage_unit",
+                            "unit_field": "quantity_unit",
+                            "required_unit": "gram",
+                            "expected_type": "decimal",
+                            "component_selector": MappingProxyType(
+                                {
+                                    "type": registry_mod.SELECTOR_RESPONSE_REFERENCE,
+                                    "question_code": registry_mod.Q_SUBJECT_COMPONENT,
+                                }
+                            ),
+                            "required_component_type": "inactive",
+                        }
+                    ),
+                    "b_upstream": MappingProxyType(
+                        {
+                            "source": registry_mod.SOURCE_CALCULATION_OUTCOME,
+                            "question_code": registry_mod.Q_DAILY_EXPOSURE,
+                            "field": "value",
+                            "required_status": "complete",
+                            "unit_source": "gram",
+                            "expected_type": "decimal",
+                        }
+                    ),
+                }
+            ),
+            calculation_dependencies=(registry_mod.Q_DAILY_EXPOSURE,),
+            recalculation_triggers=(
+                registry_mod.Q_SUBJECT_COMPONENT,
+                registry_mod.Q_DAILY_EXPOSURE,
+            ),
+        )
+        _install(
+            monkeypatch,
+            {**dict(registry_mod.CALCULATION_BINDING_REGISTRY), "conflicting": conflicting},
+        )
+        target = _question(
+            world["section"], "Q_CONFLICT", answer_type=AnswerType.CALCULATED_VALUE,
+            classification=DataSourceClassification.SYSTEM_CALCULATED,
+            binding="conflicting", order=30,
+        )
+        result = resolve_calculation_inputs(
+            execution=world["execution"], target_question=target,
+            registry_identifier="conflicting", actor=world["user"],
+        )
+        assert not result.resolved
+        assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" in _codes(result)
+        assert result.subject_component_public_id is None
+
+    def test_missing_component_provenance_is_rejected(self, world, monkeypatch):
+        _upstream_with_outcome(world, component_public_id=None)
+        target = _consumer_target(world)
+        _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
+        snapshot = _snapshot(world["tenant"], world["component"], world["formulation"])
+        result = _resolve_consumer(world, target, snapshot)
+        assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" in _codes(result)
+
+    def test_malformed_component_provenance_is_rejected(self, world, monkeypatch):
+        """Malformed provenance is distinct from missing provenance."""
+        _upstream_with_outcome(
+            world, component_public_id=None,
+            provenance={SUBJECT_COMPONENT_PROVENANCE_KEY: "not-a-uuid"},
+        )
+        target = _consumer_target(world)
+        _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
+        snapshot = _snapshot(world["tenant"], world["component"], world["formulation"])
+        result = _resolve_consumer(world, target, snapshot)
+        assert "INPUT_VALUE_INVALID" in _codes(result)
+        assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" not in _codes(result)
+
+    def test_component_provenance_outside_this_formulation_is_rejected(
+        self, world, monkeypatch, user_a
+    ):
+        """A component UUID from another formulation cannot be inherited."""
+        foreign_product = _product(world["tenant"], user_a, code="PROD-CI-FOR")
+        foreign_formulation = _formulation(foreign_product, user_a)
+        foreign_component = _component(foreign_formulation)
+        _upstream_with_outcome(
+            world, component_public_id=None,
+            provenance={
+                SUBJECT_COMPONENT_PROVENANCE_KEY: str(foreign_component.public_id)
+            },
+        )
+        target = _consumer_target(world)
+        _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
+        snapshot = _snapshot(world["tenant"], world["component"], world["formulation"])
+        result = _resolve_consumer(world, target, snapshot)
+        assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" in _codes(result)
+        for failure in result.failures:
+            assert str(foreign_component.public_id) not in failure.message
+
+    def test_ordering_failure_writes_nothing(self, world, monkeypatch):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        other = _component(world["formulation"], quantity="0.100000", order=8)
+        _upstream_with_outcome(world, component_public_id=world["component"].public_id)
+        target = _consumer_target(world)
+        _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
+        wrong = _snapshot(world["tenant"], other, world["formulation"])
+        with CaptureQueriesContext(connection) as captured:
+            result = _resolve_consumer(world, target, wrong)
+        assert not result.resolved
+        verbs = [
+            q["sql"].strip().split(None, 1)[0].upper() for q in captured.captured_queries
+        ]
+        assert not {"INSERT", "UPDATE", "DELETE"} & set(verbs), verbs
+
+
+# ===========================================================================
+# L. Normative provenance key and outcome calculation name
+# ===========================================================================
+
+
+class TestProvenanceContract:
+    def test_normative_key_exact_spelling(self):
+        from iig_checklist import calculation_translation as vocabulary
+
+        vocabulary_key = vocabulary.SUBJECT_COMPONENT_PROVENANCE_KEY
+        assert vocabulary_key == "_subject_component_public_id"
+        # The resolver reads the vocabulary constant itself -- one spelling, so
+        # the read side and the future write side cannot drift apart.
+        assert SUBJECT_COMPONENT_PROVENANCE_KEY is vocabulary_key
+        # M4D3-SEC-004 -- underscore-prefixed provenance keys are
+        # server-controlled and a request supplying one is rejected.
+        assert vocabulary_key.startswith("_")
+        assert vocabulary_key in vocabulary.RESERVED_PROVENANCE_KEYS
+
+    def test_unprefixed_legacy_key_is_not_accepted(self, world, monkeypatch):
+        """No alias: the pre-remediation spelling must not satisfy form E."""
+        _upstream_with_outcome(
+            world, component_public_id=None,
+            provenance={
+                "subject_component_public_id": str(world["component"].public_id)
+            },
+        )
+        target = _consumer_target(world)
+        _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
+        snapshot = _snapshot(world["tenant"], world["component"], world["formulation"])
+        result = _resolve_consumer(world, target, snapshot)
+        assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" in _codes(result)
+
+    def test_outcome_calculation_name_must_match_the_binding(self, mde_world):
+        """A result produced by another calculation is a different quantity."""
+        _outcome(
+            mde_world["upstream_response"], name="calculate_percentage_w_w",
+            component_public_id=mde_world["component"].public_id,
+        )
+        snapshot = _snapshot(
+            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
+        )
+        result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
+        assert "UPSTREAM_CALCULATION_NAME_MISMATCH" in _codes(result)
+
+    def test_matching_outcome_calculation_name_is_accepted(self, mde_world):
+        _outcome(
+            mde_world["upstream_response"], name="calculate_daily_exposure",
+            component_public_id=mde_world["component"].public_id,
+        )
+        snapshot = _snapshot(
+            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
+        )
+        result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
+        assert result.resolved, result.failure_codes
+
+    def test_name_mismatch_is_not_data_required(self):
+        from iig_checklist.calculation_translation import INPUT_FAILURE_MAPPING
+
+        mapping = INPUT_FAILURE_MAPPING["UPSTREAM_CALCULATION_NAME_MISMATCH"]
+        assert mapping.status == "error"
+        assert mapping.reason_code == "INPUT_RESOLUTION_FAILED"
+        assert mapping.value_rule == "null"
+
+
+# ===========================================================================
+# M. Deep immutability (remediation of Minor 1)
+# ===========================================================================
+
+
+class TestDeepImmutability:
+    def test_kwargs_cannot_be_mutated(self, world):
+        result = _resolve(world)
+        assert result.resolved
+        with pytest.raises(TypeError):
+            result.kwargs["injected"] = Decimal("1")
+
+    def test_provenance_cannot_be_mutated(self, world):
+        result = _resolve(world)
+        assert result.inputs
+        for resolved in result.inputs:
+            with pytest.raises(TypeError):
+                resolved.provenance["injected"] = "x"
+
+    def test_nested_maximum_daily_units_provenance_is_frozen(self, world, monkeypatch):
+        """considered_regimens is a tuple of read-only mappings, all the way down."""
+        _mdu_registry(monkeypatch)
+        _regimen(world["formulation"], maximum="9.0000", population="adult")
+        result = _resolve(world, identifier="mdu")
+        assert result.resolved, result.failure_codes
+        provenance = result.inputs[0].provenance
+        regimens = provenance["considered_regimens"]
+        assert isinstance(regimens, tuple)
+        assert regimens
+        with pytest.raises(TypeError):
+            regimens[0]["public_id"] = "TAMPERED"
+        with pytest.raises(TypeError):
+            provenance["considered_regimens"] = ()
+
+    def test_freeze_handles_every_container(self):
+        from collections.abc import Mapping
+
+        from iig_checklist.calculation_inputs import freeze
+
+        frozen = freeze(
+            {
+                "list": [1, {"inner": ["deep"]}],
+                "set": {"a", "b"},
+                "decimal": Decimal("1.5"),
+                "text": "unchanged",
+            }
+        )
+        assert isinstance(frozen["list"], tuple)
+        assert isinstance(frozen["list"][1], Mapping)
+        assert isinstance(frozen["list"][1]["inner"], tuple)
+        assert isinstance(frozen["set"], frozenset)
+        assert frozen["decimal"] == Decimal("1.5")
+        assert frozen["text"] == "unchanged"
+        with pytest.raises(TypeError):
+            frozen["list"][1]["inner"] = ()
