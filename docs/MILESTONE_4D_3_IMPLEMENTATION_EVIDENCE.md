@@ -1113,6 +1113,181 @@ completion workflow, `AssessmentSnapshot` creation, response mutation,
 response history, serializers and frontend. The only model change is the two
 `blank=True` flags and the `clean()` invariant; the only migration is `0003`.
 
+## 6H. ORM Phase 3 — governed calculation execution
+
+Every prior gate is closed, so this section delivers the layer they existed to
+protect: resolving inputs, invoking one approved calculation, and persisting the
+result into the placeholder created at execution creation.
+
+`backend/iig_checklist/calculation_execution.py` —
+`execute_calculation_response()`, delivered as one commit rather than the
+planned execution-then-persistence pair: the completed-outcome invariant from
+§6G makes provenance a precondition of saving any complete outcome, so an
+intermediate that persisted a result without provenance could not have passed
+its own model validation. One new audit event constant,
+`iig_checklist.response.calculated`. No other production file changed; no model,
+no migration, no serializer, no frontend.
+
+### Scope, each boundary grounded in a clause rather than convenience
+
+| Decision | Basis |
+|---|---|
+| **No response mutation** | M4D3-MDL-006 — a `SYSTEM_CALCULATED` response keeps `raw_value = null` at all times and results live exclusively in `CalculationOutcome`; M4D3-SVC-006 forbids writing `system_derived_value`. There is no projection to maintain and no second source of truth. |
+| **No history row** | M4D3-HST-003 requires a row when a governed transition *changes an existing `ChecklistResponse`*. This service changes no response, so no transition occurs. `ALLOWED_HISTORY_REASON_CODES` holds no calculation code either. |
+| **No snapshot creation** | Stop condition — see below. |
+| **Single response only** | Cascade orchestration across the dependency graph is deferred and is **not** claimed here. |
+
+### Stop condition — no governed snapshot creation service exists
+
+M4D3-SNO-001 requires the snapshot to be created "through the approved
+`iid_assessment` service". No such callable service exists: `AssessmentSnapshot`
+rows are created only inside `iid_assessment/views.py::SnapshotView.post`, bound
+to a DRF request, serializer, `request.user` and HTTP response. Extracting a
+service out of that view is an `iid_assessment` refactor this run is not
+authorised to make, and the authorisation permits snapshot creation *only*
+through the governed service.
+
+Rather than duplicate the view's logic or invent a lookup, the execution service
+accepts the exact snapshot object through `snapshot_context`, exactly as the
+already-reviewed resolver does. All four snapshot-backed calculations are fully
+executed and tested this way. **Snapshot creation remains an open blocker.**
+
+### Lock order
+
+Acquired before `expected_version` is checked and before any write:
+
+1. the `ChecklistExecution`;
+2. the target `ChecklistResponse`;
+3. every involved upstream/selector `ChecklistResponse`, ordered by `public_id`;
+4. every involved `CalculationOutcome`, ordered by `public_id`;
+5. the caller's `AssessmentSnapshot`, when supplied.
+
+Stable `public_id` ordering is what stops two concurrent executions deadlocking.
+The order is documented in the module docstring as well as here.
+
+### Flow
+
+Phase A validates the caller's objects with no locks and no writes: the response
+belongs to the execution, the execution belongs to the tenant, the question is
+`SYSTEM_CALCULATED`, and the binding resolves to an approved entry. Phase B opens
+one `transaction.atomic()`, takes the locks above, checks `expected_version`
+against the locked row, requires exactly one placeholder, resolves inputs through
+`resolve_calculation_inputs()`, and then either persists a governed input failure
+or invokes the calculation. Phase C emits one audit event through
+`transaction.on_commit()`.
+
+The calculation function is `entry.function` from the immutable server registry,
+invoked exactly once with exactly the resolver's kwargs. No dynamic import, no
+client-supplied name, no `eval`. A test replaces the bound function with a
+counter and asserts a single call with the exact kwarg set.
+
+The engine returns a governed `CalculationResult` for every scientific
+condition, so an exception from it is an implementation fault: it raises
+`CalculationEngineFailure`, aborts the transaction, and its text never reaches a
+stored outcome — asserted directly.
+
+### Translation and persistence
+
+`translate_engine_status()` and `translate_input_failure()` are reused
+unchanged. Only the existing placeholder row is updated — never a second row,
+never delete-and-recreate — and `full_clean()` runs before every save, so the
+completed-outcome invariant from §6G applies to everything this service writes.
+
+`complete` carries a value and the engine's unit; every other status stores a
+null value and an empty unit. An unknown engine status maps to
+`UNKNOWN_ENGINE_STATUS`, and a naive or malformed `generated_at` maps to
+`INVALID_GENERATED_AT` — both fail closed with a null value, both tested.
+
+Input failures persist the governed outcome from the deterministic 30-row
+mapping, using the first failure in the resolver's already-stable order. Tenant
+and configuration faults keep their own categories: a cross-tenant snapshot
+stores `TENANT_ISOLATION_VIOLATION`, and a test asserts it is not
+`NOT_COMPARABLE`.
+
+### Provenance
+
+Persisted provenance carries `_registry_binding_version`, `calculation_name`,
+`formula_version`, the snapshot public UUID where one was used, upstream outcome
+public UUIDs, and one descriptor per input holding source kind, source public
+UUID, source question code, units, conversion factor and adapter version. Inputs
+are stored as exact decimal strings — never floats, which would silently change
+a regulated number. A test walks both structures and asserts no key is a
+database id and no value is a model repr.
+
+**`_subject_component_public_id` is written whenever
+`ResolvedCalculationInputs.subject_component_public_id` is not None** — from a
+selector *or* inherited from an upstream outcome, deliberately not limited to
+entries declaring a `component_selector`. This closes the observation carried
+from the model/migration confirmation: a three-level synthetic chain is tested
+end to end, and the third level receives the component only because the
+inherited middle outcome recorded it.
+
+### Tests
+
+`backend/iig_checklist/tests/test_4d3_calculation_execution.py` — **37 tests,
+real PostgreSQL**, driving the governed path with placeholders created by the
+real `create_execution()`.
+
+All six approved calculations execute with hand-checkable fixtures: a 250 mg
+excipient in a 1 g tablet taken four times daily, against a 1 g IID potency and
+2 g MDE. `percentage_w_w` = 25 %, `daily_exposure` = 1 g/day,
+`percentage_of_iid_potency` = 25 %, `difference_from_iid_potency` = 0.75 g,
+`percentage_of_iid_mde` = 50 %, `difference_from_iid_mde` = 1 g/day.
+
+> Two expectations were initially written with the sign reversed. The engine's
+> convention is **reference minus proposed** — a positive difference means the
+> proposal sits below the precedent. The tests were corrected to the engine, not
+> the reverse, and the convention is now stated in their docstrings.
+
+Also covered: no second outcome row; JSON-safe inputs; provenance keys and
+per-input descriptors; no database ids; snapshot public id recorded; response
+never mutated; no history row; selector, inherited and three-level component
+provenance; mismatched component; every non-success category; stale
+`expected_version`; engine exception; missing and duplicate placeholder;
+non-calculated target; foreign execution; unknown binding; exactly one audit
+event on success, none on rollback; and recalculation updating the same row with
+provenance replaced atomically.
+
+Atomicity is asserted by comparing a full snapshot of outcomes, responses,
+snapshot count, history count and audit count before and after each failure.
+
+### Post-implementation gates
+
+| Gate | Command | Result |
+|---|---|---|
+| Calculation execution | `pytest iig_checklist/tests/test_4d3_calculation_execution.py --no-cov -q` | **37 passed**, 27.4 s |
+| Execution readiness | `pytest iig_checklist/tests/test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 20.2 s |
+| Input resolvers | `pytest iig_checklist/tests/test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 54.5 s |
+| Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 44.3 s |
+| Database-free foundation | `pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **183 passed**, 0.23 s |
+| Execution model / API / lifecycle / response / reviewer | `pytest …test_execution_models.py …test_execution_api.py …test_execution_lifecycle.py …test_response_api.py …test_reviewer_conclusion_api.py --no-cov -q` | **64 passed**, 38.8 s |
+| Lifecycle / clone / platform auth / tenancy / authorization | `pytest …test_lifecycle.py …test_clone_api.py …test_platform_mutation_authorization.py …test_platform_authorization.py tenancy authorization --no-cov -q` | **131 passed**, 63.0 s |
+| Full backend suite | `pytest -q` | **1364 passed**, 0 failed, 0 skipped, 398.6 s, exit 0 |
+| Coverage | same run | **93.50%** against a 55% floor |
+| `calculation_execution.py` coverage | same run | **96%** (162 statements, 6 missed) |
+| System check | `manage.py check` | no issues (0 silenced) |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check iig_checklist` | All checks passed, exit 0 |
+| Import-linter | `importlinter.cli lint` | exit 0, 7 contracts |
+
+Suite grew 1327 → 1364 (+37) and coverage rose 93.33% → 93.50%. Gates were run
+serially. No threshold lowered, no file excluded, no test weakened, and no
+pragma, noqa, skip or xfail added.
+
+### Deferred
+
+1. **Governed `AssessmentSnapshot` creation** — no callable service exists;
+   snapshots are supplied by the caller. Requires either extracting a service
+   from `iid_assessment.views.SnapshotView` or authorising one.
+2. **Cascade recalculation orchestration** — only direct single-response
+   execution is implemented. Trigger expansion, topological ordering and the
+   10-node cascade limit exist in `calculation_graph` but no orchestrator drives
+   them.
+3. Unchanged: manual override (4D-4), applicability persistence, component
+   rebinding, response-history redesign, approval automation, reports, exports,
+   dashboards, notifications, asynchronous execution, serializers and frontend.
+
 ## 7. Assertions
 
 - Migrations created: **NO**
