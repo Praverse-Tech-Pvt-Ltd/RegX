@@ -80,7 +80,6 @@ from .calculation_translation import (
     SUBJECT_COMPONENT_PROVENANCE_KEY,
 )
 from .enums import AnswerType, CalculationStatus, DataSourceClassification
-from .max_daily_units import DosingRegimenCandidate, select_maximum_daily_units
 from .unit_adapter import CONVERSION_RULE_VERSION, convert_for_calculation
 
 # ---------------------------------------------------------------------------
@@ -1214,29 +1213,33 @@ def _resolve_formulation_field(
 
 
 def _resolve_maximum_daily_units(execution, kwarg, declaration, failures):
-    """Form C -- M4D3-INP-005 / M4D3-MDU-001..024."""
-    from formulations.models import DosingRegimen
+    """Form C -- M4D3-INP-005 / M4D3-MDU-001..024.
+
+    Delegates to ``formulations.dosing``, the one helper every governed consumer
+    of the maximum-daily-units rule uses -- this resolver, the checklist
+    execution service's snapshot creation, and the persisted snapshot API. The
+    candidate collection and the freshness policy live there rather than here,
+    so a change to either cannot reach one consumer and not another.
+
+    It resolves from ``execution.formulation_version_id`` rather than
+    ``execution.formulation_version``: the latter is a lazily-loaded FK that
+    keeps whatever the row looked like when the caller first touched it, and a
+    stale copy would let this resolver disagree with the snapshot frozen in the
+    same transaction.
+
+    Read-only, as every resolver form is.
+    """
+    from formulations.dosing import resolve_current_maximum_daily_units
 
     source_kind = SOURCE_KIND_MAXIMUM_DAILY_UNITS
-    formulation = execution.formulation_version
 
-    regimens = list(
-        DosingRegimen.objects.filter(formulation_version=formulation).order_by("public_id")
+    selection = resolve_current_maximum_daily_units(
+        formulation_version_id=execution.formulation_version_id
     )
-    candidates = tuple(
-        DosingRegimenCandidate(
-            public_id=str(regimen.public_id),
-            maximum_units_per_day=regimen.maximum_units_per_day,
-            patient_population=regimen.patient_population or "",
-        )
-        for regimen in regimens
-    )
+    # The selector already carries the governed public identity; taking it from
+    # the provenance avoids a second read purely to name the source.
+    formulation_public_id = selection.provenance["formulation_version_public_id"]
 
-    selection = select_maximum_daily_units(
-        formulation_version_public_id=str(formulation.public_id),
-        version_scalar=formulation.maximum_dosage_units_per_day,
-        regimen_candidates=candidates,
-    )
     if not selection.resolved or selection.value is None:
         _fail(
             failures, kwarg=kwarg, code=F_FORMULATION_FIELD_MISSING, source_kind=source_kind,
@@ -1244,7 +1247,7 @@ def _resolve_maximum_daily_units(execution, kwarg, declaration, failures):
                 "No valid maximum daily units candidate exists for this formulation "
                 "version."
             ),
-            public_uuid=str(formulation.public_id),
+            public_uuid=formulation_public_id,
         )
         return None
 
@@ -1253,7 +1256,7 @@ def _resolve_maximum_daily_units(execution, kwarg, declaration, failures):
         value=selection.value,
         expected_type=declaration["expected_type"],
         source_kind=source_kind,
-        source_public_uuid=str(formulation.public_id),
+        source_public_uuid=formulation_public_id,
         detail_code=selection.detail_code,
         provenance=freeze(selection.provenance),
     )

@@ -85,8 +85,42 @@ def governed_maximum_daily_units_value(*, formulation_version):
     return selection.value if selection.resolved else None
 
 
+def current_formulation_version(formulation_version_id):
+    """The current row for this identity -- never a caller's cached relation.
+
+    A ``ChecklistExecution`` holds ``formulation_version`` as a lazily-loaded FK.
+    Once that descriptor is populated it keeps whatever the row looked like when
+    it was first touched, so resolving governed values from it can silently use
+    stale data. Callers that hold only an identity go through here instead.
+    """
+    from .models import FormulationVersion
+
+    return FormulationVersion.objects.select_related("product").get(
+        pk=formulation_version_id
+    )
+
+
+def resolve_current_maximum_daily_units(
+    *, formulation_version_id
+) -> MaxDailyUnitsSelection:
+    """Fresh read plus governed selection, for a caller holding an identity.
+
+    The one entry point for callers that do not already hold a current
+    ``FormulationVersion``. It reads the row inside the caller's transaction and
+    then applies exactly the same governed selection as every other caller, so a
+    stale execution instance cannot make one consumer disagree with another.
+
+    Read-only: no write, no lock, no audit.
+    """
+    return resolve_governed_maximum_daily_units(
+        formulation_version=current_formulation_version(formulation_version_id)
+    )
+
+
 __all__ = [
     "collect_dosing_regimen_candidates",
+    "current_formulation_version",
     "governed_maximum_daily_units_value",
+    "resolve_current_maximum_daily_units",
     "resolve_governed_maximum_daily_units",
 ]
