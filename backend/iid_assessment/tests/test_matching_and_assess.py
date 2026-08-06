@@ -212,7 +212,19 @@ class TestPreviewApi:
         for word in forbidden:
             assert word not in body_text or "NOT AN AUTOMATIC" in body_text
 
-    def test_snapshot_is_immutable(self, api_client_doer, active_iid_setup, user_a):
+    def test_snapshot_is_immutable(
+        self, api_client_doer, active_iid_setup, user_a, tenant_a, snapshot_formulation
+    ):
+        """The endpoint freezes a snapshot, and no later edit can change it.
+
+        The request previously named an ``IIDIngredient`` as the formulation
+        component and an ``FDADataSourceRelease`` as the formulation version --
+        neither is a formulation object. That was only possible because the view
+        wrote the raw request UUIDs without checking them. The endpoint now
+        resolves both against the caller's own formulation through
+        ``create_assessment_snapshot()``, so this request uses the real objects.
+        The immutability assertion below is unchanged.
+        """
         resp = api_client_doer.post(
             f"{BASE}/iid-assessments/snapshot/",
             data={
@@ -225,12 +237,16 @@ class TestPreviewApi:
                 "total_dosage_unit_weight": "500",
                 "total_dosage_unit_weight_unit": "milligram",
                 "maximum_dosage_units_per_day": "4",
-                "formulation_component_public_id": str(active_iid_setup["ingredient"].public_id),
-                "formulation_version_public_id": str(active_iid_setup["release"].public_id),
+                "formulation_component_public_id": str(
+                    snapshot_formulation["component"].public_id
+                ),
+                "formulation_version_public_id": str(
+                    snapshot_formulation["formulation_version"].public_id
+                ),
             },
             format="json",
         )
-        assert resp.status_code == 201
+        assert resp.status_code == 201, resp.content
         public_id = resp.json()["public_id"]
 
         # PLANTED VIOLATION (detected): a later FDA data refresh must
