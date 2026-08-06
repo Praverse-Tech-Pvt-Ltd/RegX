@@ -1993,9 +1993,13 @@ nothing is copied into `iid_assessment`.
 its own — using one source where the governed rule uses two is precisely what
 caused this. `None` now unambiguously means the caller's governed selection
 failed closed (M4D3-MDU-013), leaving the argument unresolved so
-`calculate_daily_exposure` canonicalises to `DATA_REQUIRED` (M4D3-MDU-014). This
-also restores the API path's original pre-§6J semantics, which passed the request
-value straight through with no fallback.
+`calculate_daily_exposure` canonicalises to `DATA_REQUIRED` (M4D3-MDU-014).
+
+> **Superseded by §6L.** This section left the API path still passing the
+> *request's* dosing value into the same governed service, which §6L identifies
+> as an M4D3-MDU-006 violation and fixes. The claim below that "the API
+> behaviour" was preserved unchanged was accurate but incomplete: it did not
+> disclose that the API path applied no Part 14.1 selection at all.
 
 That removal closed a real edge case the fallback had opened: a version field of
 `0` is storable (no positivity constraint on that field, unlike `DosingRegimen`),
@@ -2072,8 +2076,162 @@ weakened or skipped, and no `pragma`, `noqa`, `skip` or `xfail` was added.
 Unchanged by this remediation: the single governed creation path; always-new;
 exact active/approved release selection; exact component and formulation
 validation; tenant isolation; the immutable result; the `on_commit` audit; a
-fresh snapshot per event; rollback; the internal-bypass restriction; and the API
-behaviour. No cascade orchestration, no model, no migration.
+fresh snapshot per event; rollback; and the internal-bypass restriction. No
+cascade orchestration, no model, no migration. **The API path is corrected in
+§6L** — this section's "API behaviour unchanged" was true only of valid
+requests.
+
+## 6L. Remediation of the SnapshotView review (FAIL → 1 Major, 1 Minor)
+
+A focused confirmation review of §6K returned **FAIL**: 0 Critical, 1 Major,
+1 Minor. The execution path was confirmed fixed; the defect survived on the other
+snapshot-creation path.
+
+### Major — the persisted API accepted a client dosing value
+
+**Finding.** `SnapshotView` passed `data.get("maximum_dosage_units_per_day")`
+straight into `create_assessment_snapshot()`. **M4D3-MDU-006**: *"no dosing value
+shall ever be accepted from a client request payload"*, and the acceptance matrix
+names the request serializer as the enforcement point
+(`M4D3-MDU-006 | Request serializers | TST-328 | No client-supplied dosing value | Security`).
+
+Reproduced through the authenticated API on a formulation carrying a governed
+`DosingRegimen` of 10:
+
+| Path | daily exposure | `decision_status` |
+|---|---|---|
+| `SnapshotView`, client posts `1` | 30 | `PASS_WITH_IID_PRECEDENT` |
+| Governed Part 14.1 worst case | 300 | **`EXCEEDS_IID_PRECEDENT`** |
+
+This was §6K's Major, unfixed on the API path. §6J had made the view a caller of
+the governed service and §6K established Part 14.1 as the rule for that service's
+callers — leaving one caller applying the rule and one accepting client input.
+
+**Change.** `SnapshotRequestSerializer` no longer accepts the field: it is popped
+from `fields`, so it is absent from the endpoint's contract and its schema, and a
+request that supplies it is **rejected** with a structured 400
+(`error_code = "prohibited_request_field"`) rather than silently ignored. A caller
+who believes they set the dosing basis for a regulated assessment must not be
+told it succeeded.
+
+`MatchPreviewRequestSerializer` keeps the field. That endpoint persists nothing,
+so a caller exploring a hypothetical dosing figure freezes no regulated record;
+M4D3-MDU-006 governs the snapshot, which is immutable and whose `decision_status`
+depends on the value.
+
+`SnapshotView` now derives the value server-side, from a formulation version read
+fresh inside its transaction.
+
+### One helper, both callers
+
+The selection is no longer written twice. `formulations.dosing` provides
+`resolve_governed_maximum_daily_units()` and
+`governed_maximum_daily_units_value()`, collecting both governed sources and
+calling the selector. The checklist execution service and the API view both use
+it, and a test asserts they bind the *same function object*.
+
+**The pure selector moved to `common.max_daily_units`.** M4D3-MDU-006 requires
+the `iid_assessment` endpoint to apply Part 14.1, and
+`iig-checklist-content-is-not-imported-by-governed-domains` forbids
+`iid_assessment` importing anything from `iig_checklist` — so a selector living
+only there was unreachable from the endpoint that needed it. The algorithm is
+pure (`dataclasses`, `Decimal`, no ORM, no Django), so `common` is where a
+shared domain-free rule belongs.
+
+`iig_checklist.max_daily_units` remains as a re-export, so the governed module
+identity that M4D3-MDU-001..024 and the acceptance matrix refer to keeps its name
+and import path, and every existing importer and its 183 foundation tests are
+untouched. **Nothing about the selection changed**: not the two sources, not the
+M4D3-MDU-010 reconciliation, not the M4D3-MDU-008 tie-break, not the
+M4D3-MDU-013/014 fail-closed contract. `select_maximum_daily_units` remains the
+sole scientific selector. All seven import contracts stay green and no cycle is
+introduced.
+
+### API compatibility — an intentional correction
+
+* A valid request that does **not** contain the prohibited field keeps the same
+  endpoint, permissions, tenant isolation, 201 status and response body.
+* A request that **does** contain it now fails with a structured 400.
+* This is a deliberate security and specification correction, not accidental
+  breakage. M4D3-MDU-006 takes precedence over backward compatibility for
+  prohibited regulated input, and no compatibility path silently accepts the
+  field.
+* An unknown alternate spelling or a nested attempt is inert — nothing reads it —
+  and the governed worst case still applies. Tests assert both.
+
+### Unresolved selection
+
+When the selector fails closed the view passes `None`, exactly as the execution
+path does: the argument is left unresolved, `calculate_daily_exposure`
+canonicalises to `DATA_REQUIRED`, no MDE comparison is produced, and no
+favourable decision is fabricated. A zero or negative version scalar with no
+valid regimen reaches the same state; a zero scalar *with* a valid regimen uses
+the regimen.
+
+### Minor — evidence corrected
+
+§6K's statement that "the API behaviour" was preserved is marked superseded, and
+the paragraph that described the fallback removal as restoring the API's original
+semantics now records that it left the M4D3-MDU-006 violation in place.
+
+### Tests
+
+`TestClientDosingValueProhibited` — **24 tests**, real PostgreSQL, through the
+authenticated API:
+
+| Area | Coverage |
+|---|---|
+| Field refused | structured 400 naming the field; no snapshot; no audit |
+| Every client shape | `0`, `1`, `999`, `null`, negative, non-numeric string, int, float — all 400 |
+| Cannot be reintroduced | three alternate spellings and a nested attempt are inert; the governed worst case still applies |
+| Not advertised | absent from `SnapshotRequestSerializer().fields`, still present on `MatchPreviewRequestSerializer` |
+| The reviewed scenario | version 1 + regimen 10 → exposure 300, `EXCEEDS_IID_PRECEDENT`, MDE calculations present, one audit event |
+| Selection matrix via API | null scalar → regimen 8; scalar 12 > regimens 3/5; no regimens → scalar; no source → `DATA_REQUIRED`; zero/negative alone → `DATA_REQUIRED`; zero + regimen 6 → 6 |
+| One helper | the view binds the shared helper; the checklist side asserts both bind the same object, because `iid_assessment` may not import `iig_checklist` even in tests |
+
+Two existing API tests were corrected to stop sending the now-prohibited field.
+Their assertions are otherwise untouched.
+
+### Post-remediation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| SnapshotView M4D3-MDU-006 | `pytest …::TestClientDosingValueProhibited --no-cov -q` | **24 passed**, 18.4 s |
+| Snapshot service | `pytest iid_assessment/tests/test_snapshot_service.py --no-cov -q` | **62 passed**, 37.6 s |
+| IID assessment (all) | `pytest iid_assessment --no-cov -q` | **167 passed**, 44.2 s |
+| Calculation execution | `pytest …test_4d3_calculation_execution.py --no-cov -q` | **124 passed**, 85.1 s |
+| Execution readiness | `pytest …test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 22.8 s |
+| Input resolvers | `pytest …test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 61.7 s |
+| Activation validation | `pytest …test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 49.7 s |
+| Database-free foundation | `pytest …test_4d3_foundation.py --no-cov -q` | **183 passed**, 0.29 s |
+| Formulations | `pytest formulations --no-cov -q` | **21 passed**, 14.3 s |
+| Common | `pytest common --no-cov -q` | **10 passed**, 7.9 s |
+| Execution model / API / lifecycle / response / reviewer | `pytest …` | **64 passed**, 43.3 s |
+| Lifecycle / clone / platform auth / tenancy / authorization | `pytest …` | **131 passed**, 69.3 s |
+| Full backend suite | `pytest -q` | **1513 passed**, 0 failed, 0 skipped, 529.3 s, exit 0 |
+| Coverage | same run | **93.95 %** against a 55 % floor |
+| `common/max_daily_units.py` coverage | same run | **100 %** (67 statements, 0 missed) |
+| `formulations/dosing.py` coverage | same run | **100 %** (10 statements, 0 missed) |
+| `calculation_execution.py` coverage | same run | **100 %** (223 statements, 0 missed) |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, 956 dependencies analysed |
+
+The suite grew 1488 → **1513** (+25) and coverage rose 93.90 % → **93.95 %**. No
+model and no migration: the selector relocation is a file move plus a re-export,
+and `makemigrations --check` confirms no model-state drift. No threshold was
+lowered, no file excluded, no test weakened or skipped, and no `pragma`, `noqa`,
+`skip` or `xfail` was added.
+
+### Still deferred
+
+Unchanged: cascade recalculation orchestration; the difference result-unit
+specification gap (§6I); the durable audit outbox; external execution API
+error-code mapping (M4D3-OUT-005); and the wider deferred list of §6J.
 
 ## 7. Assertions
 
