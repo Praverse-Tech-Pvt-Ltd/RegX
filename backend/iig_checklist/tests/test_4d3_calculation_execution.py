@@ -14,16 +14,26 @@ difference means the proposal sits below the precedent.
 
 from __future__ import annotations
 
+import dataclasses
+import inspect
+import re
+import threading
 from decimal import Decimal
 from types import MappingProxyType
 
 import pytest
+from django.core.exceptions import ValidationError
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from iid_assessment import calculations as engine
+from iig_checklist import calculation_execution as execution_mod
 from iig_checklist import calculation_registry as registry_mod
 from iig_checklist.calculation_execution import (
     BindingNotApproved,
     CalculationEngineFailure,
+    CalculationExecutionResult,
+    InvalidExpectedVersion,
     PlaceholderAmbiguous,
     PlaceholderMissing,
     ResponseNotInExecution,
@@ -38,6 +48,7 @@ from iig_checklist.calculation_translation import (
 from iig_checklist.calculation_translation import (
     SUBJECT_COMPONENT_PROVENANCE_KEY as COMPONENT_KEY,
 )
+from iig_checklist.calculation_translation import format_decimal_plain
 from iig_checklist.enums import (
     AnswerType,
     CalculationStatus,
@@ -49,6 +60,43 @@ from iig_checklist.enums import (
 pytestmark = pytest.mark.django_db
 
 CALCULATED_EVENT = "iig_checklist.response.calculated"
+
+_EXPONENT = re.compile(r"\d[eE][+-]?\d")
+
+
+def _is_scientific(text: str) -> bool:
+    """True only for a *number* rendered in scientific form.
+
+    A public UUID such as ``...aca7-474b30d178a7`` contains ``4e5c``, so a bare
+    regex sweep over a whole provenance structure would flag identifiers as
+    exponents. Requiring the string to parse as a Decimal keeps the check on
+    numbers alone.
+    """
+    if not _EXPONENT.search(text):
+        return False
+    try:
+        Decimal(text)
+    except (ArithmeticError, ValueError):
+        return False
+    return True
+
+
+def _exponent_values(node) -> list[str]:
+    """Every persisted number in ``node`` that is stored in scientific form."""
+    if isinstance(node, dict):
+        return [found for item in node.values() for found in _exponent_values(item)]
+    if isinstance(node, list | tuple):
+        return [found for item in node for found in _exponent_values(item)]
+    if isinstance(node, str):
+        return [node] if _is_scientific(node) else []
+    return []
+
+
+def _has_exponent(value) -> bool:
+    """True when any persisted number in ``value`` uses scientific form."""
+    if isinstance(value, str):
+        return _is_scientific(value)
+    return bool(_exponent_values(value))
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +297,12 @@ def _snapshot(world, *, potency="1.000000", mde="2.000000", component=None,
     )
 
 
-def _run(world, key, *, snapshot=None, expected_version=None, actor=None):
+#: ``expected_version`` is mandatory, so the helper needs a sentinel distinct
+#: from ``None`` -- ``None`` is now a value under test in its own right.
+_AUTO = object()
+
+
+def _run(world, key, *, snapshot=None, expected_version=_AUTO, actor=None):
     response = world["responses"][key]
     return execute_calculation_response(
         tenant=world["tenant"],
@@ -257,7 +310,7 @@ def _run(world, key, *, snapshot=None, expected_version=None, actor=None):
         response=response,
         actor=actor or world["user"],
         expected_version=(
-            response.version if expected_version is None else expected_version
+            response.version if expected_version is _AUTO else expected_version
         ),
         snapshot_context=(
             ResolutionContext(assessment_snapshot=snapshot)
@@ -614,10 +667,15 @@ class TestNonSuccessResults:
         assert outcome.reason_code != "NOT_COMPARABLE"
         assert outcome.value is None
 
-    def test_engine_non_ok_status_yields_null_value(self, world, monkeypatch):
-        """Every non-OK engine status stores a null value."""
+    def test_engine_unit_mismatch_yields_null_value(self, world, monkeypatch):
+        """A UNIT_MISMATCH engine status stores UNIT_MISMATCH and a null value.
 
-        def _not_comparable(**kwargs):
+        Deliberately distinct from the NOT_COMPARABLE test below: a unit fault is
+        a configuration condition and must never be recorded as scientific
+        non-comparability (M4D3-IFV-004/005).
+        """
+
+        def _unit_mismatch(**kwargs):
             return engine.CalculationResult(
                 formula_identifier="percentage_w_w",
                 formula_version=engine.FORMULA_VERSION,
@@ -627,15 +685,72 @@ class TestNonSuccessResults:
                 generated_at="2026-01-01T00:00:00Z",
             )
 
-        _install_percentage_w_w(monkeypatch, _not_comparable)
+        _install_percentage_w_w(monkeypatch, _unit_mismatch)
         result = _run(world, "percentage_w_w")
         outcome = world["outcomes"]["percentage_w_w"]
         outcome.refresh_from_db()
         assert outcome.status == CalculationStatus.ERROR
         assert outcome.reason_code == "UNIT_MISMATCH"
+        assert outcome.reason_code != "NOT_COMPARABLE"
         assert outcome.value is None
         assert outcome.unit == ""
         assert result.value is None
+
+    def test_engine_emits_not_comparable_for_an_unclear_basis(self):
+        """The engine really does produce NOT_COMPARABLE (M4D3-TRL-002).
+
+        ``BASIS_UNCLEAR`` resolves to the string ``NOT_COMPARABLE``, and a zero
+        dosage-unit weight is the governed condition that reaches it. Proven
+        against the pure engine so the persistence test below is exercising a
+        real engine status rather than a hand-written one.
+        """
+        assert engine.CalculationStatus.BASIS_UNCLEAR == "NOT_COMPARABLE"
+        result = engine.calculate_percentage_w_w(
+            quantity_per_unit_grams=Decimal("0.25"),
+            total_dosage_unit_weight_grams=Decimal("0"),
+        )
+        assert result.status == "NOT_COMPARABLE"
+        assert result.value is None
+
+    def test_genuine_not_comparable_is_persisted(self, world, monkeypatch):
+        """A real engine NOT_COMPARABLE persists as NOT_COMPARABLE.
+
+        The formulation table forbids a zero ``total_dosage_unit_weight``
+        (``formulation_total_weight_positive``), so the governed basis-unclear
+        condition is reached by handing the approved function the zero basis
+        directly; the status returned is the engine's own, unmodified.
+        """
+
+        def _basis_unclear(**kwargs):
+            return engine.calculate_percentage_w_w(
+                quantity_per_unit_grams=kwargs["quantity_per_unit_grams"],
+                total_dosage_unit_weight_grams=Decimal("0"),
+            )
+
+        _install_percentage_w_w(monkeypatch, _basis_unclear)
+        result = _run(world, "percentage_w_w")
+        outcome = world["outcomes"]["percentage_w_w"]
+        outcome.refresh_from_db()
+        assert outcome.status == CalculationStatus.ERROR
+        assert outcome.reason_code == "NOT_COMPARABLE"
+        assert outcome.reason_code != "UNIT_MISMATCH"
+        assert outcome.value is None
+        assert outcome.unit == ""
+        assert result.value is None
+
+    def test_resolver_unit_fault_is_not_scientific_non_comparability(self, world):
+        """An unknown source unit is UNIT_MISMATCH, never NOT_COMPARABLE."""
+        world["component"].quantity_unit = "furlong"
+        world["component"].save(update_fields=["quantity_unit", "updated_at"])
+        result = _run(world, "percentage_w_w")
+        outcome = world["outcomes"]["percentage_w_w"]
+        outcome.refresh_from_db()
+        assert not result.executed
+        assert "INPUT_UNIT_UNSUPPORTED" in result.failure_codes
+        assert outcome.status == CalculationStatus.ERROR
+        assert outcome.reason_code == "UNIT_MISMATCH"
+        assert outcome.reason_code != "NOT_COMPARABLE"
+        assert outcome.value is None
 
     def test_engine_data_required_maps_to_data_required(self, world, monkeypatch):
         def _data_required(**kwargs):
@@ -901,3 +1016,890 @@ class TestRecalculation:
             snapshot_two.public_id
         )
         assert str(snapshot_one.public_id) not in str(outcome.input_provenance)
+
+
+# ===========================================================================
+# H. Lock order, verified against the SQL PostgreSQL actually receives
+# ===========================================================================
+
+_LOCK_TABLES = (
+    "iig_checklist_checklistexecution",
+    "iig_checklist_checklistresponse",
+    "iig_checklist_calculationoutcome",
+    "iid_assessment_assessmentsnapshot",
+)
+
+
+def _table_of(sql: str) -> str:
+    """The locked table, read from the quoted identifier rather than a guess."""
+    lowered = sql.lower()
+    for candidate in _LOCK_TABLES:
+        if f'"{candidate}"' in lowered:
+            return candidate
+    return "?"
+
+
+def _order_column(sql: str) -> str | None:
+    """The bare column name an ``ORDER BY`` uses, alias-insensitive.
+
+    Only the column matters here, so any table qualifier is discarded; the
+    assertion stays strict about *which* column orders the lock.
+    """
+    lowered = sql.lower()
+    marker = " order by "
+    if marker not in lowered:
+        return None
+    clause = lowered.split(marker, 1)[1].split(" for update")[0]
+    first = clause.split(",")[0].strip()
+    column = first.replace(" asc", "").replace(" desc", "").strip()
+    return column.split(".")[-1].strip('"')
+
+
+def _capture_locks(fn):
+    """Every ``FOR UPDATE`` statement ``fn`` issues, in execution order."""
+    with CaptureQueriesContext(connection) as ctx:
+        fn()
+    return [
+        (_table_of(q["sql"]), _order_column(q["sql"]), q["sql"])
+        for q in ctx.captured_queries
+        if "for update" in q["sql"].lower()
+    ]
+
+
+@pytest.fixture
+def snapshot_backed_locks(world):
+    """Locks taken by a snapshot-backed calculation with a Form E dependency.
+
+    ``percentage_of_iid_mde`` is the richest path: it locks the execution, its
+    own response, the upstream daily-exposure response, both outcome rows and
+    the snapshot.
+    """
+    snapshot = _snapshot(world)
+    _complete_daily_exposure(world)
+    return _capture_locks(
+        lambda: _run(world, "percentage_of_iid_mde", snapshot=snapshot)
+    )
+
+
+class TestLockOrder:
+    """M4D3-TXN-001 / M4D3-OUT-004 -- ascending primary key, never public_id."""
+
+    def test_related_responses_are_locked_by_primary_key(self, snapshot_backed_locks):
+        ordered = [
+            (table, column)
+            for table, column, _ in snapshot_backed_locks
+            if table == "iig_checklist_checklistresponse" and column is not None
+        ]
+        assert ordered, "no ordered response lock was issued"
+        assert all(column == "id" for _, column in ordered), ordered
+
+    def test_outcomes_are_locked_by_primary_key(self, snapshot_backed_locks):
+        ordered = [
+            (table, column)
+            for table, column, _ in snapshot_backed_locks
+            if table == "iig_checklist_calculationoutcome"
+        ]
+        assert ordered, "no outcome lock was issued"
+        assert all(column == "id" for _, column in ordered), ordered
+
+    def test_all_outcomes_are_locked_by_one_statement(self, snapshot_backed_locks):
+        """Upstream rows and the target placeholder share one ordered set."""
+        outcome_locks = [
+            sql
+            for table, _, sql in snapshot_backed_locks
+            if table == "iig_checklist_calculationoutcome"
+        ]
+        assert len(outcome_locks) == 1, outcome_locks
+        assert "response_id" in outcome_locks[0].lower()
+
+    def test_no_for_update_query_orders_by_public_id(self, snapshot_backed_locks):
+        offenders = [
+            sql
+            for _, column, sql in snapshot_backed_locks
+            if column is not None
+            and (
+                column == "public_id"
+                or "public_id" in sql.lower().split(" order by ", 1)[1]
+            )
+        ]
+        assert offenders == [], offenders
+
+    def test_execution_is_locked_first(self, snapshot_backed_locks):
+        assert snapshot_backed_locks[0][0] == "iig_checklist_checklistexecution"
+
+    def test_target_response_precedes_related_responses(self, snapshot_backed_locks):
+        responses = [
+            (index, column)
+            for index, (table, column, _) in enumerate(snapshot_backed_locks)
+            if table == "iig_checklist_checklistresponse"
+        ]
+        assert len(responses) >= 2, responses
+        target_index, target_order = responses[0]
+        related_index, related_order = responses[1]
+        # The target is a single-row lock, so it carries no ORDER BY; the
+        # related set that follows it is pk-ordered.
+        assert target_order is None
+        assert related_order == "id"
+        assert target_index < related_index
+
+    def test_target_outcome_is_locked_before_the_snapshot(self, snapshot_backed_locks):
+        tables = [table for table, _, _ in snapshot_backed_locks]
+        assert tables.index("iig_checklist_calculationoutcome") < tables.index(
+            "iid_assessment_assessmentsnapshot"
+        ), tables
+
+    def test_snapshot_is_locked_last(self, snapshot_backed_locks):
+        assert snapshot_backed_locks[-1][0] == "iid_assessment_assessmentsnapshot"
+
+    def test_documented_order_matches_the_issued_statements(
+        self, snapshot_backed_locks
+    ):
+        assert [table for table, _, _ in snapshot_backed_locks] == [
+            "iig_checklist_checklistexecution",
+            "iig_checklist_checklistresponse",   # target
+            "iig_checklist_checklistresponse",   # related, pk order
+            "iig_checklist_calculationoutcome",  # upstream + target, pk order
+            "iid_assessment_assessmentsnapshot",
+        ]
+
+    def test_lock_helpers_normalise_caller_supplied_order(self, world):
+        """The helpers order by pk whatever order the caller hands them.
+
+        This is what lets a future cascade or rebinding service reuse them and
+        arrive at the same acquisition order as direct execution.
+        """
+        from iig_checklist.models import ChecklistResponse
+
+        ids = list(
+            ChecklistResponse.objects.filter(execution=world["execution"])
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        assert len(ids) >= 3
+
+        for supplied in (ids, list(reversed(ids)), [ids[1], ids[0], *ids[2:]]):
+            locks = _capture_locks(
+                lambda batch=supplied: (
+                    execution_mod._lock_responses(batch),
+                    execution_mod._lock_outcomes(batch),
+                )
+            )
+            assert [column for _, column, _ in locks] == ["id", "id"], supplied
+
+
+class TestLockHelperEdges:
+    """The guards the six approved entries never reach, but a cascade would."""
+
+    def test_an_entry_declaring_no_question_codes_locks_no_related_rows(self, world):
+        """A registry entry reading only formulation fields has nothing to lock."""
+        entry = _entry(input_resolvers=MappingProxyType({}))
+        assert execution_mod._declared_question_codes(entry) == set()
+        assert (
+            execution_mod._related_response_ids(
+                world["execution"], entry, world["responses"]["percentage_w_w"].pk
+            )
+            == []
+        )
+
+    def test_empty_batches_issue_no_lock_at_all(self, world):
+        """An empty id list must never become an unbounded FOR UPDATE."""
+        locks = _capture_locks(lambda: execution_mod._lock_responses([]))
+        assert locks == []
+        outcomes = None
+
+        def _lock_none():
+            nonlocal outcomes
+            outcomes = execution_mod._lock_outcomes([])
+
+        assert _capture_locks(_lock_none) == []
+        assert outcomes == []
+
+
+class TestLockOrderConcurrency:
+    """A real overlap between two differently-ordered row sets."""
+
+    @pytest.mark.django_db(transaction=True)
+    def test_overlapping_transactions_do_not_deadlock(self, world):
+        """Two transactions, opposite logical starting points, same pk order.
+
+        One holds the row set an execution touches; the other holds the wider
+        set a cascade or rebinding pass would touch, supplied in reverse. Both
+        go through the governed helpers, so both acquire ascending pk and one
+        simply waits. Ordering by ``public_id`` on either side would have made
+        this a deadlock.
+        """
+        from django.db import connections, transaction
+
+        from iig_checklist.models import ChecklistResponse
+
+        ids = list(
+            ChecklistResponse.objects.filter(execution=world["execution"])
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        assert len(ids) >= 3
+
+        start = threading.Barrier(2, timeout=30)
+        errors: list[BaseException] = []
+        orders: dict[str, list[str | None]] = {}
+
+        def acquire(name, supplied):
+            try:
+                with transaction.atomic():
+                    # 5 s is far longer than this contention needs and far
+                    # shorter than the test timeout, so a genuine inversion
+                    # surfaces as a failure instead of a hang.
+                    with connections["default"].cursor() as cursor:
+                        cursor.execute("SET LOCAL lock_timeout = '5s'")
+                    start.wait()
+                    locks = _capture_locks(
+                        lambda: (
+                            execution_mod._lock_responses(supplied),
+                            execution_mod._lock_outcomes(supplied),
+                        )
+                    )
+                    orders[name] = [column for _, column, _ in locks]
+            except BaseException as exc:
+                # Reported through ``errors``, never swallowed -- a deadlock or
+                # lock timeout must fail the test, not disappear in a thread.
+                errors.append(exc)
+            finally:
+                connections.close_all()
+
+        threads = [
+            threading.Thread(target=acquire, args=("execution", list(ids))),
+            threading.Thread(target=acquire, args=("cascade", list(reversed(ids)))),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60)
+
+        assert not any(thread.is_alive() for thread in threads), "a transaction hung"
+        assert errors == [], errors
+        assert orders == {"execution": ["id", "id"], "cascade": ["id", "id"]}
+
+    @pytest.mark.django_db(transaction=True)
+    def test_execution_lock_serialises_concurrent_calculations(self, world):
+        """M4D3-TXN-006 -- the execution row is the serialization barrier."""
+        from django.db import connections, transaction
+
+        from iig_checklist.models import ChecklistExecution
+
+        order: list[str] = []
+        locked = threading.Event()
+        release = threading.Event()
+
+        def holder():
+            try:
+                with transaction.atomic():
+                    list(
+                        ChecklistExecution.objects.filter(pk=world["execution"].pk)
+                        .select_for_update()
+                    )
+                    order.append("holder-locked")
+                    locked.set()
+                    release.wait(timeout=30)
+                    order.append("holder-releasing")
+            finally:
+                connections.close_all()
+
+        thread = threading.Thread(target=holder)
+        thread.start()
+        assert locked.wait(timeout=30)
+
+        def run_service():
+            order.append("service-start")
+            release.set()
+            result = _run(world, "percentage_w_w")
+            order.append("service-done")
+            return result
+
+        result = run_service()
+        thread.join(timeout=30)
+
+        assert result.status == CalculationStatus.COMPLETE, result.failure_codes
+        assert order.index("holder-releasing") < order.index("service-done"), order
+
+
+# ===========================================================================
+# I. Mandatory optimistic concurrency
+# ===========================================================================
+
+
+class TestExpectedVersionIsMandatory:
+    """M4D3-TXN-003 -- there is no value that disables the check."""
+
+    @pytest.mark.parametrize(
+        "supplied",
+        [None, True, False, 0, -1, "1", 1.0, Decimal("1")],
+        ids=["none", "true", "false", "zero", "negative", "str", "float", "decimal"],
+    )
+    def test_unusable_expected_version_is_rejected(self, world, supplied):
+        before = _snapshot_state(world)
+        with pytest.raises(InvalidExpectedVersion):
+            _run(world, "percentage_w_w", expected_version=supplied)
+        assert _snapshot_state(world) == before
+
+    def test_rejection_precedes_any_calculation_or_audit(self, world, monkeypatch):
+        from audit.models import AuditEvent
+
+        calls = []
+
+        def _counting(**kwargs):
+            calls.append(kwargs)
+            return engine.calculate_percentage_w_w(**kwargs)
+
+        _install_percentage_w_w(monkeypatch, _counting)
+        audit_before = AuditEvent.objects.count()
+        with pytest.raises(InvalidExpectedVersion):
+            _run(world, "percentage_w_w", expected_version=None)
+        assert calls == []
+        assert AuditEvent.objects.count() == audit_before
+
+    def test_the_correct_version_still_executes(self, world):
+        response = world["responses"]["percentage_w_w"]
+        assert response.version == 1
+        result = _run(world, "percentage_w_w", expected_version=1)
+        assert result.status == CalculationStatus.COMPLETE, result.failure_codes
+
+    def test_stale_version_invokes_no_calculation(self, world, monkeypatch):
+        calls = []
+
+        def _counting(**kwargs):
+            calls.append(kwargs)
+            return engine.calculate_percentage_w_w(**kwargs)
+
+        _install_percentage_w_w(monkeypatch, _counting)
+        before = _snapshot_state(world)
+        with pytest.raises(StaleResponseVersion):
+            _run(world, "percentage_w_w", expected_version=999)
+        assert calls == []
+        assert _snapshot_state(world) == before
+
+
+# ===========================================================================
+# J. Tenant isolation
+# ===========================================================================
+
+
+class TestTenantIsolation:
+    def test_execution_from_another_tenant_is_rejected(
+        self, world, tenant_b, monkeypatch
+    ):
+        """The guard fires before any lock, calculation, write or audit."""
+        from audit.models import AuditEvent
+
+        calls = []
+
+        def _counting(**kwargs):
+            calls.append(kwargs)
+            return engine.calculate_percentage_w_w(**kwargs)
+
+        _install_percentage_w_w(monkeypatch, _counting)
+        before = _snapshot_state(world)
+        audit_before = AuditEvent.objects.count()
+        response = world["responses"]["percentage_w_w"]
+
+        with pytest.raises(ResponseNotInExecution) as raised:
+            execute_calculation_response(
+                tenant=tenant_b,
+                execution=world["execution"],
+                response=response,
+                actor=world["user"],
+                expected_version=response.version,
+            )
+
+        assert calls == []
+        assert _snapshot_state(world) == before
+        assert AuditEvent.objects.count() == audit_before
+        # No identifier of the foreign execution, response or tenant leaks.
+        message = str(raised.value)
+        for leaked in (
+            str(world["execution"].public_id),
+            str(response.public_id),
+            str(tenant_b.id),
+        ):
+            assert leaked not in message
+
+    def test_response_belonging_to_another_tenants_execution_is_rejected(
+        self, world, tenant_b, user_a
+    ):
+        """Another tenant's response cannot be executed through this tenant."""
+        from authorization.models import MembershipRole, Role
+        from iig_checklist.models import ChecklistDefinition, ChecklistVersion
+        from iig_checklist.services import create_execution
+        from tenancy.models import TenantMembership
+
+        # The foreign execution is built through the governed service, so the
+        # actor needs a doer role in that tenant. This grants only what tenant B
+        # needs; tenant A's guard is what the assertion is about.
+        membership, _ = TenantMembership.objects.get_or_create(
+            tenant=tenant_b, user=user_a
+        )
+        role, _ = Role.objects.get_or_create(
+            tenant=tenant_b, name="doer", defaults={"is_system": True}
+        )
+        MembershipRole.objects.get_or_create(membership=membership, role=role)
+
+        other_definition = ChecklistDefinition.objects.create(
+            code="IIG-OTHER-TENANT", title="Other tenant (synthetic)",
+            scope_type="tenant", tenant=tenant_b, created_by=user_a,
+        )
+        other_version = ChecklistVersion.objects.create(
+            definition=other_definition, version_number=1, status="active",
+            created_by=user_a,
+        )
+        other_section = _section(other_version, code="S9")
+        _question(
+            other_section, registry_mod.Q_SUBJECT_COMPONENT,
+            answer_type=AnswerType.FORMULATION_COMPONENT_REFERENCE,
+            classification=DataSourceClassification.USER_REQUIRED, order=1,
+        )
+        other_calculated = _calculated(
+            other_section, "Q_PCT_WW", "percentage_w_w", order=2
+        )
+        other_product = _product(tenant_b, user_a, code="PROD-EX-TB")
+        other_formulation = _formulation(other_product, user_a)
+        _component(other_formulation)
+        other_execution = create_execution(
+            tenant=tenant_b,
+            checklist_version_public_id=str(other_version.public_id),
+            formulation_version_public_id=str(other_formulation.public_id),
+            actor=user_a,
+        )
+        from iig_checklist.models import ChecklistResponse
+
+        foreign_response = ChecklistResponse.objects.get(
+            execution=other_execution, question=other_calculated
+        )
+        before = _snapshot_state(world)
+
+        with pytest.raises(ResponseNotInExecution):
+            execute_calculation_response(
+                tenant=world["tenant"],
+                execution=other_execution,
+                response=foreign_response,
+                actor=world["user"],
+                expected_version=foreign_response.version,
+            )
+        assert _snapshot_state(world) == before
+
+
+# ===========================================================================
+# K. Model-validation rollback
+# ===========================================================================
+
+
+class TestFullCleanRollback:
+    def test_planted_completion_invariant_failure_rolls_back(
+        self, world, monkeypatch, django_capture_on_commit_callbacks
+    ):
+        """A completed outcome the model rejects must leave nothing behind.
+
+        ``_registry_binding_version`` is planted as a two-part version, which
+        ``CalculationOutcome._validate_completed_outcome()`` rejects. The
+        calculation is invoked -- that is expected, the failure happens at
+        persistence -- but no result survives.
+        """
+        from audit.models import AuditEvent
+
+        calls = []
+
+        def _counting(**kwargs):
+            calls.append(kwargs)
+            return engine.calculate_percentage_w_w(**kwargs)
+
+        approved = registry_mod.CALCULATION_BINDING_REGISTRY["percentage_w_w"]
+        planted = _entry(
+            input_resolvers=approved.input_resolvers,
+            recalculation_triggers=approved.recalculation_triggers,
+            required_units=approved.required_units,
+            output_unit=approved.output_unit,
+            function=_counting,
+            binding_version="1.0",  # not the governed three-part form
+        )
+        _install(
+            monkeypatch,
+            {**dict(registry_mod.CALCULATION_BINDING_REGISTRY), "percentage_w_w": planted},
+        )
+
+        before = _snapshot_state(world)
+        audit_before = AuditEvent.objects.count()
+        with (
+            pytest.raises(ValidationError) as raised,
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            _run(world, "percentage_w_w")
+
+        assert BINDING_VERSION_KEY in str(raised.value)
+        assert len(calls) == 1
+        assert _snapshot_state(world) == before
+        assert AuditEvent.objects.count() == audit_before
+
+    def test_the_registry_is_restored_after_the_planted_failure(self, world):
+        """The monkeypatch above is undone, so the approved entry still runs."""
+        entry = registry_mod.get_entry("percentage_w_w")
+        assert entry.binding_version == "1.0.0"
+        result = _run(world, "percentage_w_w")
+        assert result.status == CalculationStatus.COMPLETE, result.failure_codes
+
+
+# ===========================================================================
+# L. Immutable result
+# ===========================================================================
+
+
+class TestImmutableResult:
+    def test_result_fields_cannot_be_reassigned(self, world):
+        result = _run(world, "percentage_w_w")
+        for field in dataclasses.fields(result):
+            with pytest.raises(dataclasses.FrozenInstanceError):
+                setattr(result, field.name, None)
+
+    def test_result_accepts_no_new_attribute_and_has_no_dict(self, world):
+        result = _run(world, "percentage_w_w")
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            result.injected = "x"
+        assert not hasattr(result, "__dict__")
+        assert CalculationExecutionResult.__dataclass_params__.frozen
+
+    def test_nested_result_metadata_is_immutable(self, world):
+        result = _run(world, "percentage_of_iid_potency")
+        assert isinstance(result.failure_codes, tuple)
+        with pytest.raises(AttributeError):
+            result.failure_codes.append("INJECTED")
+        with pytest.raises(TypeError):
+            result.failure_codes[0] = "INJECTED"
+
+    def test_complete_property_tracks_the_stored_status(self, world):
+        """The result's own convenience accessor, part of its public contract."""
+        assert _run(world, "percentage_w_w").complete is True
+        # A resolver failure is a governed outcome, not a completion.
+        failed = _run(world, "percentage_of_iid_potency")
+        assert failed.status == CalculationStatus.DATA_REQUIRED
+        assert failed.complete is False
+
+    def test_result_exposes_no_model_instance_or_queryset(self, world):
+        from django.db.models import Model, QuerySet
+
+        result = _run(world, "percentage_w_w")
+        for field in dataclasses.fields(result):
+            value = getattr(result, field.name)
+            assert not isinstance(value, Model | QuerySet), field.name
+            assert isinstance(value, str | bool | Decimal | tuple), field.name
+        # Identity is the public UUID string, never a database id.
+        assert result.outcome_public_id == str(
+            world["outcomes"]["percentage_w_w"].public_id
+        )
+
+
+# ===========================================================================
+# M. Persisted numeric formatting
+# ===========================================================================
+
+
+def _use_milligram_component(world):
+    """Make the subject component 0.000001 mg, i.e. exactly 1E-9 g once converted."""
+    world["component"].quantity_per_dosage_unit = Decimal("0.000001")
+    world["component"].quantity_unit = "milligram"
+    world["component"].save(
+        update_fields=["quantity_per_dosage_unit", "quantity_unit", "updated_at"]
+    )
+
+
+class TestPlainNotationPersistence:
+    """Regulated numbers are stored in plain notation, exactly."""
+
+    def test_the_json_boundary_renders_every_governed_type(self):
+        """`_json_safe` is the whole persistence boundary; each branch matters.
+
+        Provenance can legitimately carry a UUID or a timestamp, and anything
+        unforeseen must degrade to a string rather than break a governed write.
+        """
+        import uuid as uuid_module
+        from datetime import UTC, datetime
+
+        identifier = uuid_module.uuid4()
+        moment = datetime(2026, 1, 1, tzinfo=UTC)
+
+        assert execution_mod._json_safe(identifier) == str(identifier)
+        assert execution_mod._json_safe(moment) == moment.isoformat()
+        assert execution_mod._json_safe(Decimal("1E-7")) == "0.0000001"
+        assert execution_mod._json_safe({"a": Decimal("1E-7")}) == {"a": "0.0000001"}
+        assert execution_mod._json_safe(
+            MappingProxyType({"a": (Decimal("1E-7"),)})
+        ) == {"a": ["0.0000001"]}
+        assert execution_mod._json_safe(["x", 1, True, None]) == ["x", 1, True, None]
+        # Anything else is stringified rather than allowed to break the write.
+        assert execution_mod._json_safe({1, 2}) in ("{1, 2}", "{2, 1}")
+
+    @pytest.mark.parametrize(
+        ("supplied", "expected"),
+        [
+            ("1E-7", "0.0000001"),
+            ("-1E-7", "-0.0000001"),
+            ("1E-12", "0.000000000001"),
+            ("1E+3", "1000"),
+            ("0", "0"),
+            ("0.250000", "0.250000"),
+            ("-0.500000", "-0.500000"),
+        ],
+    )
+    def test_formatter_never_emits_an_exponent(self, supplied, expected):
+        rendered = format_decimal_plain(Decimal(supplied))
+        assert rendered == expected
+        assert "E" not in rendered.upper()
+        assert Decimal(rendered) == Decimal(supplied)
+
+    def test_tiny_converted_input_is_persisted_in_plain_notation(self, world):
+        """A milligram quantity converts to 1E-9 g and must not persist as that.
+
+        ``str(Decimal("1E-9"))`` really is ``'1E-9'``, so this is the exact
+        condition the shared formatter exists for.
+        """
+        _use_milligram_component(world)
+        result = _run(world, "percentage_w_w")
+        assert result.status == CalculationStatus.COMPLETE, result.failure_codes
+
+        outcome = world["outcomes"]["percentage_w_w"]
+        outcome.refresh_from_db()
+        stored = outcome.inputs["quantity_per_unit_grams"]
+        assert str(Decimal("1E-9")) == "1E-9"  # what a bare str() would have stored
+        assert stored == "0.000000001"
+        assert Decimal(stored) == Decimal("1E-9")
+        descriptor = outcome.input_provenance["quantity_per_unit_grams"]
+        assert descriptor["value"] == "0.000000001"
+        assert not _has_exponent(outcome.inputs)
+        assert not _has_exponent(outcome.input_provenance)
+
+    def test_negative_input_is_persisted_in_plain_notation(self, world):
+        """A negative reference keeps its sign and stays exponent-free.
+
+        A negative IID potency is not a scientific scenario; it is the shortest
+        governed path that puts a negative Decimal through the persistence
+        boundary, and ``calculate_difference_from_potency`` applies no sign
+        guard, so the difference completes normally.
+        """
+        snapshot = _snapshot(world, potency="-0.000001")
+        result = _run(world, "difference_from_iid_potency", snapshot=snapshot)
+        assert result.status == CalculationStatus.COMPLETE, result.failure_codes
+
+        outcome = world["outcomes"]["difference_from_iid_potency"]
+        outcome.refresh_from_db()
+        stored = outcome.inputs["selected_iid_potency_amount"]
+        assert stored == "-0.000001"
+        assert Decimal(stored) == Decimal("-0.000001")
+        assert stored.startswith("-")
+        assert not _has_exponent(outcome.inputs)
+        assert not _has_exponent(outcome.input_provenance)
+
+    def test_repeated_execution_persists_an_identical_rendering(self, world):
+        _use_milligram_component(world)
+        _run(world, "percentage_w_w")
+        outcome = world["outcomes"]["percentage_w_w"]
+        outcome.refresh_from_db()
+        first = dict(outcome.inputs)
+        _run(world, "percentage_w_w")
+        outcome.refresh_from_db()
+        assert dict(outcome.inputs) == first
+
+    def test_conversion_provenance_is_also_plain(self, world):
+        """The adapter and the writer share one formatter, so both stay plain."""
+        _use_milligram_component(world)
+        _run(world, "percentage_w_w")
+        outcome = world["outcomes"]["percentage_w_w"]
+        outcome.refresh_from_db()
+        provenance = outcome.input_provenance["quantity_per_unit_grams"]
+        resolver = provenance["resolver_provenance"]
+        assert resolver["original_value"] == "0.000001"
+        assert resolver["converted_value"] == "0.000000001"
+        assert not _has_exponent(resolver["conversion_factor"])
+        assert _exponent_values(outcome.input_provenance) == []
+
+
+# ===========================================================================
+# N. Result unit for the difference calculations -- specification gap
+# ===========================================================================
+
+
+class TestDifferenceResultUnit:
+    """M4D3-MAP-004/006 prescribe no result unit; this records that honestly.
+
+    M4D3-MAP-007 explicitly tells the service to store ``gram`` for
+    ``daily_exposure``, whose engine result also carries no unit. No equivalent
+    clause exists for either difference calculation, and the registry contract
+    states ``output_unit`` "may be empty", so the governed value today is the
+    empty string. Inventing ``iid_potency_unit`` here would be a new rule, not an
+    implementation of an approved one, so the gap is asserted rather than
+    papered over. Recorded as a deferred specification requirement in
+    docs/MILESTONE_4D_3_IMPLEMENTATION_EVIDENCE.md.
+    """
+
+    def test_registry_declares_no_output_unit_for_the_differences(self):
+        for identifier in ("difference_from_iid_potency", "difference_from_iid_mde"):
+            assert registry_mod.get_entry(identifier).output_unit == ""
+
+    def test_daily_exposure_by_contrast_has_a_governed_unit(self, world):
+        """M4D3-MAP-007 -- the clause that exists, and is honoured."""
+        assert registry_mod.get_entry("daily_exposure").output_unit == "gram"
+        result = _run(world, "daily_exposure")
+        assert result.unit == "gram"
+
+    def test_difference_outcomes_complete_with_an_empty_unit(self, world):
+        """Documents the gap: a regulated Decimal with no stored unit."""
+        snapshot = _snapshot(world)
+        _complete_daily_exposure(world)
+        for key in ("difference_from_iid_potency", "difference_from_iid_mde"):
+            result = _run(world, key, snapshot=snapshot)
+            assert result.status == CalculationStatus.COMPLETE, result.failure_codes
+            assert result.value is not None
+            assert result.unit == "", key
+            outcome = world["outcomes"][key]
+            outcome.refresh_from_db()
+            assert outcome.unit == ""
+            outcome.full_clean()
+
+    def test_the_unit_remains_reconstructible_from_provenance(self, world):
+        """The gap is bounded: both operands record their units."""
+        snapshot = _snapshot(world)
+        _run(world, "difference_from_iid_potency", snapshot=snapshot)
+        outcome = world["outcomes"]["difference_from_iid_potency"]
+        outcome.refresh_from_db()
+        for kwarg in ("selected_iid_potency_amount", "converted_proposed_quantity"):
+            descriptor = outcome.input_provenance[kwarg]
+            assert descriptor.get("target_unit") == "gram" or (
+                descriptor.get("source_unit") == "gram"
+            ), (kwarg, descriptor)
+
+
+# ===========================================================================
+# O. Audit-callback failure and the deferred boundaries
+# ===========================================================================
+
+
+class TestAuditCallbackFailure:
+    def test_a_failing_audit_callback_does_not_undo_the_commit(
+        self, world, monkeypatch, django_capture_on_commit_callbacks
+    ):
+        """Established behaviour, not a new guarantee.
+
+        The audit is dispatched through ``transaction.on_commit()``, so by the
+        time it runs the outcome is already durable. The project has no durable
+        outbox, so a failing callback propagates to the caller, writes no audit
+        row and is not retried; the calculation result stays committed. That
+        limitation is recorded in the evidence rather than hidden behind a
+        swallowed exception.
+        """
+        from audit.models import AuditEvent
+
+        def _exploding(**kwargs):
+            raise RuntimeError("audit sink unavailable")
+
+        monkeypatch.setattr(execution_mod_audit(), "emit", _exploding)
+
+        audit_before = AuditEvent.objects.count()
+        with pytest.raises(RuntimeError):
+            with django_capture_on_commit_callbacks(execute=True):
+                result = _run(world, "percentage_w_w")
+                assert result.status == CalculationStatus.COMPLETE
+
+        # The regulated result survived; only the audit row is missing.
+        outcome = world["outcomes"]["percentage_w_w"]
+        outcome.refresh_from_db()
+        assert outcome.status == CalculationStatus.COMPLETE
+        assert outcome.value == Decimal("25")
+        assert AuditEvent.objects.count() == audit_before
+
+    def test_a_successful_callback_writes_exactly_one_row(
+        self, world, django_capture_on_commit_callbacks
+    ):
+        from audit.models import AuditEvent
+
+        with django_capture_on_commit_callbacks(execute=True) as callbacks:
+            _run(world, "percentage_w_w")
+        assert len(callbacks) == 1
+        assert (
+            AuditEvent.objects.filter(
+                event_type=CALCULATED_EVENT,
+                resource_id=str(world["responses"]["percentage_w_w"].public_id),
+            ).count()
+            == 1
+        )
+
+
+def execution_mod_audit():
+    """The audit module the execution service resolves ``emit`` from."""
+    from iig_checklist import audit as audit_mod
+
+    return audit_mod
+
+
+class TestDeferredBoundaries:
+    """The stop conditions this run deliberately keeps."""
+
+    def test_the_execution_module_neither_creates_nor_looks_up_a_snapshot(self):
+        source = inspect.getsource(execution_mod)
+        for forbidden in (
+            "AssessmentSnapshot.objects.create",
+            "AssessmentSnapshot.objects.get",
+            "AssessmentSnapshot.objects.all",
+            ".first()",
+            ".last()",
+            ".latest(",
+            ".earliest(",
+        ):
+            assert forbidden not in source, forbidden
+        # The only snapshot query is the pk-scoped lock of the caller's row.
+        assert source.count("AssessmentSnapshot.objects") == 1
+        assert "AssessmentSnapshot.objects.filter(pk=snapshot.pk)" in source
+
+    def test_no_callable_governed_snapshot_service_exists_yet(self):
+        """The stop condition, asserted rather than assumed."""
+        import iid_assessment
+
+        assert not hasattr(iid_assessment, "services")
+        with pytest.raises(ImportError):
+            __import__("iid_assessment.services")
+
+    def test_snapshot_backed_execution_is_reachable_from_no_view_or_task(self):
+        """Nothing but tests and future services calls the execution service."""
+        from iig_checklist import serializers, urls, views
+
+        for module in (views, serializers, urls):
+            assert "calculation_execution" not in inspect.getsource(module), module
+
+    def test_a_client_supplied_snapshot_identifier_is_never_accepted(self, world):
+        """Only an exact server-held object is honoured (M4D3-SNO-011)."""
+        snapshot = _snapshot(world)
+        with pytest.raises((AttributeError, TypeError, ValueError)):
+            execute_calculation_response(
+                tenant=world["tenant"],
+                execution=world["execution"],
+                response=world["responses"]["percentage_of_iid_potency"],
+                actor=world["user"],
+                expected_version=1,
+                snapshot_context=ResolutionContext(
+                    assessment_snapshot=str(snapshot.public_id)
+                ),
+            )
+
+    def test_duplicate_outcome_stays_an_internal_fail_closed_exception(self, world):
+        """M4D3-OUT-005's ``duplicate_calculation_outcome`` belongs to the API layer.
+
+        This service raises a typed internal exception and writes nothing; the
+        governed external error code is mapped by the deferred serializer layer,
+        which must never serialize the raw exception.
+        """
+        from iig_checklist.models import CalculationOutcome
+
+        CalculationOutcome.objects.create(
+            response=world["responses"]["percentage_w_w"],
+            calculation_name="calculate_percentage_w_w",
+            status=CalculationStatus.DATA_REQUIRED,
+        )
+        before = _snapshot_state(world)
+        with pytest.raises(PlaceholderAmbiguous) as raised:
+            _run(world, "percentage_w_w")
+        assert "duplicate_calculation_outcome" not in str(raised.value)
+        assert _snapshot_state(world) == before
