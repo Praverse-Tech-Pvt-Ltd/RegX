@@ -78,11 +78,17 @@ class ReleaseNotEligible(AssessmentSnapshotError):
     """The supplied release is not an ``fda_iid`` release in an eligible state."""
 
 
-#: M4D3-SRC-010 -- a superseded release is still a *reproducible* one, so a
-#: snapshot may be taken from it; the resulting outcome is translated to
-#: REGULATORY_REVIEW_REQUIRED downstream rather than blocked here. Statuses
-#: outside this set were never approved for regulatory comparison at all.
-ELIGIBLE_RELEASE_STATUSES: frozenset[str] = frozenset({"active", "superseded"})
+#: Exactly the statuses ``find_iid_candidates()`` will match against
+#: (``release__status__in=[APPROVED, ACTIVE]``). Accepting a status the governed
+#: matcher rejects would let a caller create a snapshot that can never freeze a
+#: precedent -- an empty regulated record that looks like an assessment.
+#:
+#: A **superseded** release is therefore *not* eligible. Reproducibility does not
+#: come from re-deriving against an old release: it comes from the snapshot that
+#: was already frozen, which keeps its values forever regardless of later FDA
+#: refreshes. M4D3-SRC-009 forbids 4D-3 implementing its own selection, so the
+#: matcher's own status filter is the authority here rather than a second rule.
+ELIGIBLE_RELEASE_STATUSES: frozenset[str] = frozenset({"active", "approved"})
 
 
 @dataclass(frozen=True, slots=True)
