@@ -1701,6 +1701,246 @@ with a comment explaining why the broad `except` is correct there.
    approval automation, reports, exports, dashboards, notifications,
    asynchronous execution, serializers and frontend.
 
+## 6J. Governed `AssessmentSnapshot` creation, and its execution integration
+
+The execution-layer gate closed at **PASS** (independently confirmed twice at
+`4d484f3`). This section delivers the blocker every prior section deferred: the
+callable governed snapshot service, and the calculation-execution integration it
+unblocks.
+
+### The stop condition, now lifted
+
+`AssessmentSnapshot` rows could only be created inside
+`iid_assessment/views.py::SnapshotView.post`, bound to a DRF request, serializer,
+`request.user` and HTTP response. Snapshot-backed calculation execution therefore
+had to accept a caller-supplied object and stay internal-only.
+
+`backend/iid_assessment/services.py` — `create_assessment_snapshot()` — is now
+the single authoritative creation path. The API is a thin adapter over it. There
+is no second implementation.
+
+### The governed source of truth is the formulation, not the caller
+
+Per M4D3-SRC-004 the service derives every `run_preview()` argument from governed
+rows rather than from request fields:
+
+| Argument | Source |
+|---|---|
+| `active_release_public_id` | resolved server-side, M4D3-SRC-001/003 |
+| `route_code`, `dosage_form_code` | `FormulationVersion.product`, subject to Part 14.2 |
+| `proposed_quantity_per_unit`, `proposed_quantity_unit` | the `FormulationComponent` |
+| `total_dosage_unit_weight`, `…_unit` | the `FormulationVersion` (M4D3-SRC-014) |
+| substance identity | the component's `resolved_ingredient_public_id` / `resolved_unii` |
+| `maximum_dosage_units_per_day` | caller-supplied, else `FormulationVersion.maximum_dosage_units_per_day` |
+
+A caller cannot substitute its own potency, MDE or quantity, so a snapshot always
+describes the formulation it names.
+
+**One import-forced deviation, disclosed.** M4D3-SRC-004 says
+`maximum_dosage_units_per_day` comes from the Part 14.1 worst-case resolver. That
+resolver lives in `iig_checklist`, and the contract
+`iig-checklist-content-is-not-imported-by-governed-domains` forbids
+`iid_assessment` importing it. The execution service therefore calls without it
+and the service falls back to `FormulationVersion.maximum_dosage_units_per_day`,
+which is one of the Part 14.1 resolver's own two governed sources. The value
+reaches only the preview calculations the snapshot carries as provenance: 4D-3
+reads potency, MDE and their units from the snapshot and computes daily exposure
+through its own governed Form C path, so **no regulated 4D-3 number depends on
+it**. Threading the worst-case value through is recorded as deferred.
+
+### Exact release policy
+
+`resolve_active_iid_release()` implements M4D3-SRC-001: the single `fda_iid`
+release with `status = "active"`. `unique_active_release_per_dataset_type` makes
+at most one row possible, but every match is still collected and anything other
+than exactly one fails closed. No `.first()`, no ordering, no "latest" selection.
+
+`ELIGIBLE_RELEASE_STATUSES` is `{active, approved}` — **exactly** what
+`find_iid_candidates()` matches against (`release__status__in=[APPROVED, ACTIVE]`).
+
+> **A design correction the tests forced.** The first implementation used
+> `{active, superseded}`, reasoning that a superseded release is still
+> reproducible. A test showed that is false: the governed matcher excludes
+> superseded releases, so pinning one produced a snapshot with null potency — an
+> empty regulated record that looks like an assessment. M4D3-SRC-009 forbids 4D-3
+> implementing its own selection, so the matcher's own filter is the authority
+> rather than a second rule invented here. Superseded releases are now refused.
+
+**Where reproducibility actually lives.** Not in replaying an old release — in
+the snapshot already frozen. Tested end to end: release A is snapshotted; A is
+superseded and B activated with different values; the first snapshot keeps A's
+potency and A's release UUID forever; a later event uses B and its different
+values; the first snapshot is never rewritten to point at B; and re-deriving
+against A is refused rather than silently producing nothing.
+
+### Always-new (M4D3-SNO-006/008)
+
+Every call constructs a new row. No reuse, no deduplication by value, no update
+path, no delete-and-recreate. Two identical calls create two distinct snapshots
+with different public UUIDs and the earlier row is untouched.
+
+Proven at the SQL level: creation issues no snapshot `SELECT` other than Django's
+own `public_id` uniqueness probe from `full_clean()`, and specifically none keyed
+on tenant, component, formulation version, release, or any `ORDER BY` — the shape
+a reuse or dedupe lookup would have.
+
+### Ownership, transaction and audit
+
+Ownership is checked before anything else: the formulation version must belong to
+the tenant, and the component must belong to that exact formulation version.
+Both raise typed exceptions with **empty args** — no database id, SQL, foreign
+tenant identifier or raw driver exception.
+
+The caller owns the transaction (M4D3-SNO-012). The service opens none of its
+own, commits nothing independently, and schedules its audit through the caller's
+`transaction.on_commit()`, so a rollback discards the snapshot and emits no
+success audit. `full_clean()` runs before save.
+
+The audit event type and `resource_id` are unchanged; the payload gains the
+formulation version, component, release identity and match status. No test
+asserted the old payload. Callback-failure behaviour is unchanged from §6I: the
+commit stands, the exception propagates, nothing is retried, and the absent
+durable outbox remains deferred.
+
+### `SnapshotView` extraction
+
+The view resolves the request's formulation version and component into real
+tenant-owned objects, then calls the service. Status codes, permissions, tenant
+isolation and the response body are unchanged.
+
+**This tightens the endpoint, deliberately.** Previously the view wrote the raw
+request UUIDs into the snapshot with no validation at all, so a caller could
+freeze a regulated record naming a formulation that did not exist or one owned
+by another tenant. A version that does not exist and one owned by another tenant
+are both 404 and indistinguishable from outside, so the endpoint cannot be used
+to probe for another tenant's identifiers.
+
+> **One existing test corrected, not weakened.** `test_snapshot_is_immutable`
+> named an `IIDIngredient` as the formulation component and an
+> `FDADataSourceRelease` as the formulation version — neither is a formulation
+> object, and only the absent validation made that possible. It now posts a real
+> tenant-owned formulation. The immutability assertion itself is untouched. The
+> other three snapshot tests construct rows directly to exercise model
+> immutability rather than the endpoint, and are unaffected.
+
+### Execution integration (M4D3-SNO-009)
+
+When a bound entry reads an `AssessmentSnapshot`, `execute_calculation_response()`
+resolves the subject component, resolves the active release server-side, calls
+`create_assessment_snapshot()` **inside its own transaction**, and hands that
+exact object straight to `resolve_calculation_inputs()`. No lookup follows.
+
+`calculation_inputs` gains `resolve_subject_component()`, exposing exactly Phase A
+and Phase B. Both entry points call the same `_resolve_subject_component()`
+through shared `_validate_target_contract()` and `_locate_upstreams()` helpers, so
+the selector, inheritance and disagreement rules cannot diverge. No resolver logic
+is duplicated; resolution stays read-only.
+
+A snapshot this transaction creates takes **no lock** — it does not exist yet, so
+no other transaction can hold or observe it. The five-step primary-key lock order
+of §6I is otherwise unchanged, and a snapshot supplied through the private hook is
+still locked in position five.
+
+`snapshot_context` is renamed `_internal_snapshot_context`. It remains for tests
+and for server-side callers pinning an exact pre-resolved snapshot, but the
+underscore marks it as no part of the callable contract (M4D3-SNO-011). No view,
+serializer or task calls the execution service at all, and a test asserts it.
+
+**M4D3-SRC-002 implemented**: with no single active `fda_iid` release the
+calculation fails closed with a persisted `status = "error"` /
+`reason_code = "FDA_VALUE_UNAVAILABLE"` outcome — not an exception — so the
+governed record shows why nothing was calculated. No snapshot is created.
+
+When the subject component cannot be resolved, no snapshot is created either.
+That is already a governed resolver failure and the resolver reports it, with
+every other failure alongside it, a moment later.
+
+Rollback is proven for a calculation exception, an outcome-validation failure, a
+stale `expected_version` and an invalid binding: in every case the snapshot count,
+responses, outcomes, history and audit are all unchanged.
+
+### Discovered stop condition — model change and migration
+
+`AssessmentSnapshot.calculation_results` was `JSONField(default=dict)` with
+`blank=False`. Django counts `{}` among `Field.empty_values`, so a row holding
+this field's own default could not pass `full_clean()`. With no matching IID
+precedent `run_preview()` computes nothing and `calculations` is `{}` — so the
+governed service could not create a snapshot for exactly the case where one
+matters most: the reproducible record that **no precedent existed**. M4D3-SNO-006
+requires a snapshot for every governed event, so this blocked a normative
+requirement.
+
+Same defect and same remedy as `CalculationOutcome.inputs`/`input_provenance` in
+§6G: `blank=True`, `null` unchanged. Migration
+`0003_alter_assessmentsnapshot_calculation_results` — one `AlterField`,
+reversible, no `RunPython`; `sqlmigrate` emits a pure no-op state change. Nothing
+else on the model changed and snapshot immutability is untouched.
+
+No workaround was applied: `full_clean()` was not bypassed, the field was not
+excluded from validation, and no filler was written into `calculation_results`.
+
+### Tests
+
+| Module | Tests |
+|---|---|
+| `iid_assessment/tests/test_snapshot_service.py` (new) | **38** |
+| `iig_checklist/tests/test_4d3_calculation_execution.py` | 97 → **112** |
+| `iid_assessment` total | 105 → **143** |
+
+The 14 new execution tests cover all four snapshot-backed calculations creating
+exactly one fresh snapshot each with the exact release, component and formulation
+version; the outcome provenance and audit naming that exact snapshot; a
+calculation needing no snapshot creating none; recalculation creating another;
+and every rollback and fail-closed path above.
+
+### Post-implementation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| Snapshot service | `pytest iid_assessment/tests/test_snapshot_service.py --no-cov -q` | **38 passed**, 33.1 s |
+| IID assessment (all) | `pytest iid_assessment --no-cov -q` | **143 passed**, 41.2 s |
+| Calculation execution | `pytest …test_4d3_calculation_execution.py --no-cov -q` | **112 passed**, 77.9 s |
+| Execution readiness | `pytest …test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 27.8 s |
+| Input resolvers | `pytest …test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 76.2 s |
+| Activation validation | `pytest …test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 62.7 s |
+| Database-free foundation | `pytest …test_4d3_foundation.py --no-cov -q` | **183 passed**, 0.25 s |
+| Execution model / API / lifecycle / response / reviewer | `pytest …` | **64 passed**, 42.1 s |
+| Lifecycle / clone / platform auth / tenancy / authorization | `pytest …` | **131 passed**, 66.2 s |
+
+| Full backend suite | `pytest -q` | **1477 passed**, 0 failed, 0 skipped, 474.4 s, exit 0 |
+| Coverage | same run | **93.86 %** against a 55 % floor |
+| `calculation_execution.py` coverage | same run | **100 %** (218 statements, 0 missed) |
+| `iid_assessment/services.py` coverage | same run | **99 %** (78 statements, 1 missed — the defensive non-`fda_iid` guard reached only through the API path) |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0, `0003` applied |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1424 → **1477** (+53) and coverage rose 93.66 % → **93.86 %**.
+`calculation_execution.py` stayed at 100 %: the M4D3-SRC-002 and
+unresolved-component paths added here were uncovered on first measurement and
+tests were added rather than the gap accepted. No threshold was lowered, no file
+excluded, no test weakened or skipped, and no `pragma`, `noqa`, `skip` or
+`xfail` was added.
+
+### Still deferred
+
+1. **Cascade recalculation orchestration** — only direct single-response
+   execution is implemented. Not claimed.
+2. **Part 14.1 worst-case maximum-dosage-units threading** into snapshot
+   creation, blocked by the import contract; no regulated 4D-3 number depends on
+   it (above).
+3. **Difference result unit** — the §6I specification gap, untouched here.
+4. **Durable audit outbox** — repository-wide, unchanged.
+5. **External service error codes** (M4D3-OUT-005) — deferred API layer.
+6. Unchanged: `update_checklist_response()`, manual override, applicability
+   persistence, component rebinding, response-history redesign, approval
+   automation, reports, exports, dashboards, notifications, asynchronous
+   execution, broader serializer work and frontend.
+
 ## 7. Assertions
 
 These were written for the database-free foundation run and had not been
