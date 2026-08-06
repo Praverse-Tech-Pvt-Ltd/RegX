@@ -38,13 +38,36 @@ and response. Rather than duplicate that logic or invent a lookup, this service
 accepts the exact snapshot object through ``snapshot_context``, exactly as the
 reviewed resolver does. Snapshot creation is reported as an open blocker.
 
-Lock order, acquired before any validation that can mutate and before any write:
+Lock order (M4D3-TXN-001, M4D3-OUT-004), acquired before any write:
 
 1. the ``ChecklistExecution``;
 2. the target ``ChecklistResponse``;
-3. every involved upstream/selector ``ChecklistResponse``, ordered by public_id;
-4. every involved ``CalculationOutcome``, ordered by public_id;
-5. the ``AssessmentSnapshot`` the caller supplied, if any.
+3. every other involved ``ChecklistResponse``, ordered by **ascending primary
+   key**;
+4. every involved ``CalculationOutcome`` -- upstream rows *and* the target
+   placeholder -- in **one** query ordered by **ascending primary key**, then
+   classified in memory;
+5. the exact ``AssessmentSnapshot`` the caller supplied, if any.
+
+**Ordering is by database primary key, never by ``public_id``.** M4D3-TXN-001
+requires ascending primary-key order "without exception", M4D3-OUT-004 repeats it
+for ``CalculationOutcome`` and M4D3-RBD-004 pins the future component-rebinding
+transaction to the same order. ``public_id`` is a random UUID, so ordering by it
+is uncorrelated with primary-key order and would invert against any specification-
+conformant service. Public UUIDs remain the right identity for external
+representation and for deterministic error/provenance ordering; they are not a
+row-lock acquisition order.
+
+Two properties make this order deadlock-free:
+
+* every ``CalculationOutcome`` this service touches is acquired in one
+  pk-ordered statement, so upstream rows and the target placeholder can never be
+  taken in two conflicting stages;
+* the target response is locked before the remaining responses, which is not
+  itself pk-ordered -- but step 1 already holds the ``ChecklistExecution`` row,
+  and every response and outcome involved belongs to that one execution. No two
+  governed operations on the same execution can therefore be inside steps 2-5 at
+  the same time, and operations on different executions share no rows.
 """
 
 from __future__ import annotations
@@ -235,36 +258,56 @@ def _declared_question_codes(entry) -> set[str]:
     return codes
 
 
-def _lock_related_rows(execution, entry) -> None:
-    """Lock every involved response and outcome in stable public_id order.
+def _related_response_ids(execution, entry, target_pk) -> list[int]:
+    """Primary keys of every other response this entry reads, ascending.
 
-    Deterministic ordering is what keeps two concurrent executions from
-    deadlocking against each other.
+    The target is excluded because step 2 already holds it; re-acquiring it here
+    would be a no-op but would blur the documented order.
     """
-    from .models import CalculationOutcome, ChecklistResponse
+    from .models import ChecklistResponse
 
     codes = _declared_question_codes(entry)
     if not codes:
-        return
-
-    response_ids = list(
+        return []
+    return list(
         ChecklistResponse.objects.filter(
             execution=execution, question__code__in=sorted(codes)
         )
-        .order_by("public_id")
+        .exclude(pk=target_pk)
+        .order_by("pk")
         .values_list("pk", flat=True)
     )
-    if response_ids:
-        list(
-            ChecklistResponse.objects.filter(pk__in=response_ids)
-            .select_for_update()
-            .order_by("public_id")
-        )
-        list(
-            CalculationOutcome.objects.filter(response_id__in=response_ids)
-            .select_for_update()
-            .order_by("public_id")
-        )
+
+
+def _lock_responses(response_ids) -> None:
+    """M4D3-TXN-001 -- lock the given responses in ascending primary-key order."""
+    from .models import ChecklistResponse
+
+    if not response_ids:
+        return
+    list(
+        ChecklistResponse.objects.filter(pk__in=response_ids)
+        .select_for_update()
+        .order_by("pk")
+    )
+
+
+def _lock_outcomes(response_ids) -> list:
+    """M4D3-OUT-004 -- lock every involved outcome as one pk-ordered set.
+
+    Upstream outcomes and the target placeholder are acquired by a single
+    statement, so there is no window in which the two could be taken in
+    conflicting orders. The caller classifies the returned rows in memory.
+    """
+    from .models import CalculationOutcome
+
+    if not response_ids:
+        return []
+    return list(
+        CalculationOutcome.objects.filter(response_id__in=response_ids)
+        .select_for_update()
+        .order_by("pk")
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -284,8 +327,9 @@ def execute_calculation_response(
     """Resolve, calculate and persist one calculated response's outcome.
 
     The caller owns nothing: this service opens the transaction, takes every
-    lock in the documented order, validates ``expected_version`` while locked,
-    and either persists a governed outcome or leaves the database untouched.
+    lock in the documented order, validates ``expected_version`` against the
+    locked row, and either persists a governed outcome or leaves the database
+    untouched.
 
     ``snapshot_context`` carries the exact ``AssessmentSnapshot`` the caller
     selected. No snapshot is looked up or created here.
@@ -293,7 +337,7 @@ def execute_calculation_response(
     from django.db import transaction as db_transaction
 
     from .audit import IigChecklistEvent, emit
-    from .models import CalculationOutcome, ChecklistExecution, ChecklistResponse
+    from .models import ChecklistExecution, ChecklistResponse
 
     # -- Phase A: caller contract, no writes, no locks --------------------
     if response.execution_id != execution.pk:
@@ -314,36 +358,46 @@ def execute_calculation_response(
 
     # -- Phase B: one transaction, locks in the documented order ----------
     with db_transaction.atomic():
+        # 1. the execution -- also the barrier that serializes every governed
+        #    operation on this execution (M4D3-TXN-006).
         list(
             ChecklistExecution.objects.filter(pk=execution.pk).select_for_update()
         )
+        # 2. the target response.
         locked_response = (
             ChecklistResponse.objects.select_for_update()
             .select_related("question")
             .get(pk=response.pk)
         )
-        _lock_related_rows(execution, entry)
+
+        # Optimistic concurrency, checked against the locked row and before any
+        # further lock, any resolution and any write.
+        if expected_version is not None and locked_response.version != expected_version:
+            raise StaleResponseVersion()
+
+        # 3. every other involved response, ascending primary key.
+        related_ids = _related_response_ids(execution, entry, locked_response.pk)
+        _lock_responses(related_ids)
+
+        # 4. every involved outcome -- upstream and target together -- as one
+        #    ascending primary-key set, then classified in memory.
+        locked_outcomes = _lock_outcomes([*related_ids, locked_response.pk])
+        outcomes = [
+            row for row in locked_outcomes if row.response_id == locked_response.pk
+        ]
+        if not outcomes:
+            raise PlaceholderMissing(question.code)
+        if len(outcomes) > 1:
+            raise PlaceholderAmbiguous(question.code)
+        outcome = outcomes[0]
+
+        # 5. the exact snapshot the caller supplied, last.
         if snapshot is not None:
             from iid_assessment.models import AssessmentSnapshot
 
             list(
                 AssessmentSnapshot.objects.filter(pk=snapshot.pk).select_for_update()
             )
-
-        # Optimistic concurrency, checked while locked and before any write.
-        if expected_version is not None and locked_response.version != expected_version:
-            raise StaleResponseVersion()
-
-        outcomes = list(
-            CalculationOutcome.objects.select_for_update()
-            .filter(response=locked_response)
-            .order_by("public_id")
-        )
-        if not outcomes:
-            raise PlaceholderMissing(question.code)
-        if len(outcomes) > 1:
-            raise PlaceholderAmbiguous(question.code)
-        outcome = outcomes[0]
 
         resolved_inputs = resolve_calculation_inputs(
             execution=execution,
