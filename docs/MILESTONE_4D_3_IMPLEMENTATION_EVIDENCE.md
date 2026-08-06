@@ -1654,7 +1654,7 @@ Run **serially** — the suites share one PostgreSQL test database.
 
 | Gate | Command | Result |
 |---|---|---|
-| Calculation execution | `pytest iig_checklist/tests/test_4d3_calculation_execution.py --no-cov -q` | **97 passed**, 92.3 s, exit 0 |
+| Calculation execution | `pytest iig_checklist/tests/test_4d3_calculation_execution.py --no-cov -q` | **97 passed**, 62.5 s, exit 0 |
 | Execution readiness | `pytest iig_checklist/tests/test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 27.0 s, exit 0 |
 | Input resolvers | `pytest iig_checklist/tests/test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 76.1 s, exit 0 |
 | Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 62.6 s, exit 0 |
