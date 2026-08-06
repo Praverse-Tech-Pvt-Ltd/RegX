@@ -98,6 +98,7 @@ from .calculation_translation import (
     translate_input_failure,
 )
 from .enums import CalculationStatus, DataSourceClassification
+from .max_daily_units import DosingRegimenCandidate, select_maximum_daily_units
 
 
 class CalculationExecutionError(Exception):
@@ -335,6 +336,45 @@ def _entry_needs_snapshot(entry) -> bool:
     )
 
 
+def _worst_case_daily_units(formulation_version):
+    """M4D3-SRC-004 -- the Part 14.1 conservative worst-case selection.
+
+    Both governed sources are considered and the higher wins (M4D3-MDU-010):
+    ``FormulationVersion.maximum_dosage_units_per_day`` and every
+    ``DosingRegimen.maximum_units_per_day`` of that exact version. Using the
+    version field alone would understate exposure whenever a regimen exceeds it,
+    and would drop the maximum-daily-exposure comparison entirely whenever the
+    version field is null -- making the frozen snapshot decision more favourable
+    than the governed worst case.
+
+    ``select_maximum_daily_units()`` is a pure function: it takes plain data and
+    touches no ORM, so importing it here creates no dependency from
+    ``iid_assessment`` into this app. The comparison, tie-break and fail-closed
+    rules stay entirely inside it; nothing is reimplemented here.
+
+    Returns the selected ``Decimal``, or ``None`` when the selector fails closed
+    (M4D3-MDU-013), which leaves the kwarg unresolved so the engine canonicalises
+    to ``DATA_REQUIRED`` (M4D3-MDU-014).
+    """
+    candidates = tuple(
+        DosingRegimenCandidate(
+            public_id=str(regimen.public_id),
+            maximum_units_per_day=regimen.maximum_units_per_day,
+            patient_population=regimen.patient_population,
+        )
+        # Ordered by public_id so the candidate sequence is deterministic; the
+        # selector's own M4D3-MDU-008 tie-break does not depend on it, but a
+        # stable input keeps provenance byte-identical across runs.
+        for regimen in formulation_version.dosing_regimens.all().order_by("public_id")
+    )
+    selection = select_maximum_daily_units(
+        formulation_version_public_id=str(formulation_version.public_id),
+        version_scalar=formulation_version.maximum_dosage_units_per_day,
+        regimen_candidates=candidates,
+    )
+    return selection.value if selection.resolved else None
+
+
 def _create_governed_snapshot(*, tenant, execution, question, identifier, actor):
     """M4D3-SNO-009 -- component, then release, then exactly one new snapshot.
 
@@ -357,20 +397,25 @@ def _create_governed_snapshot(*, tenant, execution, question, identifier, actor)
     if not component.resolved or component.component is None:
         return None, None
 
+    # Read the formulation version fresh inside the transaction rather than
+    # trusting whatever the caller's ``execution`` happens to have cached on its
+    # FK descriptor: the worst-case selection and every frozen value derive from
+    # it, so a snapshot must never be built from a stale in-memory copy.
+    from formulations.models import FormulationVersion
+
+    formulation_version = FormulationVersion.objects.select_related("product").get(
+        pk=execution.formulation_version_id
+    )
     result = create_assessment_snapshot(
         tenant=tenant,
-        formulation_version=execution.formulation_version,
+        formulation_version=formulation_version,
         formulation_component=component.component,
         actor=actor,
         # M4D3-SRC-001/003 -- resolved server-side, never named by a caller.
         selected_release=None,
-        # The Part 14.1 worst-case resolver lives in this app and cannot be
-        # imported by iid_assessment. It affects only the preview calculations
-        # the snapshot carries as provenance; 4D-3 reads potency, MDE and their
-        # units from the snapshot and computes daily exposure through its own
-        # governed Form C path, so no regulated number depends on it. Wiring the
-        # worst-case value through is recorded as deferred.
-        maximum_dosage_units_per_day=None,
+        # M4D3-SRC-004 -- the governed Part 14.1 worst case, injected. The
+        # snapshot service applies no source rule of its own.
+        maximum_dosage_units_per_day=_worst_case_daily_units(formulation_version),
     )
     return ResolutionContext(assessment_snapshot=result.snapshot), result
 

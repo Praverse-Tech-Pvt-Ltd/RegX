@@ -35,12 +35,21 @@ comes from the ``FormulationVersion``; substance identity comes from the
 component's resolved ingredient. A caller cannot substitute its own potency, MDE
 or quantity, so a snapshot always describes the formulation it names.
 
-``maximum_dosage_units_per_day`` is the one value a caller may supply, because
-the governed worst-case resolver of M4D3-MDU-001..024 lives in ``iig_checklist``
-and the import contract ``iig-checklist-content-is-not-imported-by-governed-domains``
-forbids importing it here. When it is not supplied the service falls back to
-``FormulationVersion.maximum_dosage_units_per_day``, which is one of that
-resolver's own two governed sources -- never to a guess.
+``maximum_dosage_units_per_day`` is supplied by the caller and used exactly as
+given. The governed worst-case selection of M4D3-MDU-001..024 considers **two**
+sources -- ``FormulationVersion.maximum_dosage_units_per_day`` and every
+``DosingRegimen.maximum_units_per_day`` of that version -- and takes the higher
+(M4D3-MDU-010). That selector lives in ``iig_checklist`` and the import contract
+``iig-checklist-content-is-not-imported-by-governed-domains`` forbids importing
+it here; it is a **pure function**, so the calling side imports it and passes the
+result in. This service therefore applies **no source rule of its own**: there is
+no fallback to the version field, because using one source where the governed
+rule uses two would understate exposure and make the frozen decision more
+favourable than the worst case.
+
+``None`` means the caller's governed selection failed closed (M4D3-MDU-013/014):
+the argument is left unresolved and ``calculate_daily_exposure`` canonicalises to
+``DATA_REQUIRED``.
 """
 
 from __future__ import annotations
@@ -196,11 +205,10 @@ def _preview_arguments(formulation_version, component, release, maximum_dosage_u
         "proposed_quantity_unit": component.quantity_unit,
         "total_dosage_unit_weight": formulation_version.total_dosage_unit_weight,
         "total_dosage_unit_weight_unit": formulation_version.total_dosage_unit_weight_unit,
-        "maximum_dosage_units_per_day": (
-            formulation_version.maximum_dosage_units_per_day
-            if maximum_dosage_units_per_day is None
-            else maximum_dosage_units_per_day
-        ),
+        # Used exactly as supplied. No fallback to the version field: the
+        # governed rule reconciles two sources and takes the higher, so
+        # substituting one of them here would understate exposure.
+        "maximum_dosage_units_per_day": maximum_dosage_units_per_day,
     }
     # A component whose ingredient identity is already governed does not need
     # the free-text synonym path at all (M4D3-SRC-004); leaving both populated
@@ -242,6 +250,10 @@ def create_assessment_snapshot(
 
     Every call creates a new row. There is no reuse, no deduplication, no
     ``.first()``, no "latest" lookup and no update path (M4D3-SNO-006/008).
+
+    ``maximum_dosage_units_per_day`` is used exactly as supplied; ``None`` means
+    the caller's governed selection failed closed and the argument is left
+    unresolved (M4D3-MDU-014). This service applies no source rule of its own.
     """
     from django.db import transaction as db_transaction
 
