@@ -1731,22 +1731,15 @@ rows rather than from request fields:
 | `proposed_quantity_per_unit`, `proposed_quantity_unit` | the `FormulationComponent` |
 | `total_dosage_unit_weight`, `…_unit` | the `FormulationVersion` (M4D3-SRC-014) |
 | substance identity | the component's `resolved_ingredient_public_id` / `resolved_unii` |
-| `maximum_dosage_units_per_day` | caller-supplied, else `FormulationVersion.maximum_dosage_units_per_day` |
+| `maximum_dosage_units_per_day` | caller-supplied; the governed Part 14.1 worst case on the execution path (§6K) |
 
 A caller cannot substitute its own potency, MDE or quantity, so a snapshot always
 describes the formulation it names.
 
-**One import-forced deviation, disclosed.** M4D3-SRC-004 says
-`maximum_dosage_units_per_day` comes from the Part 14.1 worst-case resolver. That
-resolver lives in `iig_checklist`, and the contract
-`iig-checklist-content-is-not-imported-by-governed-domains` forbids
-`iid_assessment` importing it. The execution service therefore calls without it
-and the service falls back to `FormulationVersion.maximum_dosage_units_per_day`,
-which is one of the Part 14.1 resolver's own two governed sources. The value
-reaches only the preview calculations the snapshot carries as provenance: 4D-3
-reads potency, MDE and their units from the snapshot and computes daily exposure
-through its own governed Form C path, so **no regulated 4D-3 number depends on
-it**. Threading the worst-case value through is recorded as deferred.
+**`maximum_dosage_units_per_day` is the governed Part 14.1 worst case,
+injected by the caller.** See §6K — this paragraph originally described a
+fallback to `FormulationVersion.maximum_dosage_units_per_day` as "import-forced"
+and "preview-only". Both were wrong and the fallback is gone.
 
 ### Exact release policy
 
@@ -1930,9 +1923,9 @@ excluded, no test weakened or skipped, and no `pragma`, `noqa`, `skip` or
 
 1. **Cascade recalculation orchestration** — only direct single-response
    execution is implemented. Not claimed.
-2. **Part 14.1 worst-case maximum-dosage-units threading** into snapshot
-   creation, blocked by the import contract; no regulated 4D-3 number depends on
-   it (above).
+2. ~~**Part 14.1 worst-case maximum-dosage-units threading**~~ — **delivered in
+   §6K.** It was never blocked by the import contract, and the fallback it was
+   deferred behind affected regulated snapshot fields.
 3. **Difference result unit** — the §6I specification gap, untouched here.
 4. **Durable audit outbox** — repository-wide, unchanged.
 5. **External service error codes** (M4D3-OUT-005) — deferred API layer.
@@ -1940,6 +1933,147 @@ excluded, no test weakened or skipped, and no `pragma`, `noqa`, `skip` or
    persistence, component rebinding, response-history redesign, approval
    automation, reports, exports, dashboards, notifications, asynchronous
    execution, broader serializer work and frontend.
+
+## 6K. Remediation of the snapshot review (FAIL → 1 Major, 1 Minor)
+
+An independent adversarial review of §6J returned **FAIL**: 0 Critical, 1 Major,
+1 Minor. Both concern M4D3-SRC-004. No specification was amended, no model
+changed and no migration added.
+
+### Major — the worst-case daily-units selection was not used
+
+**Finding.** `_create_governed_snapshot()` passed
+`maximum_dosage_units_per_day=None`, and the snapshot service then fell back to
+`FormulationVersion.maximum_dosage_units_per_day` alone. M4D3-SRC-004 requires
+the Part 14.1 selection, which reconciles **two** governed sources and takes the
+**higher** (M4D3-MDU-010): the version field, and every `DosingRegimen.maximum_units_per_day`
+of that version.
+
+The reviewer measured the consequence on the same formulation:
+
+| | daily exposure | `decision_status` |
+|---|---|---|
+| Fallback, as shipped in §6J | 30 | `PASS_WITH_IID_PRECEDENT` |
+| Part 14.1 worst case | 300 | **`EXCEEDS_IID_PRECEDENT`** |
+
+with `FormulationVersion.maximum_dosage_units_per_day = 1` and a `DosingRegimen`
+at 10. A second case was worse in a different way: with the version field null
+and only a regimen present — a normal design, the field is nullable — the
+fallback passed nothing, so daily exposure became `DATA_REQUIRED` and **every
+maximum-daily-exposure calculation disappeared** from `calculation_results`.
+
+Those values reach `decide()` and are frozen as `decision_status`,
+`decision_note` and `calculation_results` on an immutable regulated record
+exposed by `AssessmentSnapshotSerializer`. The error direction is unsafe: it
+makes the stored decision **more favourable** than the governed worst case.
+
+**Two things §6J said about this were wrong.**
+
+*It was never import-forced.* `select_maximum_daily_units()` is a **pure
+function** taking plain data — no ORM, no Django model access. The caller,
+`_create_governed_snapshot()`, lives in `iig_checklist` and may import it
+directly. The contract `iig-checklist-content-is-not-imported-by-governed-domains`
+constrains `iid_assessment`, which never needed it, because the service already
+accepted `maximum_dosage_units_per_day` precisely so the value could be injected.
+
+*It was not preview-only.* `decision_status` and `decision_note` are decision
+fields, not provenance. §6J's narrow claim — that no regulated **4D-3
+`CalculationOutcome`** value depends on it — was true and is independently
+re-verified below, but it was stated in a way that implied the whole effect was
+confined to provenance.
+
+**Change.** `_worst_case_daily_units()` builds `DosingRegimenCandidate` values
+from the execution's formulation version and calls the pure selector. Its result
+is injected through the existing parameter. The comparison, tie-break and
+fail-closed rules stay entirely inside Part 14.1; nothing is reimplemented and
+nothing is copied into `iid_assessment`.
+
+**The service's fallback is removed entirely.** It now uses
+`maximum_dosage_units_per_day` exactly as supplied and applies no source rule of
+its own — using one source where the governed rule uses two is precisely what
+caused this. `None` now unambiguously means the caller's governed selection
+failed closed (M4D3-MDU-013), leaving the argument unresolved so
+`calculate_daily_exposure` canonicalises to `DATA_REQUIRED` (M4D3-MDU-014). This
+also restores the API path's original pre-§6J semantics, which passed the request
+value straight through with no fallback.
+
+That removal closed a real edge case the fallback had opened: a version field of
+`0` is storable (no positivity constraint on that field, unlike `DosingRegimen`),
+and the selector correctly rejects it as invalid — but the fallback would have
+passed `0` through, yielding a **zero** daily exposure and a falsely favourable
+decision. A test pins this.
+
+**The formulation version is now read fresh inside the transaction** rather than
+from whatever the caller's `execution` had cached on its FK descriptor. The
+worst-case selection and every frozen value derive from it, so a snapshot must
+never be built from a stale in-memory copy. This was found by a test that mutated
+the formulation and saw the cached value used.
+
+### Minor — evidence corrected
+
+The §6J paragraph is replaced and the deferred-item entry that hid behind it is
+struck through. The value is no longer described as preview-only or as blocked by
+the import contract.
+
+### Tests
+
+`TestWorstCaseDailyUnits` — **11 tests**, real PostgreSQL, driving the real
+execution → governed snapshot path:
+
+| Case | Assertion |
+|---|---|
+| Regimen 10 > version 1 (the reviewed scenario) | selector picks 10; snapshot exposure 2.5 g; `EXCEEDS_IID_PRECEDENT`, not `PASS_…`; MDE calculations present; decision note names the exceedance |
+| Contrast pin | supplying the version field alone still yields `PASS_WITH_IID_PRECEDENT` — the regression this fix exists for |
+| Version field null, regimen 8 | selector picks 8; exposure `OK`; MDE calculations retained; no `REVIEW_REQUIRED` from a null field |
+| Version 12 > regimens 3, 5 | version field selected; no regimen overrides it |
+| Four regimens incl. a tie at 9 | highest selected; stable across repeated evaluation; insertion order irrelevant |
+| No regimens | version field used |
+| No source at all | fails closed, `DATA_REQUIRED`, no MDE calculations, no invented default |
+| Version field `0` | rejected as invalid; no zero-exposure snapshot |
+| Selector imported, not reimplemented | no local `max(`; no dosing-regimen logic and no `iig_checklist` reference inside `iid_assessment.services` |
+| 4D-3 precedent fields | `iid_potency_amount` / `_unit` / `iid_mde` / `_unit` unchanged; the outcome still completes at 25 |
+| Rollback | a calculation exception discards the snapshot and every other write |
+
+### Post-remediation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| M4D3-SRC-004 worst case | `pytest …::TestWorstCaseDailyUnits --no-cov -q` | **11 passed**, 12.6 s |
+| Snapshot service | `pytest iid_assessment/tests/test_snapshot_service.py --no-cov -q` | **38 passed**, 24.3 s |
+| IID assessment (all) | `pytest iid_assessment --no-cov -q` | **143 passed**, 30.7 s |
+| Calculation execution | `pytest …test_4d3_calculation_execution.py --no-cov -q` | **123 passed**, 77.0 s |
+| Execution readiness | `pytest …test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 21.0 s |
+| Input resolvers | `pytest …test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 56.6 s |
+| Activation validation | `pytest …test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 46.0 s |
+| Database-free foundation | `pytest …test_4d3_foundation.py --no-cov -q` | **183 passed**, 0.25 s |
+| Execution model / API / lifecycle / response / reviewer | `pytest …` | **64 passed**, 40.4 s |
+| Lifecycle / clone / platform auth / tenancy / authorization | `pytest …` | **131 passed**, 62.8 s |
+| Full backend suite | `pytest -q` | **1488 passed**, 0 failed, 0 skipped, 500.7 s, exit 0 |
+| Coverage | same run | **93.90 %** against a 55 % floor |
+| `calculation_execution.py` coverage | same run | **100 %** (225 statements, 0 missed) |
+| `max_daily_units.py` coverage | same run | **100 %** (67 statements, 0 missed) |
+| `iid_assessment/services.py` coverage | same run | **99 %** (78 statements, 1 missed — the `has_iid_reference` convenience property) |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1477 → **1488** (+11) and coverage rose 93.86 % → **93.90 %**.
+The new import edge is `calculation_execution → max_daily_units`, intra-app and
+inside the existing contracts; `iid_assessment` still imports no `iig_checklist`
+module and no cycle exists. No threshold was lowered, no file excluded, no test
+weakened or skipped, and no `pragma`, `noqa`, `skip` or `xfail` was added.
+
+### Contract preserved
+
+Unchanged by this remediation: the single governed creation path; always-new;
+exact active/approved release selection; exact component and formulation
+validation; tenant isolation; the immutable result; the `on_commit` audit; a
+fresh snapshot per event; rollback; the internal-bypass restriction; and the API
+behaviour. No cascade orchestration, no model, no migration.
 
 ## 7. Assertions
 
