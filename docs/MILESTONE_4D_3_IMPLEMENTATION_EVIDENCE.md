@@ -1,6 +1,17 @@
 # Milestone 4D-3 — Implementation Evidence
 
-**Status: FOUNDATION LAYER + REGISTRY ACTIVATION VALIDATION. Runtime calculation, response-update, snapshot, outcome, rebinding and frontend layers deferred.**
+**Status: FOUNDATION + REGISTRY ACTIVATION + INPUT RESOLUTION + GOVERNED
+CALCULATION EXECUTION AND `CalculationOutcome` PERSISTENCE — all implemented.
+Still deferred: governed `AssessmentSnapshot` creation, cascade recalculation
+orchestration, `update_checklist_response()`, applicability persistence,
+component rebinding, response-history redesign, serializers and frontend.**
+
+> **Header correction.** Through §6F this document's header read "Runtime
+> calculation, response-update, snapshot, outcome, rebinding and frontend layers
+> deferred". That became wrong at §6H, which delivered runtime calculation and
+> outcome persistence, and it was not updated at the time. An independent review
+> raised it; the header above and the assertions in §7 are now accurate, and the
+> stale line is recorded here rather than quietly deleted.
 
 **Approved specification head:** `97653c09456d04fd194d060d29765f052a721405`
 **Implementation branch:** `regx/feat/milestone-4d-3`
@@ -1154,7 +1165,14 @@ executed and tested this way. **Snapshot creation remains an open blocker.**
 
 ### Lock order
 
-Acquired before `expected_version` is checked and before any write:
+> **Superseded by §6I.** As shipped in §6H this service ordered its multi-row
+> locks by `public_id`, which contradicts M4D3-TXN-001, M4D3-OUT-004 and
+> M4D3-RBD-004 — all three require ascending primary-key order, the first
+> "without exception". An independent review caught it. §6I corrects the
+> implementation to primary-key order and records the corrected, SQL-verified
+> sequence. The original §6H text is left below so the change is auditable.
+
+Original §6H text, **now incorrect**:
 
 1. the `ChecklistExecution`;
 2. the target `ChecklistResponse`;
@@ -1162,8 +1180,9 @@ Acquired before `expected_version` is checked and before any write:
 4. every involved `CalculationOutcome`, ordered by `public_id`;
 5. the caller's `AssessmentSnapshot`, when supplied.
 
-Stable `public_id` ordering is what stops two concurrent executions deadlocking.
-The order is documented in the module docstring as well as here.
+The claim that all outcomes were locked before the snapshot was also wrong: the
+target placeholder was in fact locked *after* the snapshot. Both defects are
+fixed in §6I.
 
 ### Flow
 
@@ -1288,15 +1307,437 @@ pragma, noqa, skip or xfail added.
    rebinding, response-history redesign, approval automation, reports, exports,
    dashboards, notifications, asynchronous execution, serializers and frontend.
 
+## 6I. Remediation of the execution review (FAIL → 1 Major, 10 Minor)
+
+An independent adversarial review of §6H returned **FAIL**: 0 Critical, 1 Major,
+10 Minor. This section records what was wrong, what changed and how each finding
+is now proven. **No specification document was altered**, no model changed and no
+migration added.
+
+### Major — lock order was `public_id`, not primary key
+
+**Finding.** `execute_calculation_response()` ordered every multi-row
+`select_for_update()` by `public_id`. Three approved clauses require ascending
+primary key: M4D3-TXN-001 ("this order shall be observed without exception"),
+M4D3-OUT-004 for `CalculationOutcome`, and M4D3-RBD-004 for the future
+component-rebinding transaction. `public_id` is a random UUID, so its order is
+uncorrelated with primary-key order; a specification-conformant cascade or
+rebinding service would have deadlocked against direct execution. §6H compounded
+this by presenting `public_id` ordering as the governed order, so the deviation
+was undisclosed.
+
+The reviewer also showed the documented sequence was wrong in a second way: the
+target `CalculationOutcome` was locked *after* the `AssessmentSnapshot`, while
+both the module docstring and §6H claimed all outcomes preceded the snapshot.
+
+**Change.** The service now acquires, in this order:
+
+| # | Rows | Ordering |
+|---|---|---|
+| 1 | the `ChecklistExecution` | single row |
+| 2 | the target `ChecklistResponse` | single row |
+| 3 | every other involved `ChecklistResponse` | `ORDER BY id ASC` |
+| 4 | every involved `CalculationOutcome` — upstream **and** target placeholder | one statement, `ORDER BY id ASC` |
+| 5 | the exact `AssessmentSnapshot`, when supplied | single row |
+
+Step 4 is the substantive change beyond the ordering column. Previously the
+upstream outcomes and the target placeholder were locked by two separate
+statements with the snapshot lock between them. They are now acquired by a
+**single** pk-ordered query and classified in memory, so there is no window in
+which the two halves could be taken in conflicting orders, and the target
+outcome necessarily precedes the snapshot.
+
+Three helpers own this and normalise whatever order a caller supplies —
+`_related_response_ids()`, `_lock_responses()` and `_lock_outcomes()` — so a
+future cascade or rebinding pass reuses one acquisition order rather than
+inventing a second.
+
+**Why target-before-related is safe.** Step 2 is not itself pk-ordered relative
+to step 3. It does not need to be: step 1 already holds the `ChecklistExecution`
+row, and every response and outcome this service touches belongs to that one
+execution. No two governed operations on the same execution can be inside steps
+2–5 simultaneously, and operations on different executions share no rows. That
+reasoning is now in the module docstring rather than left implicit.
+
+**Public UUIDs keep their proper job.** They remain the identity used in
+provenance, audit payloads, the result object and deterministic failure
+ordering. They are simply not a row-lock acquisition order.
+
+**Proof.** `TestLockOrder` captures the SQL PostgreSQL actually receives and
+asserts on it — not on Python call order. Observed for a snapshot-backed
+dependency calculation (`percentage_of_iid_mde`):
+
+```
+1  ..."iig_checklist_checklistexecution"  WHERE "ID" = 1                          FOR UPDATE
+2  ..."iig_checklist_checklistresponse"   WHERE "ID" = 6                          FOR UPDATE
+3  ..."iig_checklist_checklistresponse"   WHERE "ID" IN (3)     ORDER BY "ID" ASC FOR UPDATE
+4  ..."iig_checklist_calculationoutcome"  WHERE "RESPONSE_ID" IN (3, 6)
+                                                               ORDER BY "ID" ASC FOR UPDATE
+5  ..."iid_assessment_assessmentsnapshot" WHERE "ID" = 1                          FOR UPDATE
+```
+
+Ten tests assert this: pk ordering for responses, pk ordering for outcomes, one
+statement for the whole outcome set, no `FOR UPDATE` ordering by `public_id`,
+execution first, target response before related responses, target outcome before
+the snapshot, snapshot last, the full table sequence, and that the helpers
+normalise a reversed or shuffled caller-supplied id list. The `ORDER BY` column
+is read alias-insensitively but asserted strictly.
+
+**Mutation probe.** Reverting the three `order_by("pk")` calls to
+`order_by("public_id")` and re-running fails **6** tests, including the
+concurrency test. The tests are not vacuous.
+
+**Concurrency proof.** `test_overlapping_transactions_do_not_deadlock` runs two
+real transactions on a `transaction=True` database, released together by a
+`threading.Barrier`. One holds the row set a direct execution touches; the other
+holds the wider set a cascade or rebinding pass would touch, supplied in reverse
+order. Both go through the governed helpers, both emit `ORDER BY id ASC`, both
+complete. Each sets `SET LOCAL lock_timeout = '5s'`, so a genuine inversion
+surfaces as a failure rather than a hang. A second test keeps the existing proof
+that the execution row serializes concurrent calculations (M4D3-TXN-006).
+
+### Minor 1 — documented order did not match the implementation
+
+Fixed with the Major above. The module docstring, the service docstring, the
+inline step comments and this document now all state the same five-step
+primary-key order, and `test_documented_order_matches_the_issued_statements`
+asserts the exact table sequence so the three cannot drift apart again.
+
+### Minor 2 — `expected_version` could silently disable concurrency
+
+**Finding.** The guard read `if expected_version is not None and ...`, so passing
+`None` skipped optimistic concurrency entirely. Undocumented and untested.
+
+**Change.** `expected_version` is now mandatory and validated in Phase A, before
+any lock, any resolution, any calculation and any audit:
+
+- `None` → `InvalidExpectedVersion`;
+- `bool` → `InvalidExpectedVersion`, even though `bool` is an `int` subclass,
+  because `True` would otherwise silently mean version 1;
+- non-`int` (`str`, `float`, `Decimal`) → `InvalidExpectedVersion`;
+- below 1 → `InvalidExpectedVersion`; `ChecklistResponse.version` is a
+  `PositiveIntegerField(default=1)` that only increments, so 1 is the lowest
+  version any real row can hold.
+
+A stale but well-formed version still raises `StaleResponseVersion` while the
+row is locked, with zero mutation. The service type contract and docstring state
+that there is no value which disables the check. Eight parametrised cases plus
+three behavioural tests cover it, including proof that no calculation function is
+invoked and no audit row is written on rejection.
+
+### Minor 3 — tenant-isolation guard had no coverage
+
+`calculation_execution.py:302` — the `execution.tenant_id != tenant.id` guard —
+was one of the six uncovered lines. `TestTenantIsolation` now drives the real
+service twice: once with a foreign tenant against this execution, once with
+another tenant's governed execution and response. Both fail closed with zero
+outcome mutation, zero function invocation and zero audit, and the raised message
+is asserted to leak no execution, response or tenant identifier.
+
+### Minor 4 — no `full_clean()` rollback test
+
+`TestFullCleanRollback` plants a two-part `binding_version` on the registry
+entry, which `CalculationOutcome._validate_completed_outcome()` rejects. The
+calculation *is* invoked exactly once — the failure is at persistence, not
+before — and `ValidationError` naming `_registry_binding_version` propagates. The
+placeholder, the response, the snapshot count, the history count and the audit
+count are all unchanged. A companion test proves the monkeypatch is restored and
+the approved entry still executes.
+
+### Minor 5 — result immutability was never asserted
+
+`TestImmutableResult` attempts to reassign every dataclass field, add a new
+attribute, mutate the nested `failure_codes` tuple by `append` and by index, and
+asserts the instance has no `__dict__`. It also asserts no field is a Django
+`Model` or `QuerySet` and that identity is the outcome's public UUID string.
+
+### Minor 6 — the NOT_COMPARABLE test did not test NOT_COMPARABLE
+
+**Finding.** The helper was named `_not_comparable` but returned
+`status="UNIT_MISMATCH"`. No committed test exercised a genuine engine
+`NOT_COMPARABLE`.
+
+**Change.** Three separate tests now exist, and the misleading name is gone:
+
+- `test_engine_emits_not_comparable_for_an_unclear_basis` proves against the
+  pure engine that `CalculationStatus.BASIS_UNCLEAR == "NOT_COMPARABLE"` and
+  that a zero dosage-unit weight reaches it;
+- `test_genuine_not_comparable_is_persisted` drives that real engine status
+  through the service and asserts `error` / `NOT_COMPARABLE` / null value /
+  empty unit. The zero basis is supplied to the approved function directly
+  because `formulation_total_weight_positive` forbids a zero weight in the
+  table, so no fixture can reach it through the database;
+- `test_engine_unit_mismatch_yields_null_value` and
+  `test_resolver_unit_fault_is_not_scientific_non_comparability` keep
+  `UNIT_MISMATCH` as its own case and assert it is *not* `NOT_COMPARABLE`,
+  which is what M4D3-IFV-004/005 require.
+
+The reviewer's concern that a configuration or unit fault was being persisted as
+scientific non-comparability was **not** borne out — the mapping was already
+correct. Only the test naming and coverage were wrong.
+
+### Minor 7 — difference calculations persist an empty result unit — SPECIFICATION GAP
+
+`difference_from_iid_potency` and `difference_from_iid_mde` complete carrying a
+regulated `Decimal` with `unit = ""`. The engine sets no unit on either result,
+and both registry entries declare `output_unit = ""`.
+
+**This is not fixed, deliberately.** The specification is silent:
+
+- M4D3-MAP-007 explicitly instructs the service to store `gram` for
+  `daily_exposure`, whose engine result also carries no unit. That clause exists
+  precisely because the engine leaves the unit blank.
+- M4D3-MAP-004 and M4D3-MAP-006 say only that the difference calculations take
+  the same resolved inputs as M4D3-MAP-003/005, "only the kwarg order differs".
+  Neither prescribes a result unit.
+- The registry field contract (Part 3) states `output_unit` "may be empty".
+
+M4D3-UNC-006 makes the *natural* unit inferable — both operands of the potency
+difference are in the snapshot's `iid_potency_unit`, and both operands of the MDE
+difference are in its `iid_mde_unit` — but writing that would be a new governed
+rule, and `output_unit` is a static registry string while those units are
+snapshot-dependent. Implementing it here would mean either inventing a clause or
+redesigning `output_unit` into a dynamic value, and this run is authorised to do
+neither.
+
+**Deferred requirement, to be added to the approved specification before the
+serializer layer exposes these outcomes:** a clause equivalent to M4D3-MAP-007
+for M4D3-MAP-004 and M4D3-MAP-006, defining the stored `CalculationOutcome.unit`
+of each difference calculation as the snapshot unit its operands were reconciled
+into.
+
+**The gap is asserted, not hidden.** `TestDifferenceResultUnit` records that the
+registry declares no output unit for either difference, that `daily_exposure` by
+contrast has one and honours it, that both differences do complete with an empty
+unit, and — bounding the impact — that the unit remains reconstructible because
+every input descriptor records its own `source_unit` and `target_unit`.
+
+### Minor 8 — `str(Decimal)` could persist scientific notation
+
+**Finding.** The JSON persistence boundary used bare `str(Decimal)`, which
+renders `1E-7` for small magnitudes and `1E+3` for large ones, while the unit
+adapter already forced plain notation for the conversion factor for exactly this
+reason. Nothing was lost numerically, but a regulated record should not need
+decoding.
+
+**Change.** One shared formatter, `calculation_translation.format_decimal_plain()`,
+in the database-free module both sides already import. It uses
+`format(value, "f")`, preserves the Decimal's own exponent (so `0.250000` keeps
+its trailing zeros and repeated executions render identically), handles negatives
+and zero, and falls back to `str()` for a non-Decimal or a NaN/infinity rather
+than raising — a persistence-boundary renderer must never be the thing that
+aborts a governed write. `_json_safe()` and the unit adapter's `original_value`,
+`converted_value` and `conversion_factor` all route through it, so there is
+genuinely one formatter rather than two that agree today.
+
+Proven end to end: a component of `0.000001` milligram converts to exactly
+`Decimal("1E-9")` grams — `str()` of which really is `'1E-9'` — and persists as
+`"0.000000001"` in both `inputs` and the per-input descriptor, with a sweep
+asserting no persisted *number* anywhere in `inputs` or `input_provenance` uses
+scientific form. The sweep requires a value to parse as a `Decimal` before
+flagging it, because a public UUID such as `...aca7-474b30d178a7` contains `4e5c`
+and a naive regex would report it as an exponent. A negative reference is covered
+separately, arithmetic is untouched, and a seven-case parametrised matrix covers
+`1E-7`, `-1E-7`, `1E-12`, `1E+3`, `0`, `0.250000` and `-0.500000`.
+
+### Minor 9 — stale evidence
+
+The header and §7 assertions still described runtime calculation and outcome
+persistence as deferred, and §7 still asserted "Migrations created: NO" after
+§6G added `0003`. Both are corrected above, per scope, with the stale text
+recorded rather than silently removed. §6H's lock-order section is marked
+superseded rather than rewritten in place.
+
+### Minor 10 — coverage figure
+
+§6H recorded 93.50 %; the reviewer measured 93.51 %. The measured value for this
+run — **93.66 %** — is taken from the gates table below rather than carried
+forward, and every figure there is from a run made after the last source change.
+
+### Audit-callback failure — established behaviour, recorded not changed
+
+The audit is dispatched through `transaction.on_commit()`, so by the time it runs
+the outcome is already durable. There is **no rollback after commit** and none
+was invented. Project policy, verified across every governed service
+(`services.py` ×3, `views.py` ×1, this service ×1), is a bare
+`transaction.on_commit(...)` with no swallow, no retry and **no durable outbox
+anywhere in the repository**.
+
+Actual behaviour, now asserted by
+`test_a_failing_audit_callback_does_not_undo_the_commit`: the calculation result
+stays committed, the callback's exception propagates to the caller, no audit row
+is written and nothing is retried. A companion test asserts the success path
+registers exactly one callback and writes exactly one row.
+
+**Deferred:** a durable audit outbox. The gap is that a governed calculation can
+commit without its audit event if the audit sink fails. That is a
+repository-wide property, not specific to this service, and building an outbox is
+outside this run's authorisation.
+
+### Snapshot boundary — unchanged, and asserted
+
+The stop condition of §6H is retained and is now tested rather than asserted in
+prose. `AssessmentSnapshot` rows are still created only inside
+`iid_assessment/views.py::SnapshotView.post`, bound to a DRF request, serializer,
+`request.user` and HTTP response; there is no `iid_assessment/services.py`.
+
+`TestDeferredBoundaries` proves: the execution module contains no snapshot
+create, no snapshot lookup, no `.first()`, `.last()`, `.latest()` or
+`.earliest()`, and exactly one `AssessmentSnapshot.objects` reference — the
+pk-scoped lock of the caller's own row; `iid_assessment.services` does not
+import; no view, serializer or URL module references `calculation_execution`, so
+snapshot-backed execution is reachable only from tests and future services; and a
+client-style snapshot *identifier* in place of the object is rejected rather than
+resolved (M4D3-SNO-011).
+
+**Snapshot-backed calculation execution remains internal-only** until a governed
+`AssessmentSnapshot` creation service exists. Governed snapshot creation is
+**not** implemented in this run and is not claimed to be.
+
+### Service error codes — deferred boundary, documented
+
+M4D3-OUT-005 names the external error code `duplicate_calculation_outcome`. This
+internal service raises the typed `PlaceholderAmbiguous` and writes nothing; the
+governed external code is mapped by the deferred API layer, which must never
+serialize the raw exception. `test_duplicate_outcome_stays_an_internal_fail_closed_exception`
+records the boundary, asserting the internal exception carries no external code
+and that the failure leaves the database untouched.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `backend/iig_checklist/calculation_execution.py` | primary-key lock order, single-statement outcome locking, mandatory `expected_version`, plain-notation persistence, corrected documentation |
+| `backend/iig_checklist/calculation_translation.py` | `format_decimal_plain()` — the one shared plain-notation formatter |
+| `backend/iig_checklist/unit_adapter.py` | routes `original_value`, `converted_value` and `conversion_factor` through the shared formatter |
+| `backend/iig_checklist/tests/test_4d3_calculation_execution.py` | 37 → 97 tests |
+| `docs/MILESTONE_4D_3_IMPLEMENTATION_EVIDENCE.md` | this section, plus the header, §6H and §7 corrections |
+
+No model, no migration, no serializer, no view, no frontend, no specification
+change.
+
+### Tests
+
+`backend/iig_checklist/tests/test_4d3_calculation_execution.py` — **37 → 97
+tests, real PostgreSQL**. The 37 existing tests are retained; one was renamed
+(`test_engine_non_ok_status_yields_null_value` →
+`test_engine_unit_mismatch_yields_null_value`) and its misleadingly named helper
+corrected. New coverage:
+
+| Area | Tests |
+|---|---|
+| SQL-level lock order (`TestLockOrder`) | 10 |
+| Lock-helper edge guards (`TestLockHelperEdges`) | 2 |
+| Concurrency and deadlock order (`TestLockOrderConcurrency`) | 2 |
+| Mandatory `expected_version` (`TestExpectedVersionIsMandatory`) | 11 |
+| Tenant isolation (`TestTenantIsolation`) | 2 |
+| `full_clean()` rollback (`TestFullCleanRollback`) | 2 |
+| Immutable result (`TestImmutableResult`) | 5 |
+| Plain-notation persistence and the JSON boundary (`TestPlainNotationPersistence`) | 12 |
+| Difference result unit / specification gap (`TestDifferenceResultUnit`) | 4 |
+| Audit-callback failure (`TestAuditCallbackFailure`) | 2 |
+| Deferred boundaries (`TestDeferredBoundaries`) | 5 |
+| Genuine NOT_COMPARABLE and separate UNIT_MISMATCH | 3 |
+
+`calculation_execution.py` reaches **100 %** statement coverage from this module
+alone (179 statements, 0 missed) — it was 96 % with six uncovered lines before,
+one of which was the tenant-isolation guard.
+
+Every line the module leaves uncovered is a "this must not happen" path that a
+test is actively asserting: the counting stubs in the three tests that prove no
+calculation function is invoked, and the `except` inside the concurrency thread
+that would fire on a deadlock or lock timeout.
+
+### Post-remediation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| Calculation execution | `pytest iig_checklist/tests/test_4d3_calculation_execution.py --no-cov -q` | **97 passed**, 92.3 s, exit 0 |
+| Execution readiness | `pytest iig_checklist/tests/test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 27.0 s, exit 0 |
+| Input resolvers | `pytest iig_checklist/tests/test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 76.1 s, exit 0 |
+| Activation validation | `pytest iig_checklist/tests/test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 62.6 s, exit 0 |
+| Database-free foundation | `pytest iig_checklist/tests/test_4d3_foundation.py --no-cov -q` | **183 passed**, 0.25 s, exit 0 |
+| Execution model / API / lifecycle / response / reviewer | `pytest …test_execution_models.py …test_execution_api.py …test_execution_lifecycle.py …test_response_api.py …test_reviewer_conclusion_api.py --no-cov -q` | **64 passed**, 53.2 s, exit 0 |
+| Lifecycle / clone / platform auth / tenancy / authorization | `pytest …test_lifecycle.py …test_clone_api.py …test_platform_mutation_authorization.py …test_platform_authorization.py tenancy authorization --no-cov -q` | **131 passed**, 81.9 s, exit 0 |
+| Full backend suite | `pytest -q` | **1424 passed**, 0 failed, 0 skipped, 447.8 s, exit 0 |
+| Coverage | same run | **93.66 %** against a 55 % floor |
+| `calculation_execution.py` coverage | same run | **100 %** (179 statements, 0 missed) |
+| `calculation_translation.py` coverage | same run | **84 %** (108 statements, 17 missed — the vocabulary self-check error branches, unreachable while the approved vocabularies are in force) |
+| `unit_adapter.py` coverage | same run | **95 %** (37 statements, 2 missed) |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0, nothing unapplied |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1364 → 1424 (+60) and coverage rose 93.51 % → **93.66 %**.
+`calculation_execution.py` went from 96 % with six uncovered lines to **100 %**.
+`calculation_translation.py` rose 83 % → 84 % and `unit_adapter.py` 94 % → 95 %,
+so no module lost coverage.
+
+Import-linter analysed 911 dependencies (was 895) — the new edge is
+`unit_adapter → calculation_translation`, intra-app and inside the existing
+contracts. Both are database-free modules and no cycle is introduced:
+`calculation_translation` imports neither `unit_adapter` nor any ORM module.
+
+No threshold was lowered, no file excluded, no test weakened or skipped, and no
+`pragma`, `noqa`, `skip` or `xfail` was added. One unused `# noqa: BLE001` that
+Ruff flagged while this section was being written was **removed** and replaced
+with a comment explaining why the broad `except` is correct there.
+
+### Still deferred, unchanged
+
+1. **Governed `AssessmentSnapshot` creation** — no callable service exists.
+2. **Cascade recalculation orchestration** — only direct single-response
+   execution is implemented.
+3. **Result unit for the two difference calculations** — specification gap,
+   above.
+4. **Durable audit outbox** — repository-wide, above.
+5. **External service error codes** (M4D3-OUT-005) — deferred API layer.
+6. Unchanged: `update_checklist_response()`, manual override (4D-4),
+   applicability persistence, component rebinding, response-history redesign,
+   approval automation, reports, exports, dashboards, notifications,
+   asynchronous execution, serializers and frontend.
+
 ## 7. Assertions
 
-- Migrations created: **NO**
-- Schema changed: **NO**
-- Database access added: **NO**
-- Coverage thresholds weakened: **NO**
-- Database mocked to claim integration coverage: **NO**
-- Existing tests weakened: **NO**
-- Production registry made mutable: **NO**
-- Runtime calculation code added: **NO**
-- PR created: **NO**
-- Merged: **NO**
+These were written for the database-free foundation run and had not been
+rescoped as later sections landed. They are now stated per scope, because
+"migrations created: NO" was true of §1–§5 and false of the milestone once §6G
+added `0003`.
+
+**For the milestone to date (§1 through §6I):**
+
+| Assertion | Answer |
+|---|---|
+| Migrations created | **YES — exactly one**, `0003_alter_calculationoutcome_input_provenance_and_more`, two `AlterField` flags (§6G) |
+| Schema changed | **NO** — `0003` is a Django state change only; `sqlmigrate` emits two no-ops |
+| Database access added | **YES** — activation validation (§6A), input resolution (§6D) and calculation execution (§6H) all read persisted rows; §1–§5 were database-free |
+| Runtime calculation code added | **YES** — `execute_calculation_response()` (§6H) invokes the approved functions |
+| `CalculationOutcome` results persisted | **YES** (§6H) |
+| Governed `AssessmentSnapshot` creation | **NO** — open blocker, §6H and §6I |
+| Cascade recalculation orchestration | **NO** — deferred, §6H and §6I |
+| Serializers / API endpoint / frontend | **NO** |
+| Coverage thresholds weakened | **NO** |
+| Database mocked to claim integration coverage | **NO** |
+| Existing tests weakened | **NO** |
+| Production registry made mutable | **NO** |
+| PR created | **NO** |
+| Merged | **NO** |
+
+**For the §6I remediation run specifically:**
+
+| Assertion | Answer |
+|---|---|
+| Migrations created | **NO** |
+| Models changed | **NO** |
+| Approved specification amended | **NO** |
+| Snapshot service added | **NO** |
+| Cascade orchestration added | **NO** |
+| Serializers or frontend added | **NO** |
+| Coverage threshold lowered | **NO** |
+| `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
+| PR created | **NO** |
+| Merged | **NO** |
