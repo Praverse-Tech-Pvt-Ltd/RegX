@@ -2469,6 +2469,234 @@ class TestWorstCaseDailyUnits:
         assert _snapshot_state(world) == before
 
 
+class TestFormCDailyUnitsConsistency:
+    """Form C and governed snapshot creation must never disagree.
+
+    Both consume the maximum-daily-units rule. Before this consolidation Form C
+    collected its own candidates from ``execution.formulation_version`` -- a
+    lazily-loaded FK that keeps whatever the row looked like when the caller
+    first touched it -- while snapshot creation read the row fresh. A stale
+    execution instance could therefore make the two disagree inside one
+    transaction.
+    """
+
+    def _form_c(self, world):
+        """Form C's own resolution, through the real resolver entry point."""
+        from iig_checklist.calculation_inputs import _resolve_maximum_daily_units
+
+        failures = []
+        resolved = _resolve_maximum_daily_units(
+            world["execution"], "maximum_dosage_units_per_day",
+            {"expected_type": "decimal"}, failures,
+        )
+        return resolved, failures
+
+    def _shared(self, world):
+        from formulations.dosing import resolve_current_maximum_daily_units
+
+        return resolve_current_maximum_daily_units(
+            formulation_version_id=world["execution"].formulation_version_id
+        )
+
+    # -- freshness ---------------------------------------------------------
+
+    def test_a_stale_cached_version_scalar_is_ignored(self, world):
+        """Case A -- the scalar changes after the FK was cached."""
+        from formulations.models import FormulationVersion
+
+        execution = world["execution"]
+        # Populate the FK descriptor, then move the row underneath it.
+        cached = execution.formulation_version
+        assert cached.maximum_dosage_units_per_day == Decimal("4.0000")
+
+        fresh = FormulationVersion.objects.get(pk=world["formulation"].pk)
+        fresh.maximum_dosage_units_per_day = Decimal("9.0000")
+        fresh.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+
+        # The cached relation still reports the old value...
+        assert execution.formulation_version.maximum_dosage_units_per_day == (
+            Decimal("4.0000")
+        )
+        # ...but Form C resolves from current state.
+        resolved, failures = self._form_c(world)
+        assert failures == []
+        assert resolved.value == Decimal("9.0000")
+        assert resolved.value == self._shared(world).value
+
+    def test_a_regimen_added_after_caching_is_seen(self, world):
+        """Case B -- a governed regimen appears after the FK was cached."""
+        execution = world["execution"]
+        execution.formulation_version  # noqa: B018 - populate the descriptor
+        _regimen(world["formulation"], "11")
+
+        resolved, failures = self._form_c(world)
+        assert failures == []
+        # 11 beats the version scalar of 4.
+        assert resolved.value == Decimal("11.0000")
+        assert resolved.value == self._shared(world).value
+
+    def test_form_c_and_snapshot_agree_under_a_stale_execution(self, world):
+        """The end-to-end property: one transaction, one answer."""
+        from formulations.models import FormulationVersion
+
+        execution = world["execution"]
+        execution.formulation_version  # noqa: B018 - populate the descriptor
+        fresh = FormulationVersion.objects.get(pk=world["formulation"].pk)
+        fresh.maximum_dosage_units_per_day = Decimal("1.0000")
+        fresh.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        _regimen(world["formulation"], "10")
+
+        resolved, failures = self._form_c(world)
+        assert failures == []
+        assert resolved.value == Decimal("10.0000")
+        assert execution_mod._worst_case_daily_units(
+            FormulationVersion.objects.get(pk=world["formulation"].pk)
+        ) == resolved.value
+
+    # -- equivalence across the governed source matrix ---------------------
+
+    @pytest.mark.parametrize(
+        ("scalar", "regimens", "expected"),
+        [
+            ("1.0000", ["10"], "10.0000"),            # regimen greater
+            ("12.0000", ["3", "5"], "12.0000"),       # version greater
+            (None, ["8"], "8.0000"),                  # version null
+            ("4.0000", [], "4.0000"),                 # no regimens
+            ("2.0000", ["4", "9", "6", "9"], "9.0000"),  # multiple + tie
+            ("0.0000", ["6"], "6.0000"),              # zero scalar, valid regimen
+        ],
+        ids=["regimen-greater", "version-greater", "version-null",
+             "no-regimens", "multiple", "zero-scalar-with-regimen"],
+    )
+    def test_form_c_matches_the_shared_helper(self, world, scalar, regimens, expected):
+        world["formulation"].maximum_dosage_units_per_day = (
+            None if scalar is None else Decimal(scalar)
+        )
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        for units in regimens:
+            _regimen(world["formulation"], units)
+
+        resolved, failures = self._form_c(world)
+        shared = self._shared(world)
+
+        assert failures == []
+        assert shared.resolved is True
+        assert resolved.value == shared.value == Decimal(expected)
+        assert resolved.detail_code == shared.detail_code
+
+    @pytest.mark.parametrize(
+        ("scalar", "regimens"),
+        [(None, []), ("0.0000", []), ("-4.0000", [])],
+        ids=["null-no-regimens", "zero-no-regimens", "negative-no-regimens"],
+    )
+    def test_unresolved_cases_agree_and_fail_closed(self, world, scalar, regimens):
+        world["formulation"].maximum_dosage_units_per_day = (
+            None if scalar is None else Decimal(scalar)
+        )
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        for units in regimens:
+            _regimen(world["formulation"], units)
+
+        resolved, failures = self._form_c(world)
+        shared = self._shared(world)
+
+        assert shared.resolved is False
+        assert resolved is None
+        # Governed failure category preserved, exactly as before.
+        assert [f.failure_code for f in failures] == ["FORMULATION_FIELD_MISSING"]
+        assert failures[0].source_public_uuid == str(
+            world["formulation"].public_id
+        )
+
+    # -- contract preservation ---------------------------------------------
+
+    def test_provenance_and_source_descriptors_are_unchanged(self, world):
+        _regimen(world["formulation"], "7")
+        resolved, failures = self._form_c(world)
+        assert failures == []
+
+        provenance = resolved.provenance
+        for key in (
+            "resolver_version", "selected_source_type",
+            "formulation_version_public_id", "version_scalar",
+            "considered_regimens", "selected_value",
+            "selected_regimen_public_id", "tie_break_applied",
+            "source_disagreement", "invalid_candidates",
+        ):
+            assert key in provenance, key
+        assert provenance["formulation_version_public_id"] == str(
+            world["formulation"].public_id
+        )
+        assert resolved.source_public_uuid == str(world["formulation"].public_id)
+        assert resolved.expected_type == "decimal"
+        # Recursively immutable, and no database id anywhere.
+        with pytest.raises(TypeError):
+            provenance["resolver_version"] = "tampered"
+        with pytest.raises((TypeError, AttributeError)):
+            provenance["considered_regimens"][0]["public_id"] = "tampered"
+        assert not _exponent_values(dict(provenance))
+        walked = str(provenance)
+        assert '"id"' not in walked and "'id'" not in walked
+
+    def test_form_c_is_read_only(self, world):
+        """No write, no lock, no audit -- as every resolver form must be."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from audit.models import AuditEvent
+
+        _regimen(world["formulation"], "7")
+        audit_before = AuditEvent.objects.count()
+        with CaptureQueriesContext(connection) as ctx:
+            self._form_c(world)
+        for query in ctx.captured_queries:
+            verb = query["sql"].lstrip().upper()
+            assert not verb.startswith(("INSERT", "UPDATE", "DELETE")), query["sql"]
+            assert "FOR UPDATE" not in query["sql"].upper(), query["sql"]
+        assert AuditEvent.objects.count() == audit_before
+
+    def test_form_c_no_longer_builds_its_own_candidates(self):
+        """The duplicated ORM collection is gone, not merely bypassed."""
+        from iig_checklist import calculation_inputs
+
+        source = _executable_source(inspect.getsource(calculation_inputs))
+        assert "DosingRegimenCandidate" not in source
+        assert "select_maximum_daily_units" not in source
+        assert "DosingRegimen" not in source
+        assert "resolve_current_maximum_daily_units" in source
+
+    def test_all_three_callers_converge_on_one_selection_path(self):
+        """Form C, execution snapshot creation and the snapshot API."""
+        import inspect as _inspect
+
+        from formulations import dosing
+        from iid_assessment import views
+        from iig_checklist import calculation_inputs
+
+        # The two snapshot callers bind the same value helper.
+        assert (
+            execution_mod.governed_maximum_daily_units_value
+            is dosing.governed_maximum_daily_units_value
+        )
+        assert (
+            views.governed_maximum_daily_units_value
+            is dosing.governed_maximum_daily_units_value
+        )
+        # Form C uses the identity-based entry point of the same module.
+        assert "from formulations.dosing import resolve_current_maximum_daily_units" in (
+            _inspect.getsource(calculation_inputs)
+        )
+        # All three funnel into one governed selection function.
+        assert (
+            dosing.resolve_current_maximum_daily_units.__module__
+            == dosing.governed_maximum_daily_units_value.__module__
+        )
+
+
 class TestDeferredBoundaries:
     """The stop conditions this run deliberately keeps."""
 
