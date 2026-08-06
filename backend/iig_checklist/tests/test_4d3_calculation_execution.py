@@ -2184,6 +2184,261 @@ class TestGovernedSnapshotIntegration:
         }
 
 
+def _regimen(formulation, units, *, population=""):
+    from formulations.models import DosingRegimen
+
+    return DosingRegimen.objects.create(
+        formulation_version=formulation,
+        units_per_administration=Decimal("1.0000"),
+        administrations_per_day=Decimal(units),
+        maximum_units_per_day=Decimal(units),
+        patient_population=population,
+    )
+
+
+class TestWorstCaseDailyUnits:
+    """M4D3-SRC-004 / M4D3-MDU-010 -- both governed sources, higher wins.
+
+    The snapshot's ``decision_status``, ``decision_note`` and
+    ``calculation_results`` are regulated fields on an immutable record. Deriving
+    the proposed daily exposure from ``FormulationVersion.maximum_dosage_units_per_day``
+    alone understates it whenever a ``DosingRegimen`` exceeds that field, which
+    makes the frozen decision more favourable than the governed worst case.
+    """
+
+    def _snapshot(self, world):
+        from iid_assessment.models import AssessmentSnapshot
+
+        snapshots = list(AssessmentSnapshot.objects.filter(tenant=world["tenant"]))
+        assert len(snapshots) == 1, snapshots
+        return snapshots[0]
+
+    def _daily_exposure(self, snapshot):
+        return snapshot.calculation_results.get("daily_exposure", {})
+
+    def test_regimen_higher_than_version_field_is_selected(self, world):
+        """The exact reviewed scenario: version 1, regimen 10.
+
+        Before the fix this froze PASS_WITH_IID_PRECEDENT from an exposure of 30;
+        the governed worst case is 300, which exceeds the 200 mg precedent MDE.
+        """
+        world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        _regimen(world["formulation"], "10")
+
+        assert execution_mod._worst_case_daily_units(
+            world["formulation"]
+        ) == Decimal("10.0000")
+
+        _run(world, "percentage_of_iid_potency")
+        snapshot = self._snapshot(world)
+
+        assert snapshot.calculation_results["daily_exposure"]["value"] == (
+            "2.5000000000"
+        )
+        assert snapshot.decision_status == "EXCEEDS_IID_PRECEDENT"
+        assert snapshot.decision_status != "PASS_WITH_IID_PRECEDENT"
+        note = snapshot.decision_note.lower()
+        assert "exceeds the selected iid mde precedent" in note
+        assert "approval cannot be automatic" in note
+        # The worst-case-derived MDE comparison is present.
+        assert "percentage_of_iid_mde" in snapshot.calculation_results
+        assert "difference_from_iid_mde" in snapshot.calculation_results
+
+    def test_the_old_fallback_would_have_decided_differently(self, world):
+        """The regression this fix exists for, pinned as a contrast.
+
+        Supplying only the version field -- what the previous integration did --
+        produces a *more favourable* decision from the same formulation.
+        """
+        from iid_assessment.services import create_assessment_snapshot
+
+        world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        _regimen(world["formulation"], "10")
+
+        version_field_only = create_assessment_snapshot(
+            tenant=world["tenant"], formulation_version=world["formulation"],
+            formulation_component=world["component"], actor=world["user"],
+            maximum_dosage_units_per_day=Decimal("1.0000"),
+        ).snapshot
+        governed = create_assessment_snapshot(
+            tenant=world["tenant"], formulation_version=world["formulation"],
+            formulation_component=world["component"], actor=world["user"],
+            maximum_dosage_units_per_day=execution_mod._worst_case_daily_units(
+                world["formulation"]
+            ),
+        ).snapshot
+
+        assert version_field_only.decision_status == "PASS_WITH_IID_PRECEDENT"
+        assert governed.decision_status == "EXCEEDS_IID_PRECEDENT"
+
+    def test_null_version_field_uses_the_regimen(self, world):
+        """No DATA_REQUIRED merely because the version field is null."""
+        world["formulation"].maximum_dosage_units_per_day = None
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        _regimen(world["formulation"], "8")
+
+        assert execution_mod._worst_case_daily_units(
+            world["formulation"]
+        ) == Decimal("8.0000")
+
+        _run(world, "percentage_of_iid_potency")
+        snapshot = self._snapshot(world)
+        daily = self._daily_exposure(snapshot)
+        assert daily["status"] == "OK"
+        assert daily["value"] == "2.0000000000"
+        # The MDE comparison survives -- it vanished entirely under the fallback.
+        assert "percentage_of_iid_mde" in snapshot.calculation_results
+        assert "difference_from_iid_mde" in snapshot.calculation_results
+        assert snapshot.decision_status != "REVIEW_REQUIRED"
+
+    def test_version_field_higher_than_every_regimen_wins(self, world):
+        world["formulation"].maximum_dosage_units_per_day = Decimal("12.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        _regimen(world["formulation"], "3")
+        _regimen(world["formulation"], "5")
+
+        assert execution_mod._worst_case_daily_units(
+            world["formulation"]
+        ) == Decimal("12.0000")
+
+        _run(world, "percentage_of_iid_potency")
+        snapshot = self._snapshot(world)
+        assert self._daily_exposure(snapshot)["value"] == "3.0000000000"
+
+    def test_multiple_regimens_select_the_highest_deterministically(self, world):
+        world["formulation"].maximum_dosage_units_per_day = Decimal("2.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        for units in ("4", "9", "6", "9"):
+            _regimen(world["formulation"], units)
+
+        first = execution_mod._worst_case_daily_units(world["formulation"])
+        assert first == Decimal("9.0000")
+        # Repeated evaluation is stable, and insertion order is irrelevant.
+        for _ in range(3):
+            assert execution_mod._worst_case_daily_units(
+                world["formulation"]
+            ) == first
+
+    def test_no_regimen_uses_the_version_field(self, world):
+        world["formulation"].maximum_dosage_units_per_day = Decimal("4.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        assert not world["formulation"].dosing_regimens.exists()
+        assert execution_mod._worst_case_daily_units(
+            world["formulation"]
+        ) == Decimal("4.0000")
+
+    def test_no_source_at_all_fails_closed(self, world):
+        """M4D3-MDU-013/014 -- unresolved, never an invented default."""
+        world["formulation"].maximum_dosage_units_per_day = None
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        assert execution_mod._worst_case_daily_units(world["formulation"]) is None
+
+        _run(world, "percentage_of_iid_potency")
+        snapshot = self._snapshot(world)
+        daily = self._daily_exposure(snapshot)
+        assert daily["status"] == "DATA_REQUIRED"
+        assert daily["value"] is None
+        # No fabricated favourable exposure.
+        assert "percentage_of_iid_mde" not in snapshot.calculation_results
+
+    def test_a_non_positive_version_field_is_not_used_as_zero_exposure(self, world):
+        """The selector rejects a non-positive value; no zero-exposure snapshot."""
+        world["formulation"].maximum_dosage_units_per_day = Decimal("0.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        assert execution_mod._worst_case_daily_units(world["formulation"]) is None
+        _run(world, "percentage_of_iid_potency")
+        daily = self._daily_exposure(self._snapshot(world))
+        assert daily["status"] == "DATA_REQUIRED"
+        assert daily["value"] != "0E-10"
+
+    def test_the_selector_is_imported_not_reimplemented(self):
+        """No local comparison, max() or fallback logic."""
+        source = _executable_source(inspect.getsource(execution_mod))
+        assert "select_maximum_daily_units" in source
+        assert "max(" not in source
+        # And nothing copied the rule into the governed domain.
+        from iid_assessment import services as snapshot_services
+
+        service_source = _executable_source(inspect.getsource(snapshot_services))
+        assert "dosing_regimen" not in service_source.lower()
+        assert "iig_checklist" not in service_source
+
+    def test_the_4d3_precedent_fields_are_untouched_by_the_change(self, world):
+        """The four fields Form D reads come from the precedent record."""
+        world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        _regimen(world["formulation"], "10")
+
+        _run(world, "percentage_of_iid_potency")
+        snapshot = self._snapshot(world)
+        assert snapshot.iid_potency_amount == Decimal("1.000000")
+        assert snapshot.iid_potency_unit == "gram"
+        assert snapshot.iid_mde == Decimal("2.000000")
+        assert snapshot.iid_mde_unit == "gram"
+
+        outcome = world["outcomes"]["percentage_of_iid_potency"]
+        outcome.refresh_from_db()
+        assert outcome.status == CalculationStatus.COMPLETE
+        assert outcome.value == Decimal("25")
+
+    def test_worst_case_selection_rolls_back_with_the_transaction(
+        self, world, monkeypatch
+    ):
+        from iid_assessment.models import AssessmentSnapshot
+
+        world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
+        world["formulation"].save(
+            update_fields=["maximum_dosage_units_per_day", "updated_at"]
+        )
+        _regimen(world["formulation"], "10")
+
+        def _explode(**kwargs):
+            raise RuntimeError("engine imploded")
+
+        _install(
+            monkeypatch,
+            {
+                **dict(registry_mod.CALCULATION_BINDING_REGISTRY),
+                "percentage_of_iid_potency": _entry(
+                    calculation_name="calculate_percentage_of_potency",
+                    function=_explode,
+                    input_resolvers=registry_mod.CALCULATION_BINDING_REGISTRY[
+                        "percentage_of_iid_potency"
+                    ].input_resolvers,
+                    required_units=registry_mod.CALCULATION_BINDING_REGISTRY[
+                        "percentage_of_iid_potency"
+                    ].required_units,
+                    output_unit="percent_of_potency",
+                ),
+            },
+        )
+        before = _snapshot_state(world)
+        with pytest.raises(CalculationEngineFailure):
+            _run(world, "percentage_of_iid_potency")
+        assert AssessmentSnapshot.objects.count() == 0
+        assert _snapshot_state(world) == before
+
+
 class TestDeferredBoundaries:
     """The stop conditions this run deliberately keeps."""
 
