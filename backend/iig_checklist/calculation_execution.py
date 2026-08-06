@@ -25,18 +25,18 @@ Deliberate scope, each grounded in an approved clause rather than convenience:
 * **No history row.** M4D3-HST-003 requires a history row when a governed
   persisted-state transition *changes an existing ChecklistResponse*. This
   service changes no response, so no transition occurs and no row is due.
-* **No snapshot creation.** Snapshot rows are supplied by the caller as exact
-  objects. See the module note below.
 * **Single response only.** Cascade recalculation orchestration across a
   dependency graph is deliberately out of scope for this run.
 
-Snapshot creation is *not* implemented here. M4D3-SNO-001 requires the governed
-``iid_assessment`` service to create or reuse the snapshot, and no such callable
-service exists -- ``AssessmentSnapshot`` rows are created only inside
-``iid_assessment.views.SnapshotView.post``, coupled to a DRF request, serializer
-and response. Rather than duplicate that logic or invent a lookup, this service
-accepts the exact snapshot object through ``snapshot_context``, exactly as the
-reviewed resolver does. Snapshot creation is reported as an open blocker.
+Snapshots are **created, not supplied**. M4D3-SNO-001 requires the governed
+``iid_assessment`` service to create the snapshot, and
+``create_assessment_snapshot()`` now provides exactly that, so this service
+resolves the subject component, resolves the active FDA release server-side and
+calls it inside this transaction (M4D3-SNO-009). The governed Part 14.1
+maximum-daily-units selection is injected through
+``formulations.dosing.governed_maximum_daily_units_value()`` -- the same helper
+the persisted snapshot API uses, so neither caller can drift from the other
+(M4D3-SRC-004, M4D3-MDU-006/010).
 
 Lock order (M4D3-TXN-001, M4D3-OUT-004), acquired before any write:
 
@@ -47,7 +47,9 @@ Lock order (M4D3-TXN-001, M4D3-OUT-004), acquired before any write:
 4. every involved ``CalculationOutcome`` -- upstream rows *and* the target
    placeholder -- in **one** query ordered by **ascending primary key**, then
    classified in memory;
-5. the exact ``AssessmentSnapshot`` the caller supplied, if any.
+5. the ``AssessmentSnapshot``, when one was supplied through the private hook --
+   a snapshot this transaction creates needs no lock, because it does not exist
+   yet.
 
 **Ordering is by database primary key, never by ``public_id``.** M4D3-TXN-001
 requires ascending primary-key order "without exception", M4D3-OUT-004 repeats it
@@ -79,6 +81,8 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
+from formulations.dosing import governed_maximum_daily_units_value
+
 from .calculation_inputs import (
     ResolutionContext,
     resolve_calculation_inputs,
@@ -98,7 +102,6 @@ from .calculation_translation import (
     translate_input_failure,
 )
 from .enums import CalculationStatus, DataSourceClassification
-from .max_daily_units import DosingRegimenCandidate, select_maximum_daily_units
 
 
 class CalculationExecutionError(Exception):
@@ -339,40 +342,16 @@ def _entry_needs_snapshot(entry) -> bool:
 def _worst_case_daily_units(formulation_version):
     """M4D3-SRC-004 -- the Part 14.1 conservative worst-case selection.
 
-    Both governed sources are considered and the higher wins (M4D3-MDU-010):
-    ``FormulationVersion.maximum_dosage_units_per_day`` and every
-    ``DosingRegimen.maximum_units_per_day`` of that exact version. Using the
-    version field alone would understate exposure whenever a regimen exceeds it,
-    and would drop the maximum-daily-exposure comparison entirely whenever the
-    version field is null -- making the frozen snapshot decision more favourable
-    than the governed worst case.
+    Delegates to the one shared helper every governed snapshot caller uses
+    (``formulations.dosing``), so this service and the persisted snapshot API
+    endpoint cannot reach different answers for the same formulation. Both
+    governed sources are considered and the higher wins (M4D3-MDU-010).
 
-    ``select_maximum_daily_units()`` is a pure function: it takes plain data and
-    touches no ORM, so importing it here creates no dependency from
-    ``iid_assessment`` into this app. The comparison, tie-break and fail-closed
-    rules stay entirely inside it; nothing is reimplemented here.
-
-    Returns the selected ``Decimal``, or ``None`` when the selector fails closed
+    Returns the selected ``Decimal``, or ``None`` when the selection fails closed
     (M4D3-MDU-013), which leaves the kwarg unresolved so the engine canonicalises
     to ``DATA_REQUIRED`` (M4D3-MDU-014).
     """
-    candidates = tuple(
-        DosingRegimenCandidate(
-            public_id=str(regimen.public_id),
-            maximum_units_per_day=regimen.maximum_units_per_day,
-            patient_population=regimen.patient_population,
-        )
-        # Ordered by public_id so the candidate sequence is deterministic; the
-        # selector's own M4D3-MDU-008 tie-break does not depend on it, but a
-        # stable input keeps provenance byte-identical across runs.
-        for regimen in formulation_version.dosing_regimens.all().order_by("public_id")
-    )
-    selection = select_maximum_daily_units(
-        formulation_version_public_id=str(formulation_version.public_id),
-        version_scalar=formulation_version.maximum_dosage_units_per_day,
-        regimen_candidates=candidates,
-    )
-    return selection.value if selection.resolved else None
+    return governed_maximum_daily_units_value(formulation_version=formulation_version)
 
 
 def _create_governed_snapshot(*, tenant, execution, question, identifier, actor):

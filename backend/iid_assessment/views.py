@@ -6,6 +6,9 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from formulations.dosing import governed_maximum_daily_units_value
+from formulations.models import FormulationVersion
+
 from .assess import run_preview
 from .audit_events import IidAssessmentEvent, emit
 from .models import AssessmentSnapshot
@@ -80,8 +83,6 @@ def _require_formulation_version(tenant, public_id):
     deliberately indistinguishable from outside: both are 404, so the endpoint
     cannot be used to probe for another tenant's identifiers.
     """
-    from formulations.models import FormulationVersion
-
     try:
         return FormulationVersion.objects.select_related("product").get(
             public_id=public_id, product__tenant=tenant
@@ -147,16 +148,25 @@ class SnapshotView(APIView):
 
         try:
             with transaction.atomic():
+                # M4D3-MDU-006 -- derived from the governed formulation inside
+                # the transaction, never from the request. The same helper backs
+                # the checklist calculation-execution path, so both callers
+                # reach one answer for one formulation.
+                current_version = FormulationVersion.objects.select_related(
+                    "product"
+                ).get(pk=formulation_version.pk)
                 result = create_assessment_snapshot(
                     tenant=tenant,
-                    formulation_version=formulation_version,
+                    formulation_version=current_version,
                     formulation_component=component,
                     actor=request.user,
                     selected_release=release,
                     selected_precedent_record_public_id=data.get(
                         "selected_precedent_record_public_id"
                     ),
-                    maximum_dosage_units_per_day=data.get("maximum_dosage_units_per_day"),
+                    maximum_dosage_units_per_day=governed_maximum_daily_units_value(
+                        formulation_version=current_version
+                    ),
                 )
         except ReleaseNotEligible as exc:
             raise ValidationError(
