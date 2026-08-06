@@ -2233,6 +2233,161 @@ Unchanged: cascade recalculation orchestration; the difference result-unit
 specification gap (§6I); the durable audit outbox; external execution API
 error-code mapping (M4D3-OUT-005); and the wider deferred list of §6J.
 
+## 6M. Form C daily-units consolidation (snapshot gate CLOSED, 1 Minor)
+
+The focused confirmation review of §6L returned **PASS WITH MINOR CORRECTIONS**
+and closed the snapshot-service gate: 0 Critical, 0 Major, 1 Minor. This section
+clears that Minor before cascade orchestration.
+
+### Minor — Form C duplicated the ORM collection and the freshness policy
+
+**Finding.** §6L consolidated the two *snapshot* callers onto
+`formulations.dosing`, but a third consumer of the same governed rule was left
+untouched. `calculation_inputs._resolve_maximum_daily_units()` (Form C) still
+read `execution.formulation_version`, built its own `DosingRegimenCandidate`
+tuple, queried `DosingRegimen` itself and called `select_maximum_daily_units()`
+directly.
+
+The *scientific selector* was never duplicated — every site called the one pure
+function — but the **ORM candidate collection and the freshness policy existed
+in two places**, and they differed in one respect that matters:
+`execution.formulation_version` is a lazily-loaded FK that keeps whatever the row
+looked like when the caller first touched it, while snapshot creation reads the
+row fresh. A caller passing a stale execution could therefore have Form C resolve
+daily units from cached formulation data while the snapshot frozen in the *same
+transaction* resolved from current state — the exact class of divergence §6K and
+§6L exist to close.
+
+No value was wrong at the time of the finding: both collections were written
+identically. The risk was latent drift.
+
+**Change.** `formulations.dosing` gains the identity-based entry point:
+
+```
+current_formulation_version(formulation_version_id)
+resolve_current_maximum_daily_units(*, formulation_version_id) -> MaxDailyUnitsSelection
+```
+
+Form C now calls `resolve_current_maximum_daily_units(formulation_version_id=execution.formulation_version_id)`.
+It resolves from the raw FK column rather than the cached relation, so the stale
+copy can never be consulted. `DosingRegimenCandidate`, `select_maximum_daily_units`
+and the `DosingRegimen` import are **removed** from `calculation_inputs` — the
+duplicated path is deleted, not merely bypassed, and a test asserts none of those
+names remains in the module.
+
+The governed public identity comes from the selector's own provenance
+(`formulation_version_public_id`), so naming the source costs no second read.
+
+**Behaviour is preserved exactly.** Both query forms were already equivalent:
+`FormulationVersionRelatedManager` only adds a `for_tenant()` convenience method
+and does **not** override `get_queryset()`, so `DosingRegimen.objects.filter(...)`
+and `formulation_version.dosing_regimens.all()` return the same base queryset,
+and both sites ordered by `public_id`. The 106 resolver tests passed unchanged
+with no edits.
+
+### One governed selection path, three consumers
+
+| Consumer | Entry point |
+|---|---|
+| Persisted snapshot API (`SnapshotView`) | `governed_maximum_daily_units_value()` |
+| Checklist execution snapshot creation | `governed_maximum_daily_units_value()` |
+| Form C input resolution | `resolve_current_maximum_daily_units()` |
+
+All three funnel into `resolve_governed_maximum_daily_units()` and thence into
+the single `select_maximum_daily_units()`. A test asserts the two snapshot
+callers bind the *same function object* and that Form C imports the identity
+entry point of the same module.
+
+### Tests
+
+`TestFormCDailyUnitsConsistency` — **16 tests**, real PostgreSQL:
+
+| Area | Coverage |
+|---|---|
+| Freshness, case A | the version scalar changes after the FK is cached; the cached relation still reports the old value, Form C resolves the new one |
+| Freshness, case B | a regimen added after caching is seen |
+| End-to-end agreement | under a stale execution, Form C and the snapshot worst case return the same value |
+| Equivalence matrix | regimen greater, version greater, version null, no regimens, multiple with a tie, zero scalar with a valid regimen — Form C equals the shared helper on value *and* `detail_code` |
+| Unresolved cases | null/zero/negative with no regimen: both unresolved, `FORMULATION_FIELD_MISSING` preserved with the formulation public UUID |
+| Contract preservation | all ten provenance keys, `source_public_uuid`, `expected_type`, recursive immutability, no database id, no exponent notation |
+| Read-only | no INSERT/UPDATE/DELETE, no `FOR UPDATE`, no audit |
+| Duplication removed | `DosingRegimenCandidate`, `select_maximum_daily_units` and `DosingRegimen` absent from `calculation_inputs` |
+| Three callers | one governed selection path, asserted |
+
+### Intermediate-commit disclosure, corrected
+
+§6L's remediation was reported as "commits 1 and 2 are not independently green".
+Verified in isolated worktrees, that overstated it:
+
+| Commit | Import check |
+|---|---|
+| `1829aca` | **fails** — `ModuleNotFoundError: No module named 'formulations.dosing'` |
+| `a75e214` | imports cleanly |
+| `0a76735` | imports cleanly, tests green |
+| `4a2f6aa` | fully green |
+
+Only **one** commit is not buildable, caused by `git mv` pre-staging the selector
+rename into the first commit. No repository policy is violated:
+`.github/workflows/backend.yml` triggers only on push to `regx-main` and pull
+requests to `regx-main`, and no document requires every commit to build. The
+impact is on bisectability alone — `git bisect` across that range needs one
+`skip`. The final head is correct and internally consistent. **Observation, not a
+technical defect**; history was not rewritten.
+
+### Serializer declared-fields observation
+
+Still true and still safe: `SnapshotRequestSerializer._declared_fields` retains
+`maximum_dosage_units_per_day` by inheritance from
+`MatchPreviewRequestSerializer`, while the instantiated serializer's `.fields`
+excludes it and the generated OpenAPI schema contains it **nowhere** —
+drf-spectacular instantiates the serializer, so the dynamic removal is effective
+for the generator actually in use. Runtime and schema are both safe. Future
+tooling that introspects `_declared_fields` directly rather than an instance
+would need hardening. Not changed here: the serializer contract is out of scope
+for this correction and the current behaviour is correct.
+
+### Post-remediation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| Form C consistency | `pytest …::TestFormCDailyUnitsConsistency --no-cov -q` | **16 passed**, 18.3 s |
+| Input resolvers | `pytest …test_4d3_calculation_inputs.py --no-cov -q` | **106 passed**, 74.2 s — unchanged, no edits |
+| SnapshotView M4D3-MDU-006 | `pytest …::TestClientDosingValueProhibited --no-cov -q` | **24 passed**, 21.3 s |
+| Snapshot service | `pytest iid_assessment/tests/test_snapshot_service.py --no-cov -q` | **62 passed**, 40.8 s |
+| IID assessment (all) | `pytest iid_assessment --no-cov -q` | **167 passed**, 40.7 s |
+| Calculation execution | `pytest …test_4d3_calculation_execution.py --no-cov -q` | **140 passed**, 102.2 s |
+| Execution readiness | `pytest …test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 26.5 s |
+| Activation validation | `pytest …test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 60.5 s |
+| Database-free foundation | `pytest …test_4d3_foundation.py --no-cov -q` | **183 passed**, 0.28 s |
+| Formulations | `pytest formulations --no-cov -q` | **21 passed**, 12.8 s |
+| Execution model / API / lifecycle / response / reviewer | `pytest …` | **64 passed**, 39.4 s |
+| Lifecycle / clone / platform auth / tenancy / authorization | `pytest …` | **131 passed**, 62.2 s |
+| Full backend suite | `pytest -q` | **1529 passed**, 0 failed, 0 skipped, 488.2 s, exit 0 |
+| Coverage | same run | **93.99 %** against a 55 % floor |
+| `formulations/dosing.py` coverage | same run | **100 %** (15 statements, 0 missed) |
+| `common/max_daily_units.py` coverage | same run | **100 %** |
+| `calculation_execution.py` coverage | same run | **100 %** (223 statements, 0 missed) |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1513 → **1529** (+16) and coverage rose 93.95 % → **93.99 %**.
+`calculation_inputs.py` shrank by the deleted duplication and holds its 94 %. No
+model, no migration, no serializer or view change: the correction is confined to
+`formulations/dosing.py`, `calculation_inputs.py` and tests. No threshold was
+lowered, no file excluded, no test weakened or skipped, and no `pragma`, `noqa`,
+`skip` or `xfail` was added.
+
+### Still deferred
+
+Unchanged: cascade recalculation orchestration; the difference result-unit
+specification gap (§6I); the durable audit outbox; external execution API
+error-code mapping (M4D3-OUT-005); and the wider deferred list of §6J.
+
 ## 7. Assertions
 
 These were written for the database-free foundation run and had not been
