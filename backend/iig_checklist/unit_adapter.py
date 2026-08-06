@@ -18,6 +18,8 @@ from types import MappingProxyType
 from iid_assessment import unit_conversion
 from iid_assessment.unit_conversion import ConversionReasonCode
 
+from .calculation_translation import format_decimal_plain
+
 #: M4D3-UNC-002 -- the approved conversion service is the single source of truth.
 CONVERSION_RULE_VERSION = "iid_assessment.unit_conversion/1.0"
 
@@ -88,7 +90,7 @@ def convert_for_calculation(
     if isinstance(converted, Decimal) and value != 0:
         # Plain notation -- provenance must stay human-readable in a regulated
         # record, so never render the factor as 1E+3.
-        factor = f"{converted / value:f}"
+        factor = format_decimal_plain(converted / value)
 
     return ConversionOutcome(
         ok=True,
@@ -96,9 +98,9 @@ def convert_for_calculation(
         failure_code=None,
         provenance=MappingProxyType(
             {
-                "original_value": str(value),
+                "original_value": format_decimal_plain(value),
                 "original_unit": result.original_unit or from_unit,
-                "converted_value": str(converted),
+                "converted_value": format_decimal_plain(converted),
                 "converted_unit": result.converted_unit or to_unit,
                 "conversion_factor": factor,
                 "conversion_rule_version": CONVERSION_RULE_VERSION,
@@ -120,7 +122,9 @@ def _failure(
         failure_code=failure_code,
         provenance=MappingProxyType(
             {
-                "original_value": None if value is None else str(value),
+                "original_value": (
+                    None if value is None else format_decimal_plain(value)
+                ),
                 "original_unit": from_unit,
                 "converted_value": None,
                 "converted_unit": to_unit,

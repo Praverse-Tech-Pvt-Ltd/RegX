@@ -88,6 +88,7 @@ from .calculation_registry import (
 from .calculation_translation import (
     REGISTRY_BINDING_VERSION_PROVENANCE_KEY,
     SUBJECT_COMPONENT_PROVENANCE_KEY,
+    format_decimal_plain,
     translate_engine_status,
     translate_input_failure,
 )
@@ -127,6 +128,16 @@ class StaleResponseVersion(CalculationExecutionError):
     """The caller's expected_version no longer matches the locked row."""
 
 
+class InvalidExpectedVersion(CalculationExecutionError):
+    """``expected_version`` is absent or not a usable response version.
+
+    Optimistic concurrency is mandatory (M4D3-TXN-003): there is deliberately no
+    value -- ``None`` least of all -- that disables the check. ``bool`` is
+    rejected even though it is an ``int`` subclass, because ``True`` would
+    silently mean version 1.
+    """
+
+
 class CalculationEngineFailure(CalculationExecutionError):
     """The approved calculation function raised instead of returning a result.
 
@@ -161,12 +172,13 @@ class CalculationExecutionResult:
 def _json_safe(value: Any) -> Any:
     """Render a resolved value as JSON-storable evidence without losing it.
 
-    ``Decimal`` becomes its exact string form -- never a float, which would
-    silently change a regulated number. Mappings and sequences are converted
-    structurally rather than stringified whole.
+    ``Decimal`` becomes its exact **plain-notation** string -- never a float,
+    which would silently change a regulated number, and never ``1E-7``, which a
+    reader of a regulated record should not have to decode. Mappings and
+    sequences are converted structurally rather than stringified whole.
     """
     if isinstance(value, Decimal):
-        return str(value)
+        return format_decimal_plain(value)
     if isinstance(value, uuid_module.UUID):
         return str(value)
     if isinstance(value, datetime):
@@ -310,6 +322,19 @@ def _lock_outcomes(response_ids) -> list:
     )
 
 
+def _validate_expected_version(expected_version) -> int:
+    """M4D3-TXN-003 -- optimistic concurrency is mandatory, not opt-in.
+
+    ``ChecklistResponse.version`` is a ``PositiveIntegerField(default=1)`` that
+    only ever increments, so 1 is the lowest version any real row can hold.
+    """
+    if isinstance(expected_version, bool) or not isinstance(expected_version, int):
+        raise InvalidExpectedVersion()
+    if expected_version < 1:
+        raise InvalidExpectedVersion()
+    return expected_version
+
+
 # ---------------------------------------------------------------------------
 # The governed service
 # ---------------------------------------------------------------------------
@@ -321,7 +346,7 @@ def execute_calculation_response(
     execution,
     response,
     actor,
-    expected_version,
+    expected_version: int,
     snapshot_context: ResolutionContext | None = None,
 ) -> CalculationExecutionResult:
     """Resolve, calculate and persist one calculated response's outcome.
@@ -330,6 +355,11 @@ def execute_calculation_response(
     lock in the documented order, validates ``expected_version`` against the
     locked row, and either persists a governed outcome or leaves the database
     untouched.
+
+    ``expected_version`` is **mandatory** and must be the ``int`` version the
+    caller believes the target response holds (M4D3-TXN-003). There is no value
+    that skips the concurrency check: ``None``, ``bool`` and anything below 1 are
+    rejected in Phase A, before a lock is taken or a calculation is invoked.
 
     ``snapshot_context`` carries the exact ``AssessmentSnapshot`` the caller
     selected. No snapshot is looked up or created here.
@@ -340,6 +370,8 @@ def execute_calculation_response(
     from .models import ChecklistExecution, ChecklistResponse
 
     # -- Phase A: caller contract, no writes, no locks --------------------
+    expected_version = _validate_expected_version(expected_version)
+
     if response.execution_id != execution.pk:
         raise ResponseNotInExecution()
     if execution.tenant_id != getattr(tenant, "id", None):
@@ -372,7 +404,7 @@ def execute_calculation_response(
 
         # Optimistic concurrency, checked against the locked row and before any
         # further lock, any resolution and any write.
-        if expected_version is not None and locked_response.version != expected_version:
+        if locked_response.version != expected_version:
             raise StaleResponseVersion()
 
         # 3. every other involved response, ascending primary key.
@@ -547,6 +579,7 @@ __all__ = [
     "CalculationEngineFailure",
     "CalculationExecutionError",
     "CalculationExecutionResult",
+    "InvalidExpectedVersion",
     "PlaceholderAmbiguous",
     "PlaceholderMissing",
     "ResponseNotInExecution",

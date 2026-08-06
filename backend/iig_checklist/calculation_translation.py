@@ -24,9 +24,37 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from types import MappingProxyType
 
 from iid_assessment.calculations import CalculationResult
+
+# ---------------------------------------------------------------------------
+# Plain-notation Decimal rendering for persisted regulated numbers.
+#
+# The single formatter used at every JSON persistence boundary in 4D-3, so the
+# execution writer and the unit adapter cannot drift apart. It is here, in the
+# database-free module both sides already import, rather than duplicated.
+# ---------------------------------------------------------------------------
+
+
+def format_decimal_plain(value: object) -> str:
+    """Render ``value`` in plain notation, exactly and losslessly.
+
+    ``str(Decimal("1E-7"))`` is ``'1E-7'``, which a reader of a regulated record
+    should not have to decode, so ``format(value, "f")`` is used instead. The
+    result is exact: no float ever appears, no digit is dropped, and the
+    Decimal's own exponent is preserved, so ``0.250000`` keeps its trailing
+    zeros and the same input always renders identically.
+
+    Anything that is not a ``Decimal`` -- and a NaN or infinity, which has no
+    plain form -- falls back to ``str()`` rather than raising, because this is a
+    persistence-boundary renderer and must never be the thing that aborts a
+    governed write.
+    """
+    if not isinstance(value, Decimal) or not value.is_finite():
+        return str(value)
+    return format(value, "f")
 
 # ---------------------------------------------------------------------------
 # Stored CalculationStatus values (iig_checklist.enums.CalculationStatus)
