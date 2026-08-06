@@ -99,6 +99,43 @@ def _has_exponent(value) -> bool:
     return bool(_exponent_values(value))
 
 
+def _executable_source(source: str) -> str:
+    """``source`` with docstrings and comments removed.
+
+    A module that documents "no ``.first()``" would otherwise fail a search for
+    ``.first()`` in its own prose.
+    """
+    import ast
+    import io
+    import tokenize
+
+    tree = ast.parse(source)
+    docstrings = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef):
+            body = getattr(node, "body", None)
+            if (
+                body
+                and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)
+            ):
+                docstrings.add((body[0].lineno, body[0].end_lineno))
+
+    dropped = {n for start, end in docstrings for n in range(start, end + 1)}
+    kept = [
+        line
+        for number, line in enumerate(source.splitlines(), start=1)
+        if number not in dropped
+    ]
+    readline = io.StringIO("\n".join(kept)).readline
+    out = []
+    for token in tokenize.generate_tokens(readline):
+        if token.type != tokenize.COMMENT:
+            out.append(token.string)
+    return "\n".join(out)
+
+
 # ---------------------------------------------------------------------------
 # Persisted content
 # ---------------------------------------------------------------------------
@@ -125,15 +162,73 @@ def _formulation(product, user, *, weight="1.000000", max_units=None):
     )
 
 
-def _component(formulation, *, quantity="0.250000", order=1, ctype="inactive"):
+def _component(formulation, *, quantity="0.250000", order=1, ctype="inactive",
+               ingredient=None):
     from formulations.models import FormulationComponent
 
     return FormulationComponent.objects.create(
         formulation_version=formulation, component_type=ctype,
         ingredient_name="Synthetic Excipient",
+        resolved_ingredient_public_id=(
+            ingredient.public_id if ingredient is not None else None
+        ),
         quantity_per_dosage_unit=Decimal(quantity), quantity_unit="gram",
         display_order=order,
     )
+
+
+def _iid_setup(*, potency="1.000000", mde="2.000000"):
+    """One active FDA IID release with a CALCULABLE precedent for the excipient.
+
+    The governed snapshot service resolves this release server-side
+    (M4D3-SRC-001) and freezes its potency and MDE, so these are the values the
+    approved calculations are checked against: a 1 g potency and a 2 g maximum
+    daily exposure, matching the hand-checkable fixture in the module docstring.
+    """
+    from fda_data.models import (
+        ControlledDosageForm,
+        ControlledRoute,
+        ControlledUnit,
+        FDADataSourceRelease,
+        FDAReleaseStatus,
+        IIDCalculabilityStatus,
+        IIDIngredient,
+        IIDPrecedentRecord,
+    )
+
+    route = ControlledRoute.objects.create(
+        code="oral", canonical_label="Oral", lifecycle="active"
+    )
+    dosage_form = ControlledDosageForm.objects.create(
+        code="tablet", canonical_label="Tablet", lifecycle="active"
+    )
+    gram = ControlledUnit.objects.create(
+        code="gram", symbol="G", dimension="mass", active=True
+    )
+    release = FDADataSourceRelease.objects.create(
+        dataset_type="fda_iid", source_name="FDA IID",
+        official_source_reference="ref", source_checksum_sha256="a" * 64,
+        status=FDAReleaseStatus.ACTIVE,
+    )
+    ingredient = IIDIngredient.objects.create(
+        canonical_name="Synthetic Excipient", normalized_name="SYNTHETIC EXCIPIENT"
+    )
+    record = IIDPrecedentRecord.objects.create(
+        release=release, ingredient=ingredient,
+        ingredient_name_raw="Synthetic Excipient",
+        route_raw="ORAL", route_normalized=route,
+        dosage_form_raw="TABLET", dosage_form_normalized=dosage_form,
+        potency_amount=Decimal(potency), potency_unit_raw="G",
+        potency_unit_normalized=gram,
+        maximum_daily_exposure=Decimal(mde), mde_unit_raw="G",
+        mde_unit_normalized=gram,
+        raw_row_checksum="b" * 64,
+        calculability_status=IIDCalculabilityStatus.CALCULABLE,
+    )
+    return {
+        "route": route, "dosage_form": dosage_form, "unit": gram,
+        "release": release, "ingredient": ingredient, "record": record,
+    }
 
 
 def _section(version, code="S1", order=1):
@@ -224,9 +319,10 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
     )
     from iig_checklist.services import create_execution
 
+    iid = _iid_setup()
     product = _product(tenant_a, user_a)
     formulation = _formulation(product, user_a, max_units="4.0000")
-    component = _component(formulation)
+    component = _component(formulation, ingredient=iid["ingredient"])
     version = ChecklistVersion.objects.create(
         definition=tenant_definition, version_number=1, status="active",
         created_by=user_a,
@@ -275,7 +371,7 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
         "tenant": tenant_a, "user": user_a, "formulation": formulation,
         "component": component, "version": version, "section": section,
         "execution": execution, "questions": questions, "responses": responses,
-        "selector_response": selector_response,
+        "selector_response": selector_response, "iid": iid,
         "outcomes": {
             key: CalculationOutcome.objects.get(response=r)
             for key, r in responses.items()
@@ -303,6 +399,12 @@ _AUTO = object()
 
 
 def _run(world, key, *, snapshot=None, expected_version=_AUTO, actor=None):
+    """Execute one calculated response.
+
+    ``snapshot`` is only for the tests that must pin a *specific* -- usually
+    deliberately wrong -- snapshot through the private hook. Left unset, the
+    service creates its own governed snapshot, which is the production path.
+    """
     response = world["responses"][key]
     return execute_calculation_response(
         tenant=world["tenant"],
@@ -312,12 +414,21 @@ def _run(world, key, *, snapshot=None, expected_version=_AUTO, actor=None):
         expected_version=(
             response.version if expected_version is _AUTO else expected_version
         ),
-        snapshot_context=(
+        _internal_snapshot_context=(
             ResolutionContext(assessment_snapshot=snapshot)
             if snapshot is not None
             else None
         ),
     )
+
+
+def _created_snapshot(world):
+    """The single snapshot the governed service created for this execution."""
+    from iid_assessment.models import AssessmentSnapshot
+
+    snapshots = list(AssessmentSnapshot.objects.filter(tenant=world["tenant"]))
+    assert len(snapshots) == 1, snapshots
+    return snapshots[0]
 
 
 def _complete_daily_exposure(world):
@@ -608,7 +719,7 @@ class TestComponentProvenance:
             tenant=world["tenant"], execution=world["execution"],
             response=third_response, actor=world["user"],
             expected_version=third_response.version,
-            snapshot_context=ResolutionContext(assessment_snapshot=snapshot),
+            _internal_snapshot_context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert result.status == CalculationStatus.COMPLETE, result.failure_codes
         third_outcome = CalculationOutcome.objects.get(response=third_response)
@@ -638,20 +749,47 @@ class TestComponentProvenance:
 
 class TestNonSuccessResults:
     def test_input_failure_persists_a_governed_outcome(self, world):
-        """A missing snapshot is DATA_REQUIRED, with a null value."""
+        """A snapshot that froze no IID potency is DATA_REQUIRED, value null.
+
+        The service now always creates a snapshot, so the governed failure is no
+        longer an absent snapshot but an empty one: with no matching precedent
+        record the snapshot is still frozen -- that is the reproducible record of
+        "no precedent existed" -- and Form D reports the missing field.
+        """
+        world["iid"]["record"].delete()
         result = _run(world, "percentage_of_iid_potency")
         assert not result.executed
-        assert "ASSESSMENT_SNAPSHOT_MISSING" in result.failure_codes
+        # An empty snapshot fails both snapshot-derived kwargs: the potency
+        # value is absent, and so is the unit the proposed quantity would have
+        # been converted into. Both are governed missing-data codes.
+        assert set(result.failure_codes) == {
+            "ASSESSMENT_FIELD_MISSING", "INPUT_UNIT_MISSING",
+        }
         outcome = world["outcomes"]["percentage_of_iid_potency"]
         outcome.refresh_from_db()
         assert outcome.status == CalculationStatus.DATA_REQUIRED
         assert outcome.reason_code == "DATA_REQUIRED"
         assert outcome.value is None
         assert outcome.unit == ""
-        assert outcome.input_provenance["input_failures"][0]["failure_code"] == (
-            "ASSESSMENT_SNAPSHOT_MISSING"
-        )
+        recorded = {
+            failure["failure_code"]
+            for failure in outcome.input_provenance["input_failures"]
+        }
+        assert recorded == set(result.failure_codes)
         outcome.full_clean()
+        # The snapshot still exists: a governed event always leaves one behind.
+        snapshot = _created_snapshot(world)
+        assert snapshot.iid_potency_amount is None
+        assert snapshot.match_status == "NO_MATCHING_IID_PRECEDENT"
+
+    def test_a_snapshot_is_created_even_when_no_precedent_matches(self, world):
+        """M4D3-SNO-006 -- the event is recorded whatever the outcome."""
+        from iid_assessment.models import AssessmentSnapshot
+
+        world["iid"]["record"].delete()
+        assert AssessmentSnapshot.objects.count() == 0
+        _run(world, "percentage_of_iid_potency")
+        assert AssessmentSnapshot.objects.count() == 1
 
     def test_tenant_failure_is_not_a_scientific_result(self, world, tenant_b):
         """M4D3-IFV-005 -- isolation faults never become NOT_COMPARABLE."""
@@ -968,6 +1106,7 @@ class TestAudit:
         """A DATA_REQUIRED outcome is a governed result, not a silent no-op."""
         from audit.models import AuditEvent
 
+        world["iid"]["record"].delete()
         with django_capture_on_commit_callbacks(execute=True):
             _run(world, "percentage_of_iid_potency")
         event = AuditEvent.objects.get(
@@ -975,6 +1114,10 @@ class TestAudit:
             resource_id=str(world["responses"]["percentage_of_iid_potency"].public_id),
         )
         assert event.payload["status"] == CalculationStatus.DATA_REQUIRED
+        # The snapshot the event was calculated against is named in the audit.
+        assert event.payload["assessment_snapshot_public_id"] == str(
+            _created_snapshot(world).public_id
+        )
 
 
 # ===========================================================================
@@ -1576,6 +1719,7 @@ class TestImmutableResult:
         """The result's own convenience accessor, part of its public contract."""
         assert _run(world, "percentage_w_w").complete is True
         # A resolver failure is a governed outcome, not a completion.
+        world["iid"]["record"].delete()
         failed = _run(world, "percentage_of_iid_potency")
         assert failed.status == CalculationStatus.DATA_REQUIRED
         assert failed.complete is False
@@ -1838,7 +1982,8 @@ def execution_mod_audit():
 class TestDeferredBoundaries:
     """The stop conditions this run deliberately keeps."""
 
-    def test_the_execution_module_neither_creates_nor_looks_up_a_snapshot(self):
+    def test_the_execution_module_never_writes_a_snapshot_itself(self):
+        """Creation belongs to the governed service, never to this module."""
         source = inspect.getsource(execution_mod)
         for forbidden in (
             "AssessmentSnapshot.objects.create",
@@ -1850,17 +1995,31 @@ class TestDeferredBoundaries:
             ".earliest(",
         ):
             assert forbidden not in source, forbidden
-        # The only snapshot query is the pk-scoped lock of the caller's row.
+        # The only snapshot query is the pk-scoped lock of a supplied row; the
+        # created one is obtained from the service, never queried back.
         assert source.count("AssessmentSnapshot.objects") == 1
-        assert "AssessmentSnapshot.objects.filter(pk=snapshot.pk)" in source
+        assert "create_assessment_snapshot" in source
 
-    def test_no_callable_governed_snapshot_service_exists_yet(self):
-        """The stop condition, asserted rather than assumed."""
-        import iid_assessment
+    def test_the_governed_snapshot_service_is_the_single_creation_path(self):
+        """The stop condition of §6H is lifted, and asserted rather than assumed."""
+        import inspect as _inspect
 
-        assert not hasattr(iid_assessment, "services")
-        with pytest.raises(ImportError):
-            __import__("iid_assessment.services")
+        from iid_assessment import services as snapshot_services
+        from iid_assessment import views as assessment_views
+
+        assert callable(snapshot_services.create_assessment_snapshot)
+        # The API is an adapter over the same service -- no second path.
+        view_source = _inspect.getsource(assessment_views)
+        assert "create_assessment_snapshot" in view_source
+        assert "AssessmentSnapshot.objects.create" not in view_source
+        # And the service itself creates without any lookup or reuse. Prose is
+        # stripped first: the module docstring *names* the prohibited calls to
+        # record that they are prohibited, which is not a use of them.
+        code = _executable_source(_inspect.getsource(snapshot_services))
+        for forbidden in (".first()", ".last()", ".latest(", ".earliest("):
+            assert forbidden not in code, forbidden
+        # The row is constructed in memory, never fetched back.
+        assert "AssessmentSnapshot.objects" not in code
 
     def test_snapshot_backed_execution_is_reachable_from_no_view_or_task(self):
         """Nothing but tests and future services calls the execution service."""

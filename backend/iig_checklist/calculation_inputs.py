@@ -1476,6 +1476,103 @@ def _resolve_constant(kwarg, declaration, failures):
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class SubjectComponentResolution:
+    """Phase B's answer, for a caller that must act before Phase C can run."""
+
+    required: bool
+    resolved: bool
+    component: Any = None
+    public_id: str | None = None
+    sources: tuple[str, ...] = ()
+    failures: tuple[InputFailure, ...] = ()
+
+    @property
+    def failure_codes(self) -> tuple[str, ...]:
+        return tuple(failure.failure_code for failure in self.failures)
+
+
+def _validate_target_contract(execution, target_question, entry) -> None:
+    """Phase A's structural guards -- server-side faults, never client input."""
+    if target_question.section.checklist_version_id != execution.checklist_version_id:
+        raise CalculationInputContractError(
+            "target_question does not belong to the execution's checklist version"
+        )
+    if target_question.data_source_classification != DataSourceClassification.SYSTEM_CALCULATED:
+        raise CalculationInputContractError(
+            "target_question is not a system_calculated question"
+        )
+    if target_question.answer_type != entry.allowed_answer_type:
+        raise CalculationInputContractError(
+            "target_question answer type does not match the registry entry"
+        )
+
+
+def _locate_upstreams(execution, entry, failures) -> dict[str, _Upstream]:
+    upstreams: dict[str, _Upstream] = {}
+    for kwarg, declaration in sorted(entry.input_resolvers.items()):
+        if declaration.get("source") != SOURCE_CALCULATION_OUTCOME:
+            continue
+        located = _locate_upstream(execution, kwarg, declaration, failures)
+        if located is not None:
+            upstreams[kwarg] = located
+    return upstreams
+
+
+def resolve_subject_component(
+    *, execution, target_question, registry_identifier: str
+) -> SubjectComponentResolution:
+    """M4D3-SNO-009 step one -- the subject component, before a snapshot exists.
+
+    The governed calculation-execution service has to create the
+    ``AssessmentSnapshot`` *before* Form D can read it, and a snapshot is scoped
+    to one subject component (M4D3-SNO-010), so the component must be known
+    first. This exposes exactly Phase A and Phase B of
+    :func:`resolve_calculation_inputs` and duplicates neither: both call the same
+    ``_resolve_subject_component()``, so the selector rule, the inheritance rule
+    and the disagreement rule can never diverge between the two entry points.
+
+    Read-only. Opens no transaction, takes no lock and writes nothing.
+    """
+    entry = get_entry(registry_identifier)
+    if entry is None:
+        return SubjectComponentResolution(
+            required=False,
+            resolved=False,
+            failures=(
+                InputFailure(
+                    kwarg_name="",
+                    failure_code=F_RESOLVER_UNKNOWN,
+                    source_kind="registry",
+                    message=f"{registry_identifier!r} is not an approved registry entry.",
+                ),
+            ),
+        )
+
+    _validate_target_contract(execution, target_question, entry)
+
+    failures: list[InputFailure] = []
+    upstreams = _locate_upstreams(execution, entry, failures)
+    component = _resolve_subject_component(execution, entry, upstreams, failures)
+
+    if component.state == STATE_NOT_REQUIRED:
+        return SubjectComponentResolution(
+            required=False, resolved=True, failures=tuple(failures)
+        )
+    if component.state == STATE_FAILED:
+        return SubjectComponentResolution(
+            required=True, resolved=False, failures=tuple(failures)
+        )
+    return SubjectComponentResolution(
+        required=True,
+        resolved=True,
+        component=component.component,
+        public_id=component.public_id,
+        sources=component.sources,
+        failures=tuple(failures),
+    )
+
+
 def resolve_calculation_inputs(
     *,
     execution,
@@ -1525,31 +1622,13 @@ def resolve_calculation_inputs(
             ),
         )
 
-    if target_question.section.checklist_version_id != execution.checklist_version_id:
-        raise CalculationInputContractError(
-            "target_question does not belong to the execution's checklist version"
-        )
-    if target_question.data_source_classification != DataSourceClassification.SYSTEM_CALCULATED:
-        raise CalculationInputContractError(
-            "target_question is not a system_calculated question"
-        )
-    if target_question.answer_type != entry.allowed_answer_type:
-        raise CalculationInputContractError(
-            "target_question answer type does not match the registry entry"
-        )
+    _validate_target_contract(execution, target_question, entry)
 
     snapshot = getattr(locked_context, "assessment_snapshot", None)
     expected_release = getattr(locked_context, "expected_iid_release_public_id", None)
 
     # -- Phase B: the subject component, established once ---------------------
-    upstreams: dict[str, _Upstream] = {}
-    for kwarg, declaration in sorted(entry.input_resolvers.items()):
-        if declaration.get("source") != SOURCE_CALCULATION_OUTCOME:
-            continue
-        located = _locate_upstream(execution, kwarg, declaration, failures)
-        if located is not None:
-            upstreams[kwarg] = located
-
+    upstreams = _locate_upstreams(execution, entry, failures)
     component = _resolve_subject_component(execution, entry, upstreams, failures)
     component_public_id = component.public_id
     component_object = component.component

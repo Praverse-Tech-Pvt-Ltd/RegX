@@ -79,8 +79,13 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
-from .calculation_inputs import ResolutionContext, resolve_calculation_inputs
+from .calculation_inputs import (
+    ResolutionContext,
+    resolve_calculation_inputs,
+    resolve_subject_component,
+)
 from .calculation_registry import (
+    SOURCE_ASSESSMENT_SNAPSHOT,
     SOURCE_CALCULATION_OUTCOME,
     SOURCE_QUESTION_RESPONSE,
     get_entry,
@@ -322,6 +327,85 @@ def _lock_outcomes(response_ids) -> list:
     )
 
 
+def _entry_needs_snapshot(entry) -> bool:
+    """True when any declared input is read from an ``AssessmentSnapshot``."""
+    return any(
+        declaration.get("source") == SOURCE_ASSESSMENT_SNAPSHOT
+        for declaration in entry.input_resolvers.values()
+    )
+
+
+def _create_governed_snapshot(*, tenant, execution, question, identifier, actor):
+    """M4D3-SNO-009 -- component, then release, then exactly one new snapshot.
+
+    Returns ``(resolution_context, snapshot_result)``. Both are ``None`` when the
+    subject component cannot be resolved: that is already a governed resolver
+    failure, and the resolver reports it -- with every other failure alongside it
+    -- a moment later. Creating a snapshot for an unknown component would be
+    creating a regulated record that describes nothing.
+
+    The snapshot is created inside the caller's transaction, so any later
+    failure discards it (M4D3-SNO-003/012).
+    """
+    from iid_assessment.services import create_assessment_snapshot
+
+    component = resolve_subject_component(
+        execution=execution,
+        target_question=question,
+        registry_identifier=identifier,
+    )
+    if not component.resolved or component.component is None:
+        return None, None
+
+    result = create_assessment_snapshot(
+        tenant=tenant,
+        formulation_version=execution.formulation_version,
+        formulation_component=component.component,
+        actor=actor,
+        # M4D3-SRC-001/003 -- resolved server-side, never named by a caller.
+        selected_release=None,
+        # The Part 14.1 worst-case resolver lives in this app and cannot be
+        # imported by iid_assessment. It affects only the preview calculations
+        # the snapshot carries as provenance; 4D-3 reads potency, MDE and their
+        # units from the snapshot and computes daily exposure through its own
+        # governed Form C path, so no regulated number depends on it. Wiring the
+        # worst-case value through is recorded as deferred.
+        maximum_dosage_units_per_day=None,
+    )
+    return ResolutionContext(assessment_snapshot=result.snapshot), result
+
+
+def _persist_source_unavailable(outcome, entry):
+    """M4D3-SRC-002 -- no active FDA release is a governed error, not a crash."""
+    outcome.calculation_name = entry.calculation_name
+    outcome.formula_version = entry.formula_version
+    outcome.status = CalculationStatus.ERROR
+    outcome.value = None
+    outcome.unit = ""
+    outcome.rounding_rule = entry.rounding_rule
+    outcome.reason_code = "FDA_VALUE_UNAVAILABLE"
+    outcome.generated_at = None
+    outcome.inputs = {}
+    outcome.input_provenance = {
+        REGISTRY_BINDING_VERSION_PROVENANCE_KEY: entry.binding_version,
+        "calculation_name": entry.calculation_name,
+        "formula_version": entry.formula_version,
+        "source_failure": "ACTIVE_IID_RELEASE_UNAVAILABLE",
+    }
+    outcome.source_assessment_snapshot_public_id = None
+    outcome.full_clean()
+    outcome.save()
+
+    return CalculationExecutionResult(
+        executed=False,
+        outcome_public_id=str(outcome.public_id),
+        status=outcome.status,
+        reason_code=outcome.reason_code,
+        value=None,
+        unit="",
+    )
+
+
 def _validate_expected_version(expected_version) -> int:
     """M4D3-TXN-003 -- optimistic concurrency is mandatory, not opt-in.
 
@@ -347,7 +431,7 @@ def execute_calculation_response(
     response,
     actor,
     expected_version: int,
-    snapshot_context: ResolutionContext | None = None,
+    _internal_snapshot_context: ResolutionContext | None = None,
 ) -> CalculationExecutionResult:
     """Resolve, calculate and persist one calculated response's outcome.
 
@@ -361,12 +445,25 @@ def execute_calculation_response(
     that skips the concurrency check: ``None``, ``bool`` and anything below 1 are
     rejected in Phase A, before a lock is taken or a calculation is invoked.
 
-    ``snapshot_context`` carries the exact ``AssessmentSnapshot`` the caller
-    selected. No snapshot is looked up or created here.
+    **Snapshots are created, not supplied.** When the bound entry reads an
+    ``AssessmentSnapshot``, this service resolves the subject component, resolves
+    the active FDA release server-side (M4D3-SRC-001/003) and calls the governed
+    ``create_assessment_snapshot()`` inside this transaction, then hands that
+    exact object straight to the resolver (M4D3-SNO-007). Every governed
+    execution and recalculation therefore gets its own new immutable snapshot
+    (M4D3-SNO-006), and any later failure rolls it back with everything else.
+
+    ``_internal_snapshot_context`` is a **private** hook for tests and for
+    server-side callers that must pin an exact pre-resolved snapshot -- a
+    reproducibility check against a superseded release, for instance. It is
+    underscore-prefixed because no client-reachable path may steer a snapshot
+    into a calculation (M4D3-SNO-011); no view, serializer or task calls this
+    service at all, and a test asserts that.
     """
     from django.db import transaction as db_transaction
 
-    from .audit import IigChecklistEvent, emit
+    from iid_assessment.services import ActiveReleaseUnavailable
+
     from .models import ChecklistExecution, ChecklistResponse
 
     # -- Phase A: caller contract, no writes, no locks --------------------
@@ -386,7 +483,7 @@ def execute_calculation_response(
     if entry is None:
         raise BindingNotApproved(question.code)
 
-    snapshot = getattr(snapshot_context, "assessment_snapshot", None)
+    supplied_snapshot = getattr(_internal_snapshot_context, "assessment_snapshot", None)
 
     # -- Phase B: one transaction, locks in the documented order ----------
     with db_transaction.atomic():
@@ -423,20 +520,48 @@ def execute_calculation_response(
             raise PlaceholderAmbiguous(question.code)
         outcome = outcomes[0]
 
-        # 5. the exact snapshot the caller supplied, last.
-        if snapshot is not None:
+        # 5. the snapshot, last.
+        #
+        #    A snapshot this transaction is about to create needs no lock: it
+        #    does not exist yet, so no other transaction can hold or observe it.
+        #    A pre-existing one supplied through the private hook is locked in
+        #    the documented position.
+        resolution_context = _internal_snapshot_context
+        if supplied_snapshot is not None:
             from iid_assessment.models import AssessmentSnapshot
 
             list(
-                AssessmentSnapshot.objects.filter(pk=snapshot.pk).select_for_update()
+                AssessmentSnapshot.objects.filter(
+                    pk=supplied_snapshot.pk
+                ).select_for_update()
             )
+        elif _entry_needs_snapshot(entry):
+            try:
+                resolution_context, _ = _create_governed_snapshot(
+                    tenant=tenant,
+                    execution=execution,
+                    question=question,
+                    identifier=identifier,
+                    actor=actor,
+                )
+            except ActiveReleaseUnavailable:
+                # M4D3-SRC-002 -- a governed error outcome, not an exception.
+                result = _persist_source_unavailable(outcome, entry)
+                _schedule_audit(
+                    tenant=tenant, execution=execution, response=locked_response,
+                    question=question, identifier=identifier, entry=entry,
+                    actor=actor, result=result, snapshot_public_id=None,
+                )
+                return result
+
+        snapshot = getattr(resolution_context, "assessment_snapshot", None)
 
         resolved_inputs = resolve_calculation_inputs(
             execution=execution,
             target_question=question,
             registry_identifier=identifier,
             actor=actor,
-            locked_context=snapshot_context,
+            locked_context=resolution_context,
         )
 
         if not resolved_inputs.resolved:
@@ -448,27 +573,49 @@ def execute_calculation_response(
             )
 
         # -- Phase C: audit, only after the transaction commits ----------
-        payload = {
-            "execution_public_id": str(execution.public_id),
-            "response_public_id": str(locked_response.public_id),
-            "outcome_public_id": result.outcome_public_id,
-            "question_code": question.code,
-            "registry_identifier": identifier,
-            "calculation_name": entry.calculation_name,
-            "status": result.status,
-            "reason_code": result.reason_code,
-        }
-        db_transaction.on_commit(
-            lambda: emit(
-                event_type=IigChecklistEvent.RESPONSE_CALCULATED,
-                resource_id=str(locked_response.public_id),
-                actor_id=getattr(actor, "id", None),
-                actor_email=getattr(actor, "email", ""),
-                tenant_id=getattr(tenant, "id", None),
-                payload=payload,
-            )
+        _schedule_audit(
+            tenant=tenant, execution=execution, response=locked_response,
+            question=question, identifier=identifier, entry=entry, actor=actor,
+            result=result,
+            snapshot_public_id=(
+                str(snapshot.public_id) if snapshot is not None else None
+            ),
         )
     return result
+
+
+def _schedule_audit(
+    *, tenant, execution, response, question, identifier, entry, actor, result,
+    snapshot_public_id,
+):
+    """One governed audit event, dispatched only after the commit succeeds."""
+    from django.db import transaction as db_transaction
+
+    from .audit import IigChecklistEvent, emit
+
+    payload = {
+        "execution_public_id": str(execution.public_id),
+        "response_public_id": str(response.public_id),
+        "outcome_public_id": result.outcome_public_id,
+        "question_code": question.code,
+        "registry_identifier": identifier,
+        "calculation_name": entry.calculation_name,
+        "status": result.status,
+        "reason_code": result.reason_code,
+    }
+    if snapshot_public_id is not None:
+        payload["assessment_snapshot_public_id"] = snapshot_public_id
+
+    db_transaction.on_commit(
+        lambda: emit(
+            event_type=IigChecklistEvent.RESPONSE_CALCULATED,
+            resource_id=str(response.public_id),
+            actor_id=getattr(actor, "id", None),
+            actor_email=getattr(actor, "email", ""),
+            tenant_id=getattr(tenant, "id", None),
+            payload=payload,
+        )
+    )
 
 
 def _invoke(entry, resolved_inputs):
