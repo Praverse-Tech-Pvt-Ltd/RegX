@@ -1979,6 +1979,211 @@ def execution_mod_audit():
     return audit_mod
 
 
+class TestGovernedSnapshotIntegration:
+    """M4D3-SNO-009 -- a fresh governed snapshot for every event that needs one."""
+
+    def _snapshots(self, world):
+        from iid_assessment.models import AssessmentSnapshot
+
+        return list(AssessmentSnapshot.objects.filter(tenant=world["tenant"]))
+
+    @pytest.mark.parametrize(
+        "key",
+        [
+            "percentage_of_iid_potency", "difference_from_iid_potency",
+            "percentage_of_iid_mde", "difference_from_iid_mde",
+        ],
+    )
+    def test_each_snapshot_backed_calculation_creates_exactly_one(self, world, key):
+        if key.endswith("mde"):
+            _complete_daily_exposure(world)
+        before = len(self._snapshots(world))
+        result = _run(world, key)
+        assert result.status == CalculationStatus.COMPLETE, result.failure_codes
+
+        created = self._snapshots(world)
+        assert len(created) == before + 1
+        snapshot = created[-1]
+        # Exact release, exact component, exact formulation version.
+        assert snapshot.iid_release_public_id == world["iid"]["release"].public_id
+        assert snapshot.formulation_component_public_id == world["component"].public_id
+        assert snapshot.formulation_version_public_id == (
+            world["formulation"].public_id
+        )
+        # The resolver read that exact object: its UUID is in the provenance.
+        outcome = world["outcomes"][key]
+        outcome.refresh_from_db()
+        assert outcome.source_assessment_snapshot_public_id == snapshot.public_id
+        assert outcome.input_provenance["assessment_snapshot_public_id"] == str(
+            snapshot.public_id
+        )
+        assert outcome.input_provenance[COMPONENT_KEY] == str(
+            world["component"].public_id
+        )
+
+    def test_a_calculation_needing_no_snapshot_creates_none(self, world):
+        _run(world, "percentage_w_w")
+        assert self._snapshots(world) == []
+
+    def test_recalculation_creates_another_snapshot(self, world):
+        """M4D3-SNO-006 -- every governed event gets its own record."""
+        first = _run(world, "percentage_of_iid_potency")
+        second = _run(world, "percentage_of_iid_potency")
+        assert first.status == second.status == CalculationStatus.COMPLETE
+        snapshots = self._snapshots(world)
+        assert len(snapshots) == 2
+        assert snapshots[0].public_id != snapshots[1].public_id
+        # The outcome points at the newer one; the older row is untouched.
+        outcome = world["outcomes"]["percentage_of_iid_potency"]
+        outcome.refresh_from_db()
+        assert outcome.source_assessment_snapshot_public_id in {
+            s.public_id for s in snapshots
+        }
+
+    def test_the_audit_names_the_snapshot_used(
+        self, world, django_capture_on_commit_callbacks
+    ):
+        from audit.models import AuditEvent
+
+        with django_capture_on_commit_callbacks(execute=True):
+            _run(world, "percentage_of_iid_potency")
+        event = AuditEvent.objects.get(
+            event_type=CALCULATED_EVENT,
+            resource_id=str(world["responses"]["percentage_of_iid_potency"].public_id),
+        )
+        assert event.payload["assessment_snapshot_public_id"] == str(
+            self._snapshots(world)[0].public_id
+        )
+
+    def test_stale_expected_version_creates_no_snapshot(self, world):
+        before = _snapshot_state(world)
+        with pytest.raises(StaleResponseVersion):
+            _run(world, "percentage_of_iid_potency", expected_version=999)
+        assert self._snapshots(world) == []
+        assert _snapshot_state(world) == before
+
+    def test_invalid_binding_creates_no_snapshot(self, world):
+        question = world["questions"]["percentage_of_iid_potency"]
+        question.calculation_binding_identifier = "not_a_registry_key"
+        question.save(update_fields=["calculation_binding_identifier", "updated_at"])
+        response = world["responses"]["percentage_of_iid_potency"]
+        response.refresh_from_db()
+        with pytest.raises(BindingNotApproved):
+            execute_calculation_response(
+                tenant=world["tenant"], execution=world["execution"],
+                response=response, actor=world["user"],
+                expected_version=response.version,
+            )
+        assert self._snapshots(world) == []
+
+    def test_a_calculation_exception_rolls_the_snapshot_back(self, world, monkeypatch):
+        """The snapshot shares the outcome's transaction (M4D3-SNO-003)."""
+
+        def _explode(**kwargs):
+            raise RuntimeError("engine imploded")
+
+        _install(
+            monkeypatch,
+            {
+                **dict(registry_mod.CALCULATION_BINDING_REGISTRY),
+                "percentage_of_iid_potency": _entry(
+                    calculation_name="calculate_percentage_of_potency",
+                    function=_explode,
+                    input_resolvers=registry_mod.CALCULATION_BINDING_REGISTRY[
+                        "percentage_of_iid_potency"
+                    ].input_resolvers,
+                    required_units=registry_mod.CALCULATION_BINDING_REGISTRY[
+                        "percentage_of_iid_potency"
+                    ].required_units,
+                    output_unit="percent_of_potency",
+                ),
+            },
+        )
+        before = _snapshot_state(world)
+        with pytest.raises(CalculationEngineFailure):
+            _run(world, "percentage_of_iid_potency")
+        assert self._snapshots(world) == []
+        assert _snapshot_state(world) == before
+
+    def test_an_outcome_validation_failure_rolls_the_snapshot_back(
+        self, world, monkeypatch
+    ):
+        real_build = execution_mod._build_provenance
+        monkeypatch.setattr(
+            execution_mod, "_build_provenance",
+            lambda entry, resolved, snapshot: {**real_build(entry, resolved, snapshot),
+                                               BINDING_VERSION_KEY: "1.0"},
+        )
+        before = _snapshot_state(world)
+        with pytest.raises(ValidationError):
+            _run(world, "percentage_of_iid_potency")
+        assert self._snapshots(world) == []
+        assert _snapshot_state(world) == before
+
+    def test_no_active_release_is_a_governed_error_outcome(self, world):
+        """M4D3-SRC-002 -- fail closed with FDA_VALUE_UNAVAILABLE, not a crash."""
+        from fda_data.models import FDAReleaseStatus
+
+        release = world["iid"]["release"]
+        release.status = FDAReleaseStatus.REGISTERED
+        release.save(update_fields=["status"])
+
+        result = _run(world, "percentage_of_iid_potency")
+        assert not result.executed
+        assert result.status == CalculationStatus.ERROR
+        assert result.reason_code == "FDA_VALUE_UNAVAILABLE"
+        assert result.value is None
+
+        outcome = world["outcomes"]["percentage_of_iid_potency"]
+        outcome.refresh_from_db()
+        assert outcome.status == CalculationStatus.ERROR
+        assert outcome.reason_code == "FDA_VALUE_UNAVAILABLE"
+        assert outcome.value is None
+        assert outcome.unit == ""
+        assert outcome.source_assessment_snapshot_public_id is None
+        assert outcome.input_provenance["source_failure"] == (
+            "ACTIVE_IID_RELEASE_UNAVAILABLE"
+        )
+        outcome.full_clean()
+        # No snapshot was created for an event that could not be assessed.
+        assert self._snapshots(world) == []
+
+    def test_no_active_release_still_audits_its_status(
+        self, world, django_capture_on_commit_callbacks
+    ):
+        from audit.models import AuditEvent
+        from fda_data.models import FDAReleaseStatus
+
+        release = world["iid"]["release"]
+        release.status = FDAReleaseStatus.REGISTERED
+        release.save(update_fields=["status"])
+
+        with django_capture_on_commit_callbacks(execute=True):
+            _run(world, "percentage_of_iid_potency")
+        event = AuditEvent.objects.get(
+            event_type=CALCULATED_EVENT,
+            resource_id=str(world["responses"]["percentage_of_iid_potency"].public_id),
+        )
+        assert event.payload["status"] == CalculationStatus.ERROR
+        assert event.payload["reason_code"] == "FDA_VALUE_UNAVAILABLE"
+        assert "assessment_snapshot_public_id" not in event.payload
+
+    def test_an_unresolvable_component_creates_no_snapshot(self, world):
+        """A regulated record describing no component is worse than none."""
+        world["selector_response"].raw_value = None
+        world["selector_response"].save(update_fields=["raw_value", "updated_at"])
+
+        result = _run(world, "percentage_of_iid_potency")
+        assert not result.executed
+        assert self._snapshots(world) == []
+        outcome = world["outcomes"]["percentage_of_iid_potency"]
+        outcome.refresh_from_db()
+        assert outcome.value is None
+        assert outcome.status in {
+            CalculationStatus.DATA_REQUIRED, CalculationStatus.ERROR
+        }
+
+
 class TestDeferredBoundaries:
     """The stop conditions this run deliberately keeps."""
 
