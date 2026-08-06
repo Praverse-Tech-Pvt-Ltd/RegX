@@ -496,7 +496,9 @@ def _post(client, world, **overrides):
         "proposed_quantity_unit": "milligram",
         "total_dosage_unit_weight": "500",
         "total_dosage_unit_weight_unit": "milligram",
-        "maximum_dosage_units_per_day": "4",
+        # maximum_dosage_units_per_day is deliberately absent: M4D3-MDU-006
+        # prohibits a client dosing value on the persisted endpoint, and the
+        # server derives it from the formulation instead.
         "formulation_component_public_id": str(world["component"].public_id),
         "formulation_version_public_id": str(world["formulation_version"].public_id),
     }
@@ -615,3 +617,251 @@ class TestSnapshotApi:
             formulation_version_public_id="11111111-1111-1111-1111-111111111111",
         )
         assert AuditEvent.objects.count() == before
+
+
+# ===========================================================================
+# G. M4D3-MDU-006 -- no client dosing value on the persisted endpoint
+# ===========================================================================
+
+
+def _regimen(formulation_version, units):
+    from formulations.models import DosingRegimen
+
+    return DosingRegimen.objects.create(
+        formulation_version=formulation_version,
+        units_per_administration=Decimal("1.0000"),
+        administrations_per_day=Decimal(units),
+        maximum_units_per_day=Decimal(units),
+    )
+
+
+class TestClientDosingValueProhibited:
+    """M4D3-MDU-006 -- "no dosing value shall ever be accepted from a client
+    request payload", enforced at the request serializer as the acceptance
+    matrix specifies.
+
+    The reviewed defect: a client could post ``maximum_dosage_units_per_day: 1``
+    against a formulation carrying a governed ``DosingRegimen`` of 10, and the
+    endpoint froze ``PASS_WITH_IID_PRECEDENT`` where the governed Part 14.1 worst
+    case gives ``EXCEEDS_IID_PRECEDENT``.
+    """
+
+    def _worst_case_fixture(self, world):
+        fv = world["formulation_version"]
+        fv.maximum_dosage_units_per_day = Decimal("1.0000")
+        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        _regimen(fv, "10")
+        return fv
+
+    # -- A. the field is refused, not ignored ---------------------------------
+
+    def test_supplying_the_field_is_a_structured_400(self, api_client_doer, world):
+        from audit.models import AuditEvent
+
+        self._worst_case_fixture(world)
+        before = AuditEvent.objects.count()
+
+        resp = _post(api_client_doer, world, maximum_dosage_units_per_day="1")
+
+        assert resp.status_code == 400, resp.content
+        body = resp.content.decode()
+        assert "prohibited_request_field" in body
+        assert "maximum_dosage_units_per_day" in body
+        # Refused, never silently dropped, and nothing was written.
+        assert AssessmentSnapshot.objects.count() == 0
+        assert AuditEvent.objects.count() == before
+
+    @pytest.mark.parametrize(
+        "supplied",
+        ["0", "1", "999", None, "-5", "not-a-number", 7, 7.5],
+        ids=["zero", "one", "large", "null", "negative", "string", "int", "float"],
+    )
+    def test_no_client_value_of_any_shape_is_accepted(
+        self, api_client_doer, world, supplied
+    ):
+        self._worst_case_fixture(world)
+        resp = _post(api_client_doer, world, maximum_dosage_units_per_day=supplied)
+        assert resp.status_code == 400, (supplied, resp.content)
+        assert AssessmentSnapshot.objects.count() == 0
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "maximumDosageUnitsPerDay",
+            "max_daily_units",
+            "maximum_units_per_day",
+        ],
+    )
+    def test_an_alternate_spelling_cannot_reintroduce_it(
+        self, api_client_doer, world, field
+    ):
+        """An unknown field is inert: nothing reads it, so nothing changes."""
+        self._worst_case_fixture(world)
+        resp = _post(api_client_doer, world, **{field: "1"})
+        assert resp.status_code == 201, resp.content
+        snapshot = AssessmentSnapshot.objects.get()
+        # The governed worst case still applied.
+        assert snapshot.decision_status == "EXCEEDS_IID_PRECEDENT"
+
+    def test_a_nested_attempt_cannot_reintroduce_it(self, api_client_doer, world):
+        self._worst_case_fixture(world)
+        resp = _post(
+            api_client_doer, world,
+            dosing={"maximum_dosage_units_per_day": "1"},
+        )
+        assert resp.status_code == 201, resp.content
+        assert AssessmentSnapshot.objects.get().decision_status == (
+            "EXCEEDS_IID_PRECEDENT"
+        )
+
+    def test_the_field_is_not_advertised_on_the_persisted_endpoint(self):
+        from iid_assessment.serializers import (
+            MatchPreviewRequestSerializer,
+            SnapshotRequestSerializer,
+        )
+
+        assert "maximum_dosage_units_per_day" not in SnapshotRequestSerializer().fields
+        # The non-persisting preview keeps its own contract untouched.
+        assert "maximum_dosage_units_per_day" in MatchPreviewRequestSerializer().fields
+
+    # -- B. the governed value is derived server-side -------------------------
+
+    def test_the_reviewed_scenario_now_freezes_the_worst_case(
+        self, api_client_doer, world, django_capture_on_commit_callbacks
+    ):
+        from audit.models import AuditEvent
+
+        self._worst_case_fixture(world)
+
+        with django_capture_on_commit_callbacks(execute=True):
+            resp = _post(api_client_doer, world)
+        assert resp.status_code == 201, resp.content
+
+        snapshot = AssessmentSnapshot.objects.get()
+        daily = snapshot.calculation_results["daily_exposure"]
+        assert daily["status"] == "OK"
+        # 30 mg per unit x 10 units/day, not x 1.
+        assert daily["value"] == "300.0000000000"
+        assert snapshot.decision_status == "EXCEEDS_IID_PRECEDENT"
+        assert snapshot.decision_status != "PASS_WITH_IID_PRECEDENT"
+        note = snapshot.decision_note.lower()
+        assert "exceeds the selected iid mde precedent" in note
+        assert "percentage_of_iid_mde" in snapshot.calculation_results
+        assert "difference_from_iid_mde" in snapshot.calculation_results
+
+        assert (
+            AuditEvent.objects.filter(
+                event_type="iid_assessment.snapshot.created"
+            ).count()
+            == 1
+        )
+
+    def test_null_version_scalar_uses_the_regimen(self, api_client_doer, world):
+        fv = world["formulation_version"]
+        fv.maximum_dosage_units_per_day = None
+        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        _regimen(fv, "8")
+
+        resp = _post(api_client_doer, world)
+        assert resp.status_code == 201, resp.content
+        snapshot = AssessmentSnapshot.objects.get()
+        daily = snapshot.calculation_results["daily_exposure"]
+        assert daily["status"] == "OK"
+        assert daily["value"] == "240.0000000000"
+        assert "percentage_of_iid_mde" in snapshot.calculation_results
+
+    def test_version_scalar_higher_than_every_regimen_wins(
+        self, api_client_doer, world
+    ):
+        fv = world["formulation_version"]
+        fv.maximum_dosage_units_per_day = Decimal("12.0000")
+        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        _regimen(fv, "3")
+        _regimen(fv, "5")
+
+        resp = _post(api_client_doer, world)
+        assert resp.status_code == 201, resp.content
+        daily = AssessmentSnapshot.objects.get().calculation_results["daily_exposure"]
+        assert daily["value"] == "360.0000000000"
+
+    def test_no_regimen_uses_the_version_scalar(self, api_client_doer, world):
+        fv = world["formulation_version"]
+        fv.maximum_dosage_units_per_day = Decimal("4.0000")
+        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        assert not fv.dosing_regimens.exists()
+
+        resp = _post(api_client_doer, world)
+        assert resp.status_code == 201, resp.content
+        daily = AssessmentSnapshot.objects.get().calculation_results["daily_exposure"]
+        assert daily["value"] == "120.0000000000"
+
+    def test_no_source_at_all_fails_closed(self, api_client_doer, world):
+        fv = world["formulation_version"]
+        fv.maximum_dosage_units_per_day = None
+        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+
+        resp = _post(api_client_doer, world)
+        assert resp.status_code == 201, resp.content
+        snapshot = AssessmentSnapshot.objects.get()
+        daily = snapshot.calculation_results["daily_exposure"]
+        assert daily["status"] == "DATA_REQUIRED"
+        assert daily["value"] is None
+        # No invented default and no favourable MDE conclusion.
+        assert "percentage_of_iid_mde" not in snapshot.calculation_results
+        assert snapshot.decision_status != "PASS_WITH_IID_PRECEDENT"
+
+    @pytest.mark.parametrize("scalar", ["0.0000", "-3.0000"])
+    def test_non_positive_scalar_alone_fails_closed(
+        self, api_client_doer, world, scalar
+    ):
+        fv = world["formulation_version"]
+        fv.maximum_dosage_units_per_day = Decimal(scalar)
+        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+
+        resp = _post(api_client_doer, world)
+        assert resp.status_code == 201, resp.content
+        daily = AssessmentSnapshot.objects.get().calculation_results["daily_exposure"]
+        assert daily["status"] == "DATA_REQUIRED"
+        assert daily["value"] is None
+
+    def test_zero_scalar_with_a_valid_regimen_uses_the_regimen(
+        self, api_client_doer, world
+    ):
+        fv = world["formulation_version"]
+        fv.maximum_dosage_units_per_day = Decimal("0.0000")
+        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        _regimen(fv, "6")
+
+        resp = _post(api_client_doer, world)
+        assert resp.status_code == 201, resp.content
+        daily = AssessmentSnapshot.objects.get().calculation_results["daily_exposure"]
+        assert daily["value"] == "180.0000000000"
+
+    def test_the_view_uses_the_shared_governed_helper(self):
+        """One helper, both snapshot callers -- no second selection rule."""
+        import inspect
+
+        from formulations import dosing
+        from iid_assessment import views
+
+        assert "governed_maximum_daily_units_value" in inspect.getsource(views)
+        assert "data.get(\"maximum_dosage_units_per_day\")" not in inspect.getsource(
+            views
+        )
+        # The helper delegates; it implements no comparison of its own.
+        helper_source = inspect.getsource(dosing)
+        assert "select_maximum_daily_units" in helper_source
+        assert "max(" not in helper_source
+
+    def test_the_view_binds_the_shared_helper_itself(self):
+        """The checklist side of this pairing is asserted in iig_checklist's
+        own suite: this package may not import ``iig_checklist`` at all
+        (contract ``iig-checklist-content-is-not-imported-by-governed-domains``),
+        and that applies to its tests too."""
+        from formulations.dosing import governed_maximum_daily_units_value
+        from iid_assessment import views
+
+        assert (
+            views.governed_maximum_daily_units_value
+            is governed_maximum_daily_units_value
+        )

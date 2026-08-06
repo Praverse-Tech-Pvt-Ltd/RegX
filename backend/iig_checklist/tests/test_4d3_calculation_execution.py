@@ -2369,11 +2369,41 @@ class TestWorstCaseDailyUnits:
         assert daily["status"] == "DATA_REQUIRED"
         assert daily["value"] != "0E-10"
 
+    def test_both_snapshot_callers_share_one_governed_helper(self):
+        """The execution service and the snapshot API must not drift apart.
+
+        Asserted here because ``iid_assessment`` may not import this app at all,
+        so its own suite can only check its half of the pairing.
+        """
+        from formulations.dosing import governed_maximum_daily_units_value
+        from iid_assessment import views
+
+        assert (
+            execution_mod.governed_maximum_daily_units_value
+            is governed_maximum_daily_units_value
+        )
+        assert (
+            views.governed_maximum_daily_units_value
+            is governed_maximum_daily_units_value
+        )
+
     def test_the_selector_is_imported_not_reimplemented(self):
-        """No local comparison, max() or fallback logic."""
+        """No local comparison, max() or fallback logic anywhere on the path."""
+        from formulations import dosing
+
         source = _executable_source(inspect.getsource(execution_mod))
-        assert "select_maximum_daily_units" in source
+        # This module delegates to the shared helper rather than assembling
+        # candidates or calling the selector itself.
+        assert "governed_maximum_daily_units_value" in source
         assert "max(" not in source
+        assert "DosingRegimenCandidate" not in source
+
+        # The shared helper delegates to the one pure selector.
+        helper_source = _executable_source(inspect.getsource(dosing))
+        assert "select_maximum_daily_units" in helper_source
+        assert "max(" not in helper_source
+        assert ".first()" not in helper_source
+
         # And nothing copied the rule into the governed domain.
         from iid_assessment import services as snapshot_services
 

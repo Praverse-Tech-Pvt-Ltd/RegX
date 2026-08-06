@@ -236,7 +236,8 @@ class TestPreviewApi:
                 "proposed_quantity_unit": "milligram",
                 "total_dosage_unit_weight": "500",
                 "total_dosage_unit_weight_unit": "milligram",
-                "maximum_dosage_units_per_day": "4",
+                # M4D3-MDU-006 -- the persisted endpoint refuses a client dosing
+                # value and derives it from the governed formulation instead.
                 "formulation_component_public_id": str(
                     snapshot_formulation["component"].public_id
                 ),
