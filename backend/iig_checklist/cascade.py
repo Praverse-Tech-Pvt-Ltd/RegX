@@ -54,7 +54,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .calculation_execution import execute_calculation_response
+from .calculation_execution import (
+    StaleResponseVersion,
+    execute_calculation_response,
+    validate_expected_version,
+)
 from .calculation_graph import (
     CalculationNode,
     GraphConfigurationError,
@@ -234,7 +238,11 @@ def recalculate_dependents(
     transaction.
 
     ``expected_version`` is the caller's expected version of the **changed**
-    response and is checked against the locked row. Each recalculated target
+    response. It is first validated structurally by the shared
+    ``validate_expected_version()`` of M4D3-TXN-003 -- the same gate the
+    single-response writer uses, so ``None``, ``bool``, ``float``, ``str``,
+    containers, zero and negatives raise ``InvalidExpectedVersion`` before the
+    transaction opens -- and only then compared against the locked row. Each recalculated target
     supplies its own current version, read under the lock this service already
     holds, because a calculated response is never mutated by recalculation
     (M4D3-MDL-006) and so has no independent version to conflict on.
@@ -248,6 +256,15 @@ def recalculate_dependents(
     from .models import CalculationOutcome, ChecklistExecution, ChecklistResponse
 
     # -- Phase A: caller contract, no locks, no writes ---------------------
+    #
+    # M4D3-TXN-003 -- the same governed structural gate the single-response
+    # writer applies, reused rather than restated. It runs before the
+    # transaction opens, so a malformed ``expected_version`` never reaches a
+    # ``SELECT ... FOR UPDATE``, and it keeps the two failures distinct:
+    # structurally invalid is ``InvalidExpectedVersion``, and only a valid
+    # integer that differs from the locked row is ``StaleResponseVersion``.
+    expected_version = validate_expected_version(expected_version)
+
     if changed_response.execution_id != execution.pk:
         raise CascadeResponseNotInExecution()
     if execution.tenant_id != getattr(tenant, "id", None):
@@ -270,9 +287,9 @@ def recalculate_dependents(
             .select_related("question")
             .get(pk=changed_response.pk)
         )
+        # The validated integer against the locked row: a genuine stale version,
+        # and nothing else, reaches this branch.
         if locked_origin.version != expected_version:
-            from .calculation_execution import StaleResponseVersion
-
             raise StaleResponseVersion()
 
         origin_code = locked_origin.question.code

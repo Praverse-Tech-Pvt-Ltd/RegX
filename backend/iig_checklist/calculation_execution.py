@@ -446,11 +446,22 @@ def _outcome_signature(outcome):
     return (outcome.status, outcome.value, outcome.reason_code, outcome.generated_at)
 
 
-def _validate_expected_version(expected_version) -> int:
+def validate_expected_version(expected_version) -> int:
     """M4D3-TXN-003 -- optimistic concurrency is mandatory, not opt-in.
 
     ``ChecklistResponse.version`` is a ``PositiveIntegerField(default=1)`` that
     only ever increments, so 1 is the lowest version any real row can hold.
+
+    This is the single governed structural gate for ``expected_version``. Every
+    governed writer that accepts one -- ``execute_calculation_response()`` and
+    the 4D-3 cascade -- routes through this function rather than comparing the
+    supplied value to a row directly: ``True == 1`` and ``1.0 == 1`` under Python
+    equality, so a direct comparison would silently accept a malformed value at
+    version 1, and would misreport every other malformed value as a stale
+    version. Structural rejection is ``InvalidExpectedVersion``; only a valid
+    integer that differs from the locked row is ``StaleResponseVersion``.
+
+    It is internal to ``iig_checklist`` and is not exposed through the API.
     """
     if isinstance(expected_version, bool) or not isinstance(expected_version, int):
         raise InvalidExpectedVersion()
@@ -519,7 +530,7 @@ def execute_calculation_response(
     from .models import ChecklistExecution, ChecklistResponse
 
     # -- Phase A: caller contract, no writes, no locks --------------------
-    expected_version = _validate_expected_version(expected_version)
+    expected_version = validate_expected_version(expected_version)
 
     if response.execution_id != execution.pk:
         raise ResponseNotInExecution()
@@ -794,4 +805,5 @@ __all__ = [
     "StaleResponseVersion",
     "TargetNotCalculated",
     "execute_calculation_response",
+    "validate_expected_version",
 ]
