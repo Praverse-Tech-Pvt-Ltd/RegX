@@ -2705,6 +2705,15 @@ service. No view, serializer, signal or task calls it, and no client-reachable
 path can steer a dependency list into it — dependencies come only from the
 immutable approved registry.
 
+> **Superseded by §6P.** The first sentence above was true when §6N was written
+> and is no longer. `update_checklist_response()` now calls
+> `recalculate_dependents()`, so a client request can start a cascade. It is
+> left in place rather than rewritten, so the record of what was true when is
+> preserved. The second half still holds without qualification: the caller
+> supplies no dependency list, and dependencies still come only from the
+> immutable approved registry — §6P adds a committed AST test proving the new
+> service does not restate the trigger rules.
+
 ## 6O. Remediation of the independent cascade review (FAIL → 1 Major, 3 Minor)
 
 The independent review of the cascade at `88f6f24` returned **FAIL**: 0 Critical,
@@ -2905,6 +2914,245 @@ modified, staged, reverted or committed at any point in this run.
 | Existing tests weakened or skipped | **NO** |
 | `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
 | `frontend/next.config.ts` modified, staged or committed | **NO** |
+| PR created | **NO** |
+| Merged | **NO** |
+
+## 6P. Checklist update trigger integration and client-facing recalculation wiring
+
+With the cascade gate closed, the cascade was wired to the only thing that can
+legitimately start it: a governed change to a checklist response. This section
+implements Part 4 (the governed response-update service) and Part 5 (the
+`expected_version` contract) of the approved specification.
+
+Before this change the cascade had no caller outside tests, which §6N recorded
+as the deliberate deferral. It now has exactly one: `update_checklist_response()`.
+
+### The write path, before and after
+
+M4D3-SVC-001 recorded the prior state exactly, and it was verified again before
+any edit: `ChecklistResponseUpdateView.patch()` performed `full_clean()` and
+`save()` with **no** `transaction.atomic()`, **no** `select_for_update()`, **no**
+`expected_version` and **no** version increment.
+
+The write path is now:
+
+```
+PATCH /api/regx/v1/iig-checklists/executions/{id}/responses/{id}/
+  -> ChecklistResponseUpdateView.patch()      thin adapter, M4D3-SVC-004
+    -> update_checklist_response()            governed service, M4D3-SVC-002/003
+      -> recalculate_dependents()             M4D3-RCL-001, same transaction
+        -> execute_calculation_response()     per target, unchanged
+```
+
+### `update_checklist_response()` — M4D3-SVC-002 / M4D3-SVC-003
+
+Three phases, matching the `enter_reviewer_conclusion()` precedent already in
+`services.py`:
+
+| Phase | Contents |
+|---|---|
+| A — no lock, no write | tenant-scoped execution lookup (404 through `visible_to()`, never 403, so existence is not disclosed across a tenant boundary); permission (`PERM_EDIT_EXECUTION`); execution-state validation; tenant-scoped response lookup; reviewer-conclusion rejection; M4D3-SVC-005 server-controlled rejection; payload deserialization |
+| B — one `transaction.atomic()` | execution `select_for_update()` (M4D3-TXN-001, M4D3-TXN-006); **status re-read under the lock**; response `select_for_update()`; `expected_version` against the locked row (M4D3-TXN-003); field application; version increment; `full_clean()` and `save()`; `recalculate_dependents()` (M4D3-TXN-002) |
+| C — after commit | `RESPONSE_ENTERED` / `RESPONSE_UPDATED` via `transaction.on_commit()` (M4D3-TXN-005) |
+
+The cascade runs **inside** Phase B, so M4D3-TXN-004 holds literally: an
+exception raised during recalculation rolls back the triggering response write
+along with every outcome, snapshot and audit.
+
+**The service does not decide what cascades.** It calls `recalculate_dependents()`
+for every successful update and lets the cascade consult
+`recalculation_triggers` itself. Keying that decision in the service would be a
+second implementation of trigger rules the immutable registry already owns —
+the same duplication the §6O Major was about. A committed test parses the
+service's AST and asserts it never mentions `recalculation_triggers`,
+`calculation_dependencies` or `build_execution_graph`.
+
+**No history row is written, deliberately.** M4D3-HST-001 scopes
+`ChecklistResponseHistory` reuse to governed persisted-state transitions, which
+for this milestone are exactly persisted applicability transitions and
+component-reference rebinding. M4D3-HST-005 closes `correction_reason` to
+`APPLICABILITY_REEVALUATED` and `COMPONENT_REBOUND` and instructs that no code
+shall be applied to an event type it does not describe. An ordinary user
+response edit is neither transition, so no code honestly describes it and
+writing one would fabricate governed vocabulary. Both transitions remain out of
+scope. This is a reasoned reading of "history creation where required" in
+M4D3-SVC-003, not an omission.
+
+**M4D3-SVC-005** rejects any write to a response whose
+`data_source_type_snapshot` is `fda_derived_default` or `system_calculated`
+with HTTP 403 and `error_code = "server_controlled_value"`. Because M4D3-SVC-006
+defers the override path to 4D-4, **no override permission exists in this
+milestone**, so the rejection is unconditional rather than permission-dependent.
+The check lives in the service, as the clause requires, and a committed test
+calls the service directly to prove it is not merely a serializer rule.
+`system_derived_value` and `override_reason` are not client-writable here.
+
+### `expected_version` — Part 5, a controlled breaking API contract change
+
+| Clause | Behaviour | Status |
+|---|---|---|
+| M4D3-VER-002 | required integer field on the governed request serializer | done |
+| M4D3-VER-004 | omitted → **400**, `error_code = "expected_version_required"`, no write | done |
+| M4D3-VER-005 | mismatch against the locked row → **409**, `error_code = "stale_version"`, no write, no history, no increment, no success audit | done |
+| M4D3-VER-006 | success increments `version` by exactly one | done |
+
+The field is declared `required=False` on the serializer **only** so that its
+omission is reported with the governed code rather than DRF's generic "This
+field is required." It is mandatory in every other sense: `validate()` rejects
+its absence before anything else can run.
+
+M4D3-VER-001 calls this breaking rather than additive, and it is: the ordinary
+response PATCH previously accepted no such field. Two existing tests in
+`test_response_api.py` were updated to send it — that is the contract change
+landing, not a test weakened.
+
+**Deployment risk, measured rather than assumed.** M4D3-VER-003 requires the
+frontend to send `expected_version` before or with this change, and frontend
+work is not authorized in this run. The actual exposure was therefore checked
+directly: `frontend/src/lib/api.ts` defines `iigChecklists.responses.update()`
+with no `expected_version`, but **no frontend page calls it** — a repository-wide
+search for `.responses.` and for the endpoint template returns only the
+definition itself. No live screen performs a governed response update today, so
+this change breaks no existing frontend behaviour. The `api.ts` helper must be
+updated when response editing is actually built, which is part of the
+separately-authorized frontend work.
+
+### `ChecklistResponseUpdateView` — M4D3-SVC-004
+
+Reduced to deserialize-nothing, call the service, map governed exceptions onto
+the HTTP contract, serialize the result. It contains no business logic, no model
+mutation, no transaction management and no audit emission. Two imports —
+`PERM_EDIT_EXECUTION` and `ChecklistResponseUpdateSerializer` — became unused in
+`views.py` and were removed; Ruff flagging them is independent evidence that the
+logic really moved. A committed AST test asserts the view body mentions none of
+`emit`, `on_commit`, `atomic`, `select_for_update`, `full_clean`, `save`,
+`objects`, `IigChecklistEvent`, `ChecklistResponseUpdateSerializer` or
+`has_iig_checklist_permission`, and that it does call
+`update_checklist_response`.
+
+### Exception → HTTP mapping
+
+| Service exception | Status | `error_code` |
+|---|---|---|
+| `NotFound` (cross-tenant or unknown id) | 404 | — |
+| `ResponseUpdatePermissionDenied` | 403 | — |
+| `ResponseUpdateInvalidState` | 400 | `response_immutable` |
+| `ResponseUpdateWrongAnswerType` | 400 | `reviewer_conclusion_wrong_answer_type` |
+| `ResponseUpdateServerControlledValue` | 403 | `server_controlled_value` |
+| `ResponseUpdateStaleVersion` | 409 | `stale_version` |
+| `ResponseUpdateInvalidPayload` | 400 | serializer errors, incl. `expected_version_required` and `invalid_raw_value_shape` |
+
+### Tests added
+
+A new module, `iig_checklist/tests/test_4d3_response_update.py` — **31 tests**,
+all PostgreSQL-backed, driving the real endpoint, the real cascade, the real
+resolver and the real engine. Nothing is mocked.
+
+| Section | Covers |
+|---|---|
+| A — `expected_version` contract | omission → 400 with zero mutation; stale → 409 with zero mutation; success increments by exactly one; a replayed version is now stale; `0`, `-1`, `"abc"`, `None`, `[]`, `{}` rejected; `True` rejected at version 1; `version` still not client-writable |
+| B — server-controlled values | a `system_calculated` response → 403; an `fda_derived_default` response → 403; the check proven to live in the service by calling it directly |
+| C — cascade trigger | one PATCH moves all six outcomes `DATA_REQUIRED` → `COMPLETE` with the governed values (1 g exposure, 50 % of a 2 g precedent); the downstream link cites the upstream outcome written by that same request; a non-trigger update changes no calculated version and emits no calculation audit (M4D3-RCL-007); the AST check that the service does not restate trigger rules |
+| D — atomicity | a planted engine fault during recalculation rolls back the **response write** as well (M4D3-TXN-004); no success audit survives it (M4D3-TXN-005) |
+| E — audit | one `RESPONSE_UPDATED` after commit carrying prior/new version and `recalculated_count`; one `response.calculated` per recalculated target |
+| F — thin view | the two AST assertions above |
+| G — authorization | a reviewer without `PERM_EDIT_EXECUTION` → 403 with zero mutation; a foreign tenant → `NotFound`, never 403; a submitted execution → 400 `response_immutable`; an unknown response id → 404 |
+| H — remaining rejection paths | a model-level `clean()` failure surfaces as a structured 400, not a 500; a status change committed between Phase A and Phase B is caught by the under-lock re-read |
+
+Every rejection test asserts a whole-world fingerprint — all six outcome
+`status`/`value`/`updated_at` triples, every response `version` and `raw_value`
+in the execution, the `ChecklistResponseHistory` count, the `AssessmentSnapshot`
+count and the `AuditEvent` count — so "no write" means no write anywhere, not
+one field that happened to stay equal.
+
+### Post-implementation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| Response update (new) | `pytest …test_4d3_response_update.py --no-cov -q` | **31 passed**, 32.8 s |
+| Response API + validation | `pytest …test_response_api.py …test_response_validation.py --no-cov -q` | **48 passed**, 10.5 s |
+| Whole checklist app | `pytest iig_checklist --no-cov -q` | **1086 passed**, 415.7 s |
+| Full backend suite | `pytest -q` | **1707 passed**, 0 failed, 0 skipped, 786.5 s, exit 0 |
+| Coverage | same run | **94.42 %** against a 55 % floor |
+| `cascade.py` coverage | full run | **100 %** (86 statements, 0 missed) |
+| `calculation_execution.py` coverage | full run | **100 %** (231 statements, 0 missed) |
+| `update_checklist_response()` coverage | targeted run | **100 %** — no uncovered line in the new service |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration model-state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1676 → **1707** (+31) and coverage rose 94.30 % → **94.42 %**.
+
+No model, no migration, no threshold lowered, no file excluded, no test weakened
+or skipped, and no `pragma`, `noqa`, `skip` or `xfail` added.
+
+### Disclosed gaps and observations
+
+1. **M4D3-VER-008 is only partly satisfied.** The OpenAPI schema is generated at
+   runtime by drf-spectacular; there is no checked-in schema artifact to
+   regenerate. Generation was run before and after this change and produced an
+   **identical** 13 warnings / 452 errors, so nothing here regressed it — but
+   `expected_version` does not appear in the generated schema, because
+   `ChecklistResponseUpdateView` is a bare `APIView` with no `serializer_class`
+   or `@extend_schema`. That is a pre-existing condition across essentially the
+   whole API surface (it is most of those 452 errors), not something introduced
+   here. Annotating the endpoint is a separable follow-up. The contract change
+   is recorded in this document in lieu of a release-notes file, which the
+   repository does not have.
+2. **Governed cascade failures reach the client as HTTP 500.**
+   `CalculationEngineFailure` and `CascadeGraphInvalid` are not mapped to
+   structured responses. For the engine fault that is arguably correct — the
+   engine returns a governed result for every scientific condition, so an
+   exception is an implementation fault. For `CascadeGraphInvalid`, which a
+   misconfigured checklist version can cause, a structured 4xx would be better.
+   Mapping it needs governed HTTP vocabulary that M4D3-OUT-005 (external
+   execution API error-code mapping) explicitly defers, so no error code was
+   invented here. Recorded as a deferred item rather than silently guessed.
+3. The recalculation result is **not** returned in the PATCH response body. The
+   endpoint still returns the serialized response exactly as before. Adding a
+   recalculation block would be an API surface addition no clause requires; the
+   client re-fetches the response list to see recalculated outcomes.
+
+### Held out of scope, by instruction
+
+Not implemented, and deliberately: governed applicability handling and the
+M4D3-APP-009 rejection of client-supplied applicability; `answer_sources.py` and
+the FDA-derived-default resolvers (M4D3-SVC-007/008); the override path
+(M4D3-SVC-006, deferred to 4D-4); component rebinding; frontend calculation
+display, `expected_version` plumbing in `api.ts` and 409 handling (M4D3-FE-005,
+M4D3-VER-007); async or Celery orchestration; reports and exports.
+
+`frontend/next.config.ts` carries an unrelated local modification. It was not
+modified, staged, reverted or committed at any point in this run.
+
+### Assertions for the §6P run
+
+| Assertion | Answer |
+|---|---|
+| Governed response-update service added | **YES** — `update_checklist_response()` |
+| View reduced to a thin adapter | **YES** |
+| Cascade reachable from a client request | **YES** — one caller, the governed service |
+| `expected_version` required on the governed update | **YES** |
+| Breaking API contract change | **YES** — disclosed, M4D3-VER-001 / M4D3-MIG-004 |
+| Live frontend behaviour broken | **NO** — the `api.ts` helper has no callers |
+| History rows written for ordinary updates | **NO** — no governed reason code describes one |
+| Migrations created | **NO** |
+| Models changed | **NO** |
+| Approved specification amended | **NO** |
+| Trigger rules duplicated outside the registry | **NO** |
+| Second calculation writer introduced | **NO** |
+| Applicability persistence added | **NO** |
+| `answer_sources.py` added | **NO** |
+| Override path added | **NO** |
+| Async / Celery orchestration added | **NO** |
+| Frontend changed | **NO** |
+| Coverage threshold lowered | **NO** |
+| Existing tests weakened or skipped | **NO** — two updated to send the newly required field |
+| `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
 | PR created | **NO** |
 | Merged | **NO** |
 
