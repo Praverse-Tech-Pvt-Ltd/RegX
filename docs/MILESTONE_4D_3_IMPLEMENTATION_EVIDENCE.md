@@ -3073,7 +3073,7 @@ Run **serially** — the suites share one PostgreSQL test database.
 |---|---|---|
 | Response update (new) | `pytest …test_4d3_response_update.py --no-cov -q` | **31 passed**, 32.8 s |
 | Response API + validation | `pytest …test_response_api.py …test_response_validation.py --no-cov -q` | **48 passed**, 10.5 s |
-| Whole checklist app | `pytest iig_checklist --no-cov -q` | **1086 passed**, 415.7 s |
+| Whole checklist app | `pytest iig_checklist --no-cov -q` | **1089 passed** (corrected in §6Q; 1086 was measured before the final three tests of the same commit) |
 | Full backend suite | `pytest -q` | **1707 passed**, 0 failed, 0 skipped, 786.5 s, exit 0 |
 | Coverage | same run | **94.42 %** against a 55 % floor |
 | `cascade.py` coverage | full run | **100 %** (86 statements, 0 missed) |
@@ -3153,6 +3153,220 @@ modified, staged, reverted or committed at any point in this run.
 | Coverage threshold lowered | **NO** |
 | Existing tests weakened or skipped | **NO** — two updated to send the newly required field |
 | `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
+| PR created | **NO** |
+| Merged | **NO** |
+
+## 6Q. Remediation of the independent client-trigger review (FAIL → 1 Major, 2 Minor)
+
+The independent adversarial review of the client-trigger integration at
+`27f8fed` returned **FAIL**: 0 Critical, **1 Major**, 2 Minor.
+
+### Major — M4D3-APP-011 was not implemented
+
+> **M4D3-APP-011** The governed service shall reject any client-supplied
+> `not_applicable_reason` beginning with the reserved prefix `REVIEW_REQUIRED:`
+> for any response, rule-governed or not, with
+> `error_code = "reserved_reason_prefix"`.
+
+The clause was not implemented anywhere. The reviewer measured the gap against
+the real endpoint and it reproduced exactly:
+
+```
+APP-011 status=200 code=None
+APP-011 stored reason='REVIEW_REQUIRED: injected by client'
+APP-011 stored is_not_applicable=True
+```
+
+M4D3-PST-002 reserves `REVIEW_REQUIRED:<ApplicabilityRule.reason_code>` in
+`not_applicable_reason` for a **server-side** applicability determination. Any
+user holding `PERM_EDIT_EXECUTION` could therefore persist a value that
+impersonates one, and a future applicability service reading that field would
+have no way to tell a forged marker from its own.
+
+**Fix.** A guard in the governed service, in Phase A, before the transaction:
+
+- `RESERVED_REASON_PREFIX = "REVIEW_REQUIRED:"` is defined in
+  `governed_vocabularies.py` next to the other governed vocabularies, with an
+  explicit note that it is a persisted **value prefix** and deliberately not a
+  member of any of the four closed code sets — `_validate()` is not extended to
+  cover it, and the two frozensets are unchanged.
+- `update_checklist_response()` rejects any submitted `not_applicable_reason`
+  beginning with it, raising `ResponseUpdateReservedReasonPrefix`.
+- The adapter maps that to **HTTP 403** with the clause's exact
+  `error_code = "reserved_reason_prefix"`.
+
+**Matching semantics, read rather than invented.** The clause says "beginning
+with the reserved prefix `REVIEW_REQUIRED:`" and defines no trimming, folding or
+canonicalisation, so the guard is a plain case-sensitive `startswith` and
+nothing more. `review_required:`, `Review_Required:`, `REVIEW_REQUIRED` without
+the colon, and an embedded occurrence are all ordinary reasons and remain
+accepted. Committed boundary tests pin that reading in both directions so a
+later change cannot quietly widen or narrow it.
+
+**The status code is chosen, and disclosed as such.** M4D3-APP-011 fixes the
+`error_code` but states no HTTP status. 403 is used because it matches its
+sibling M4D3-APP-009 (403 for client-supplied applicability on a rule-governed
+response) and the M4D3-SVC-005 server-controlled-value rejection already in this
+service. No new external vocabulary was invented, and M4D3-OUT-005 remains
+deferred.
+
+**One case worth recording.** DRF's `CharField` trims surrounding whitespace, so
+`" REVIEW_REQUIRED:x"` arrives at the guard — and would arrive at the database —
+as the bare reserved marker. The guard therefore runs on the **deserialized**
+value, not the wire form: it must judge what would actually be stored. A test
+that initially expected the leading-space form to be accepted was corrected to
+expect rejection, because accepting it would have persisted the marker.
+
+### Minor 1 — the governed expected-version validator was not reused
+
+The response-update path relied on DRF `IntegerField(min_value=1)`, whose
+coercion disagreed with the governed validator:
+
+| Submitted | `validate_expected_version()` | endpoint, before | endpoint, now |
+|---|---|---|---|
+| `1.0`, `"1"`, `"1.0"` | `InvalidExpectedVersion` | **accepted as version 1** | `InvalidExpectedVersion` |
+| `True`, `False`, `None`, `1.5`, `[]`, `{}`, `0`, `-1` | rejected | rejected | rejected |
+
+Not a concurrency bypass — `True`/`False` were already refused and the domain
+always received a real `int` — but a genuine validation-contract divergence, and
+the same class of defect the §6O Major was about, one layer up.
+
+**Fix.** The serializer field became a passthrough
+`JSONField(required=False, allow_null=True)`, so the value the client submitted
+reaches the governed validator untouched, and
+`update_checklist_response()` now calls `validate_expected_version()` — the same
+callable `execute_calculation_response()` and `recalculate_dependents()` use.
+
+The two concerns are now cleanly separated, which M4D3-VER-004 requires:
+
+| Case | Result |
+|---|---|
+| key absent | 400 `expected_version_required` (serializer, presence only) |
+| present but structurally invalid | 400 `invalid_expected_version` (governed validator) |
+| valid integer, disagrees with the locked row | 409 `stale_version` |
+| valid integer, matches | success, version + 1 |
+
+`invalid_expected_version` follows the repository's existing structured-400
+convention (as `invalid_raw_value_shape` does) because no clause names a code
+for this case; it is not an M4D3-OUT-005 expansion.
+
+**There is now exactly one structural validator.** A repository-wide search
+returns a single `validate_expected_version()` definition, and a committed AST
+test asserts the service calls it. Note that `ReviewerConclusionSerializer`
+still uses `IntegerField(min_value=1)` for its own endpoint — see the
+observations below; it was not a finding and was deliberately left alone.
+
+### Minor 2 — inaccurate figure in the evidence
+
+§6P reported "Whole checklist app: **1086 passed**". That measurement predated
+the last three tests added in the same commit; the reviewed figure at `27f8fed`
+was **1089**. Corrected in the §6P table, with the current figure recorded
+below.
+
+### Tests added
+
+`test_4d3_response_update.py` grew 31 → **60** (+29).
+
+| Group | Covers |
+|---|---|
+| APP-011, domain boundary | a direct `update_checklist_response()` call is rejected with a whole-world fingerprint unchanged; an AST check that the guard is in the service and not only the serializer; the prefix constant matches the M4D3-PST-002 marker form |
+| APP-011, over HTTP | 403 with `reserved_reason_prefix`; the reason, the N/A flag and the fingerprint all unchanged; zero cascade invocation, zero `on_commit` callbacks and zero audit; the rejection issues no `FOR UPDATE`, `UPDATE` or `INSERT`; a `system_calculated` target is still refused first with `server_controlled_value`, so the existing ordering is preserved |
+| APP-011 boundary | six values that must be rejected — including the whitespace-trimmed form — and seven that must be accepted, pinning the exact case-sensitive prefix with no invented normalisation |
+| expected_version matrix | twelve malformed values over the real endpoint (`None`, `True`, `False`, `1.0`, `1.5`, `"1"`, `"1.0"`, `"abc"`, `0`, `-1`, `[]`, `{}`), each asserted to give 400 `invalid_expected_version` with zero mutation |
+| validator agreement | every value the governed validator refuses is refused by the service, proven by calling both; an AST check that the service calls `validate_expected_version`; a check that the serializer preserves the submitted value's exact type rather than coercing it |
+
+`Decimal("1")` is covered at the domain boundary rather than over HTTP: it has no
+JSON representation that survives transport as a `Decimal`, so asserting it
+through the endpoint would test the parser, not the contract.
+
+### Behaviour re-confirmed, not assumed
+
+The whole cascade and trigger surface was re-run after the change: automatic
+cascade on a normal client update, the transitive chain, the diamond, whole-
+cascade rollback on a downstream failure, real double-submission concurrency
+(one winner, one stale, one increment, no deadlock), tenant and execution
+isolation, and the under-lock lifecycle re-read. Neither the serializer change
+nor the new guard weakened any of them.
+
+### Post-remediation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| Response update | `pytest …test_4d3_response_update.py --no-cov -q` | **60 passed**, 43.1 s |
+| Response API + validation | `pytest …test_response_api.py …test_response_validation.py --no-cov -q` | **48 passed**, 12.3 s |
+| Cascade | `pytest …test_4d3_cascade.py --no-cov -q` | **140 passed**, 112.0 s |
+| Calculation inputs + execution | `pytest …test_4d3_calculation_inputs.py …test_4d3_calculation_execution.py --no-cov -q` | **250 passed**, 172.1 s |
+| Snapshot service | `pytest iid_assessment --no-cov -q` | **167 passed**, 55.0 s |
+| Foundation (governed vocabularies) | `pytest …test_4d3_foundation.py --no-cov -q` | **186 passed**, 0.25 s |
+| Whole checklist app | `pytest iig_checklist --no-cov -q` | **1118 passed**, 575.5 s |
+| Full backend suite | `pytest -q` | **1736 passed**, 0 failed, 0 skipped, 785.6 s, exit 0 |
+| Coverage | same run | **94.46 %** against a 55 % floor |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration model-state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1707 → **1736** (+29) and coverage rose 94.42 % → **94.46 %**.
+`cascade.py` and `calculation_execution.py` remain **100 %**, and
+`update_checklist_response()` including both new guards is **100 %**.
+
+No model, no migration, no frontend change, no threshold lowered, no file
+excluded, no test weakened or skipped, and no `pragma`, `noqa`, `skip` or
+`xfail` added.
+
+### Still deferred, unchanged by this remediation
+
+- **M4D3-APP-009** — a client can still set `is_not_applicable` on a
+  **rule-governed** response (measured: HTTP 200). Deferred by an explicit
+  authorized scope decision and recorded here as a **live exposure**, not
+  merely a paper deferral: until it lands, the fields M4D3-APP-008 calls
+  server-owned are client-writable when a rule governs them. APP-011 is
+  independent of it and is now enforced for every response, rule-governed or
+  not.
+- **M4D3-VER-008** — `expected_version` is still absent from the generated
+  OpenAPI schema because the endpoint is a bare `APIView` with no annotation.
+  Schema generation was re-run and the baseline is unchanged at 13 warnings /
+  452 errors, identical to both prior heads, so nothing regressed. Known gap.
+- **M4D3-OUT-005** — the broad external error vocabulary stays deferred;
+  `CascadeGraphInvalid` still surfaces as HTTP 500.
+- **Same-value update** — resubmitting an identical answer still increments the
+  version, re-runs the cascade and re-emits one calculation audit per target
+  (the disclosed `generated_at` / M4D3-RCL-004 interaction). Unchanged by
+  instruction.
+- **PATCH response payload** — still carries no recalculation metadata; a client
+  re-fetches to see recalculated outcomes. Unchanged by instruction; it is a
+  frontend-integration decision.
+- **`ReviewerConclusionSerializer`** — the reviewer-conclusion endpoint keeps
+  `IntegerField(min_value=1)` and so retains the same coercion divergence for
+  its own `expected_version`. It was not among the findings and is a different
+  write path, so it was deliberately left untouched rather than fixed as
+  collateral scope. Recorded here so it is not lost.
+
+### Assertions for the §6Q remediation run
+
+| Assertion | Answer |
+|---|---|
+| M4D3-APP-011 enforced in the governed service | **YES** |
+| Reserved marker persistable by a client | **NO** |
+| Guard reachable only through HTTP | **NO** — bound at the domain boundary |
+| Prefix matching normalisation invented | **NO** — plain case-sensitive prefix |
+| Governed expected-version validator reused | **YES** |
+| Structural validators repo-wide | **ONE** |
+| Serializer performs structural version validation | **NO** — presence only |
+| APP-009 implemented | **NO** — deferred, disclosed as a live exposure |
+| Recalculation payload redesigned | **NO** |
+| OpenAPI framework changed | **NO** |
+| M4D3-OUT-005 mapping added | **NO** |
+| Migrations created | **NO** |
+| Models changed | **NO** |
+| Frontend changed | **NO** |
+| Coverage threshold lowered | **NO** |
+| Existing tests weakened or skipped | **NO** |
+| `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
+| `frontend/next.config.ts` modified, staged or committed | **NO** |
 | PR created | **NO** |
 | Merged | **NO** |
 
