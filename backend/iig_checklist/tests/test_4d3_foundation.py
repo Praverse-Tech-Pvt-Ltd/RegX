@@ -547,6 +547,14 @@ class TestCalculationGraph:
         orders = {graph_mod.build_graph(nodes).order for _ in range(10)}
         assert len(orders) == 1
 
+    def test_an_empty_node_set_is_a_valid_empty_graph(self):
+        """A checklist version with no calculations is legitimate, not a fault."""
+        graph = graph_mod.build_graph(())
+        assert graph.order == ()
+        assert graph.depth == 0
+        assert dict(graph.nodes) == {}
+        assert graph_mod.affected_nodes_for_trigger(graph, "Q_ANYTHING") == ()
+
     def test_tie_break_is_the_question_code_not_the_node_id(self):
         """M4D3-DAG-006 -- ordered by ascending ``ChecklistQuestion.code``.
 

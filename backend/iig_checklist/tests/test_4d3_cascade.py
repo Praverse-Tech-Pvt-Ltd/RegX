@@ -389,6 +389,23 @@ class TestGraphDiscovery:
         assert not any("FOR UPDATE" in q["sql"].upper() for q in ctx.captured_queries)
         assert AuditEvent.objects.count() == audit_before
 
+    def test_an_execution_with_no_calculations_yields_an_empty_graph(self, world):
+        """A legitimate state: a checklist version that calculates nothing."""
+        from iig_checklist.models import CalculationOutcome
+
+        for key in ALL_KEYS:
+            response = world["responses"][key]
+            CalculationOutcome.objects.filter(response=response).delete()
+            response.delete()
+
+        graph = build_execution_graph(world["execution"])
+        assert dict(graph.nodes) == {}
+        assert graph.order == ()
+
+        result = _cascade(world)
+        assert result.triggered is False
+        assert result.targets == ()
+
     def test_another_executions_responses_never_enter_the_graph(self, world, user_a):
         """M4D3-DAG-009 -- the graph is scoped to one execution's responses."""
         other, _ = _sibling_execution(world, user_a)
