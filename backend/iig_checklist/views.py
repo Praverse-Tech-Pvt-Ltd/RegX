@@ -1199,9 +1199,11 @@ class ChecklistResponseUpdateView(APIView):
 
     def patch(self, request, public_id, response_public_id):
         from .services import (
+            ResponseUpdateInvalidExpectedVersion,
             ResponseUpdateInvalidPayload,
             ResponseUpdateInvalidState,
             ResponseUpdatePermissionDenied,
+            ResponseUpdateReservedReasonPrefix,
             ResponseUpdateServerControlledValue,
             ResponseUpdateStaleVersion,
             ResponseUpdateWrongAnswerType,
@@ -1249,6 +1251,36 @@ class ChecklistResponseUpdateView(APIView):
                     ),
                 },
                 status=status.HTTP_403_FORBIDDEN,
+            )
+        except ResponseUpdateReservedReasonPrefix:
+            # M4D3-APP-011 fixes the error_code and is silent on the status.
+            # 403 matches its sibling M4D3-APP-009 and the M4D3-SVC-005
+            # server-controlled rejection above: the value is server-owned.
+            return Response(
+                {
+                    "error_code": "reserved_reason_prefix",
+                    "detail": (
+                        "not_applicable_reason must not begin with the reserved "
+                        "REVIEW_REQUIRED: prefix; it is written only by a governed "
+                        "server-side determination."
+                    ),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except ResponseUpdateInvalidExpectedVersion:
+            # M4D3-TXN-003 structural rejection. No clause names an API code for
+            # it, so this follows the repository's existing structured-400
+            # convention (as `invalid_raw_value_shape` does) rather than
+            # inventing external vocabulary M4D3-OUT-005 still defers.
+            return Response(
+                {
+                    "error_code": "invalid_expected_version",
+                    "detail": (
+                        "expected_version must be an integer of at least 1. "
+                        "Reload and retry."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except ResponseUpdateStaleVersion:
             # M4D3-VER-005 -- nothing was written; the client reloads and retries.

@@ -57,6 +57,25 @@ ALLOWED_SERVICE_DETAIL_CODES: frozenset[str] = frozenset(
 )
 
 
+# ---------------------------------------------------------------------------
+# M4D3-PST-002 -- the reserved server-owned marker prefix.
+#
+# A REVIEW_REQUIRED applicability outcome is persisted as
+# ``REVIEW_REQUIRED:<ApplicabilityRule.reason_code>`` in
+# ``ChecklistResponse.not_applicable_reason``. The marker is written only by a
+# governed server-side service, so M4D3-APP-011 requires the governed
+# response-update service to reject any client-supplied
+# ``not_applicable_reason`` beginning with it -- for any response, rule-governed
+# or not -- so client data can never impersonate a server determination.
+#
+# This is a persisted **value prefix**, deliberately not a member of any of the
+# four closed code vocabularies above: it names a marker, not a reason code, and
+# ``_validate()`` below is intentionally not extended to cover it.
+# ---------------------------------------------------------------------------
+
+RESERVED_REASON_PREFIX = "REVIEW_REQUIRED:"
+
+
 def _validate() -> None:
     """Import-time separation guard across all four closed vocabularies."""
     named = (

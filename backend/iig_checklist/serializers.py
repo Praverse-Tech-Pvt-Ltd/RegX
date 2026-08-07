@@ -305,7 +305,15 @@ class ChecklistResponseUpdateSerializer(serializers.Serializer):
     #: controlled breaking API contract change: the ordinary response PATCH did
     #: not previously accept it, and optimistic concurrency is mandatory rather
     #: than opt-in, so there is no value that skips the check.
-    expected_version = serializers.IntegerField(min_value=1, required=False)
+    #:
+    #: Deliberately a passthrough field rather than ``IntegerField``. An
+    #: ``IntegerField`` coerces ``1.0``, ``"1"`` and ``"1.0"`` into the integer
+    #: 1, which the governed ``validate_expected_version()`` of M4D3-TXN-003
+    #: rejects -- so the transport layer would have applied a second, more
+    #: permissive structural rule than the domain. The serializer enforces
+    #: **presence** only; the submitted value reaches the governed validator
+    #: exactly as the client sent it, and structural validity is decided there.
+    expected_version = serializers.JSONField(required=False, allow_null=True)
     raw_value = serializers.JSONField(allow_null=True, required=False)
     is_not_applicable = serializers.BooleanField(required=False)
     not_applicable_reason = serializers.CharField(
@@ -333,6 +341,12 @@ class ChecklistResponseUpdateSerializer(serializers.Serializer):
         # contract is reported instead of DRF's generic "This field is
         # required."; it is mandatory in every other sense. Silent overwrite of
         # a concurrently changed response is prohibited.
+        #
+        # This is a **presence** check only. A key that is present but holds a
+        # structurally invalid value -- ``null``, ``1.0``, ``"1"``, ``0`` --
+        # passes here untouched and is refused by the governed
+        # ``validate_expected_version()`` in the service, so the two concerns
+        # stay separated and only one structural rule exists.
         if "expected_version" not in attrs:
             raise serializers.ValidationError(
                 {

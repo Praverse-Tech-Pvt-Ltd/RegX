@@ -842,6 +842,32 @@ class ResponseUpdateInvalidPayload(ResponseUpdateError):
         self.errors = errors
 
 
+class ResponseUpdateReservedReasonPrefix(ResponseUpdateError):
+    """M4D3-APP-011 -- the client supplied the reserved server-owned marker.
+
+    ``REVIEW_REQUIRED:<reason_code>`` is written into ``not_applicable_reason``
+    only by a governed server-side applicability determination (M4D3-PST-002).
+    A client-supplied value beginning with that prefix is rejected **for any
+    response, rule-governed or not**, so stored data can never impersonate a
+    server determination.
+
+    The clause fixes ``error_code = "reserved_reason_prefix"`` but states no
+    HTTP status. The adapter maps it to 403, matching its sibling M4D3-APP-009
+    (403 for client-supplied applicability on a rule-governed response) and the
+    M4D3-SVC-005 server-controlled-value rejection already in this service.
+    """
+
+
+class ResponseUpdateInvalidExpectedVersion(ResponseUpdateError):
+    """M4D3-TXN-003 -- ``expected_version`` is structurally invalid.
+
+    Raised when the governed ``validate_expected_version()`` refuses the value
+    the client actually submitted. Distinct from
+    :class:`ResponseUpdateStaleVersion`, which means a *valid* integer that
+    disagrees with the locked row.
+    """
+
+
 #: M4D3-SVC-005 -- classifications whose stored value the client may not write.
 SERVER_CONTROLLED_CLASSIFICATIONS: frozenset[str] = frozenset(
     {
@@ -902,8 +928,13 @@ def update_checklist_response(
     from django.db import transaction as db_transaction
     from django.utils import timezone
 
+    from .calculation_execution import (
+        InvalidExpectedVersion,
+        validate_expected_version,
+    )
     from .cascade import recalculate_dependents
     from .enums import AnswerType
+    from .governed_vocabularies import RESERVED_REASON_PREFIX
     from .models import ChecklistExecution, ChecklistResponse
     from .permissions import PERM_EDIT_EXECUTION, has_iig_checklist_permission
     from .serializers import ChecklistResponseUpdateSerializer
@@ -956,7 +987,30 @@ def update_checklist_response(
         raise ResponseUpdateInvalidPayload(serializer.errors)
 
     data = serializer.validated_data
-    expected_version = data["expected_version"]
+
+    # M4D3-APP-011 -- the reserved server-owned marker is never client-supplied,
+    # for any response, rule-governed or not. Checked in the governed service so
+    # a direct domain call is bound by it too, and before the transaction opens
+    # so a rejected request touches nothing. The comparison is a plain
+    # case-sensitive prefix test on the submitted string: M4D3-PST-002 fixes the
+    # stored form as ``REVIEW_REQUIRED:<reason_code>`` and no clause defines any
+    # trimming, folding or normalisation, so none is invented here.
+    supplied_reason = data.get("not_applicable_reason")
+    if isinstance(supplied_reason, str) and supplied_reason.startswith(
+        RESERVED_REASON_PREFIX
+    ):
+        raise ResponseUpdateReservedReasonPrefix()
+
+    # M4D3-TXN-003 -- the same governed structural gate the calculation writer
+    # and the cascade use, applied to the value the client actually submitted.
+    # The serializer deliberately does not coerce, so ``1.0``, ``"1"`` and
+    # ``"1.0"`` arrive intact and are refused here rather than silently becoming
+    # version 1. One structural validator, three governed entry points.
+    try:
+        expected_version = validate_expected_version(data["expected_version"])
+    except InvalidExpectedVersion as exc:
+        raise ResponseUpdateInvalidExpectedVersion() from exc
+
     prior_entered_by = response.entered_by_id
 
     # -- Phase B: every governed write, one transaction --------------------
