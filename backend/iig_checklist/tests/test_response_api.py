@@ -180,8 +180,15 @@ class TestResponseUpdate:
             "iig_checklist:execution-response-update",
             kwargs={"public_id": ex.public_id, "response_public_id": response.public_id},
         )
-        resp = api_client_doer.patch(url, {"raw_value": {"value": True}}, format="json")
+        # M4D3-VER-002 -- expected_version is required on the governed update.
+        resp = api_client_doer.patch(
+            url,
+            {"raw_value": {"value": True}, "expected_version": response.version},
+            format="json",
+        )
         assert resp.status_code == 200
+        # M4D3-VER-006 -- exactly one increment.
+        assert resp.data["version"] == response.version + 1
 
     def test_patch_version_rejected(
         self, api_client_doer, tenant_a, tenant_definition, user_a, doer_membership
@@ -225,7 +232,11 @@ class TestResponseUpdate:
         )
         resp = api_client_doer.patch(
             url,
-            {"is_not_applicable": True, "not_applicable_reason": "Not relevant"},
+            {
+                "is_not_applicable": True,
+                "not_applicable_reason": "Not relevant",
+                "expected_version": response.version,
+            },
             format="json",
         )
         assert resp.status_code == 200
