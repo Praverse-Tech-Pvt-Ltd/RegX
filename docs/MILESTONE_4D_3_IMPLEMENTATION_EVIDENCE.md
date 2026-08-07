@@ -2667,9 +2667,16 @@ checked at the time.
 | `b9aa82c` DAG-006 tie-break | OK (4 modules) | 185 passed |
 | `31d7686` orchestration | OK (4 modules) | — |
 | `a630f6a` cascade tests | OK (4 modules) | 64 passed |
+| `5bf820b` empty-graph boundary tests | OK (4 modules) | 65 passed |
 
 All six commits build independently. `git bisect` across this range needs no
 `skip`.
+
+> **Correction (§6O).** The `5bf820b` row above was added during the §6O
+> remediation. As first written this table listed five rows while the sentence
+> beneath it claimed six commits build independently — the sixth was verified
+> but not recorded. The independent cascade review raised this as Minor 3, and
+> it was a genuine omission in the evidence, not in the verification.
 
 ### Commit-plan deviation, disclosed
 
@@ -2697,6 +2704,209 @@ arbitrary SQL dependencies; PR creation; merge.
 service. No view, serializer, signal or task calls it, and no client-reachable
 path can steer a dependency list into it — dependencies come only from the
 immutable approved registry.
+
+## 6O. Remediation of the independent cascade review (FAIL → 1 Major, 3 Minor)
+
+The independent review of the cascade at `88f6f24` returned **FAIL**: 0 Critical,
+**1 Major**, 3 Minor.
+
+### Major — the cascade did not use the governed expected-version contract
+
+`recalculate_dependents()` validated the caller's `expected_version` by comparing
+it to the locked row directly:
+
+```python
+if locked_origin.version != expected_version:
+    raise StaleResponseVersion()
+```
+
+The single-response writer had, since §6H, routed the same parameter through a
+governed structural gate (`_validate_expected_version()`, M4D3-TXN-003) that
+rejects `None`, `bool`, non-`int` and anything below 1 with
+`InvalidExpectedVersion`, in Phase A, before a lock is taken. The cascade
+restated the check instead of reusing it, and the two therefore disagreed.
+
+The review measured the consequences, and they reproduce exactly:
+
+| Supplied value | Origin at version 1 — before | After |
+|---|---|---|
+| `True` | **accepted** — `True == 1` | `InvalidExpectedVersion` |
+| `1.0` | **accepted** — `1.0 == 1` | `InvalidExpectedVersion` |
+| `None`, `"1"`, `0`, `-1`, `1.5`, `[1]`, `{}` | `StaleResponseVersion` — misclassified | `InvalidExpectedVersion` |
+| `2` | `StaleResponseVersion` | `StaleResponseVersion` — unchanged |
+| `1` | accepted | accepted — unchanged |
+
+Two distinct defects, one root cause. `True` and `1.0` **bypassed the origin
+concurrency gate entirely** whenever the changed response stood at version 1 —
+which is where every freshly created response stands — so a malformed value
+silently disabled the optimistic-concurrency check the milestone requires to be
+mandatory. Every other malformed value was reported as a *stale version*, which
+tells a caller to re-read and retry when the real fault is a malformed request
+that no retry can fix.
+
+**Fix.** The validator is now the single governed gate, shared rather than
+duplicated:
+
+- `_validate_expected_version()` in `calculation_execution.py` was renamed to
+  **`validate_expected_version()`** and added to that module's `__all__`. Its
+  rules are unchanged — this is a visibility change, not a behaviour change.
+- `cascade.py` imports it and calls it in **Phase A**, before
+  `transaction.atomic()` opens, so a malformed value never reaches a
+  `SELECT … FOR UPDATE`.
+- The cascade's locked comparison now runs on the *validated integer* only, so
+  `StaleResponseVersion` means one thing: a valid version that differs from the
+  locked row.
+- No second implementation exists. A committed test asserts the identity
+  `cascade.validate_expected_version is calculation_execution.validate_expected_version`,
+  and a second parses the AST of `recalculate_dependents()` to prove it contains
+  no `isinstance` call of its own.
+
+**Placement.** The validator stayed in `calculation_execution.py` rather than
+moving to a new shared module. `cascade.py` already imported that module for
+`execute_calculation_response()` and `StaleResponseVersion`, so reusing the gate
+adds **no new dependency edge** and cannot introduce a cycle; a new module would
+have been ceremony around an import that already existed. `InvalidExpectedVersion`
+and `StaleResponseVersion` did not move, so no existing public or internal
+contract changed, and nothing is exposed through the API. Import-linter remains
+**7 kept, 0 broken**.
+
+### Minor 1 and 2 — missing committed topology and stale-target tests
+
+Both were real gaps: the ordering guarantees and the whole-cascade rollback were
+asserted, but no committed test drove a named chain or diamond topology, and no
+committed test forced a *downstream target* to present a stale version.
+
+### Minor 3 — the per-commit buildability table omitted `5bf820b`
+
+Corrected in place in §6N above, with a note recording that the omission was in
+the evidence rather than in the verification.
+
+### Tests added — all PostgreSQL-backed, none mocking the writer
+
+`test_4d3_cascade.py` grew 65 → **140** tests (+75, sections N, O, P, Q) — the
+same +75 the full backend suite records below.
+
+| Section | Covers |
+|---|---|
+| N — structural gate | 12 invalid values (`None`, `True`, `False`, `1.0`, `"1"`, `0`, `-1`, `1.5`, `[]`, `{}`, `[1]`, `Decimal("1")`) × 4 assertions each: `InvalidExpectedVersion`; a whole-database fingerprint unchanged; zero calculation invocations; zero `FOR UPDATE`, `UPDATE` and `INSERT` queries. Plus: the shared-validator identity; the AST no-duplicate check; no audit |
+| N — the measured regression | with the origin genuinely at version 1, `True` and `1.0` each raise `InvalidExpectedVersion` and mutate nothing, while integer `1` still cascades all six targets |
+| N — genuine stale | a valid integer mismatch raises `StaleResponseVersion`; the origin *is* locked before the mismatch is reported; nothing is mutated; no target runs |
+| O — stale downstream target | the third of six targets is handed a stale `expected_version` through a seam that changes only that argument — the real `execute_calculation_response()` runs, takes its own locks and raises. Asserts: three writer calls happened; every outcome is back at its pre-cascade `DATA_REQUIRED`/`None`/`generated_at=None` state; zero surviving snapshots; **zero captured `on_commit` callbacks**; zero audit |
+| P — real chain | manual `Q_SUBJECT_COMPONENT` → `daily_exposure` → `percentage_of_iid_mde`, entirely on the approved registry with real ORM rows, the real resolver and the real writer. Asserts the graph really is a two-level chain; each link runs exactly once; B precedes C; C reads B's fresh outcome (1 g → 50 % of a 2 g precedent); C's provenance names B's current outcome UUID; and changing the component flows all the way down (0.5 g → 25 %) |
+| Q — real diamond | A → B, A → C, (B, C) → D. Asserts the topology; B, C and D each execute exactly once; D executes last; D is **not** run twice for its two parents (M4D3-DAG-010 on the topology that would expose a missing visited set); D's value equals C − B from the outcomes written in that same cascade; D's provenance lists **both** parents' current outcome UUIDs |
+
+**The regression tests fail against the reviewed implementation.** Verified by
+stashing `cascade.py` and `calculation_execution.py` back to `88f6f24` and
+re-running: `test_true_does_not_pass_as_version_one` and
+`test_float_one_does_not_pass_as_version_one` both **FAILED**; both pass with the
+fix.
+
+**Test-construction notes**, since each could have produced a test that passes
+for the wrong reason:
+
+- The zero-mutation assertions compare a fingerprint covering all six outcomes
+  (`status`, `value`, `reason_code`, `generated_at`, `updated_at`), every
+  response `version` in the execution, the `AssessmentSnapshot` count and the
+  `AuditEvent` count — not a single field that could stay equal by luck.
+- `_cascade()` treats `expected_version=None` as "use the row's own version", so
+  the invalid cases call `recalculate_dependents()` directly. Routing `None`
+  through the helper would have silently tested the valid path.
+- The stale-target seam mutates only the `expected_version` argument. The real
+  writer is never replaced, so the `StaleResponseVersion` raised is the governed
+  one, raised under the writer's own lock.
+- The diamond's sink declares a literal `"gram"` target unit rather than a
+  `SnapshotUnitRef`: with both its inputs sourced from calculation outcomes the
+  entry needs no snapshot, so a reference unit would have had nothing to read
+  and the test would have proved only `ASSESSMENT_SNAPSHOT_MISSING`.
+- One recorder body in `test_a_genuine_stale_version_runs_no_target` is
+  deliberately never executed — that is the assertion, restated as an empty
+  call list, and it is the only uncovered pair in the module.
+
+The approved six entries contain no diamond, so section Q installs a synthetic
+registry with `monkeypatch`. Only the *shape* is synthetic: B and C are the
+approved `daily_exposure` entry itself, D is the approved
+`difference_from_iid_mde` entry with its two inputs re-pointed at B and C, and
+the real resolver, the real engine functions and the real calculation writer all
+run untouched. No committed registry definition is mutated.
+
+### Post-remediation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| Cascade | `pytest …test_4d3_cascade.py --no-cov -q` | **140 passed**, 0 failed, 112.2 s |
+| Calculation execution + resolvers | `pytest …test_4d3_calculation_execution.py …test_4d3_calculation_inputs.py --no-cov -q` | **250 passed**, 131.6 s |
+| Foundation, activation, readiness, execution API/model, lifecycle, authorization | `pytest …test_4d3_foundation.py …test_4d3_activation_validation.py …test_4d3_execution_readiness.py …test_execution_api.py …test_execution_models.py …test_execution_lifecycle.py …test_platform_authorization.py --no-cov -q` | **369 passed**, 89.2 s |
+| Snapshot service (all of `iid_assessment`) | `pytest iid_assessment --no-cov -q` | **167 passed**, 40.9 s |
+| Full backend suite | `pytest -q` | **1676 passed**, 0 failed, 0 skipped, 673.3 s, exit 0 |
+| Coverage | same run | **94.30 %** against a 55 % floor |
+| `cascade.py` coverage | targeted run | **100 %** (86 statements, 0 missed) |
+| `calculation_execution.py` coverage | targeted run | **100 %** (231 statements, 0 missed) |
+| `calculation_graph.py` coverage | targeted run | **100 %** (112 statements, 0 missed) |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration model-state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1601 → **1676** (+75) and coverage rose 94.22 % → **94.30 %**. No
+threshold lowered, no file excluded, no test weakened or skipped, and no
+`pragma`, `noqa`, `skip` or `xfail` added.
+
+### Behaviour explicitly re-confirmed, not merely assumed
+
+The whole `test_4d3_cascade.py` module was re-run: Form B freshness, graph
+discovery, transitive affected-node expansion, the M4D3-DAG-006 question-code
+tie-break, cycle and self-cycle detection, the no-op cascade, snapshot-backed
+recalculation, the fresh-snapshot policy, downstream freshness, `DATA_REQUIRED`,
+`NOT_COMPARABLE` and `ERROR` propagation, tenant isolation, checklist-version
+isolation, M4D3-RCL-004 suppression, repeated cascade behaviour, the immutable
+cascade result, and the lock-order and concurrency probes all pass unchanged.
+
+### Held out of scope, by instruction
+
+**M4D3-RCL-004 was not redesigned.** Its literal behaviour is retained and no new
+audit semantics were added. The review's observation that `generated_at` moves on
+every successful result — and so prevents suppression for a `COMPLETE` outcome —
+remains a disclosed, non-blocking observation (§6N).
+
+**The repeating-decimal `DecimalField` observation is not solved here.** It stays
+a deferred issue. No model precision and no rounding rule was changed; doing so
+without an approved scientific specification would be inventing governed
+numerics.
+
+### Scope held
+
+No client-facing recalculation trigger, no cascade API endpoint, no serializer or
+view wiring, no frontend, no component rebinding, no applicability persistence, no
+manual override, no async or Celery task, no report or export, and no new model or
+migration. `recalculate_dependents()` remains a callable domain service that no
+view, serializer, signal or task invokes.
+
+`frontend/next.config.ts` carries an unrelated local modification. It was not
+modified, staged, reverted or committed at any point in this run.
+
+### Assertions for the §6O remediation run
+
+| Assertion | Answer |
+|---|---|
+| Prior cascade Major resolved | **YES** |
+| Second expected-version implementation introduced | **NO** — one shared validator, asserted by identity |
+| Migrations created | **NO** |
+| Models changed | **NO** |
+| Approved specification amended | **NO** |
+| Validator exposed through the API | **NO** — internal to `iig_checklist` |
+| Import contracts broken | **NO** — 7 kept, 0 broken |
+| Client-facing recalculation trigger added | **NO** |
+| Serializers, views, API endpoints or frontend added | **NO** |
+| Async / Celery orchestration added | **NO** |
+| Coverage threshold lowered | **NO** — 94.22 % → 94.30 % |
+| Existing tests weakened or skipped | **NO** |
+| `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
+| `frontend/next.config.ts` modified, staged or committed | **NO** |
+| PR created | **NO** |
+| Merged | **NO** |
 
 ## 7. Assertions
 
