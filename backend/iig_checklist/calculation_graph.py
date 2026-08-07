@@ -169,13 +169,25 @@ def _topological_order(
     """Kahn's algorithm with a stable alphabetical tie-break (M4D3-DAG-005/006).
 
     Iterative -- no recursion, so no unbounded stack growth.
+
+    M4D3-DAG-006 names the tie-break exactly: ascending ``ChecklistQuestion.code``.
+    It is emphatically *not* ``node_id``. A node id is the governed response
+    public UUID, which is effectively random, so ordering by it would make the
+    order of independent nodes unpredictable between executions carrying the same
+    questions -- and unpredictable is the one thing a stable order may not be.
+    Question codes are unique within a graph (``_index_by_question_code``
+    enforces it), so the code alone is already a total order; ``node_id`` is
+    appended only to keep the sort key total by construction.
     """
+
+    def sort_key(node_id: str) -> tuple[str, str]:
+        return (node_map[node_id].question_code, node_id)
+
     indegree = {node_id: len(upstream) for node_id, upstream in edges.items()}
-    ready = sorted(n for n, deg in indegree.items() if deg == 0)
+    ready = sorted((n for n, deg in indegree.items() if deg == 0), key=sort_key)
     order: list[str] = []
 
     while ready:
-        # Tie-break on the governed node identity, never the function name.
         current = ready.pop(0)
         order.append(current)
         for node_id, upstream in edges.items():
@@ -183,7 +195,7 @@ def _topological_order(
                 indegree[node_id] -= 1
                 if indegree[node_id] == 0:
                     ready.append(node_id)
-                    ready.sort()
+                    ready.sort(key=sort_key)
 
     if len(order) != len(node_map):
         remaining = sorted(set(node_map) - set(order))

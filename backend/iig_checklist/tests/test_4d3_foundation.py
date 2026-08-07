@@ -547,6 +547,39 @@ class TestCalculationGraph:
         orders = {graph_mod.build_graph(nodes).order for _ in range(10)}
         assert len(orders) == 1
 
+    def test_tie_break_is_the_question_code_not_the_node_id(self):
+        """M4D3-DAG-006 -- ordered by ascending ``ChecklistQuestion.code``.
+
+        The two orderings are deliberately opposed here: sorting by ``node_id``
+        would put ``zzz`` last, sorting by ``question_code`` puts ``Q_AAA``
+        first. Every other test in this class uses node ids that happen to sort
+        the same way as their codes, so only this one can tell them apart.
+
+        It matters because in production a node id is the response public UUID,
+        which is effectively random: keyed on it, two executions carrying the
+        same questions would recalculate in different orders.
+        """
+        nodes = (
+            _node("zzz", "Q_AAA", "percentage_w_w"),
+            _node("aaa", "Q_ZZZ", "percentage_w_w"),
+        )
+        graph = graph_mod.build_graph(nodes)
+        assert graph.order == ("zzz", "aaa")
+        assert [graph.nodes[n].question_code for n in graph.order] == [
+            "Q_AAA",
+            "Q_ZZZ",
+        ]
+
+    def test_the_tie_break_applies_to_nodes_released_mid_sort(self):
+        """Nodes that become ready later are ordered by code too, not append order."""
+        nodes = (
+            _node("n-exposure", registry_mod.Q_DAILY_EXPOSURE, "daily_exposure"),
+            _node("zz-pct", "Q_MDE_A_PCT", "percentage_of_iid_mde"),
+            _node("aa-diff", "Q_MDE_B_DIFF", "difference_from_iid_mde"),
+        )
+        graph = graph_mod.build_graph(nodes)
+        assert graph.order == ("n-exposure", "zz-pct", "aa-diff")
+
     def test_unknown_dependency_rejected(self):
         nodes = (_node("n-pct", "Q_MDE_PCT", "percentage_of_iid_mde"),)
         with pytest.raises(GraphConfigurationError) as exc:
