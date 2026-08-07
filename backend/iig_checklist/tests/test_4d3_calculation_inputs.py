@@ -18,6 +18,7 @@ from types import MappingProxyType
 import pytest
 
 from iid_assessment import calculations as engine
+from iig_checklist import calculation_inputs as inputs_mod
 from iig_checklist import calculation_registry as registry_mod
 from iig_checklist.calculation_inputs import (
     REVIEW_REQUIRED_MARKER,
@@ -717,6 +718,117 @@ class TestFormBFormulationField:
         world["component"].save(update_fields=["component_type", "updated_at"])
         result = _resolve(world)
         assert "FORMULATION_COMPONENT_TYPE_MISMATCH" in _codes(result)
+
+
+class TestFormBFormulationFreshness:
+    """Form B must read the committed formulation row, never a cached relation.
+
+    ``execution.formulation_version`` is a lazily-loaded FK: once anything touches
+    it, the instance keeps that copy for the rest of its life. A governed
+    ``AssessmentSnapshot`` freezes ``total_dosage_unit_weight`` from the *current*
+    row inside the same transaction, so a Form B kwarg served from a stale copy
+    would put two different weights into one ``percentage_w_w`` calculation.
+    Same defect class as the Form C finding, and the same shared helper fixes it.
+    """
+
+    @staticmethod
+    def _weight_input(result):
+        return next(
+            i
+            for i in result.inputs
+            if i.kwarg_name == "total_dosage_unit_weight_grams"
+        )
+
+    def test_stale_cached_scalar_is_bypassed(self, world):
+        """The cache is proven stale first, then Form B is proven to ignore it."""
+        from formulations.models import FormulationVersion
+
+        execution = world["execution"]
+        cached = execution.formulation_version  # populate the FK descriptor
+        assert cached.total_dosage_unit_weight == Decimal("1.000000")
+
+        other = FormulationVersion.objects.get(pk=world["formulation"].pk)
+        other.total_dosage_unit_weight = Decimal("2.000000")
+        other.save(update_fields=["total_dosage_unit_weight", "updated_at"])
+
+        # Without this the test would prove nothing: the cache must still be old.
+        assert execution.formulation_version.total_dosage_unit_weight == Decimal(
+            "1.000000"
+        )
+
+        result = _resolve(world)
+        assert result.resolved, result.failure_codes
+        assert self._weight_input(result).value == Decimal("2.000000")
+
+    def test_stale_cached_unit_is_bypassed(self, world):
+        """The declared ``unit_field`` is read fresh too, not only the scalar.
+
+        One gram becomes 1000 milligrams, so a stale unit would be visible as a
+        thousand-fold error rather than a silent equality.
+        """
+        from formulations.models import FormulationVersion
+
+        execution = world["execution"]
+        execution.formulation_version  # noqa: B018 - populate the FK descriptor
+
+        other = FormulationVersion.objects.get(pk=world["formulation"].pk)
+        other.total_dosage_unit_weight = Decimal("1000.000000")
+        other.total_dosage_unit_weight_unit = "milligram"
+        other.save(
+            update_fields=[
+                "total_dosage_unit_weight",
+                "total_dosage_unit_weight_unit",
+                "updated_at",
+            ]
+        )
+        assert (
+            execution.formulation_version.total_dosage_unit_weight_unit == "gram"
+        )
+
+        result = _resolve(world)
+        assert result.resolved, result.failure_codes
+        weight = self._weight_input(result)
+        # Converted from the fresh unit into the declared gram target.
+        assert weight.value == Decimal("1.000000")
+        assert weight.source_unit == "milligram"
+        assert weight.target_unit == "gram"
+
+    def test_form_b_and_the_snapshot_agree_on_one_weight(self, world):
+        """The defect this hardening prevents, stated as an equality.
+
+        A governed snapshot freezes the weight from the current row. Form B must
+        deliver that same number, so the two sides of ``percentage_w_w`` can
+        never be computed from two different formulation states.
+        """
+        from formulations.dosing import current_formulation_version
+        from formulations.models import FormulationVersion
+
+        execution = world["execution"]
+        execution.formulation_version  # noqa: B018 - populate the FK descriptor
+
+        other = FormulationVersion.objects.get(pk=world["formulation"].pk)
+        other.total_dosage_unit_weight = Decimal("3.500000")
+        other.save(update_fields=["total_dosage_unit_weight", "updated_at"])
+
+        fresh = current_formulation_version(execution.formulation_version_id)
+        result = _resolve(world)
+        assert result.resolved, result.failure_codes
+        assert self._weight_input(result).value == fresh.total_dosage_unit_weight
+        assert (
+            self._weight_input(result).value
+            != execution.formulation_version.total_dosage_unit_weight
+        )
+
+    def test_form_b_uses_the_one_shared_freshness_helper(self):
+        """Form B and Form C must not drift into two different read paths."""
+        import inspect
+
+        from formulations import dosing
+
+        source = inspect.getsource(inputs_mod._resolve_formulation_field)
+        assert "current_formulation_version" in source
+        assert "execution.formulation_version\n" not in source
+        assert callable(dosing.current_formulation_version)
 
 
 # ===========================================================================

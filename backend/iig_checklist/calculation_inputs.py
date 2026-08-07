@@ -1105,23 +1105,37 @@ def _resolve_formulation_field(
     ``SnapshotUnitRef``: the component quantity is then converted into the IID
     reference unit so both sides of a comparison are like quantities
     (M4D3-UNC-006).
+
+    The formulation version is read fresh from ``execution.formulation_version_id``
+    rather than through ``execution.formulation_version``. That relation is a
+    lazily-loaded FK which keeps whatever the row looked like when the caller
+    first touched it, and the values read here -- ``total_dosage_unit_weight``
+    and its unit -- are regulated inputs to ``percentage_w_w`` that a governed
+    ``AssessmentSnapshot`` freezes from the *current* row in the same
+    transaction. A cached copy could make the two disagree. Same correction, and
+    the same shared helper, as Form C.
     """
     obj = declaration["object"]
     field_name = declaration["field"]
     unit_field = declaration.get("unit_field")
 
     if obj == "formulation_version":
+        from formulations.dosing import current_formulation_version
+
         source_kind = SOURCE_KIND_FORMULATION_VERSION
-        if execution.formulation_version.product.tenant_id != execution.tenant_id:
+        formulation_version = current_formulation_version(
+            execution.formulation_version_id
+        )
+        if formulation_version.product.tenant_id != execution.tenant_id:
             _fail(
                 failures, kwarg=kwarg, code=F_TENANT_MISMATCH, source_kind=source_kind,
                 message=(
                     "This execution's formulation version belongs to another tenant."
                 ),
-                public_uuid=str(execution.formulation_version.public_id),
+                public_uuid=str(formulation_version.public_id),
             )
             return None
-        target_object = execution.formulation_version
+        target_object = formulation_version
         value_fields = _FORMULATION_VERSION_VALUE_FIELDS
         unit_fields = _FORMULATION_VERSION_UNIT_FIELDS
         public_uuid = str(target_object.public_id)
