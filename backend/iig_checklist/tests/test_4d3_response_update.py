@@ -24,9 +24,12 @@ import textwrap
 from decimal import Decimal
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from iig_checklist import calculation_registry as registry_mod
+from iig_checklist import cascade as cascade_mod
 from iig_checklist.enums import (
     AnswerType,
     CalculationStatus,
@@ -330,10 +333,23 @@ class TestExpectedVersionContract:
         assert replay.status_code == 409
         assert _error_code(replay) == "stale_version"
 
-    @pytest.mark.parametrize("bad", [0, -1, "abc", None, [], {}])
+    @pytest.mark.parametrize(
+        "bad",
+        [None, True, False, 1.0, 1.5, "1", "1.0", "abc", 0, -1, [], {}],
+        ids=[
+            "none", "true", "false", "float_one", "float_frac", "str_one",
+            "str_float_one", "str_abc", "zero", "negative", "list", "dict",
+        ],
+    )
     def test_a_malformed_expected_version_is_rejected(
         self, world, api_client_doer, bad
     ):
+        """M4D3-TXN-003 through the transport layer, with no coercion.
+
+        ``1.0``, ``"1"`` and ``"1.0"`` are the values a DRF ``IntegerField``
+        would have silently turned into version 1. The serializer no longer
+        coerces, so the governed validator sees what the client sent.
+        """
         before = _fingerprint(world)
         resp = api_client_doer.patch(
             _url(world),
@@ -344,7 +360,67 @@ class TestExpectedVersionContract:
             format="json",
         )
         assert resp.status_code == 400
+        assert _error_code(resp) == "invalid_expected_version"
         assert _fingerprint(world) == before
+
+    def test_the_endpoint_and_the_domain_validator_now_agree(self, world):
+        """One structural rule, not two.
+
+        Every value the governed validator refuses is refused by the update
+        service too -- the divergence the independent review measured, where
+        ``1.0``/``"1"``/``"1.0"`` passed the endpoint but failed the validator.
+        """
+        from iig_checklist.calculation_execution import (
+            InvalidExpectedVersion,
+            validate_expected_version,
+        )
+        from iig_checklist.services import (
+            ResponseUpdateInvalidExpectedVersion,
+            update_checklist_response,
+        )
+
+        for bad in (None, True, False, 1.0, 1.5, "1", "1.0", 0, -1, [], {}):
+            with pytest.raises(InvalidExpectedVersion):
+                validate_expected_version(bad)
+            with pytest.raises(ResponseUpdateInvalidExpectedVersion):
+                update_checklist_response(
+                    tenant=world["tenant"],
+                    execution_public_id=world["execution"].public_id,
+                    response_public_id=world["selector_response"].public_id,
+                    actor=world["user"],
+                    payload={"expected_version": bad},
+                )
+
+    def test_the_service_uses_the_governed_validator(self):
+        """Not a second implementation -- the same callable, by identity."""
+        import ast
+        import textwrap
+
+        from iig_checklist import calculation_execution as exec_mod
+        from iig_checklist import services as services_mod
+
+        src = textwrap.dedent(
+            inspect.getsource(services_mod.update_checklist_response)
+        )
+        called = {
+            node.func.id
+            for node in ast.walk(ast.parse(src))
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        assert "validate_expected_version" in called
+        assert exec_mod.validate_expected_version is not None
+
+    def test_the_serializer_does_not_coerce_the_submitted_value(self):
+        """The transport layer enforces presence, never structure."""
+        from iig_checklist.serializers import ChecklistResponseUpdateSerializer
+
+        for value in (1.0, "1", "1.0", True, None, []):
+            serializer = ChecklistResponseUpdateSerializer(
+                data={"expected_version": value}, context={}
+            )
+            assert serializer.is_valid(), serializer.errors
+            assert serializer.validated_data["expected_version"] == value
+            assert type(serializer.validated_data["expected_version"]) is type(value)
 
     def test_true_is_not_accepted_as_version_one(self, world, api_client_doer):
         """The bool/int trap, defended at the API edge as well as in the domain."""
@@ -801,3 +877,238 @@ class TestUnderLockStateRecheck:
                 },
             )
         assert _fingerprint(world) == before
+
+
+# ===========================================================================
+# I. M4D3-APP-011 -- the reserved server-owned marker is never client-supplied
+# ===========================================================================
+#
+# M4D3-PST-002 stores a REVIEW_REQUIRED applicability outcome as
+# ``REVIEW_REQUIRED:<ApplicabilityRule.reason_code>`` in
+# ``not_applicable_reason``. M4D3-APP-011 requires the governed service to
+# reject any client-supplied value beginning with that prefix, **for any
+# response, rule-governed or not**, with ``error_code = "reserved_reason_prefix"``.
+#
+# The independent review measured the gap directly: the endpoint returned
+# HTTP 200 and stored ``REVIEW_REQUIRED: injected by client`` verbatim.
+
+RESERVED = "REVIEW_REQUIRED:"
+
+
+class TestReservedReasonPrefixAtTheDomainBoundary:
+    """The guard lives in the service, so a direct call is bound by it too."""
+
+    def test_a_direct_service_call_is_rejected(self, world):
+        from iig_checklist.services import (
+            ResponseUpdateReservedReasonPrefix,
+            update_checklist_response,
+        )
+
+        target = world["free_response"]
+        before = _fingerprint(world)
+        with pytest.raises(ResponseUpdateReservedReasonPrefix):
+            update_checklist_response(
+                tenant=world["tenant"],
+                execution_public_id=world["execution"].public_id,
+                response_public_id=target.public_id,
+                actor=world["user"],
+                payload={
+                    "is_not_applicable": True,
+                    "not_applicable_reason": f"{RESERVED} injected by client",
+                    "expected_version": target.version,
+                },
+            )
+        assert _fingerprint(world) == before
+
+    def test_the_guard_is_not_only_a_serializer_rule(self):
+        """M4D3-APP-011 binds the governed service, as M4D3-SVC-005 does."""
+        import ast
+        import textwrap
+
+        from iig_checklist import services as services_mod
+
+        src = textwrap.dedent(
+            inspect.getsource(services_mod.update_checklist_response)
+        )
+        names = {
+            n.id for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Name)
+        }
+        assert "RESERVED_REASON_PREFIX" in names
+
+    def test_the_prefix_constant_matches_the_persisted_marker_form(self):
+        """M4D3-PST-002 -- ``REVIEW_REQUIRED:<reason_code>``."""
+        from iig_checklist.governed_vocabularies import RESERVED_REASON_PREFIX
+
+        assert RESERVED_REASON_PREFIX == "REVIEW_REQUIRED:"
+
+
+class TestReservedReasonPrefixOverHttp:
+    def test_the_endpoint_rejects_the_reserved_marker(self, world, api_client_doer):
+        target = world["free_response"]
+        before = _fingerprint(world)
+        resp = api_client_doer.patch(
+            _url(world, target),
+            {
+                "is_not_applicable": True,
+                "not_applicable_reason": f"{RESERVED} injected by client",
+                "expected_version": target.version,
+            },
+            format="json",
+        )
+        assert resp.status_code == 403
+        assert _error_code(resp) == "reserved_reason_prefix"
+
+        target.refresh_from_db()
+        assert target.not_applicable_reason != f"{RESERVED} injected by client"
+        assert target.is_not_applicable is False
+        assert _fingerprint(world) == before
+
+    def test_a_rejected_marker_drives_no_cascade_and_no_audit(
+        self, world, api_client_doer, monkeypatch, django_capture_on_commit_callbacks
+    ):
+        from audit.models import AuditEvent
+
+        calls = []
+        monkeypatch.setattr(
+            cascade_mod,
+            "execute_calculation_response",
+            lambda **kwargs: calls.append(kwargs),
+        )
+        audit_before = AuditEvent.objects.count()
+
+        # The selector is the cascade trigger, so a rejected write here would
+        # be the one most likely to leak a recalculation.
+        selector = world["selector_response"]
+        with django_capture_on_commit_callbacks(execute=True) as callbacks:
+            resp = api_client_doer.patch(
+                _url(world, selector),
+                {
+                    "is_not_applicable": True,
+                    "not_applicable_reason": f"{RESERVED}NOT_APPLICABLE_BY_RULE",
+                    "expected_version": selector.version,
+                },
+                format="json",
+            )
+        assert resp.status_code == 403
+        assert calls == []
+        assert callbacks == []
+        assert AuditEvent.objects.count() == audit_before
+
+    def test_the_rejection_precedes_any_lock(self, world, api_client_doer):
+        """Phase A, before the transaction opens."""
+        target = world["free_response"]
+        with CaptureQueriesContext(connection) as ctx:
+            resp = api_client_doer.patch(
+                _url(world, target),
+                {
+                    "is_not_applicable": True,
+                    "not_applicable_reason": f"{RESERVED}X",
+                    "expected_version": target.version,
+                },
+                format="json",
+            )
+        assert resp.status_code == 403
+        assert not any(
+            "FOR UPDATE" in q["sql"].upper() for q in ctx.captured_queries
+        )
+        verbs = {q["sql"].lstrip().split()[0].upper() for q in ctx.captured_queries}
+        assert "UPDATE" not in verbs
+        assert "INSERT" not in verbs
+
+    def test_a_calculated_response_is_still_refused_first(
+        self, world, api_client_doer
+    ):
+        """Ordering is unchanged: server-controlled classification wins."""
+        target = world["responses"]["daily_exposure"]
+        resp = api_client_doer.patch(
+            _url(world, target),
+            {
+                "is_not_applicable": True,
+                "not_applicable_reason": f"{RESERVED}X",
+                "expected_version": target.version,
+            },
+            format="json",
+        )
+        assert resp.status_code == 403
+        assert _error_code(resp) == "server_controlled_value"
+
+
+class TestReservedPrefixBoundary:
+    """Exactly the normative prefix -- no trimming, folding or normalisation.
+
+    M4D3-APP-011 says "beginning with the reserved prefix ``REVIEW_REQUIRED:``"
+    and defines no canonicalisation, so none is applied. These cases pin that
+    reading so a later change cannot quietly widen or narrow it.
+    """
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            "REVIEW_REQUIRED:",
+            "REVIEW_REQUIRED:test",
+            "REVIEW_REQUIRED: test",
+            "REVIEW_REQUIRED:NOT_APPLICABLE_BY_RULE",
+            "REVIEW_REQUIRED:anything at all",
+            # DRF's CharField trims surrounding whitespace, so this reaches the
+            # guard -- and the database -- as the bare reserved marker. The
+            # guard deliberately runs on the deserialized value for exactly this
+            # reason: it must judge what would be *stored*, not the wire form.
+            " REVIEW_REQUIRED:leading space",
+        ],
+    )
+    def test_values_that_must_be_rejected(self, world, api_client_doer, reason):
+        target = world["free_response"]
+        before = _fingerprint(world)
+        resp = api_client_doer.patch(
+            _url(world, target),
+            {
+                "is_not_applicable": True,
+                "not_applicable_reason": reason,
+                "expected_version": target.version,
+            },
+            format="json",
+        )
+        assert resp.status_code == 403
+        assert _error_code(resp) == "reserved_reason_prefix"
+        assert _fingerprint(world) == before
+
+    @pytest.mark.parametrize(
+        "reason",
+        [
+            # Case differs -- the clause names an exact prefix and defines no
+            # case folding, so this is a permitted ordinary reason.
+            "review_required:lower",
+            "Review_Required:mixed",
+            # The marker does not begin the string.
+            "note REVIEW_REQUIRED:embedded",
+            # The colon is part of the prefix.
+            "REVIEW_REQUIRED",
+            "REVIEW_REQUIRED_NO_COLON",
+            # Ordinary text.
+            "Not relevant to this product",
+        ],
+    )
+    def test_values_that_must_be_accepted(self, world, api_client_doer, reason):
+        target = world["free_response"]
+        target.refresh_from_db()
+        resp = api_client_doer.patch(
+            _url(world, target),
+            {
+                "is_not_applicable": True,
+                "not_applicable_reason": reason,
+                "expected_version": target.version,
+            },
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
+        target.refresh_from_db()
+        assert target.not_applicable_reason == reason
+
+    def test_a_null_reason_is_unaffected(self, world, api_client_doer):
+        target = world["free_response"]
+        resp = api_client_doer.patch(
+            _url(world, target),
+            {"raw_value": {"value": "ok"}, "expected_version": target.version},
+            format="json",
+        )
+        assert resp.status_code == 200, resp.data
