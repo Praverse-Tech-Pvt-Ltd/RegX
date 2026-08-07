@@ -301,6 +301,11 @@ class ChecklistResponseSerializer(serializers.ModelSerializer):
 
 
 class ChecklistResponseUpdateSerializer(serializers.Serializer):
+    #: M4D3-VER-002 -- required, not additive. M4D3-VER-001 records this as a
+    #: controlled breaking API contract change: the ordinary response PATCH did
+    #: not previously accept it, and optimistic concurrency is mandatory rather
+    #: than opt-in, so there is no value that skips the check.
+    expected_version = serializers.IntegerField(min_value=1, required=False)
     raw_value = serializers.JSONField(allow_null=True, required=False)
     is_not_applicable = serializers.BooleanField(required=False)
     not_applicable_reason = serializers.CharField(
@@ -321,6 +326,19 @@ class ChecklistResponseUpdateSerializer(serializers.Serializer):
         if "version" in self.initial_data:
             raise serializers.ValidationError(
                 {"error_code": "unknown_field", "detail": "version is not client-writable."}
+            )
+
+        # M4D3-VER-004 -- an omitted expected_version is rejected with its own
+        # governed code and no write. Declared ``required=False`` only so this
+        # contract is reported instead of DRF's generic "This field is
+        # required."; it is mandatory in every other sense. Silent overwrite of
+        # a concurrently changed response is prohibited.
+        if "expected_version" not in attrs:
+            raise serializers.ValidationError(
+                {
+                    "error_code": "expected_version_required",
+                    "detail": "expected_version is required on a governed response update.",
+                }
             )
 
         question = self.context.get("question")

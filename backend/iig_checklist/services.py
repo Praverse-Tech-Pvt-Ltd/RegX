@@ -11,7 +11,12 @@ from django.db.models import Max
 from .audit import IigChecklistEvent, emit
 from .calculation_registry import get_entry
 from .codes import normalize_code
-from .enums import CLONABLE_SOURCE_VERSION_STATUSES, ChecklistVersionStatus
+from .enums import (
+    CLONABLE_SOURCE_VERSION_STATUSES,
+    ChecklistVersionStatus,
+    DataSourceClassification,
+    ExecutionStatus,
+)
 from .models import ChecklistDefinition, ChecklistQuestion, ChecklistSection, ChecklistVersion
 
 
@@ -768,3 +773,270 @@ def _clone_applicability_rule(source_rule, new_version):
         explanation_template=source_rule.explanation_template,
         field_registry_version=source_rule.field_registry_version,
     )
+
+
+# ---------------------------------------------------------------------------
+# Milestone 4D-3 -- governed response-update service (Part 4)
+# ---------------------------------------------------------------------------
+#
+# M4D3-SVC-001 recorded that the previous write path was
+# ``ChecklistResponseUpdateView.patch()`` doing ``full_clean()`` and ``save()``
+# with no transaction, no lock, no ``expected_version`` and no version
+# increment. This service replaces that path; the view is now a thin adapter
+# (M4D3-SVC-004).
+#
+# M4D3-SVC-003 fixes the responsibility order implemented below: tenant-scoped
+# execution lookup; tenant-scoped response lookup; execution-state validation;
+# permission validation; ``expected_version`` validation; execution lock;
+# response lock; payload validation; dependent recalculation; version
+# increment; every write inside one ``transaction.atomic()``; audit through
+# ``transaction.on_commit()``.
+#
+# **No history row is written here, deliberately.** M4D3-HST-001 scopes
+# ``ChecklistResponseHistory`` reuse to governed persisted-state transitions,
+# which for this milestone are exactly persisted applicability transitions and
+# component-reference rebinding, and M4D3-HST-005 closes
+# ``correction_reason`` to ``APPLICABILITY_REEVALUATED`` and
+# ``COMPONENT_REBOUND`` with the instruction that no code shall be applied to
+# an event type it does not describe. An ordinary user response edit is
+# neither transition, so there is no code that honestly describes it and
+# writing one would fabricate governed vocabulary. Both transitions are out of
+# scope for this change.
+
+
+class ResponseUpdateError(Exception):
+    """Base class for governed response-update rejections, raised before commit."""
+
+
+class ResponseUpdateInvalidState(ResponseUpdateError):
+    """The execution is not in a status that permits response edits."""
+
+
+class ResponseUpdatePermissionDenied(ResponseUpdateError):
+    """The actor lacks ``PERM_EDIT_EXECUTION`` for this tenant."""
+
+
+class ResponseUpdateWrongAnswerType(ResponseUpdateError):
+    """A ``reviewer_conclusion`` response has its own governed endpoint."""
+
+
+class ResponseUpdateServerControlledValue(ResponseUpdateError):
+    """M4D3-SVC-005 -- the value is server-owned, not client-writable.
+
+    ``fda_derived_default`` and ``system_calculated`` responses are populated
+    and recalculated by governed services. M4D3-SVC-006 defers the override
+    path to 4D-4, so no override permission exists in this milestone and the
+    rejection is therefore unconditional rather than permission-dependent.
+    """
+
+
+class ResponseUpdateStaleVersion(ResponseUpdateError):
+    """M4D3-VER-005 -- ``expected_version`` does not match the locked row."""
+
+
+class ResponseUpdateInvalidPayload(ResponseUpdateError):
+    """The payload failed governed deserialization; carries the field errors."""
+
+    def __init__(self, errors) -> None:
+        super().__init__("invalid_payload")
+        self.errors = errors
+
+
+#: M4D3-SVC-005 -- classifications whose stored value the client may not write.
+SERVER_CONTROLLED_CLASSIFICATIONS: frozenset[str] = frozenset(
+    {
+        DataSourceClassification.FDA_DERIVED_DEFAULT,
+        DataSourceClassification.SYSTEM_CALCULATED,
+    }
+)
+
+#: M4D3-SVC-003 -- the execution statuses in which a response may be edited.
+EDITABLE_EXECUTION_STATUSES: frozenset[str] = frozenset(
+    {ExecutionStatus.DRAFT, ExecutionStatus.RETURNED}
+)
+
+#: The client-writable fields of a governed response update. ``system_derived_value``
+#: and ``override_reason`` are deliberately absent: M4D3-SVC-006 defers the override
+#: path to 4D-4.
+_UPDATABLE_FIELDS = ("raw_value", "is_not_applicable", "not_applicable_reason")
+
+
+@dataclass(frozen=True, slots=True)
+class ResponseUpdateResult:
+    """One governed response update and the cascade it drove.
+
+    ``cascade`` is the immutable :class:`~iig_checklist.cascade.CascadeRecalculationResult`
+    of the recalculation this update triggered. It is ``None`` only when the
+    updated question appears in no ``recalculation_triggers`` set *and* the
+    cascade was therefore never entered -- see ``triggered`` on the result
+    itself for the M4D3-RCL-007 no-op case, which still returns a result.
+    """
+
+    response: object
+    cascade: object = None
+
+
+def update_checklist_response(
+    *,
+    tenant,
+    execution_public_id,
+    response_public_id,
+    actor,
+    payload,
+) -> ResponseUpdateResult:
+    """Update one governed response and recalculate everything it feeds.
+
+    Three phases, matching the reviewer-conclusion service:
+
+    - Phase A -- non-mutating validation. No lock, no write.
+    - Phase B -- one ``transaction.atomic()`` holding the response write and
+      every dependent outcome update (M4D3-TXN-002). An exception anywhere in
+      it rolls back both (M4D3-TXN-004).
+    - Phase C -- audit dispatched through ``transaction.on_commit()``
+      (M4D3-TXN-005), so nothing is announced that did not commit.
+
+    ``payload`` is the raw request body. Deserialization happens here rather
+    than in the view because the governed shape rules depend on the question,
+    which is only known after the tenant-scoped lookup.
+    """
+    from django.db import transaction as db_transaction
+    from django.utils import timezone
+
+    from .cascade import recalculate_dependents
+    from .enums import AnswerType
+    from .models import ChecklistExecution, ChecklistResponse
+    from .permissions import PERM_EDIT_EXECUTION, has_iig_checklist_permission
+    from .serializers import ChecklistResponseUpdateSerializer
+
+    # -- Phase A: non-mutating validation ---------------------------------
+
+    # Object lookup first -- a cross-tenant id is a 404 through visible_to(),
+    # never a 403, so existence is not disclosed to a foreign tenant.
+    try:
+        execution = ChecklistExecution.objects.visible_to(tenant).get(
+            public_id=execution_public_id
+        )
+    except ChecklistExecution.DoesNotExist:
+        from rest_framework.exceptions import NotFound
+
+        raise NotFound() from None
+
+    if not has_iig_checklist_permission(actor, tenant, PERM_EDIT_EXECUTION):
+        raise ResponseUpdatePermissionDenied()
+
+    if execution.status not in EDITABLE_EXECUTION_STATUSES:
+        raise ResponseUpdateInvalidState()
+
+    try:
+        response = ChecklistResponse.objects.select_related("question").get(
+            public_id=response_public_id,
+            execution=execution,
+        )
+    except ChecklistResponse.DoesNotExist:
+        from rest_framework.exceptions import NotFound
+
+        raise NotFound() from None
+
+    if response.question.answer_type == AnswerType.REVIEWER_CONCLUSION:
+        raise ResponseUpdateWrongAnswerType()
+
+    # M4D3-SVC-005 -- checked in the service, not only in the serializer.
+    if response.data_source_type_snapshot in SERVER_CONTROLLED_CLASSIFICATIONS:
+        raise ResponseUpdateServerControlledValue()
+
+    serializer = ChecklistResponseUpdateSerializer(
+        data=payload,
+        context={
+            "question": response.question,
+            "execution": execution,
+            "tenant": tenant,
+        },
+    )
+    if not serializer.is_valid():
+        raise ResponseUpdateInvalidPayload(serializer.errors)
+
+    data = serializer.validated_data
+    expected_version = data["expected_version"]
+    prior_entered_by = response.entered_by_id
+
+    # -- Phase B: every governed write, one transaction --------------------
+    with db_transaction.atomic():
+        # M4D3-TXN-001 / M4D3-TXN-006 -- the execution first; it is the
+        # serialization barrier every governed operation on this execution
+        # shares, and the cascade re-enters it below on the same transaction.
+        locked_execution = ChecklistExecution.objects.select_for_update().get(
+            pk=execution.pk
+        )
+        # Re-read under the lock: the status examined must be committed state,
+        # not what the Phase A scan happened to see.
+        if locked_execution.status not in EDITABLE_EXECUTION_STATUSES:
+            raise ResponseUpdateInvalidState()
+
+        locked_response = (
+            ChecklistResponse.objects.select_for_update()
+            .select_related("question")
+            .get(pk=response.pk)
+        )
+
+        # M4D3-TXN-003 -- validated against the locked row, after the lock and
+        # before any write. M4D3-VER-005 -- no write, no version increment and
+        # no success audit follow a mismatch.
+        if locked_response.version != expected_version:
+            raise ResponseUpdateStaleVersion()
+
+        for field in _UPDATABLE_FIELDS:
+            if field in data:
+                setattr(locked_response, field, data[field])
+        locked_response.entered_by = actor
+        locked_response.entered_at = timezone.now()
+        # M4D3-VER-006 -- exactly one.
+        locked_response.version = expected_version + 1
+
+        try:
+            locked_response.full_clean()
+            locked_response.save()
+        except ValidationError as exc:
+            raise ResponseUpdateInvalidPayload(
+                {"error_code": "invalid_raw_value_shape", "detail": str(exc)}
+            ) from exc
+
+        # M4D3-RCL-001 -- the cascade is entered for every governed update, and
+        # decides for itself whether this question triggers anything. Keying
+        # that decision here would duplicate the trigger rules the registry
+        # already owns. M4D3-TXN-002 -- it runs inside this transaction, so a
+        # recalculation failure rolls the response write back with it.
+        cascade_result = recalculate_dependents(
+            tenant=tenant,
+            execution=locked_execution,
+            changed_response=locked_response,
+            actor=actor,
+            expected_version=locked_response.version,
+        )
+
+    # -- Phase C: post-commit audit ---------------------------------------
+    event_type = (
+        IigChecklistEvent.RESPONSE_UPDATED
+        if prior_entered_by
+        else IigChecklistEvent.RESPONSE_ENTERED
+    )
+
+    def _audit():
+        emit(
+            event_type=event_type,
+            resource_id=str(locked_response.public_id),
+            actor_id=getattr(actor, "id", None),
+            actor_email=getattr(actor, "email", ""),
+            tenant_id=getattr(tenant, "id", None),
+            payload={
+                "execution_public_id": str(locked_execution.public_id),
+                "response_public_id": str(locked_response.public_id),
+                "question_public_id": str(locked_response.question.public_id),
+                "data_source_type_snapshot": locked_response.data_source_type_snapshot,
+                "prior_response_version": expected_version,
+                "new_response_version": locked_response.version,
+                "recalculated_count": cascade_result.recalculated_count,
+            },
+        )
+
+    db_transaction.on_commit(_audit)
+    return ResponseUpdateResult(response=locked_response, cascade=cascade_result)

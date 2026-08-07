@@ -37,7 +37,6 @@ from .permissions import (
     PERM_CREATE_DEFINITION,
     PERM_DELETE_DRAFT,
     PERM_EDIT_DRAFT,
-    PERM_EDIT_EXECUTION,
     PERM_REVIEW_EXECUTION,
     PERM_SUBMIT_EXECUTION,
     PERM_SUPERSEDE_EXECUTION,
@@ -65,7 +64,6 @@ from .serializers import (
     ChecklistExecutionSerializer,
     ChecklistQuestionSerializer,
     ChecklistResponseSerializer,
-    ChecklistResponseUpdateSerializer,
     ChecklistSectionSerializer,
     ChecklistVersionSerializer,
     CloneDefinitionSerializer,
@@ -1192,19 +1190,37 @@ class ChecklistResponseListView(APIView):
 
 
 class ChecklistResponseUpdateView(APIView):
-    def patch(self, request, public_id, response_public_id):
-        from django.utils import timezone
+    """M4D3-SVC-004 -- a thin adapter over ``update_checklist_response()``.
 
-        from .audit import IigChecklistEvent, emit
-        from .enums import AnswerType
+    It validates nothing itself, mutates no model, emits no audit and holds no
+    business rule: it calls the governed service and maps the governed
+    exceptions onto the structured HTTP contract of Part 5.
+    """
+
+    def patch(self, request, public_id, response_public_id):
+        from .services import (
+            ResponseUpdateInvalidPayload,
+            ResponseUpdateInvalidState,
+            ResponseUpdatePermissionDenied,
+            ResponseUpdateServerControlledValue,
+            ResponseUpdateStaleVersion,
+            ResponseUpdateWrongAnswerType,
+            update_checklist_response,
+        )
 
         tenant = _require_tenant()
-        # Object lookup first — cross-tenant IDs return 404 via visible_to().
-        execution = _get_execution_or_404(public_id, tenant)
-        if not has_iig_checklist_permission(request.user, tenant, PERM_EDIT_EXECUTION):
-            raise PermissionDenied()
 
-        if execution.status not in {"draft", "returned"}:
+        try:
+            result = update_checklist_response(
+                tenant=tenant,
+                execution_public_id=public_id,
+                response_public_id=response_public_id,
+                actor=request.user,
+                payload=request.data,
+            )
+        except ResponseUpdatePermissionDenied:
+            raise PermissionDenied() from None
+        except ResponseUpdateInvalidState:
             return Response(
                 {
                     "error_code": "response_immutable",
@@ -1212,16 +1228,7 @@ class ChecklistResponseUpdateView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        try:
-            response = ChecklistResponse.objects.select_related("question").get(
-                public_id=response_public_id,
-                execution=execution,
-            )
-        except ChecklistResponse.DoesNotExist:
-            raise NotFound() from None
-
-        if response.question.answer_type == AnswerType.REVIEWER_CONCLUSION:
+        except ResponseUpdateWrongAnswerType:
             return Response(
                 {
                     "error_code": "reviewer_conclusion_wrong_answer_type",
@@ -1231,54 +1238,33 @@ class ChecklistResponseUpdateView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        serializer = ChecklistResponseUpdateSerializer(
-            data=request.data,
-            context={"question": response.question, "execution": execution, "tenant": tenant},
-        )
-        if not serializer.is_valid():
-            raise ValidationError(serializer.errors)
-
-        prior_entered_by = response.entered_by_id
-
-        data = serializer.validated_data
-        for field in ("raw_value", "is_not_applicable", "not_applicable_reason", "override_reason"):
-            if field in data:
-                setattr(response, field, data[field])
-        response.entered_by = request.user
-        response.entered_at = timezone.now()
-
-        try:
-            response.full_clean()
-            response.save()
-        except DjangoValidationError as exc:
-            raise ValidationError(
-                {"error_code": "invalid_raw_value_shape", "detail": str(exc)}
-            ) from exc
-
-        event_type = (
-            IigChecklistEvent.RESPONSE_UPDATED
-            if prior_entered_by
-            else IigChecklistEvent.RESPONSE_ENTERED
-        )
-
-        def _audit():
-            emit(
-                event_type=event_type,
-                resource_id=str(response.public_id),
-                actor_id=request.user.id,
-                actor_email=getattr(request.user, "email", ""),
-                tenant_id=getattr(tenant, "id", None),
-                payload={
-                    "execution_public_id": str(execution.public_id),
-                    "response_public_id": str(response.public_id),
-                    "question_public_id": str(response.question.public_id),
-                    "data_source_type_snapshot": response.data_source_type_snapshot,
+        except ResponseUpdateServerControlledValue:
+            # M4D3-SVC-005 -- the stored value is owned by a governed service.
+            return Response(
+                {
+                    "error_code": "server_controlled_value",
+                    "detail": (
+                        "This response is populated by a governed service and is not "
+                        "client-writable."
+                    ),
                 },
+                status=status.HTTP_403_FORBIDDEN,
             )
+        except ResponseUpdateStaleVersion:
+            # M4D3-VER-005 -- nothing was written; the client reloads and retries.
+            return Response(
+                {
+                    "error_code": "stale_version",
+                    "detail": (
+                        "expected_version does not match current version. Reload and retry."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        except ResponseUpdateInvalidPayload as exc:
+            raise ValidationError(exc.errors) from None
 
-        transaction.on_commit(_audit)
-        return Response(ChecklistResponseSerializer(response).data)
+        return Response(ChecklistResponseSerializer(result.response).data)
 
 
 class ChecklistReviewerConclusionView(APIView):
