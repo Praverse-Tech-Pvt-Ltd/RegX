@@ -1302,3 +1302,611 @@ class TestResultContract:
             if node_id in set(result.recalculated_response_public_ids)
         ]
         assert list(result.recalculated_response_public_ids) == expected
+
+
+# ===========================================================================
+# N. expected_version -- M4D3-TXN-003, the same gate as the single writer
+# ===========================================================================
+#
+# The cascade previously compared the caller's ``expected_version`` to the
+# locked row directly. Under Python equality ``True == 1`` and ``1.0 == 1``, so
+# a malformed value was accepted whenever the origin stood at version 1, and
+# every other malformed value was reported as ``StaleResponseVersion`` rather
+# than ``InvalidExpectedVersion``. The structural gate is now the shared
+# ``validate_expected_version()`` the single-response writer already used.
+
+#: Every value M4D3-TXN-003 rejects structurally, whatever the row holds.
+INVALID_EXPECTED_VERSIONS = (
+    None,
+    True,
+    False,
+    1.0,
+    "1",
+    0,
+    -1,
+    1.5,
+    [],
+    {},
+    [1],
+    Decimal("1"),
+)
+
+
+def _raw_cascade(world, expected_version):
+    """``recalculate_dependents`` with ``expected_version`` passed verbatim.
+
+    ``_cascade`` treats ``None`` as "use the row's own version", so the invalid
+    cases must not go through it.
+    """
+    return recalculate_dependents(
+        tenant=world["tenant"],
+        execution=world["execution"],
+        changed_response=world["selector_response"],
+        actor=world["user"],
+        expected_version=expected_version,
+    )
+
+
+def _mutation_fingerprint(world):
+    """Everything a cascade must leave untouched to have written nothing."""
+    from audit.models import AuditEvent
+    from iid_assessment.models import AssessmentSnapshot
+    from iig_checklist.models import ChecklistResponse
+
+    return {
+        "outcomes": {
+            key: (
+                _outcome(world, key).status,
+                _outcome(world, key).value,
+                _outcome(world, key).reason_code,
+                _outcome(world, key).generated_at,
+                _outcome(world, key).updated_at,
+            )
+            for key in ALL_KEYS
+        },
+        "responses": dict(
+            ChecklistResponse.objects.filter(
+                execution=world["execution"]
+            ).values_list("pk", "version")
+        ),
+        "snapshots": AssessmentSnapshot.objects.count(),
+        "audit": AuditEvent.objects.count(),
+    }
+
+
+class TestExpectedVersionStructuralGate:
+    def test_the_cascade_uses_the_single_governed_validator(self):
+        """No second implementation: cascade imports the writer's own gate."""
+        from iig_checklist import calculation_execution as exec_mod
+
+        assert (
+            cascade_mod.validate_expected_version
+            is exec_mod.validate_expected_version
+        )
+
+    def test_the_cascade_restates_none_of_the_validation_rules(self):
+        """The rules live in one place; cascade must not re-derive them.
+
+        Read from the parsed AST of ``recalculate_dependents`` so the module's
+        prose about the contract is not mistaken for a duplicate check.
+        """
+        import ast
+
+        tree = ast.parse(inspect.getsource(cascade_mod.recalculate_dependents))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                name = getattr(func, "id", None) or getattr(func, "attr", None)
+                assert name != "isinstance", "cascade re-implements the type rule"
+
+    @pytest.mark.parametrize("bad", INVALID_EXPECTED_VERSIONS)
+    def test_a_malformed_expected_version_is_invalid_not_stale(self, world, bad):
+        from iig_checklist.calculation_execution import InvalidExpectedVersion
+
+        with pytest.raises(InvalidExpectedVersion):
+            _raw_cascade(world, bad)
+
+    @pytest.mark.parametrize("bad", INVALID_EXPECTED_VERSIONS)
+    def test_a_malformed_expected_version_mutates_nothing(self, world, bad):
+        """Zero outcome, response, snapshot, audit and history mutation."""
+        from iig_checklist.calculation_execution import InvalidExpectedVersion
+
+        before = _mutation_fingerprint(world)
+        with pytest.raises(InvalidExpectedVersion):
+            _raw_cascade(world, bad)
+        assert _mutation_fingerprint(world) == before
+
+    @pytest.mark.parametrize("bad", INVALID_EXPECTED_VERSIONS)
+    def test_a_malformed_expected_version_invokes_no_calculation(
+        self, world, bad, monkeypatch
+    ):
+        from iig_checklist.calculation_execution import InvalidExpectedVersion
+
+        calls = []
+        monkeypatch.setattr(
+            cascade_mod,
+            "execute_calculation_response",
+            lambda **kwargs: calls.append(kwargs),
+        )
+        with pytest.raises(InvalidExpectedVersion):
+            _raw_cascade(world, bad)
+        assert calls == []
+
+    @pytest.mark.parametrize("bad", INVALID_EXPECTED_VERSIONS)
+    def test_validation_precedes_locking(self, world, bad):
+        """Phase A runs before the transaction, so nothing is ever locked."""
+        from iig_checklist.calculation_execution import InvalidExpectedVersion
+
+        with CaptureQueriesContext(connection) as ctx:
+            with pytest.raises(InvalidExpectedVersion):
+                _raw_cascade(world, bad)
+        assert not any(
+            "FOR UPDATE" in query["sql"].upper() for query in ctx.captured_queries
+        )
+        verbs = {q["sql"].lstrip().split()[0].upper() for q in ctx.captured_queries}
+        assert "UPDATE" not in verbs
+        assert "INSERT" not in verbs
+
+    def test_a_malformed_expected_version_emits_no_audit(
+        self, world, django_capture_on_commit_callbacks
+    ):
+        from audit.models import AuditEvent
+        from iig_checklist.calculation_execution import InvalidExpectedVersion
+
+        before = AuditEvent.objects.count()
+        with (
+            pytest.raises(InvalidExpectedVersion),
+            django_capture_on_commit_callbacks(execute=True),
+        ):
+            _raw_cascade(world, True)
+        assert AuditEvent.objects.count() == before
+
+
+class TestTrueAndFloatDoNotPassAsVersionOne:
+    """The regression the independent review measured, stated directly.
+
+    The fixture's selector response stands at version 1, which is precisely
+    where ``True == 1`` and ``1.0 == 1`` made a direct comparison succeed.
+    """
+
+    def test_the_origin_really_is_at_version_one(self, world):
+        world["selector_response"].refresh_from_db()
+        assert world["selector_response"].version == 1
+
+    def test_true_does_not_pass_as_version_one(self, world):
+        from iig_checklist.calculation_execution import InvalidExpectedVersion
+
+        world["selector_response"].refresh_from_db()
+        assert world["selector_response"].version == 1
+        # The exact Python equality a direct comparison would have accepted.
+        assert True == 1
+
+        before = _mutation_fingerprint(world)
+        with pytest.raises(InvalidExpectedVersion):
+            _raw_cascade(world, True)
+        assert _mutation_fingerprint(world) == before
+
+    def test_float_one_does_not_pass_as_version_one(self, world):
+        from iig_checklist.calculation_execution import InvalidExpectedVersion
+
+        world["selector_response"].refresh_from_db()
+        assert world["selector_response"].version == 1
+        assert 1.0 == 1
+
+        before = _mutation_fingerprint(world)
+        with pytest.raises(InvalidExpectedVersion):
+            _raw_cascade(world, 1.0)
+        assert _mutation_fingerprint(world) == before
+
+    def test_the_valid_integer_one_still_passes(self, world):
+        """The gate must reject the impostors without rejecting the real value."""
+        world["selector_response"].refresh_from_db()
+        assert world["selector_response"].version == 1
+        result = _raw_cascade(world, 1)
+        assert result.triggered is True
+        assert result.recalculated_count == len(ALL_KEYS)
+
+
+class TestGenuineStaleVersion:
+    """A valid integer that differs from the locked row -- and nothing else."""
+
+    def test_a_valid_integer_mismatch_is_stale(self, world):
+        world["selector_response"].refresh_from_db()
+        current = world["selector_response"].version
+        with pytest.raises(StaleResponseVersion):
+            _raw_cascade(world, current + 1)
+
+    def test_a_genuine_stale_version_is_detected_under_the_lock(self, world):
+        """The comparison reads the locked row, not the caller's copy."""
+        with CaptureQueriesContext(connection) as ctx:
+            with pytest.raises(StaleResponseVersion):
+                _raw_cascade(world, 9999)
+        locked = [q for q in ctx.captured_queries if "FOR UPDATE" in q["sql"].upper()]
+        assert locked, "the origin must be locked before the mismatch is reported"
+
+    def test_a_genuine_stale_version_mutates_nothing(self, world):
+        before = _mutation_fingerprint(world)
+        with pytest.raises(StaleResponseVersion):
+            _raw_cascade(world, 9999)
+        assert _mutation_fingerprint(world) == before
+
+    def test_a_genuine_stale_version_runs_no_target(self, world, monkeypatch):
+        from iig_checklist import calculation_execution as exec_mod
+
+        calls = []
+        original = exec_mod.execute_calculation_response
+
+        def recording(**kwargs):
+            # Deliberately never reached: that this recorder's body stays
+            # uncovered is the assertion, restated below as an empty ``calls``.
+            calls.append(str(kwargs["response"].public_id))
+            return original(**kwargs)
+
+        monkeypatch.setattr(cascade_mod, "execute_calculation_response", recording)
+        with pytest.raises(StaleResponseVersion):
+            _raw_cascade(world, 9999)
+        assert calls == []
+
+
+# ===========================================================================
+# O. A stale downstream target -- M4D3-RBD-008 whole-cascade rollback
+# ===========================================================================
+
+
+class TestStaleDownstreamTarget:
+    """The third target presents a stale version part-way through the cascade.
+
+    The seam replaces only the ``expected_version`` the cascade hands the writer
+    for that one target: the real ``execute_calculation_response()`` runs, takes
+    its own locks and raises the governed ``StaleResponseVersion`` itself.
+    """
+
+    @staticmethod
+    def _stale_at_third(monkeypatch, seen):
+        from iig_checklist import calculation_execution as exec_mod
+
+        original = exec_mod.execute_calculation_response
+
+        def staling(**kwargs):
+            seen.append(str(kwargs["response"].public_id))
+            if len(seen) == 3:
+                kwargs["expected_version"] = kwargs["expected_version"] + 500
+            return original(**kwargs)
+
+        monkeypatch.setattr(cascade_mod, "execute_calculation_response", staling)
+
+    def test_the_cascade_has_at_least_three_calculated_targets(self, world):
+        assert len(build_execution_graph(world["execution"]).nodes) >= 3
+
+    def test_a_stale_target_raises_and_rolls_the_whole_cascade_back(
+        self, world, monkeypatch
+    ):
+        seen = []
+        before = _mutation_fingerprint(world)
+        self._stale_at_third(monkeypatch, seen)
+
+        with pytest.raises(StaleResponseVersion):
+            _cascade(world)
+
+        # The first two targets did run and did write; none of it survived.
+        assert len(seen) == 3
+        assert _mutation_fingerprint(world) == before
+
+    def test_no_snapshot_survives_a_stale_target(self, world, monkeypatch):
+        from iid_assessment.models import AssessmentSnapshot
+
+        before = AssessmentSnapshot.objects.count()
+        self._stale_at_third(monkeypatch, [])
+        with pytest.raises(StaleResponseVersion):
+            _cascade(world)
+        assert AssessmentSnapshot.objects.count() == before
+
+    def test_no_audit_fires_for_a_stale_target(
+        self, world, monkeypatch, django_capture_on_commit_callbacks
+    ):
+        """The rollback discards the transaction, so no on_commit callback runs."""
+        from audit.models import AuditEvent
+
+        before = AuditEvent.objects.count()
+        self._stale_at_third(monkeypatch, [])
+        with (
+            pytest.raises(StaleResponseVersion),
+            django_capture_on_commit_callbacks(execute=True) as callbacks,
+        ):
+            _cascade(world)
+        assert callbacks == []
+        assert AuditEvent.objects.count() == before
+
+    def test_no_partial_cascade_survives(self, world, monkeypatch):
+        """Every outcome is back at its pre-cascade state, not merely most."""
+        self._stale_at_third(monkeypatch, [])
+        with pytest.raises(StaleResponseVersion):
+            _cascade(world)
+        for key in ALL_KEYS:
+            outcome = _outcome(world, key)
+            assert outcome.status == CalculationStatus.DATA_REQUIRED
+            assert outcome.value is None
+            assert outcome.generated_at is None
+
+
+# ===========================================================================
+# P. A real multi-level chain -- manual A -> calculated B -> calculated C
+# ===========================================================================
+
+
+def _recording_writer(monkeypatch):
+    """Count real writer invocations per response, without replacing it."""
+    from iig_checklist import calculation_execution as exec_mod
+
+    seen: list[str] = []
+    original = exec_mod.execute_calculation_response
+
+    def recording(**kwargs):
+        seen.append(str(kwargs["response"].public_id))
+        return original(**kwargs)
+
+    monkeypatch.setattr(cascade_mod, "execute_calculation_response", recording)
+    return seen
+
+
+def _keep_only(world, keys):
+    """Reduce the execution's calculated responses to ``keys``, leaving them real."""
+    from iig_checklist.models import CalculationOutcome
+
+    for key in set(world["responses"]) - set(keys):
+        response = world["responses"][key]
+        CalculationOutcome.objects.filter(response=response).delete()
+        response.delete()
+
+
+class TestRealChainCascade:
+    """``Q_SUBJECT_COMPONENT`` -> ``daily_exposure`` -> ``percentage_of_iid_mde``.
+
+    Entirely the approved registry: real ORM responses and outcomes, the real
+    resolver and the real calculation writer. Nothing is mocked -- the recorder
+    wraps the writer to count calls and delegates to it unchanged.
+    """
+
+    CHAIN = ("daily_exposure", "percentage_of_iid_mde")
+
+    @pytest.fixture
+    def chain(self, world):
+        _keep_only(world, self.CHAIN)
+        return world
+
+    def test_the_topology_really_is_a_two_level_chain(self, chain):
+        graph = build_execution_graph(chain["execution"])
+        by_code = {n.question_code: node_id for node_id, n in graph.nodes.items()}
+        assert set(by_code) == {registry_mod.Q_DAILY_EXPOSURE, "Q_PCT_MDE"}
+        assert graph.edges[by_code["Q_PCT_MDE"]] == (
+            by_code[registry_mod.Q_DAILY_EXPOSURE],
+        )
+        assert graph.edges[by_code[registry_mod.Q_DAILY_EXPOSURE]] == ()
+
+    def test_each_link_runs_exactly_once_and_in_order(self, chain, monkeypatch):
+        seen = _recording_writer(monkeypatch)
+        result = _cascade(chain)
+
+        b_id = str(chain["responses"]["daily_exposure"].public_id)
+        c_id = str(chain["responses"]["percentage_of_iid_mde"].public_id)
+        assert seen.count(b_id) == 1
+        assert seen.count(c_id) == 1
+        assert seen.index(b_id) < seen.index(c_id)
+        assert list(result.recalculated_response_public_ids) == [b_id, c_id]
+
+    def test_the_downstream_link_reads_the_upstream_outcome_written_this_cascade(
+        self, chain
+    ):
+        result = _cascade(chain)
+        assert result.triggered is True
+
+        upstream = _outcome(chain, "daily_exposure")
+        downstream = _outcome(chain, "percentage_of_iid_mde")
+        assert upstream.status == CalculationStatus.COMPLETE
+        assert upstream.value == Decimal("1.000000")
+        assert downstream.status == CalculationStatus.COMPLETE
+        # 1 g against the precedent's 2 g maximum daily exposure.
+        assert downstream.value == Decimal("50")
+
+    def test_the_downstream_provenance_names_the_current_upstream_outcome(
+        self, chain
+    ):
+        _cascade(chain)
+        upstream = _outcome(chain, "daily_exposure")
+        downstream = _outcome(chain, "percentage_of_iid_mde")
+        assert downstream.input_provenance["upstream_outcome_public_ids"] == [
+            str(upstream.public_id)
+        ]
+        descriptor = downstream.input_provenance["converted_proposed_daily_exposure"]
+        assert descriptor["source_public_id"] == str(upstream.public_id)
+        assert descriptor["source_question_code"] == registry_mod.Q_DAILY_EXPOSURE
+        assert descriptor["resolver_provenance"]["upstream_outcome_public_id"] == str(
+            upstream.public_id
+        )
+
+    def test_a_changed_input_flows_the_whole_way_down_the_chain(self, chain):
+        """The chain is live, not a fixture coincidence: move A, watch C move."""
+        _cascade(chain)
+        assert _outcome(chain, "percentage_of_iid_mde").value == Decimal("50")
+
+        component = chain["component"]
+        component.quantity_per_dosage_unit = Decimal("0.125000")
+        component.save(update_fields=["quantity_per_dosage_unit", "updated_at"])
+
+        _cascade(chain)
+        assert _outcome(chain, "daily_exposure").value == Decimal("0.500000")
+        assert _outcome(chain, "percentage_of_iid_mde").value == Decimal("25")
+
+
+# ===========================================================================
+# Q. A real diamond -- A -> B, A -> C, (B, C) -> D
+# ===========================================================================
+#
+# The approved six entries contain no diamond, so the topology is expressed
+# with a synthetic registry. Only the *shape* is synthetic: B and C are the
+# approved ``daily_exposure`` entry itself, D is the approved
+# ``difference_from_iid_mde`` entry with its two inputs pointed at B and C, and
+# the real resolver, the real engine functions and the real calculation writer
+# all run untouched.
+
+
+class TestRealDiamondCascade:
+    B_CODE = "Q_DIA_B"
+    C_CODE = "Q_DIA_C"
+    D_CODE = "Q_DIA_D"
+
+    @pytest.fixture
+    def diamond(self, world, monkeypatch):
+        approved = registry_mod.CALCULATION_BINDING_REGISTRY
+        parent = approved["daily_exposure"]
+        sink = approved["difference_from_iid_mde"]
+
+        def _from_outcome(question_code):
+            return MappingProxyType(
+                {
+                    "source": registry_mod.SOURCE_CALCULATION_OUTCOME,
+                    "question_code": question_code,
+                    "field": "value",
+                    "required_status": "complete",
+                    # A literal target unit, not a ``SnapshotUnitRef``: the
+                    # sink declares no snapshot-sourced input here, so there is
+                    # no snapshot for a reference unit to be read from. Both
+                    # parents emit grams, so no conversion is implied either.
+                    "required_unit": "gram",
+                    "unit_source": "gram",
+                    "expected_type": "decimal",
+                }
+            )
+
+        _synthetic_world(
+            world,
+            monkeypatch,
+            {
+                "dia_b": parent,
+                "dia_c": parent,
+                "dia_d": dataclasses.replace(
+                    sink,
+                    input_resolvers=MappingProxyType(
+                        {
+                            "converted_proposed_daily_exposure": _from_outcome(
+                                self.B_CODE
+                            ),
+                            "selected_iid_mde": _from_outcome(self.C_CODE),
+                        }
+                    ),
+                    calculation_dependencies=(self.B_CODE, self.C_CODE),
+                    recalculation_triggers=(self.B_CODE, self.C_CODE),
+                    required_units=MappingProxyType(
+                        {
+                            "converted_proposed_daily_exposure": "gram",
+                            "selected_iid_mde": "gram",
+                        }
+                    ),
+                ),
+            },
+            {
+                "daily_exposure": (self.B_CODE, "dia_b"),
+                "percentage_w_w": (self.C_CODE, "dia_c"),
+                "difference_from_iid_mde": (self.D_CODE, "dia_d"),
+            },
+        )
+        return {
+            "world": world,
+            "b": world["responses"]["daily_exposure"],
+            "c": world["responses"]["percentage_w_w"],
+            "d": world["responses"]["difference_from_iid_mde"],
+        }
+
+    def test_the_topology_really_is_a_diamond(self, diamond):
+        graph = build_execution_graph(diamond["world"]["execution"])
+        by_code = {n.question_code: node_id for node_id, n in graph.nodes.items()}
+        assert set(by_code) == {self.B_CODE, self.C_CODE, self.D_CODE}
+        assert graph.edges[by_code[self.B_CODE]] == ()
+        assert graph.edges[by_code[self.C_CODE]] == ()
+        assert set(graph.edges[by_code[self.D_CODE]]) == {
+            by_code[self.B_CODE],
+            by_code[self.C_CODE],
+        }
+
+    def test_every_node_runs_exactly_once_with_the_sink_last(
+        self, diamond, monkeypatch
+    ):
+        seen = _recording_writer(monkeypatch)
+        result = _cascade(diamond["world"])
+
+        b_id = str(diamond["b"].public_id)
+        c_id = str(diamond["c"].public_id)
+        d_id = str(diamond["d"].public_id)
+        assert seen.count(b_id) == 1
+        assert seen.count(c_id) == 1
+        assert seen.count(d_id) == 1
+        assert len(seen) == 3
+        assert seen[-1] == d_id
+        assert list(result.recalculated_response_public_ids) == [b_id, c_id, d_id]
+        assert list(result.question_codes) == [self.B_CODE, self.C_CODE, self.D_CODE]
+
+    def test_the_sink_is_not_executed_twice_for_its_two_parents(
+        self, diamond, monkeypatch
+    ):
+        """M4D3-DAG-010 -- the visited set, on the topology that would expose it."""
+        seen = _recording_writer(monkeypatch)
+        _cascade(diamond["world"])
+        assert seen.count(str(diamond["d"].public_id)) == 1
+
+    def test_the_sink_reads_both_newly_recalculated_parents(self, diamond):
+        world = diamond["world"]
+        result = _cascade(world)
+        assert result.triggered is True
+
+        b_outcome = _outcome(world, "daily_exposure")
+        c_outcome = _outcome(world, "percentage_w_w")
+        d_outcome = _outcome(world, "difference_from_iid_mde")
+
+        assert b_outcome.status == CalculationStatus.COMPLETE
+        assert c_outcome.status == CalculationStatus.COMPLETE
+        assert d_outcome.status == CalculationStatus.COMPLETE
+        # D is ``selected_iid_mde - converted_proposed_daily_exposure``, wired
+        # here to C - B, and both parents recalculated in this same cascade.
+        assert d_outcome.value == c_outcome.value - b_outcome.value
+
+    def test_the_sink_provenance_names_both_current_upstream_outcomes(self, diamond):
+        world = diamond["world"]
+        _cascade(world)
+
+        b_outcome = _outcome(world, "daily_exposure")
+        c_outcome = _outcome(world, "percentage_w_w")
+        d_outcome = _outcome(world, "difference_from_iid_mde")
+
+        assert set(d_outcome.input_provenance["upstream_outcome_public_ids"]) == {
+            str(b_outcome.public_id),
+            str(c_outcome.public_id),
+        }
+        for kwarg, parent in (
+            ("converted_proposed_daily_exposure", b_outcome),
+            ("selected_iid_mde", c_outcome),
+        ):
+            descriptor = d_outcome.input_provenance[kwarg]
+            assert descriptor["source_public_id"] == str(parent.public_id)
+            assert descriptor["resolver_provenance"][
+                "upstream_outcome_public_id"
+            ] == str(parent.public_id)
+
+    def test_a_changed_parent_moves_the_sink(self, diamond):
+        """Both parents are live inputs, so the sink tracks them."""
+        world = diamond["world"]
+        _cascade(world)
+        first = _outcome(world, "difference_from_iid_mde").value
+
+        world["component"].quantity_per_dosage_unit = Decimal("0.125000")
+        world["component"].save(
+            update_fields=["quantity_per_dosage_unit", "updated_at"]
+        )
+        _cascade(world)
+
+        b_outcome = _outcome(world, "daily_exposure")
+        c_outcome = _outcome(world, "percentage_w_w")
+        assert b_outcome.value == Decimal("0.500000")
+        assert _outcome(world, "difference_from_iid_mde").value == (
+            c_outcome.value - b_outcome.value
+        )
+        assert first is not None
