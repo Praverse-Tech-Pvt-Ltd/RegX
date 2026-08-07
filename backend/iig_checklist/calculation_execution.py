@@ -75,7 +75,7 @@ Two properties make this order deadlock-free:
 from __future__ import annotations
 
 import uuid as uuid_module
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from types import MappingProxyType
@@ -167,6 +167,10 @@ class CalculationExecutionResult:
     value: Decimal | None
     unit: str
     failure_codes: tuple[str, ...] = ()
+    #: M4D3-RCL-004 -- set only when a recalculation left ``status``, ``value``,
+    #: ``reason_code`` and ``generated_at`` all unchanged and the governed audit
+    #: event was therefore withheld. Always ``False`` for a direct execution.
+    audit_suppressed: bool = False
 
     @property
     def complete(self) -> bool:
@@ -430,6 +434,18 @@ def _persist_source_unavailable(outcome, entry):
     )
 
 
+def _outcome_signature(outcome):
+    """M4D3-RCL-004 -- the four governed fields the clause names, and only those.
+
+    ``updated_at`` and ``input_provenance`` move on every write and are
+    deliberately excluded: the clause defines "unchanged" as ``status``,
+    ``value``, ``reason_code`` and ``generated_at``, so widening the comparison
+    would suppress audit for a recalculation that did change a governed value,
+    and narrowing it would emit an event the clause forbids.
+    """
+    return (outcome.status, outcome.value, outcome.reason_code, outcome.generated_at)
+
+
 def _validate_expected_version(expected_version) -> int:
     """M4D3-TXN-003 -- optimistic concurrency is mandatory, not opt-in.
 
@@ -456,6 +472,7 @@ def execute_calculation_response(
     actor,
     expected_version: int,
     _internal_snapshot_context: ResolutionContext | None = None,
+    _suppress_unchanged_audit: bool = False,
 ) -> CalculationExecutionResult:
     """Resolve, calculate and persist one calculated response's outcome.
 
@@ -483,6 +500,17 @@ def execute_calculation_response(
     underscore-prefixed because no client-reachable path may steer a snapshot
     into a calculation (M4D3-SNO-011); no view, serializer or task calls this
     service at all, and a test asserts that.
+
+    ``_suppress_unchanged_audit`` is the M4D3-RCL-004 hook, set only by the
+    governed cascade service. When a recalculation leaves ``status``, ``value``,
+    ``reason_code`` and ``generated_at`` all unchanged, no audit event is
+    emitted. Only this service can make that judgement -- it alone sees the
+    outcome row before and after the write, under the lock, and it alone owns
+    the ``on_commit`` dispatch -- so the decision lives here rather than in the
+    cascade. It defaults to ``False``, so a direct execution always audits and
+    the reviewed single-response behaviour is untouched. The clause's companion
+    requirement, "no version change", needs no code: recalculation never writes
+    ``ChecklistResponse.version`` on a calculated response (M4D3-MDL-006).
     """
     from django.db import transaction as db_transaction
 
@@ -544,6 +572,24 @@ def execute_calculation_response(
             raise PlaceholderAmbiguous(question.code)
         outcome = outcomes[0]
 
+        # M4D3-RCL-004 -- the governed comparison basis, read from the locked
+        # row before anything writes to it.
+        outcome_before = _outcome_signature(outcome)
+
+        def audit_unless_unchanged(result, snapshot_public_id):
+            """M4D3-RCL-004 -- withhold the event when nothing governed moved."""
+            if _suppress_unchanged_audit and _outcome_signature(outcome) == (
+                outcome_before
+            ):
+                return replace(result, audit_suppressed=True)
+            _schedule_audit(
+                tenant=tenant, execution=execution, response=locked_response,
+                question=question, identifier=identifier, entry=entry,
+                actor=actor, result=result,
+                snapshot_public_id=snapshot_public_id,
+            )
+            return result
+
         # 5. the snapshot, last.
         #
         #    A snapshot this transaction is about to create needs no lock: it
@@ -571,12 +617,7 @@ def execute_calculation_response(
             except ActiveReleaseUnavailable:
                 # M4D3-SRC-002 -- a governed error outcome, not an exception.
                 result = _persist_source_unavailable(outcome, entry)
-                _schedule_audit(
-                    tenant=tenant, execution=execution, response=locked_response,
-                    question=question, identifier=identifier, entry=entry,
-                    actor=actor, result=result, snapshot_public_id=None,
-                )
-                return result
+                return audit_unless_unchanged(result, None)
 
         snapshot = getattr(resolution_context, "assessment_snapshot", None)
 
@@ -597,13 +638,9 @@ def execute_calculation_response(
             )
 
         # -- Phase C: audit, only after the transaction commits ----------
-        _schedule_audit(
-            tenant=tenant, execution=execution, response=locked_response,
-            question=question, identifier=identifier, entry=entry, actor=actor,
-            result=result,
-            snapshot_public_id=(
-                str(snapshot.public_id) if snapshot is not None else None
-            ),
+        result = audit_unless_unchanged(
+            result,
+            str(snapshot.public_id) if snapshot is not None else None,
         )
     return result
 
