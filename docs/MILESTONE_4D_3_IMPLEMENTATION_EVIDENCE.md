@@ -2388,6 +2388,316 @@ Unchanged: cascade recalculation orchestration; the difference result-unit
 specification gap (§6I); the durable audit outbox; external execution API
 error-code mapping (M4D3-OUT-005); and the wider deferred list of §6J.
 
+## 6N. Cascade recalculation orchestration
+
+Closes the largest remaining gap of Milestone 4D-3. Every earlier section
+recalculated **one** response at a time; this one implements M4D3-RCL — when a
+governed response changes, every outcome that consumes it is recalculated, in a
+deterministic order, inside one transaction.
+
+Six commits, `cd1b86c` → `5bf820b`, on `regx/feat/milestone-4d-3`.
+
+### Form B freshness, hardened first (`cd1b86c`)
+
+§6M closed the Form C duplication. Auditing the remaining `execution.<relation>`
+uses in the resolver found the same defect class in Form B.
+`_resolve_formulation_field()` read `execution.formulation_version`, a
+lazily-loaded FK that keeps whatever the row held when the caller first touched
+it. The values it reads — `total_dosage_unit_weight` and its unit — are regulated
+inputs to `percentage_w_w`, and a governed `AssessmentSnapshot` freezes that same
+weight from the **current** row in the same transaction. A cached copy could put
+two different formulation states into one calculation.
+
+It now reads through `formulations.dosing.current_formulation_version()`, the one
+shared helper Form C already uses.
+
+**The §14 audit of the other forms found no further instances.**
+
+| Resolver form | Read path | Staleness risk |
+|---|---|---|
+| A — `question_response` | `_responses_for_question()` queries fresh | none |
+| B — `formulation_field` | **was** `execution.formulation_version` | **fixed here** |
+| C — `maximum_daily_units` | `resolve_current_maximum_daily_units()` | none (§6M) |
+| D — `assessment_snapshot` | the caller's exact locked snapshot, `tenant_id` compared | none by design |
+| E — `calculation_outcome` | `_locate_upstream()` queries `CalculationOutcome` fresh | none — and this is what makes a cascade dependant see its upstream's new value |
+| F — `constant` | registry only, no ORM | none |
+| subject component | `_component_in_execution()` queries fresh, scoped by `formulation_version_id` | none |
+
+The one remaining use of `execution.tenant` is passed to
+`validate_raw_value_shape()` for tenant scoping, not read as a regulated value.
+
+Four tests, each of which **fails** against the previous implementation
+(verified by reverting the fix): a stale cached scalar bypassed; a stale cached
+unit bypassed, visible as a 1000× conversion rather than a silent equality; Form
+B and a fresh read agreeing on one weight; and Form B and Form C sharing one read
+path. Behaviour preservation was established first — the existing 246 resolver
+and execution tests passed with **no edits** before those four were added.
+
+### The normative matrix, read before coding
+
+Per §3 of the brief, the cascade rules were taken from the specification rather
+than inferred. Nothing below is a design choice.
+
+| Clause | What it requires | Where it lands |
+|---|---|---|
+| M4D3-RCL-001 | cascade keyed on `recalculation_triggers`, explicitly **not** `calculation_dependencies` | `affected_nodes_for_trigger()` |
+| M4D3-RCL-006 | resolve changed identity → directly affected set → expand through `calculation_dependencies` → union in stable topological order → lock in Part 17 order → recalculate in the same transaction | `recalculate_dependents()`, steps 1–5 |
+| M4D3-RCL-007 | a non-trigger response recalculates nothing, changes no version, emits no audit | early return, `triggered=False` |
+| M4D3-RCL-002 / DAG-006 | stable topological order, tie-break ascending `ChecklistQuestion.code` | `_topological_order()` — **corrected**, below |
+| M4D3-RCL-003 | outcome rows updated in place, `full_clean()` before each save | already owned by the execution service |
+| M4D3-RCL-004 | no audit and no version change when `status`, `value`, `reason_code` and `generated_at` are all unchanged | `_suppress_unchanged_audit`, below |
+| M4D3-RCL-005 | terminal and submitted executions never auto-recalculated | `RECALCULABLE_EXECUTION_STATUSES` allow-list |
+| M4D3-DAG-005 | Kahn's or equivalent iterative; unbounded recursion prohibited | pre-existing, unchanged |
+| M4D3-DAG-010 | a visited set; each node runs at most once | `dict.fromkeys()` over the graph order |
+| M4D3-RBD-008 | "dependency-graph failure, and stale `expected_version`" are among the structural failures that "roll back the entire" operation | whole-cascade rollback |
+
+**§11 of the brief said "do not invent this choice" about rollback vs partial
+completion. It was not invented.** M4D3-RBD-008 names both failure modes
+explicitly, so the cascade is all-or-nothing: one blocking failure discards every
+outcome, snapshot and audit of the event.
+
+**There is no cascade summary audit event, and this too is read, not chosen.**
+M4D3-RCL-006 requires the per-calculation success audit after commit. No approved
+clause and no constant in `iig_checklist/audit.py` defines a cascade-level event —
+`RECALC` and `CASCADE` appear nowhere in it. Adding one would be inventing
+governed vocabulary.
+
+### The dependency graph, ORM side (`1a056bf`)
+
+`calculation_graph` was already pure and complete — edge derivation, Kahn
+ordering, cycle detection, the depth limit and the cascade node limit. Nothing
+built its nodes from the database. `build_execution_graph()` is that half.
+
+| Decision | Clause | Why |
+|---|---|---|
+| node identity is the **response** public UUID | M4D3-DEP-007 | two questions bound to one function stay distinct |
+| the query is scoped to the execution | M4D3-DAG-009 | one `ChecklistVersion`, one tenant; a graph can never span versions |
+| nodes are **not** filtered | M4D3-RBD-008 | an unapproved binding raises `UNKNOWN_REGISTRY_IDENTIFIER`; skipping it would recalculate part of the graph and leave the rest silently stale |
+| `CascadeGraphInvalid` carries `error_code` + question codes | — | never a database id, never a raw exception |
+
+Read-only: no transaction, no lock, no write — asserted by capturing SQL and
+requiring the verb set to be exactly `{SELECT}` with no `FOR UPDATE`.
+
+### A defect the cascade exposed — the DAG-006 tie-break (`b9aa82c`)
+
+**Found while writing the ordering tests, not by inspection.**
+
+M4D3-DAG-006 names the tie-break for equal-precedence nodes exactly: ascending
+`ChecklistQuestion.code`. `_topological_order()` sorted by `node_id`.
+
+The two were indistinguishable until now. Every existing pure-graph test passes
+node ids (`"n-exposure"`, `"n-pct"`) that happen to sort the same way as their
+question codes, and nothing built nodes from the database.
+`build_execution_graph()` does, and its node identity is the governed response
+public UUID — effectively random. Keyed on it:
+
+- two executions carrying exactly the same six questions would recalculate them
+  in **different** orders;
+- repeated runs of one execution would agree only by accident.
+
+The sort key is now `(question_code, node_id)`, applied both to the initial ready
+set and to nodes released mid-sort. Question codes are already unique within a
+graph (`_index_by_question_code` enforces it), so the code alone is a total
+order; `node_id` keeps the key total by construction.
+
+Two regression tests, both failing against the previous implementation, use node
+ids and codes that are deliberately **opposed** (`"zzz"`/`Q_AAA` vs
+`"aaa"`/`Q_ZZZ`), so only the correct key produces the asserted order. The full
+1601-test suite passing with the corrected key is itself the evidence that no
+existing behaviour depended on the node-id ordering.
+
+### The orchestration service (`31d7686`)
+
+```
+recalculate_dependents(*, tenant, execution, changed_response, actor,
+                       expected_version) -> CascadeRecalculationResult
+```
+
+M4D3-RCL-006 implemented in order:
+
+| Step | Action |
+|---|---|
+| A | caller contract — response in execution, execution in tenant. No lock, no write |
+| 1 | `ChecklistExecution` locked; M4D3-RCL-005 status checked **under the lock**, so the state examined is the committed state |
+| 2 | the changed response locked; `expected_version` checked against the locked row |
+| 3 | graph built and the affected set resolved — read-only, and a graph fault raises **here**, before any further lock or write |
+| 4 | every affected response, then every affected outcome, each `ORDER BY id ASC ... FOR UPDATE`, taken as one set before any recalculation |
+| 5 | each target executed in stable topological order, once |
+
+**It is not a second calculation writer.** Every target goes through
+`execute_calculation_response()`, which stays the sole owner of function
+invocation, engine translation, outcome persistence, provenance, snapshot
+creation and audit. The module never names the engine, never touches an outcome
+field and never dispatches audit — asserted against its **parsed AST**, not its
+text, because the module documents at length what it does not do and a substring
+sweep would flag its own prose.
+
+**Two ORM details worth recording.**
+
+Neither batched lock uses `select_related`: on PostgreSQL a joined
+`SELECT … FOR UPDATE` would also lock `checklistquestion`, adding a table the
+Part 17 order does not contain. The locked rows are then re-read with a plain
+`SELECT` inside the transaction, so the `version` handed to the writer is the
+value under our own lock rather than whatever the pre-lock scan saw.
+
+### M4D3-RCL-004 — why the flag lives in the writer
+
+The clause suppresses the audit event when `status`, `value`, `reason_code` and
+`generated_at` are all unchanged. Only the writer can evaluate that: it alone
+sees the outcome row before and after the write, under the lock, and it alone
+owns the `on_commit` dispatch. So `execute_calculation_response()` gained a
+private `_suppress_unchanged_audit` parameter rather than the cascade emitting or
+withholding audit itself.
+
+| Property | Value |
+|---|---|
+| fields compared | exactly the four the clause names — `updated_at` and `input_provenance` move on every write and are deliberately excluded |
+| default | `False`, so direct single-response execution is untouched |
+| set by | the cascade service only |
+| surfaced as | `CalculationExecutionResult.audit_suppressed`, `CascadeTarget.audit_suppressed`, `CascadeRecalculationResult.audited_count` |
+
+The clause's companion requirement, "no version change", needs **no code**:
+recalculation never writes `ChecklistResponse.version` on a calculated response
+(M4D3-MDL-006), and a test asserts every version is unchanged after a cascade.
+
+Widening the comparison would suppress audit for a recalculation that *did*
+change a governed value; narrowing it would emit an event the clause forbids.
+
+### Tests (`a630f6a`, `5bf820b`)
+
+**65 tests**, real PostgreSQL, no mocked QuerySets or managers.
+
+The approved six-entry registry already contains a genuine two-level cascade, so
+the primary fixture needs no synthetic registry:
+
+```
+Q_SUBJECT_COMPONENT   (user-required selector — no graph edge at all)
+  --recalculation_triggers--> percentage_w_w
+                              daily_exposure            (= Q_DAILY_EXPOSURE)
+                              percentage_of_iid_potency
+                              difference_from_iid_potency
+
+Q_DAILY_EXPOSURE      (both a trigger and a calculation_dependency)
+  --------------------------> percentage_of_iid_mde
+                              difference_from_iid_mde
+```
+
+That is M4D3-RCL-001 in one fixture: the selector creates no edge, yet changing
+it recalculates all six, ordered so `daily_exposure` precedes the two
+calculations that read its outcome.
+
+| Group | Coverage |
+|---|---|
+| Graph discovery | all six become nodes; identity is the response UUID; user-input questions are not nodes; edges come only from `calculation_dependencies`; discovery is read-only; another execution's responses never enter; an execution with no calculations yields a valid empty graph |
+| Governed graph faults | cycle; self-dependency; dependency outside the version; depth beyond the limit; unapproved binding **rejected, not skipped**; a fault aborts before any write; the error carries no database id |
+| Trigger identification | the selector cascades to all six; a non-trigger response recalculates nothing and issues no `UPDATE`/`INSERT` at all; a trigger reaches only its declared consumers |
+| Ordering | upstream before dependants; independent nodes by ascending code; stable across runs; **independent of response public ids**, proven with a sibling execution carrying the same codes on different UUIDs; a dependant consumes the upstream value written in the same cascade, checked through `upstream_outcome_public_ids` |
+| Writer boundary | every target passes through `execute_calculation_response()`; the AST assertion; no ORM object leaks; the result is frozen |
+| Outcome persistence | rows updated in place, same pk and public id, no row count change; a second cascade reuses them; response versions unchanged; **end-to-end value assertion** — doubling the component quantity moves `percentage_w_w` 25 → 50, `daily_exposure` 1 g → 2 g, `percentage_of_iid_mde` 50 → 100 |
+| Audit | one event per target; no cascade summary event invented; M4D3-RCL-004 suppression; a changed recalculation still audits; direct execution always audits; a rolled-back cascade emits nothing |
+| Atomicity | an engine fault part-way through discards **every** outcome; no snapshot survives a rollback; a stale `expected_version` writes nothing; the version is checked against the committed row |
+| Snapshots | one new snapshot per snapshot-backed target (M4D3-SNO-006); a second cascade creates a second generation; outcomes reference the snapshot from their own cascade |
+| Execution state | all five non-recalculable statuses refused (parametrised); DRAFT and RETURNED proceed; the allow-list is disjoint from `TERMINAL_EXECUTION_STATUSES`; the status is read under the lock, proven with a genuinely stale in-memory copy |
+| Isolation | a foreign tenant refused; a response from another execution refused; a cascade never touches another execution's outcomes |
+| Lock order | the execution first; every multi-row lock `ORDER BY … id ASC`; responses before outcomes; **the whole affected set held before the first target runs** |
+| Result contract | origin identity; governed codes and 36-character UUIDs only; counts agree; target order equals the graph order |
+
+Two test-construction notes worth recording, because both could have produced a
+test that passes for the wrong reason:
+
+- The lock-order test examines only the queries issued **before** the first
+  target call, because `execute_calculation_response()` takes its own batched
+  locks per target. It then requires the cascade's own response lock to contain
+  all six affected ids and the outcome lock to follow it.
+- The M4D3-RCL-004 test deletes the FDA precedent first. The engine stamps
+  `generated_at` fresh on every successful result, so a repeated *successful*
+  recalculation always differs in that field; a stable `DATA_REQUIRED` outcome
+  (`generated_at` = `None`) is the only state in which a second run genuinely
+  changes none of the four governed fields. Companion tests assert a changed
+  recalculation still audits and that direct execution always audits, so the
+  suppression cannot degenerate into blanket cascade silence.
+
+Synthetic registries are installed with `monkeypatch` only where the approved
+entries cannot express the case — a cycle, a self-dependency, an over-deep chain.
+No committed registry definition is mutated.
+
+`create_execution` refuses a second active execution per formulation version, so
+the isolation and ordering-independence tests build a sibling execution on its
+own product and formulation.
+
+### Post-implementation gates
+
+Run **serially** — the suites share one PostgreSQL test database.
+
+| Gate | Command | Result |
+|---|---|---|
+| Cascade | `pytest …test_4d3_cascade.py --no-cov -q` | **65 passed**, 70.9 s |
+| Database-free foundation | `pytest …test_4d3_foundation.py --no-cov -q` | **186 passed**, 0.24 s |
+| Input resolvers | `pytest …test_4d3_calculation_inputs.py --no-cov -q` | **110 passed**, 76.5 s |
+| Calculation execution | `pytest …test_4d3_calculation_execution.py --no-cov -q` | **140 passed**, 112.0 s |
+| Execution readiness | `pytest …test_4d3_execution_readiness.py --no-cov -q` | **59 passed**, 26.2 s |
+| Activation validation | `pytest …test_4d3_activation_validation.py --no-cov -q` | **59 passed**, 44.5 s |
+| IID assessment (all) | `pytest iid_assessment --no-cov -q` | **167 passed**, 53.7 s |
+| Formulations | `pytest formulations --no-cov -q` | **21 passed**, 15.7 s |
+| Full backend suite | `pytest -q` | **1601 passed**, 0 failed, 0 skipped, 659.7 s, exit 0 |
+| Coverage | same run | **94.22 %** against a 55 % floor |
+| `cascade.py` coverage | targeted run | **100 %** (86 statements, 0 missed) |
+| `calculation_graph.py` coverage | targeted run | **100 %** (112 statements, 0 missed) |
+| `calculation_execution.py` coverage | targeted run | **100 %** |
+| System check | `manage.py check` | no issues (0 silenced), exit 0 |
+| Migration state | `makemigrations --check --dry-run` | **No changes detected**, exit 0 |
+| Migration history | `migrate --check` | exit 0 |
+| Ruff | `ruff check .` | All checks passed, exit 0 |
+| Import-linter | `lint-imports` | **7 kept, 0 broken**, exit 0 |
+
+The suite grew 1529 → **1601** (+72: 4 Form B, 65 cascade, 3 graph boundary) and
+coverage rose 93.99 % → **94.22 %**. No model, no migration, no serializer, no
+view and no frontend change. No threshold lowered, no file excluded, no test
+weakened or skipped, and no `pragma`, `noqa`, `skip` or `xfail` added.
+
+### Per-commit buildability
+
+Verified in isolated worktrees — the §6M disclosure exists because this was not
+checked at the time.
+
+| Commit | Imports in isolation | Own tests |
+|---|---|---|
+| `cd1b86c` Form B freshness | OK (3 modules) | 110 passed |
+| `1a056bf` dependency graph | OK (4 modules) | 183 passed |
+| `b9aa82c` DAG-006 tie-break | OK (4 modules) | 185 passed |
+| `31d7686` orchestration | OK (4 modules) | — |
+| `a630f6a` cascade tests | OK (4 modules) | 64 passed |
+
+All six commits build independently. `git bisect` across this range needs no
+`skip`.
+
+### Commit-plan deviation, disclosed
+
+The brief's §28 named five commits. Six were made. The two additions are both
+deliberate separations rather than scope creep:
+
+- `b9aa82c` — the DAG-006 tie-break is a **defect fix in a different module**,
+  found while writing the ordering tests. Folding it into the cascade feature
+  commit would have hidden a correctness change inside a feature.
+- `5bf820b` — the empty-graph boundary tests extend two already-committed test
+  files and close the last uncovered branch in the graph layer.
+
+### Still deferred
+
+Unchanged: the difference result-unit specification gap (§6I); the durable audit
+outbox; external execution API error-code mapping (M4D3-OUT-005); and the wider
+deferred list of §6J.
+
+**Not authorised and not done:** frontend; reports and exports; approval
+automation; manual override and deviation; component rebinding; async/Celery
+orchestration; any general-purpose rules engine; `eval` or dynamic expressions;
+arbitrary SQL dependencies; PR creation; merge.
+
+**No trigger surface was added.** `recalculate_dependents()` is a callable domain
+service. No view, serializer, signal or task calls it, and no client-reachable
+path can steer a dependency list into it — dependencies come only from the
+immutable approved registry.
+
 ## 7. Assertions
 
 These were written for the database-free foundation run and had not been
@@ -2426,5 +2736,36 @@ added `0003`.
 | Serializers or frontend added | **NO** |
 | Coverage threshold lowered | **NO** |
 | `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
+| PR created | **NO** |
+| Merged | **NO** |
+
+**Superseded rows.** Two rows of the milestone-to-date table above were written
+when §6I was the head and are no longer true. They are left in place rather than
+rewritten, so the record of what was true when is preserved:
+
+| Row | Was | Now |
+|---|---|---|
+| Governed `AssessmentSnapshot` creation | **NO** — open blocker | **YES** — §6J, `iid_assessment.services.create_assessment_snapshot()` |
+| Cascade recalculation orchestration | **NO** — deferred | **YES** — §6N, `iig_checklist.cascade.recalculate_dependents()` |
+
+**For the §6N cascade run specifically:**
+
+| Assertion | Answer |
+|---|---|
+| Migrations created | **NO** |
+| Models changed | **NO** |
+| Approved specification amended | **NO** |
+| Rules engine, `eval` or dynamic expressions added | **NO** — dependencies come only from the immutable approved registry |
+| Caller-supplied dependency lists accepted | **NO** |
+| Second calculation writer introduced | **NO** — every target goes through `execute_calculation_response()` |
+| Cascade-level audit event invented | **NO** — no approved clause or event constant defines one |
+| Async / Celery orchestration added | **NO** |
+| Component rebinding added | **NO** |
+| Serializers, views, API endpoints or frontend added | **NO** |
+| Trigger surface exposed to clients | **NO** — callable domain service only |
+| Coverage threshold lowered | **NO** — 93.99 % → 94.22 % |
+| Existing tests weakened or skipped | **NO** |
+| `pragma` / `noqa` / `skip` / `xfail` added | **NO** |
+| `frontend/next.config.ts` modified, staged or committed | **NO** — untouched throughout |
 | PR created | **NO** |
 | Merged | **NO** |
