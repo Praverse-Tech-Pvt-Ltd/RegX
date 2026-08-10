@@ -964,7 +964,15 @@ class TestAtomicity:
             calls["n"] += 1
             raise RuntimeError("engine fault")
 
-        monkeypatch.setattr(engine, "calculate_percentage_of_potency", exploding)
+        # The fault is injected at the governed calculation binding only -- the
+        # exact boundary this test exercises. Patching
+        # ``engine.calculate_percentage_of_potency`` itself is also reached by the
+        # governed snapshot preview (``_create_governed_snapshot`` ->
+        # ``create_assessment_snapshot`` -> ``run_preview``), which raises before
+        # the writer can wrap the failure, so the test saw a bare ``RuntimeError``
+        # instead of the governed ``CalculationEngineFailure`` depending on run
+        # order. The registry binding below faults the same calculation at the
+        # writer boundary the clause actually governs.
         monkeypatch.setattr(
             registry_mod,
             "CALCULATION_BINDING_REGISTRY",
