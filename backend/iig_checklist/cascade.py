@@ -170,9 +170,7 @@ def _calculated_responses(execution) -> list:
     return list(
         ChecklistResponse.objects.filter(
             execution=execution,
-            question__data_source_classification=(
-                DataSourceClassification.SYSTEM_CALCULATED
-            ),
+            question__data_source_classification=(DataSourceClassification.SYSTEM_CALCULATED),
         )
         .select_related("question")
         .order_by("question__code")
@@ -200,9 +198,7 @@ def build_execution_graph(execution):
         CalculationNode(
             node_id=str(response.public_id),
             question_code=response.question.code,
-            registry_identifier=(
-                response.question.calculation_binding_identifier or ""
-            ).strip(),
+            registry_identifier=(response.question.calculation_binding_identifier or "").strip(),
         )
         for response in _calculated_responses(execution)
     )
@@ -273,9 +269,7 @@ def recalculate_dependents(
     with db_transaction.atomic():
         # 1. the execution -- the serialization barrier every governed
         #    operation on this execution shares (M4D3-TXN-006).
-        locked_execution = ChecklistExecution.objects.select_for_update().get(
-            pk=execution.pk
-        )
+        locked_execution = ChecklistExecution.objects.select_for_update().get(pk=execution.pk)
         if locked_execution.status not in RECALCULABLE_EXECUTION_STATUSES:
             # M4D3-RCL-005 -- checked under the lock so the state examined is
             # the committed state.
@@ -314,14 +308,10 @@ def recalculate_dependents(
         #    Neither lock uses ``select_related``: on PostgreSQL a joined
         #    ``SELECT ... FOR UPDATE`` would also lock ``checklistquestion``,
         #    adding a table the Part 17 order does not contain.
-        pk_by_node = {
-            str(row.public_id): row.pk for row in _calculated_responses(execution)
-        }
+        pk_by_node = {str(row.public_id): row.pk for row in _calculated_responses(execution)}
         affected_pks = sorted(pk_by_node[node_id] for node_id in affected_node_ids)
         list(
-            ChecklistResponse.objects.filter(pk__in=affected_pks)
-            .select_for_update()
-            .order_by("pk")
+            ChecklistResponse.objects.filter(pk__in=affected_pks).select_for_update().order_by("pk")
         )
         list(
             CalculationOutcome.objects.filter(response_id__in=affected_pks)
@@ -334,9 +324,9 @@ def recalculate_dependents(
         # lock and not whatever the pre-lock scan happened to see.
         locked_by_node = {
             str(row.public_id): row
-            for row in ChecklistResponse.objects.filter(
-                pk__in=affected_pks
-            ).select_related("question")
+            for row in ChecklistResponse.objects.filter(pk__in=affected_pks).select_related(
+                "question"
+            )
         }
 
         # 5. recalculate in stable topological order (M4D3-RCL-002), each node
@@ -367,9 +357,7 @@ def recalculate_dependents(
                 )
             )
 
-    return CascadeRecalculationResult(
-        **result_base, triggered=True, targets=tuple(targets)
-    )
+    return CascadeRecalculationResult(**result_base, triggered=True, targets=tuple(targets))
 
 
 __all__ = [

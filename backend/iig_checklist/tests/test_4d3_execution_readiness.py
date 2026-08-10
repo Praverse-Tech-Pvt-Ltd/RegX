@@ -50,8 +50,12 @@ def _product(tenant, user, code="PROD-XR-01"):
     from formulations.models import ProductDevelopmentRecord
 
     return ProductDevelopmentRecord.objects.create(
-        tenant=tenant, product_code=code, proposed_product_name="Synthetic Product",
-        active_ingredient="Synthetic Ingredient", dosage_form="tablet", route="oral",
+        tenant=tenant,
+        product_code=code,
+        proposed_product_name="Synthetic Product",
+        active_ingredient="Synthetic Ingredient",
+        dosage_form="tablet",
+        route="oral",
         created_by=user,
     )
 
@@ -60,9 +64,12 @@ def _formulation(product, user):
     from formulations.models import FormulationVersion
 
     return FormulationVersion.objects.create(
-        product=product, version_number=1, status="approved",
+        product=product,
+        version_number=1,
+        status="approved",
         total_dosage_unit_weight=Decimal("1.000000"),
-        total_dosage_unit_weight_unit="gram", created_by=user,
+        total_dosage_unit_weight_unit="gram",
+        created_by=user,
     )
 
 
@@ -70,9 +77,11 @@ def _component(formulation, *, quantity="0.250000", order=1):
     from formulations.models import FormulationComponent
 
     return FormulationComponent.objects.create(
-        formulation_version=formulation, component_type="inactive",
+        formulation_version=formulation,
+        component_type="inactive",
         ingredient_name="Synthetic Excipient",
-        quantity_per_dosage_unit=Decimal(quantity), quantity_unit="gram",
+        quantity_per_dosage_unit=Decimal(quantity),
+        quantity_unit="gram",
         display_order=order,
     )
 
@@ -89,8 +98,11 @@ def _section(version, code="S1", order=1):
     from iig_checklist.models import ChecklistSection
 
     return ChecklistSection.objects.create(
-        checklist_version=version, code=code, title=f"Section {code}",
-        display_order=order, criticality=Criticality.MEDIUM,
+        checklist_version=version,
+        code=code,
+        title=f"Section {code}",
+        display_order=order,
+        criticality=Criticality.MEDIUM,
     )
 
 
@@ -98,17 +110,25 @@ def _question(section, code, *, answer_type, classification, binding="", order=1
     from iig_checklist.models import ChecklistQuestion
 
     return ChecklistQuestion.objects.create(
-        section=section, code=code, question_text=f"Q {code}", display_order=order,
-        answer_type=answer_type, data_source_classification=classification,
-        calculation_binding_identifier=binding, criticality=Criticality.LOW,
+        section=section,
+        code=code,
+        question_text=f"Q {code}",
+        display_order=order,
+        answer_type=answer_type,
+        data_source_classification=classification,
+        calculation_binding_identifier=binding,
+        criticality=Criticality.LOW,
     )
 
 
 def _calculated(section, code, identifier, *, order=1, answer_type=None):
     return _question(
-        section, code, answer_type=answer_type or AnswerType.CALCULATED_VALUE,
+        section,
+        code,
+        answer_type=answer_type or AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding=identifier, order=order,
+        binding=identifier,
+        order=order,
     )
 
 
@@ -118,9 +138,7 @@ def _grant_create_execution(tenant, user):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
-    role, _ = Role.objects.get_or_create(
-        tenant=tenant, name="doer", defaults={"is_system": True}
-    )
+    role, _ = Role.objects.get_or_create(tenant=tenant, name="doer", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
     return membership
 
@@ -134,9 +152,13 @@ def execution_world(db, tenant_a, tenant_definition, user_a, doer_membership):
     version = _active_version(tenant_definition, user_a)
     section = _section(version)
     return {
-        "tenant": tenant_a, "user": user_a, "product": product,
-        "formulation": formulation, "component": component,
-        "version": version, "section": section,
+        "tenant": tenant_a,
+        "user": user_a,
+        "product": product,
+        "formulation": formulation,
+        "component": component,
+        "version": version,
+        "section": section,
     }
 
 
@@ -222,9 +244,7 @@ class TestPlaceholderCalculationName:
         assert SUBJECT_COMPONENT_PROVENANCE_KEY not in outcome.input_provenance
         assert "_registry_binding_version" not in outcome.input_provenance
 
-    def test_two_calculated_questions_produce_two_valid_placeholders(
-        self, execution_world
-    ):
+    def test_two_calculated_questions_produce_two_valid_placeholders(self, execution_world):
         from iig_checklist.models import CalculationOutcome
 
         _calculated(execution_world["section"], "Q_PCT_WW", "percentage_w_w", order=1)
@@ -244,8 +264,11 @@ class TestPlaceholderCalculationName:
 
         _calculated(execution_world["section"], "Q_PCT_WW", "percentage_w_w", order=1)
         _question(
-            execution_world["section"], "Q_PLAIN", answer_type=AnswerType.SHORT_TEXT,
-            classification=DataSourceClassification.USER_REQUIRED, order=2,
+            execution_world["section"],
+            "Q_PLAIN",
+            answer_type=AnswerType.SHORT_TEXT,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=2,
         )
         execution = _create(execution_world)
         assert ChecklistResponse.objects.filter(execution=execution).count() == 2
@@ -288,7 +311,9 @@ class TestPlaceholderCalculationName:
         from iig_checklist.models import CalculationOutcome, ChecklistResponse
 
         _question(
-            execution_world["section"], "Q_PLAIN", answer_type=AnswerType.SHORT_TEXT,
+            execution_world["section"],
+            "Q_PLAIN",
+            answer_type=AnswerType.SHORT_TEXT,
             classification=DataSourceClassification.USER_REQUIRED,
         )
         execution = _create(execution_world)
@@ -313,9 +338,7 @@ class TestPlaceholderFailsClosed:
         assert ChecklistExecution.objects.count() == 0
         assert ChecklistResponse.objects.count() == 0
         assert CalculationOutcome.objects.count() == 0
-        assert not AuditEvent.objects.filter(
-            event_type="iig_checklist.execution.created"
-        ).exists()
+        assert not AuditEvent.objects.filter(event_type="iig_checklist.execution.created").exists()
 
     def test_unknown_identifier_rolls_everything_back(self, execution_world):
         from iig_checklist.services import InvalidCalculationBinding
@@ -329,7 +352,8 @@ class TestPlaceholderFailsClosed:
         from iig_checklist.services import InvalidCalculationBinding
 
         _question(
-            execution_world["section"], "Q_ORPHAN",
+            execution_world["section"],
+            "Q_ORPHAN",
             answer_type=AnswerType.CALCULATED_VALUE,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
         )
@@ -341,16 +365,16 @@ class TestPlaceholderFailsClosed:
         from iig_checklist.services import InvalidCalculationBinding
 
         _calculated(
-            execution_world["section"], "Q_PCT_WW", "percentage_w_w",
+            execution_world["section"],
+            "Q_PCT_WW",
+            "percentage_w_w",
             answer_type=AnswerType.CALCULATED_STATUS,
         )
         with pytest.raises(InvalidCalculationBinding):
             _create(execution_world)
         self._assert_nothing_persisted()
 
-    def test_wrong_source_classification_rolls_everything_back(
-        self, execution_world, monkeypatch
-    ):
+    def test_wrong_source_classification_rolls_everything_back(self, execution_world, monkeypatch):
         """Only reachable with a synthetic entry: the approved registry's
         allowed_data_source is always system_calculated."""
         from iig_checklist.services import InvalidCalculationBinding
@@ -359,9 +383,7 @@ class TestPlaceholderFailsClosed:
             monkeypatch,
             {
                 "fda_scoped": _entry(
-                    allowed_data_source=(
-                        DataSourceClassification.FDA_DERIVED_DEFAULT.value
-                    )
+                    allowed_data_source=(DataSourceClassification.FDA_DERIVED_DEFAULT.value)
                 )
             },
         )
@@ -370,9 +392,7 @@ class TestPlaceholderFailsClosed:
             _create(execution_world)
         self._assert_nothing_persisted()
 
-    def test_valid_question_beside_invalid_one_is_also_rolled_back(
-        self, execution_world
-    ):
+    def test_valid_question_beside_invalid_one_is_also_rolled_back(self, execution_world):
         """No partial execution: a good question does not survive a bad one.
 
         The valid question is ordered first, so it reaches placeholder creation
@@ -401,7 +421,9 @@ class TestExecutionCreationUnchanged:
 
     def _plain_question(self, world):
         return _question(
-            world["section"], "Q_PLAIN", answer_type=AnswerType.SHORT_TEXT,
+            world["section"],
+            "Q_PLAIN",
+            answer_type=AnswerType.SHORT_TEXT,
             classification=DataSourceClassification.USER_REQUIRED,
         )
 
@@ -484,13 +506,13 @@ def resolver_world(execution_world):
 
     section = execution_world["section"]
     selector_q = _question(
-        section, registry_mod.Q_SUBJECT_COMPONENT,
+        section,
+        registry_mod.Q_SUBJECT_COMPONENT,
         answer_type=AnswerType.FORMULATION_COMPONENT_REFERENCE,
-        classification=DataSourceClassification.USER_REQUIRED, order=1,
+        classification=DataSourceClassification.USER_REQUIRED,
+        order=1,
     )
-    upstream_q = _calculated(
-        section, registry_mod.Q_DAILY_EXPOSURE, "daily_exposure", order=2
-    )
+    upstream_q = _calculated(section, registry_mod.Q_DAILY_EXPOSURE, "daily_exposure", order=2)
     target = _calculated(section, "Q_MDE_PCT", "percentage_of_iid_mde", order=3)
 
     execution = ChecklistExecution.objects.create(
@@ -501,16 +523,19 @@ def resolver_world(execution_world):
         created_by=execution_world["user"],
     )
     ChecklistResponse.objects.create(
-        execution=execution, question=selector_q,
+        execution=execution,
+        question=selector_q,
         data_source_type_snapshot=selector_q.data_source_classification,
         raw_value={"public_id": str(execution_world["component"].public_id)},
     )
     upstream_response = ChecklistResponse.objects.create(
-        execution=execution, question=upstream_q,
+        execution=execution,
+        question=upstream_q,
         data_source_type_snapshot=upstream_q.data_source_classification,
     )
     outcome = CalculationOutcome.objects.create(
-        response=upstream_response, calculation_name="calculate_daily_exposure",
+        response=upstream_response,
+        calculation_name="calculate_daily_exposure",
         status=CalculationStatus.DATA_REQUIRED,
     )
     execution_world.update(
@@ -531,7 +556,8 @@ def _snapshot(world, component=None):
         tenant=world["tenant"],
         formulation_component_public_id=(component or world["component"]).public_id,
         formulation_version_public_id=world["formulation"].public_id,
-        iid_mde=Decimal("2.000000"), iid_mde_unit="gram",
+        iid_mde=Decimal("2.000000"),
+        iid_mde_unit="gram",
     )
 
 
@@ -546,16 +572,16 @@ def _complete_upstream(world, recorded_component):
     outcome.value = Decimal("0.750000")
     outcome.unit = "gram"
     outcome.input_provenance = {SUBJECT_COMPONENT_PROVENANCE_KEY: recorded_component}
-    outcome.save(
-        update_fields=["status", "value", "unit", "input_provenance", "updated_at"]
-    )
+    outcome.save(update_fields=["status", "value", "unit", "input_provenance", "updated_at"])
     return outcome
 
 
 def _resolve(world):
     return resolve_calculation_inputs(
-        execution=world["execution"], target_question=world["target"],
-        registry_identifier="percentage_of_iid_mde", actor=world["user"],
+        execution=world["execution"],
+        target_question=world["target"],
+        registry_identifier="percentage_of_iid_mde",
+        actor=world["user"],
         locked_context=ResolutionContext(assessment_snapshot=_snapshot(world)),
     )
 
@@ -628,9 +654,7 @@ class TestCanonicalComponentProvenance:
         from iid_assessment.models import AssessmentSnapshot
         from iig_checklist.models import CalculationOutcome, ChecklistResponse
 
-        _complete_upstream(
-            resolver_world, str(resolver_world["component"].public_id).upper()
-        )
+        _complete_upstream(resolver_world, str(resolver_world["component"].public_id).upper())
         before = (
             ChecklistResponse.objects.count(),
             CalculationOutcome.objects.count(),
@@ -647,9 +671,7 @@ class TestCanonicalComponentProvenance:
                 locked_context=ResolutionContext(assessment_snapshot=snapshot),
             )
         assert not result.resolved
-        verbs = [
-            q["sql"].strip().split(None, 1)[0].upper() for q in captured.captured_queries
-        ]
+        verbs = [q["sql"].strip().split(None, 1)[0].upper() for q in captured.captured_queries]
         assert not {"INSERT", "UPDATE", "DELETE"} & set(verbs), verbs
         after = (
             ChecklistResponse.objects.count(),
@@ -734,9 +756,7 @@ class TestPlaceholderStatesRemainValid:
         ],
     )
     def test_incomplete_statuses_accept_empty_provenance(self, status):
-        outcome = _outcome(
-            status=status, value=None, unit="", input_provenance={}, inputs={}
-        )
+        outcome = _outcome(status=status, value=None, unit="", input_provenance={}, inputs={})
         assert _clean_errors(outcome) == set()
 
 
@@ -783,7 +803,8 @@ class TestCompletedOutcomeInvariant:
         assert "input_provenance" in _clean_errors(outcome)
 
     @pytest.mark.parametrize(
-        "version", ["1.0", "1.0.0.0", "v1.0.0", "", "one.zero.zero", 100],
+        "version",
+        ["1.0", "1.0.0.0", "v1.0.0", "", "one.zero.zero", 100],
         ids=["two-part", "four-part", "prefixed", "empty", "words", "non-string"],
     )
     def test_malformed_binding_version_is_rejected(self, version):
@@ -853,9 +874,7 @@ class TestCompletedOutcomeInvariant:
         )
         assert SUBJECT_COMPONENT_PROVENANCE_KEY in _clean_errors(outcome)
 
-    def test_component_key_prohibited_when_neither_selected_nor_inherited(
-        self, monkeypatch
-    ):
+    def test_component_key_prohibited_when_neither_selected_nor_inherited(self, monkeypatch):
         """Only reachable with a synthetic entry: every approved entry either
         selects a component or inherits one."""
         _install(
@@ -924,19 +943,13 @@ class TestCompletedOutcomePersistence:
         outcome.input_provenance = {
             BINDING_VERSION_KEY: "1.0.0",
             "quantity_per_dosage_unit": {"source": "formulation_component"},
-            SUBJECT_COMPONENT_PROVENANCE_KEY: str(
-                resolver_world["component"].public_id
-            ),
+            SUBJECT_COMPONENT_PROVENANCE_KEY: str(resolver_world["component"].public_id),
         }
         outcome.full_clean()
         outcome.save()
-        assert CalculationOutcome.objects.get(pk=outcome.pk).value == Decimal(
-            "0.7500000000"
-        )
+        assert CalculationOutcome.objects.get(pk=outcome.pk).value == Decimal("0.7500000000")
 
-    def test_completed_outcome_without_provenance_cannot_be_saved(
-        self, resolver_world
-    ):
+    def test_completed_outcome_without_provenance_cannot_be_saved(self, resolver_world):
         from django.core.exceptions import ValidationError as DjangoValidationError
 
         outcome = resolver_world["outcome"]

@@ -124,9 +124,7 @@ def _executable_source(source: str) -> str:
 
     dropped = {n for start, end in docstrings for n in range(start, end + 1)}
     kept = [
-        line
-        for number, line in enumerate(source.splitlines(), start=1)
-        if number not in dropped
+        line for number, line in enumerate(source.splitlines(), start=1) if number not in dropped
     ]
     readline = io.StringIO("\n".join(kept)).readline
     out = []
@@ -145,8 +143,12 @@ def _product(tenant, user, code="PROD-EX-01"):
     from formulations.models import ProductDevelopmentRecord
 
     return ProductDevelopmentRecord.objects.create(
-        tenant=tenant, product_code=code, proposed_product_name="Synthetic Product",
-        active_ingredient="Synthetic Ingredient", dosage_form="tablet", route="oral",
+        tenant=tenant,
+        product_code=code,
+        proposed_product_name="Synthetic Product",
+        active_ingredient="Synthetic Ingredient",
+        dosage_form="tablet",
+        route="oral",
         created_by=user,
     )
 
@@ -155,24 +157,26 @@ def _formulation(product, user, *, weight="1.000000", max_units=None):
     from formulations.models import FormulationVersion
 
     return FormulationVersion.objects.create(
-        product=product, version_number=1, status="approved",
+        product=product,
+        version_number=1,
+        status="approved",
         total_dosage_unit_weight=Decimal(weight),
         total_dosage_unit_weight_unit="gram",
-        maximum_dosage_units_per_day=max_units, created_by=user,
+        maximum_dosage_units_per_day=max_units,
+        created_by=user,
     )
 
 
-def _component(formulation, *, quantity="0.250000", order=1, ctype="inactive",
-               ingredient=None):
+def _component(formulation, *, quantity="0.250000", order=1, ctype="inactive", ingredient=None):
     from formulations.models import FormulationComponent
 
     return FormulationComponent.objects.create(
-        formulation_version=formulation, component_type=ctype,
+        formulation_version=formulation,
+        component_type=ctype,
         ingredient_name="Synthetic Excipient",
-        resolved_ingredient_public_id=(
-            ingredient.public_id if ingredient is not None else None
-        ),
-        quantity_per_dosage_unit=Decimal(quantity), quantity_unit="gram",
+        resolved_ingredient_public_id=(ingredient.public_id if ingredient is not None else None),
+        quantity_per_dosage_unit=Decimal(quantity),
+        quantity_unit="gram",
         display_order=order,
     )
 
@@ -196,38 +200,45 @@ def _iid_setup(*, potency="1.000000", mde="2.000000"):
         IIDPrecedentRecord,
     )
 
-    route = ControlledRoute.objects.create(
-        code="oral", canonical_label="Oral", lifecycle="active"
-    )
+    route = ControlledRoute.objects.create(code="oral", canonical_label="Oral", lifecycle="active")
     dosage_form = ControlledDosageForm.objects.create(
         code="tablet", canonical_label="Tablet", lifecycle="active"
     )
-    gram = ControlledUnit.objects.create(
-        code="gram", symbol="G", dimension="mass", active=True
-    )
+    gram = ControlledUnit.objects.create(code="gram", symbol="G", dimension="mass", active=True)
     release = FDADataSourceRelease.objects.create(
-        dataset_type="fda_iid", source_name="FDA IID",
-        official_source_reference="ref", source_checksum_sha256="a" * 64,
+        dataset_type="fda_iid",
+        source_name="FDA IID",
+        official_source_reference="ref",
+        source_checksum_sha256="a" * 64,
         status=FDAReleaseStatus.ACTIVE,
     )
     ingredient = IIDIngredient.objects.create(
         canonical_name="Synthetic Excipient", normalized_name="SYNTHETIC EXCIPIENT"
     )
     record = IIDPrecedentRecord.objects.create(
-        release=release, ingredient=ingredient,
+        release=release,
+        ingredient=ingredient,
         ingredient_name_raw="Synthetic Excipient",
-        route_raw="ORAL", route_normalized=route,
-        dosage_form_raw="TABLET", dosage_form_normalized=dosage_form,
-        potency_amount=Decimal(potency), potency_unit_raw="G",
+        route_raw="ORAL",
+        route_normalized=route,
+        dosage_form_raw="TABLET",
+        dosage_form_normalized=dosage_form,
+        potency_amount=Decimal(potency),
+        potency_unit_raw="G",
         potency_unit_normalized=gram,
-        maximum_daily_exposure=Decimal(mde), mde_unit_raw="G",
+        maximum_daily_exposure=Decimal(mde),
+        mde_unit_raw="G",
         mde_unit_normalized=gram,
         raw_row_checksum="b" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
     )
     return {
-        "route": route, "dosage_form": dosage_form, "unit": gram,
-        "release": release, "ingredient": ingredient, "record": record,
+        "route": route,
+        "dosage_form": dosage_form,
+        "unit": gram,
+        "release": release,
+        "ingredient": ingredient,
+        "record": record,
     }
 
 
@@ -235,8 +246,11 @@ def _section(version, code="S1", order=1):
     from iig_checklist.models import ChecklistSection
 
     return ChecklistSection.objects.create(
-        checklist_version=version, code=code, title=f"Section {code}",
-        display_order=order, criticality=Criticality.MEDIUM,
+        checklist_version=version,
+        code=code,
+        title=f"Section {code}",
+        display_order=order,
+        criticality=Criticality.MEDIUM,
     )
 
 
@@ -244,17 +258,25 @@ def _question(section, code, *, answer_type, classification, binding="", order=1
     from iig_checklist.models import ChecklistQuestion
 
     return ChecklistQuestion.objects.create(
-        section=section, code=code, question_text=f"Q {code}", display_order=order,
-        answer_type=answer_type, data_source_classification=classification,
-        calculation_binding_identifier=binding, criticality=Criticality.LOW,
+        section=section,
+        code=code,
+        question_text=f"Q {code}",
+        display_order=order,
+        answer_type=answer_type,
+        data_source_classification=classification,
+        calculation_binding_identifier=binding,
+        criticality=Criticality.LOW,
     )
 
 
 def _calculated(section, code, identifier, *, order=1):
     return _question(
-        section, code, answer_type=AnswerType.CALCULATED_VALUE,
+        section,
+        code,
+        answer_type=AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding=identifier, order=order,
+        binding=identifier,
+        order=order,
     )
 
 
@@ -324,14 +346,18 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
     formulation = _formulation(product, user_a, max_units="4.0000")
     component = _component(formulation, ingredient=iid["ingredient"])
     version = ChecklistVersion.objects.create(
-        definition=tenant_definition, version_number=1, status="active",
+        definition=tenant_definition,
+        version_number=1,
+        status="active",
         created_by=user_a,
     )
     section = _section(version)
     selector_q = _question(
-        section, registry_mod.Q_SUBJECT_COMPONENT,
+        section,
+        registry_mod.Q_SUBJECT_COMPONENT,
         answer_type=AnswerType.FORMULATION_COMPONENT_REFERENCE,
-        classification=DataSourceClassification.USER_REQUIRED, order=1,
+        classification=DataSourceClassification.USER_REQUIRED,
+        order=1,
     )
     questions = {
         "percentage_w_w": _calculated(section, "Q_PCT_WW", "percentage_w_w", order=2),
@@ -357,9 +383,7 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
         formulation_version_public_id=str(formulation.public_id),
         actor=user_a,
     )
-    selector_response = ChecklistResponse.objects.get(
-        execution=execution, question=selector_q
-    )
+    selector_response = ChecklistResponse.objects.get(execution=execution, question=selector_q)
     selector_response.raw_value = {"public_id": str(component.public_id)}
     selector_response.save(update_fields=["raw_value", "updated_at"])
 
@@ -368,19 +392,24 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
         for key, q in questions.items()
     }
     return {
-        "tenant": tenant_a, "user": user_a, "formulation": formulation,
-        "component": component, "version": version, "section": section,
-        "execution": execution, "questions": questions, "responses": responses,
-        "selector_response": selector_response, "iid": iid,
+        "tenant": tenant_a,
+        "user": user_a,
+        "formulation": formulation,
+        "component": component,
+        "version": version,
+        "section": section,
+        "execution": execution,
+        "questions": questions,
+        "responses": responses,
+        "selector_response": selector_response,
+        "iid": iid,
         "outcomes": {
-            key: CalculationOutcome.objects.get(response=r)
-            for key, r in responses.items()
+            key: CalculationOutcome.objects.get(response=r) for key, r in responses.items()
         },
     }
 
 
-def _snapshot(world, *, potency="1.000000", mde="2.000000", component=None,
-              release=None):
+def _snapshot(world, *, potency="1.000000", mde="2.000000", component=None, release=None):
     from iid_assessment.models import AssessmentSnapshot
 
     return AssessmentSnapshot.objects.create(
@@ -388,8 +417,10 @@ def _snapshot(world, *, potency="1.000000", mde="2.000000", component=None,
         formulation_component_public_id=(component or world["component"]).public_id,
         formulation_version_public_id=world["formulation"].public_id,
         iid_release_public_id=release,
-        iid_potency_amount=Decimal(potency), iid_potency_unit="gram",
-        iid_mde=Decimal(mde), iid_mde_unit="gram",
+        iid_potency_amount=Decimal(potency),
+        iid_potency_unit="gram",
+        iid_mde=Decimal(mde),
+        iid_mde_unit="gram",
     )
 
 
@@ -411,13 +442,9 @@ def _run(world, key, *, snapshot=None, expected_version=_AUTO, actor=None):
         execution=world["execution"],
         response=response,
         actor=actor or world["user"],
-        expected_version=(
-            response.version if expected_version is _AUTO else expected_version
-        ),
+        expected_version=(response.version if expected_version is _AUTO else expected_version),
         _internal_snapshot_context=(
-            ResolutionContext(assessment_snapshot=snapshot)
-            if snapshot is not None
-            else None
+            ResolutionContext(assessment_snapshot=snapshot) if snapshot is not None else None
         ),
     )
 
@@ -512,9 +539,7 @@ class TestApprovedCalculations:
         _install_percentage_w_w(monkeypatch, _counting)
         _run(world, "percentage_w_w")
         assert len(calls) == 1
-        assert set(calls[0]) == {
-            "quantity_per_unit_grams", "total_dosage_unit_weight_grams"
-        }
+        assert set(calls[0]) == {"quantity_per_unit_grams", "total_dosage_unit_weight_grams"}
 
 
 # ===========================================================================
@@ -530,9 +555,7 @@ class TestOutcomePersistence:
         _run(world, "percentage_w_w")
         assert CalculationOutcome.objects.count() == before
         assert (
-            CalculationOutcome.objects.filter(
-                response=world["responses"]["percentage_w_w"]
-            ).count()
+            CalculationOutcome.objects.filter(response=world["responses"]["percentage_w_w"]).count()
             == 1
         )
 
@@ -540,9 +563,7 @@ class TestOutcomePersistence:
         _run(world, "percentage_w_w")
         outcome = world["outcomes"]["percentage_w_w"]
         outcome.refresh_from_db()
-        assert set(outcome.inputs) == {
-            "quantity_per_unit_grams", "total_dosage_unit_weight_grams"
-        }
+        assert set(outcome.inputs) == {"quantity_per_unit_grams", "total_dosage_unit_weight_grams"}
         # Exact decimal strings, never floats.
         assert outcome.inputs["quantity_per_unit_grams"] == "0.250000"
         for value in outcome.inputs.values():
@@ -593,19 +614,25 @@ class TestOutcomePersistence:
         outcome = world["outcomes"]["percentage_of_iid_potency"]
         outcome.refresh_from_db()
         assert outcome.source_assessment_snapshot_public_id == snapshot.public_id
-        assert outcome.input_provenance["assessment_snapshot_public_id"] == str(
-            snapshot.public_id
-        )
+        assert outcome.input_provenance["assessment_snapshot_public_id"] == str(snapshot.public_id)
 
     def test_response_is_never_mutated(self, world):
         """M4D3-MDL-006 -- results live exclusively in the outcome."""
         response = world["responses"]["percentage_w_w"]
-        before = (response.raw_value, response.version, response.system_derived_value,
-                  response.is_not_applicable)
+        before = (
+            response.raw_value,
+            response.version,
+            response.system_derived_value,
+            response.is_not_applicable,
+        )
         _run(world, "percentage_w_w")
         response.refresh_from_db()
-        assert (response.raw_value, response.version, response.system_derived_value,
-                response.is_not_applicable) == before
+        assert (
+            response.raw_value,
+            response.version,
+            response.system_derived_value,
+            response.is_not_applicable,
+        ) == before
         assert response.raw_value is None
 
     def test_no_history_row_is_written(self, world):
@@ -627,9 +654,7 @@ class TestComponentProvenance:
         _run(world, "percentage_w_w")
         outcome = world["outcomes"]["percentage_w_w"]
         outcome.refresh_from_db()
-        assert outcome.input_provenance[COMPONENT_KEY] == str(
-            world["component"].public_id
-        )
+        assert outcome.input_provenance[COMPONENT_KEY] == str(world["component"].public_id)
         assert "selector" in outcome.input_provenance["subject_component_sources"]
 
     def test_inherited_component_is_written_without_a_selector(self, world):
@@ -644,12 +669,8 @@ class TestComponentProvenance:
         outcome = world["outcomes"]["percentage_of_iid_mde"]
         outcome.refresh_from_db()
         entry = registry_mod.get_entry("percentage_of_iid_mde")
-        assert not any(
-            d.get("component_selector") for d in entry.input_resolvers.values()
-        )
-        assert outcome.input_provenance[COMPONENT_KEY] == str(
-            world["component"].public_id
-        )
+        assert not any(d.get("component_selector") for d in entry.input_resolvers.values())
+        assert outcome.input_provenance[COMPONENT_KEY] == str(world["component"].public_id)
         assert "inherited" in outcome.input_provenance["subject_component_sources"]
         outcome.full_clean()
 
@@ -703,36 +724,37 @@ class TestComponentProvenance:
 
         middle = world["outcomes"]["percentage_of_iid_mde"]
         middle.refresh_from_db()
-        assert middle.input_provenance[COMPONENT_KEY] == str(
-            world["component"].public_id
-        )
+        assert middle.input_provenance[COMPONENT_KEY] == str(world["component"].public_id)
 
         third_response = ChecklistResponse.objects.create(
-            execution=world["execution"], question=third,
+            execution=world["execution"],
+            question=third,
             data_source_type_snapshot=third.data_source_classification,
         )
         CalculationOutcome.objects.create(
-            response=third_response, calculation_name="calculate_difference_from_mde",
+            response=third_response,
+            calculation_name="calculate_difference_from_mde",
             status=CalculationStatus.DATA_REQUIRED,
         )
         result = execute_calculation_response(
-            tenant=world["tenant"], execution=world["execution"],
-            response=third_response, actor=world["user"],
+            tenant=world["tenant"],
+            execution=world["execution"],
+            response=third_response,
+            actor=world["user"],
             expected_version=third_response.version,
             _internal_snapshot_context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert result.status == CalculationStatus.COMPLETE, result.failure_codes
         third_outcome = CalculationOutcome.objects.get(response=third_response)
-        assert third_outcome.input_provenance[COMPONENT_KEY] == str(
-            world["component"].public_id
-        )
+        assert third_outcome.input_provenance[COMPONENT_KEY] == str(world["component"].public_id)
 
     def test_mismatched_component_fails_atomically(self, world):
         """A snapshot for another component is rejected with no value stored."""
         other = _component(world["formulation"], quantity="0.100000", order=9)
         outcome = world["outcomes"]["percentage_of_iid_potency"]
         result = _run(
-            world, "percentage_of_iid_potency",
+            world,
+            "percentage_of_iid_potency",
             snapshot=_snapshot(world, component=other),
         )
         assert not result.executed
@@ -763,7 +785,8 @@ class TestNonSuccessResults:
         # value is absent, and so is the unit the proposed quantity would have
         # been converted into. Both are governed missing-data codes.
         assert set(result.failure_codes) == {
-            "ASSESSMENT_FIELD_MISSING", "INPUT_UNIT_MISSING",
+            "ASSESSMENT_FIELD_MISSING",
+            "INPUT_UNIT_MISSING",
         }
         outcome = world["outcomes"]["percentage_of_iid_potency"]
         outcome.refresh_from_db()
@@ -772,8 +795,7 @@ class TestNonSuccessResults:
         assert outcome.value is None
         assert outcome.unit == ""
         recorded = {
-            failure["failure_code"]
-            for failure in outcome.input_provenance["input_failures"]
+            failure["failure_code"] for failure in outcome.input_provenance["input_failures"]
         }
         assert recorded == set(result.failure_codes)
         outcome.full_clean()
@@ -930,7 +952,9 @@ class TestNonSuccessResults:
             return engine.CalculationResult(
                 formula_identifier="percentage_w_w",
                 formula_version=engine.FORMULA_VERSION,
-                status="OK", value=Decimal("25"), unit="percent_w_w",
+                status="OK",
+                value=Decimal("25"),
+                unit="percent_w_w",
                 generated_at="2026-01-01T00:00:00",  # no timezone
             )
 
@@ -958,8 +982,7 @@ def _snapshot_state(world):
     )
 
     outcomes = sorted(
-        (str(o.public_id), o.status, str(o.value), o.unit,
-         str(o.input_provenance), str(o.inputs))
+        (str(o.public_id), o.status, str(o.value), o.unit, str(o.input_provenance), str(o.inputs))
         for o in CalculationOutcome.objects.all()
     )
     responses = sorted(
@@ -967,7 +990,8 @@ def _snapshot_state(world):
         for r in ChecklistResponse.objects.all()
     )
     return (
-        outcomes, responses,
+        outcomes,
+        responses,
         AssessmentSnapshot.objects.count(),
         ChecklistResponseHistory.objects.count(),
         AuditEvent.objects.count(),
@@ -995,9 +1019,7 @@ class TestAtomicity:
     def test_missing_placeholder_fails_closed(self, world):
         from iig_checklist.models import CalculationOutcome
 
-        CalculationOutcome.objects.filter(
-            response=world["responses"]["percentage_w_w"]
-        ).delete()
+        CalculationOutcome.objects.filter(response=world["responses"]["percentage_w_w"]).delete()
         before = _snapshot_state(world)
         with pytest.raises(PlaceholderMissing):
             _run(world, "percentage_w_w")
@@ -1025,8 +1047,10 @@ class TestAtomicity:
         )
         with pytest.raises(TargetNotCalculated):
             execute_calculation_response(
-                tenant=world["tenant"], execution=world["execution"],
-                response=response, actor=world["user"],
+                tenant=world["tenant"],
+                execution=world["execution"],
+                response=response,
+                actor=world["user"],
                 expected_version=response.version,
             )
 
@@ -1034,16 +1058,20 @@ class TestAtomicity:
         from iig_checklist.models import ChecklistExecution
 
         other = ChecklistExecution.objects.create(
-            tenant=world["tenant"], checklist_version=world["version"],
+            tenant=world["tenant"],
+            checklist_version=world["version"],
             formulation_version=_formulation(
                 _product(world["tenant"], user_a, code="PROD-EX-02"), user_a
             ),
-            status=ExecutionStatus.DRAFT, created_by=user_a,
+            status=ExecutionStatus.DRAFT,
+            created_by=user_a,
         )
         with pytest.raises(ResponseNotInExecution):
             execute_calculation_response(
-                tenant=world["tenant"], execution=other,
-                response=world["responses"]["percentage_w_w"], actor=world["user"],
+                tenant=world["tenant"],
+                execution=other,
+                response=world["responses"]["percentage_w_w"],
+                actor=world["user"],
                 expected_version=1,
             )
 
@@ -1056,8 +1084,10 @@ class TestAtomicity:
         before = _snapshot_state(world)
         with pytest.raises(BindingNotApproved):
             execute_calculation_response(
-                tenant=world["tenant"], execution=world["execution"],
-                response=response, actor=world["user"],
+                tenant=world["tenant"],
+                execution=world["execution"],
+                response=response,
+                actor=world["user"],
                 expected_version=response.version,
             )
         assert _snapshot_state(world) == before
@@ -1069,9 +1099,7 @@ class TestAtomicity:
 
 
 class TestAudit:
-    def test_success_emits_exactly_one_audit_event(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_success_emits_exactly_one_audit_event(self, world, django_capture_on_commit_callbacks):
         from audit.models import AuditEvent
 
         with django_capture_on_commit_callbacks(execute=True):
@@ -1132,17 +1160,13 @@ class TestRecalculation:
         first = _run(world, "percentage_w_w")
         outcome_id = first.outcome_public_id
         world["component"].quantity_per_dosage_unit = Decimal("0.500000")
-        world["component"].save(
-            update_fields=["quantity_per_dosage_unit", "updated_at"]
-        )
+        world["component"].save(update_fields=["quantity_per_dosage_unit", "updated_at"])
         second = _run(world, "percentage_w_w")
 
         assert second.outcome_public_id == outcome_id
         assert second.value == Decimal("50")
         assert (
-            CalculationOutcome.objects.filter(
-                response=world["responses"]["percentage_w_w"]
-            ).count()
+            CalculationOutcome.objects.filter(response=world["responses"]["percentage_w_w"]).count()
             == 1
         )
 
@@ -1219,9 +1243,7 @@ def snapshot_backed_locks(world):
     """
     snapshot = _snapshot(world)
     _complete_daily_exposure(world)
-    return _capture_locks(
-        lambda: _run(world, "percentage_of_iid_mde", snapshot=snapshot)
-    )
+    return _capture_locks(lambda: _run(world, "percentage_of_iid_mde", snapshot=snapshot))
 
 
 class TestLockOrder:
@@ -1260,10 +1282,7 @@ class TestLockOrder:
             sql
             for _, column, sql in snapshot_backed_locks
             if column is not None
-            and (
-                column == "public_id"
-                or "public_id" in sql.lower().split(" order by ", 1)[1]
-            )
+            and (column == "public_id" or "public_id" in sql.lower().split(" order by ", 1)[1])
         ]
         assert offenders == [], offenders
 
@@ -1294,13 +1313,11 @@ class TestLockOrder:
     def test_snapshot_is_locked_last(self, snapshot_backed_locks):
         assert snapshot_backed_locks[-1][0] == "iid_assessment_assessmentsnapshot"
 
-    def test_documented_order_matches_the_issued_statements(
-        self, snapshot_backed_locks
-    ):
+    def test_documented_order_matches_the_issued_statements(self, snapshot_backed_locks):
         assert [table for table, _, _ in snapshot_backed_locks] == [
             "iig_checklist_checklistexecution",
-            "iig_checklist_checklistresponse",   # target
-            "iig_checklist_checklistresponse",   # related, pk order
+            "iig_checklist_checklistresponse",  # target
+            "iig_checklist_checklistresponse",  # related, pk order
             "iig_checklist_calculationoutcome",  # upstream + target, pk order
             "iid_assessment_assessmentsnapshot",
         ]
@@ -1437,8 +1454,9 @@ class TestLockOrderConcurrency:
             try:
                 with transaction.atomic():
                     list(
-                        ChecklistExecution.objects.filter(pk=world["execution"].pk)
-                        .select_for_update()
+                        ChecklistExecution.objects.filter(
+                            pk=world["execution"].pk
+                        ).select_for_update()
                     )
                     order.append("holder-locked")
                     locked.set()
@@ -1527,9 +1545,7 @@ class TestExpectedVersionIsMandatory:
 
 
 class TestTenantIsolation:
-    def test_execution_from_another_tenant_is_rejected(
-        self, world, tenant_b, monkeypatch
-    ):
+    def test_execution_from_another_tenant_is_rejected(self, world, tenant_b, monkeypatch):
         """The guard fires before any lock, calculation, write or audit."""
         from audit.models import AuditEvent
 
@@ -1577,31 +1593,34 @@ class TestTenantIsolation:
         # The foreign execution is built through the governed service, so the
         # actor needs a doer role in that tenant. This grants only what tenant B
         # needs; tenant A's guard is what the assertion is about.
-        membership, _ = TenantMembership.objects.get_or_create(
-            tenant=tenant_b, user=user_a
-        )
+        membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_b, user=user_a)
         role, _ = Role.objects.get_or_create(
             tenant=tenant_b, name="doer", defaults={"is_system": True}
         )
         MembershipRole.objects.get_or_create(membership=membership, role=role)
 
         other_definition = ChecklistDefinition.objects.create(
-            code="IIG-OTHER-TENANT", title="Other tenant (synthetic)",
-            scope_type="tenant", tenant=tenant_b, created_by=user_a,
+            code="IIG-OTHER-TENANT",
+            title="Other tenant (synthetic)",
+            scope_type="tenant",
+            tenant=tenant_b,
+            created_by=user_a,
         )
         other_version = ChecklistVersion.objects.create(
-            definition=other_definition, version_number=1, status="active",
+            definition=other_definition,
+            version_number=1,
+            status="active",
             created_by=user_a,
         )
         other_section = _section(other_version, code="S9")
         _question(
-            other_section, registry_mod.Q_SUBJECT_COMPONENT,
+            other_section,
+            registry_mod.Q_SUBJECT_COMPONENT,
             answer_type=AnswerType.FORMULATION_COMPONENT_REFERENCE,
-            classification=DataSourceClassification.USER_REQUIRED, order=1,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=1,
         )
-        other_calculated = _calculated(
-            other_section, "Q_PCT_WW", "percentage_w_w", order=2
-        )
+        other_calculated = _calculated(other_section, "Q_PCT_WW", "percentage_w_w", order=2)
         other_product = _product(tenant_b, user_a, code="PROD-EX-TB")
         other_formulation = _formulation(other_product, user_a)
         _component(other_formulation)
@@ -1733,9 +1752,7 @@ class TestImmutableResult:
             assert not isinstance(value, Model | QuerySet), field.name
             assert isinstance(value, str | bool | Decimal | tuple), field.name
         # Identity is the public UUID string, never a database id.
-        assert result.outcome_public_id == str(
-            world["outcomes"]["percentage_w_w"].public_id
-        )
+        assert result.outcome_public_id == str(world["outcomes"]["percentage_w_w"].public_id)
 
 
 # ===========================================================================
@@ -1771,9 +1788,9 @@ class TestPlainNotationPersistence:
         assert execution_mod._json_safe(moment) == moment.isoformat()
         assert execution_mod._json_safe(Decimal("1E-7")) == "0.0000001"
         assert execution_mod._json_safe({"a": Decimal("1E-7")}) == {"a": "0.0000001"}
-        assert execution_mod._json_safe(
-            MappingProxyType({"a": (Decimal("1E-7"),)})
-        ) == {"a": ["0.0000001"]}
+        assert execution_mod._json_safe(MappingProxyType({"a": (Decimal("1E-7"),)})) == {
+            "a": ["0.0000001"]
+        }
         assert execution_mod._json_safe(["x", 1, True, None]) == ["x", 1, True, None]
         # Anything else is stringified rather than allowed to break the write.
         assert execution_mod._json_safe({1, 2}) in ("{1, 2}", "{2, 1}")
@@ -1990,8 +2007,10 @@ class TestGovernedSnapshotIntegration:
     @pytest.mark.parametrize(
         "key",
         [
-            "percentage_of_iid_potency", "difference_from_iid_potency",
-            "percentage_of_iid_mde", "difference_from_iid_mde",
+            "percentage_of_iid_potency",
+            "difference_from_iid_potency",
+            "percentage_of_iid_mde",
+            "difference_from_iid_mde",
         ],
     )
     def test_each_snapshot_backed_calculation_creates_exactly_one(self, world, key):
@@ -2007,19 +2026,13 @@ class TestGovernedSnapshotIntegration:
         # Exact release, exact component, exact formulation version.
         assert snapshot.iid_release_public_id == world["iid"]["release"].public_id
         assert snapshot.formulation_component_public_id == world["component"].public_id
-        assert snapshot.formulation_version_public_id == (
-            world["formulation"].public_id
-        )
+        assert snapshot.formulation_version_public_id == (world["formulation"].public_id)
         # The resolver read that exact object: its UUID is in the provenance.
         outcome = world["outcomes"][key]
         outcome.refresh_from_db()
         assert outcome.source_assessment_snapshot_public_id == snapshot.public_id
-        assert outcome.input_provenance["assessment_snapshot_public_id"] == str(
-            snapshot.public_id
-        )
-        assert outcome.input_provenance[COMPONENT_KEY] == str(
-            world["component"].public_id
-        )
+        assert outcome.input_provenance["assessment_snapshot_public_id"] == str(snapshot.public_id)
+        assert outcome.input_provenance[COMPONENT_KEY] == str(world["component"].public_id)
 
     def test_a_calculation_needing_no_snapshot_creates_none(self, world):
         _run(world, "percentage_w_w")
@@ -2036,13 +2049,9 @@ class TestGovernedSnapshotIntegration:
         # The outcome points at the newer one; the older row is untouched.
         outcome = world["outcomes"]["percentage_of_iid_potency"]
         outcome.refresh_from_db()
-        assert outcome.source_assessment_snapshot_public_id in {
-            s.public_id for s in snapshots
-        }
+        assert outcome.source_assessment_snapshot_public_id in {s.public_id for s in snapshots}
 
-    def test_the_audit_names_the_snapshot_used(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_the_audit_names_the_snapshot_used(self, world, django_capture_on_commit_callbacks):
         from audit.models import AuditEvent
 
         with django_capture_on_commit_callbacks(execute=True):
@@ -2070,8 +2079,10 @@ class TestGovernedSnapshotIntegration:
         response.refresh_from_db()
         with pytest.raises(BindingNotApproved):
             execute_calculation_response(
-                tenant=world["tenant"], execution=world["execution"],
-                response=response, actor=world["user"],
+                tenant=world["tenant"],
+                execution=world["execution"],
+                response=response,
+                actor=world["user"],
                 expected_version=response.version,
             )
         assert self._snapshots(world) == []
@@ -2105,14 +2116,15 @@ class TestGovernedSnapshotIntegration:
         assert self._snapshots(world) == []
         assert _snapshot_state(world) == before
 
-    def test_an_outcome_validation_failure_rolls_the_snapshot_back(
-        self, world, monkeypatch
-    ):
+    def test_an_outcome_validation_failure_rolls_the_snapshot_back(self, world, monkeypatch):
         real_build = execution_mod._build_provenance
         monkeypatch.setattr(
-            execution_mod, "_build_provenance",
-            lambda entry, resolved, snapshot: {**real_build(entry, resolved, snapshot),
-                                               BINDING_VERSION_KEY: "1.0"},
+            execution_mod,
+            "_build_provenance",
+            lambda entry, resolved, snapshot: {
+                **real_build(entry, resolved, snapshot),
+                BINDING_VERSION_KEY: "1.0",
+            },
         )
         before = _snapshot_state(world)
         with pytest.raises(ValidationError):
@@ -2141,9 +2153,7 @@ class TestGovernedSnapshotIntegration:
         assert outcome.value is None
         assert outcome.unit == ""
         assert outcome.source_assessment_snapshot_public_id is None
-        assert outcome.input_provenance["source_failure"] == (
-            "ACTIVE_IID_RELEASE_UNAVAILABLE"
-        )
+        assert outcome.input_provenance["source_failure"] == ("ACTIVE_IID_RELEASE_UNAVAILABLE")
         outcome.full_clean()
         # No snapshot was created for an event that could not be assessed.
         assert self._snapshots(world) == []
@@ -2179,9 +2189,7 @@ class TestGovernedSnapshotIntegration:
         outcome = world["outcomes"]["percentage_of_iid_potency"]
         outcome.refresh_from_db()
         assert outcome.value is None
-        assert outcome.status in {
-            CalculationStatus.DATA_REQUIRED, CalculationStatus.ERROR
-        }
+        assert outcome.status in {CalculationStatus.DATA_REQUIRED, CalculationStatus.ERROR}
 
 
 def _regimen(formulation, units, *, population=""):
@@ -2223,21 +2231,15 @@ class TestWorstCaseDailyUnits:
         the governed worst case is 300, which exceeds the 200 mg precedent MDE.
         """
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
-        assert execution_mod._worst_case_daily_units(
-            world["formulation"]
-        ) == Decimal("10.0000")
+        assert execution_mod._worst_case_daily_units(world["formulation"]) == Decimal("10.0000")
 
         _run(world, "percentage_of_iid_potency")
         snapshot = self._snapshot(world)
 
-        assert snapshot.calculation_results["daily_exposure"]["value"] == (
-            "2.5000000000"
-        )
+        assert snapshot.calculation_results["daily_exposure"]["value"] == ("2.5000000000")
         assert snapshot.decision_status == "EXCEEDS_IID_PRECEDENT"
         assert snapshot.decision_status != "PASS_WITH_IID_PRECEDENT"
         note = snapshot.decision_note.lower()
@@ -2256,19 +2258,21 @@ class TestWorstCaseDailyUnits:
         from iid_assessment.services import create_assessment_snapshot
 
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         version_field_only = create_assessment_snapshot(
-            tenant=world["tenant"], formulation_version=world["formulation"],
-            formulation_component=world["component"], actor=world["user"],
+            tenant=world["tenant"],
+            formulation_version=world["formulation"],
+            formulation_component=world["component"],
+            actor=world["user"],
             maximum_dosage_units_per_day=Decimal("1.0000"),
         ).snapshot
         governed = create_assessment_snapshot(
-            tenant=world["tenant"], formulation_version=world["formulation"],
-            formulation_component=world["component"], actor=world["user"],
+            tenant=world["tenant"],
+            formulation_version=world["formulation"],
+            formulation_component=world["component"],
+            actor=world["user"],
             maximum_dosage_units_per_day=execution_mod._worst_case_daily_units(
                 world["formulation"]
             ),
@@ -2280,14 +2284,10 @@ class TestWorstCaseDailyUnits:
     def test_null_version_field_uses_the_regimen(self, world):
         """No DATA_REQUIRED merely because the version field is null."""
         world["formulation"].maximum_dosage_units_per_day = None
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "8")
 
-        assert execution_mod._worst_case_daily_units(
-            world["formulation"]
-        ) == Decimal("8.0000")
+        assert execution_mod._worst_case_daily_units(world["formulation"]) == Decimal("8.0000")
 
         _run(world, "percentage_of_iid_potency")
         snapshot = self._snapshot(world)
@@ -2301,15 +2301,11 @@ class TestWorstCaseDailyUnits:
 
     def test_version_field_higher_than_every_regimen_wins(self, world):
         world["formulation"].maximum_dosage_units_per_day = Decimal("12.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "3")
         _regimen(world["formulation"], "5")
 
-        assert execution_mod._worst_case_daily_units(
-            world["formulation"]
-        ) == Decimal("12.0000")
+        assert execution_mod._worst_case_daily_units(world["formulation"]) == Decimal("12.0000")
 
         _run(world, "percentage_of_iid_potency")
         snapshot = self._snapshot(world)
@@ -2317,9 +2313,7 @@ class TestWorstCaseDailyUnits:
 
     def test_multiple_regimens_select_the_highest_deterministically(self, world):
         world["formulation"].maximum_dosage_units_per_day = Decimal("2.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         for units in ("4", "9", "6", "9"):
             _regimen(world["formulation"], units)
 
@@ -2327,26 +2321,18 @@ class TestWorstCaseDailyUnits:
         assert first == Decimal("9.0000")
         # Repeated evaluation is stable, and insertion order is irrelevant.
         for _ in range(3):
-            assert execution_mod._worst_case_daily_units(
-                world["formulation"]
-            ) == first
+            assert execution_mod._worst_case_daily_units(world["formulation"]) == first
 
     def test_no_regimen_uses_the_version_field(self, world):
         world["formulation"].maximum_dosage_units_per_day = Decimal("4.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         assert not world["formulation"].dosing_regimens.exists()
-        assert execution_mod._worst_case_daily_units(
-            world["formulation"]
-        ) == Decimal("4.0000")
+        assert execution_mod._worst_case_daily_units(world["formulation"]) == Decimal("4.0000")
 
     def test_no_source_at_all_fails_closed(self, world):
         """M4D3-MDU-013/014 -- unresolved, never an invented default."""
         world["formulation"].maximum_dosage_units_per_day = None
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         assert execution_mod._worst_case_daily_units(world["formulation"]) is None
 
         _run(world, "percentage_of_iid_potency")
@@ -2360,9 +2346,7 @@ class TestWorstCaseDailyUnits:
     def test_a_non_positive_version_field_is_not_used_as_zero_exposure(self, world):
         """The selector rejects a non-positive value; no zero-exposure snapshot."""
         world["formulation"].maximum_dosage_units_per_day = Decimal("0.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         assert execution_mod._worst_case_daily_units(world["formulation"]) is None
         _run(world, "percentage_of_iid_potency")
         daily = self._daily_exposure(self._snapshot(world))
@@ -2379,13 +2363,9 @@ class TestWorstCaseDailyUnits:
         from iid_assessment import views
 
         assert (
-            execution_mod.governed_maximum_daily_units_value
-            is governed_maximum_daily_units_value
+            execution_mod.governed_maximum_daily_units_value is governed_maximum_daily_units_value
         )
-        assert (
-            views.governed_maximum_daily_units_value
-            is governed_maximum_daily_units_value
-        )
+        assert views.governed_maximum_daily_units_value is governed_maximum_daily_units_value
 
     def test_the_selector_is_imported_not_reimplemented(self):
         """No local comparison, max() or fallback logic anywhere on the path."""
@@ -2414,9 +2394,7 @@ class TestWorstCaseDailyUnits:
     def test_the_4d3_precedent_fields_are_untouched_by_the_change(self, world):
         """The four fields Form D reads come from the precedent record."""
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         _run(world, "percentage_of_iid_potency")
@@ -2431,15 +2409,11 @@ class TestWorstCaseDailyUnits:
         assert outcome.status == CalculationStatus.COMPLETE
         assert outcome.value == Decimal("25")
 
-    def test_worst_case_selection_rolls_back_with_the_transaction(
-        self, world, monkeypatch
-    ):
+    def test_worst_case_selection_rolls_back_with_the_transaction(self, world, monkeypatch):
         from iid_assessment.models import AssessmentSnapshot
 
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         def _explode(**kwargs):
@@ -2486,8 +2460,10 @@ class TestFormCDailyUnitsConsistency:
 
         failures = []
         resolved = _resolve_maximum_daily_units(
-            world["execution"], "maximum_dosage_units_per_day",
-            {"expected_type": "decimal"}, failures,
+            world["execution"],
+            "maximum_dosage_units_per_day",
+            {"expected_type": "decimal"},
+            failures,
         )
         return resolved, failures
 
@@ -2514,9 +2490,7 @@ class TestFormCDailyUnitsConsistency:
         fresh.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
 
         # The cached relation still reports the old value...
-        assert execution.formulation_version.maximum_dosage_units_per_day == (
-            Decimal("4.0000")
-        )
+        assert execution.formulation_version.maximum_dosage_units_per_day == (Decimal("4.0000"))
         # ...but Form C resolves from current state.
         resolved, failures = self._form_c(world)
         assert failures == []
@@ -2549,32 +2523,39 @@ class TestFormCDailyUnitsConsistency:
         resolved, failures = self._form_c(world)
         assert failures == []
         assert resolved.value == Decimal("10.0000")
-        assert execution_mod._worst_case_daily_units(
-            FormulationVersion.objects.get(pk=world["formulation"].pk)
-        ) == resolved.value
+        assert (
+            execution_mod._worst_case_daily_units(
+                FormulationVersion.objects.get(pk=world["formulation"].pk)
+            )
+            == resolved.value
+        )
 
     # -- equivalence across the governed source matrix ---------------------
 
     @pytest.mark.parametrize(
         ("scalar", "regimens", "expected"),
         [
-            ("1.0000", ["10"], "10.0000"),            # regimen greater
-            ("12.0000", ["3", "5"], "12.0000"),       # version greater
-            (None, ["8"], "8.0000"),                  # version null
-            ("4.0000", [], "4.0000"),                 # no regimens
+            ("1.0000", ["10"], "10.0000"),  # regimen greater
+            ("12.0000", ["3", "5"], "12.0000"),  # version greater
+            (None, ["8"], "8.0000"),  # version null
+            ("4.0000", [], "4.0000"),  # no regimens
             ("2.0000", ["4", "9", "6", "9"], "9.0000"),  # multiple + tie
-            ("0.0000", ["6"], "6.0000"),              # zero scalar, valid regimen
+            ("0.0000", ["6"], "6.0000"),  # zero scalar, valid regimen
         ],
-        ids=["regimen-greater", "version-greater", "version-null",
-             "no-regimens", "multiple", "zero-scalar-with-regimen"],
+        ids=[
+            "regimen-greater",
+            "version-greater",
+            "version-null",
+            "no-regimens",
+            "multiple",
+            "zero-scalar-with-regimen",
+        ],
     )
     def test_form_c_matches_the_shared_helper(self, world, scalar, regimens, expected):
         world["formulation"].maximum_dosage_units_per_day = (
             None if scalar is None else Decimal(scalar)
         )
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         for units in regimens:
             _regimen(world["formulation"], units)
 
@@ -2595,9 +2576,7 @@ class TestFormCDailyUnitsConsistency:
         world["formulation"].maximum_dosage_units_per_day = (
             None if scalar is None else Decimal(scalar)
         )
-        world["formulation"].save(
-            update_fields=["maximum_dosage_units_per_day", "updated_at"]
-        )
+        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         for units in regimens:
             _regimen(world["formulation"], units)
 
@@ -2608,9 +2587,7 @@ class TestFormCDailyUnitsConsistency:
         assert resolved is None
         # Governed failure category preserved, exactly as before.
         assert [f.failure_code for f in failures] == ["FORMULATION_FIELD_MISSING"]
-        assert failures[0].source_public_uuid == str(
-            world["formulation"].public_id
-        )
+        assert failures[0].source_public_uuid == str(world["formulation"].public_id)
 
     # -- contract preservation ---------------------------------------------
 
@@ -2621,16 +2598,19 @@ class TestFormCDailyUnitsConsistency:
 
         provenance = resolved.provenance
         for key in (
-            "resolver_version", "selected_source_type",
-            "formulation_version_public_id", "version_scalar",
-            "considered_regimens", "selected_value",
-            "selected_regimen_public_id", "tie_break_applied",
-            "source_disagreement", "invalid_candidates",
+            "resolver_version",
+            "selected_source_type",
+            "formulation_version_public_id",
+            "version_scalar",
+            "considered_regimens",
+            "selected_value",
+            "selected_regimen_public_id",
+            "tie_break_applied",
+            "source_disagreement",
+            "invalid_candidates",
         ):
             assert key in provenance, key
-        assert provenance["formulation_version_public_id"] == str(
-            world["formulation"].public_id
-        )
+        assert provenance["formulation_version_public_id"] == str(world["formulation"].public_id)
         assert resolved.source_public_uuid == str(world["formulation"].public_id)
         assert resolved.expected_type == "decimal"
         # Recursively immutable, and no database id anywhere.
@@ -2682,10 +2662,7 @@ class TestFormCDailyUnitsConsistency:
             execution_mod.governed_maximum_daily_units_value
             is dosing.governed_maximum_daily_units_value
         )
-        assert (
-            views.governed_maximum_daily_units_value
-            is dosing.governed_maximum_daily_units_value
-        )
+        assert views.governed_maximum_daily_units_value is dosing.governed_maximum_daily_units_value
         # Form C uses the identity-based entry point of the same module.
         assert "from formulations.dosing import resolve_current_maximum_daily_units" in (
             _inspect.getsource(calculation_inputs)
@@ -2756,9 +2733,7 @@ class TestDeferredBoundaries:
                 response=world["responses"]["percentage_of_iid_potency"],
                 actor=world["user"],
                 expected_version=1,
-                snapshot_context=ResolutionContext(
-                    assessment_snapshot=str(snapshot.public_id)
-                ),
+                snapshot_context=ResolutionContext(assessment_snapshot=str(snapshot.public_id)),
             )
 
     def test_duplicate_outcome_stays_an_internal_fail_closed_exception(self, world):

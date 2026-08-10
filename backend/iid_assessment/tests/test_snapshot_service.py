@@ -80,16 +80,10 @@ class TestSuccessfulCreation:
     def test_exact_formulation_and_component_linkage(self, world):
         result = _create(world)
         snapshot = AssessmentSnapshot.objects.get()
-        assert snapshot.formulation_version_public_id == (
-            world["formulation_version"].public_id
-        )
+        assert snapshot.formulation_version_public_id == (world["formulation_version"].public_id)
         assert snapshot.formulation_component_public_id == world["component"].public_id
-        assert result.formulation_version_public_id == str(
-            world["formulation_version"].public_id
-        )
-        assert result.formulation_component_public_id == str(
-            world["component"].public_id
-        )
+        assert result.formulation_version_public_id == str(world["formulation_version"].public_id)
+        assert result.formulation_component_public_id == str(world["component"].public_id)
 
     def test_exact_release_identity_is_frozen(self, world):
         result = _create(world)
@@ -114,9 +108,7 @@ class TestSuccessfulCreation:
         """M4D3-SRC-004 -- the formulation is the governed source, not input."""
         result = _create(world)
         snapshot = AssessmentSnapshot.objects.get()
-        assert snapshot.proposed_quantity_per_unit == (
-            world["component"].quantity_per_dosage_unit
-        )
+        assert snapshot.proposed_quantity_per_unit == (world["component"].quantity_per_dosage_unit)
         assert snapshot.proposed_quantity_unit == world["component"].quantity_unit
         assert result.match_status == "EXACT_MATCH"
 
@@ -153,22 +145,16 @@ class TestSuccessfulCreation:
         assert AssessmentSnapshot.objects.count() == 1
         assert result.iid_precedent_record_public_id is None
 
-    def test_one_audit_event_after_commit(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_one_audit_event_after_commit(self, world, django_capture_on_commit_callbacks):
         from audit.models import AuditEvent
 
         with django_capture_on_commit_callbacks(execute=True):
             result = _create(world)
-        events = list(
-            AuditEvent.objects.filter(event_type="iid_assessment.snapshot.created")
-        )
+        events = list(AuditEvent.objects.filter(event_type="iid_assessment.snapshot.created"))
         assert len(events) == 1
         payload = events[0].payload
         assert events[0].resource_id == result.snapshot_public_id
-        assert payload["formulation_version_public_id"] == (
-            result.formulation_version_public_id
-        )
+        assert payload["formulation_version_public_id"] == (result.formulation_version_public_id)
         assert payload["formulation_component_public_id"] == (
             result.formulation_component_public_id
         )
@@ -282,20 +268,29 @@ class TestOwnershipAndIsolation:
         )
 
         other_product = ProductDevelopmentRecord.objects.create(
-            tenant=world["tenant"], product_code="OTHER-01",
-            proposed_product_name="Other", active_ingredient="Other",
-            dosage_form="tablet", route="oral", created_by=user_a,
+            tenant=world["tenant"],
+            product_code="OTHER-01",
+            proposed_product_name="Other",
+            active_ingredient="Other",
+            dosage_form="tablet",
+            route="oral",
+            created_by=user_a,
         )
         other_version = FormulationVersion.objects.create(
-            product=other_product, version_number=1, status="approved",
+            product=other_product,
+            version_number=1,
+            status="approved",
             total_dosage_unit_weight=Decimal("500.000000"),
-            total_dosage_unit_weight_unit="milligram", created_by=user_a,
+            total_dosage_unit_weight_unit="milligram",
+            created_by=user_a,
         )
         foreign_component = FormulationComponent.objects.create(
-            formulation_version=other_version, component_type="inactive",
+            formulation_version=other_version,
+            component_type="inactive",
             ingredient_name="Other Excipient",
             quantity_per_dosage_unit=Decimal("10.000000"),
-            quantity_unit="milligram", display_order=1,
+            quantity_unit="milligram",
+            display_order=1,
         )
         with pytest.raises(ComponentNotInFormulationVersion):
             _create(world, formulation_component=foreign_component)
@@ -340,8 +335,10 @@ class TestReleasePolicy:
         from fda_data.models import FDADataSourceRelease, FDAReleaseStatus
 
         orange_book = FDADataSourceRelease.objects.create(
-            dataset_type="fda_orange_book", source_name="OB",
-            official_source_reference="ref", source_checksum_sha256="c" * 64,
+            dataset_type="fda_orange_book",
+            source_name="OB",
+            official_source_reference="ref",
+            source_checksum_sha256="c" * 64,
             status=FDAReleaseStatus.ACTIVE,
         )
         with pytest.raises(ReleaseNotEligible):
@@ -352,8 +349,10 @@ class TestReleasePolicy:
         from fda_data.models import FDADataSourceRelease, FDAReleaseStatus
 
         staged = FDADataSourceRelease.objects.create(
-            dataset_type="fda_iid", source_name="FDA IID staged",
-            official_source_reference="ref", source_checksum_sha256="d" * 64,
+            dataset_type="fda_iid",
+            source_name="FDA IID staged",
+            official_source_reference="ref",
+            source_checksum_sha256="d" * 64,
             status=FDAReleaseStatus.STAGED,
         )
         with pytest.raises(ReleaseNotEligible):
@@ -414,18 +413,25 @@ class TestReleaseDrift:
         old.status = FDAReleaseStatus.SUPERSEDED
         old.save(update_fields=["status"])
         new = FDADataSourceRelease.objects.create(
-            dataset_type="fda_iid", source_name="FDA IID 2",
-            official_source_reference="ref2", source_checksum_sha256="9" * 64,
+            dataset_type="fda_iid",
+            source_name="FDA IID 2",
+            official_source_reference="ref2",
+            source_checksum_sha256="9" * 64,
             status=FDAReleaseStatus.ACTIVE,
         )
         IIDPrecedentRecord.objects.create(
-            release=new, ingredient=world["iid"]["ingredient"],
+            release=new,
+            ingredient=world["iid"]["ingredient"],
             ingredient_name_raw="Synthetic Starch",
-            route_raw="ORAL", route_normalized=world["iid"]["route"],
-            dosage_form_raw="TABLET", dosage_form_normalized=world["iid"]["dosage_form"],
-            potency_amount=Decimal(potency), potency_unit_raw="MG",
+            route_raw="ORAL",
+            route_normalized=world["iid"]["route"],
+            dosage_form_raw="TABLET",
+            dosage_form_normalized=world["iid"]["dosage_form"],
+            potency_amount=Decimal(potency),
+            potency_unit_raw="MG",
             potency_unit_normalized=world["iid"]["unit"],
-            maximum_daily_exposure=Decimal(mde), mde_unit_raw="MG",
+            maximum_daily_exposure=Decimal(mde),
+            mde_unit_raw="MG",
             mde_unit_normalized=world["iid"]["unit"],
             raw_row_checksum="8" * 64,
             calculability_status=IIDCalculabilityStatus.CALCULABLE,
@@ -507,9 +513,7 @@ def _post(client, world, **overrides):
 
 
 class TestSnapshotApi:
-    def test_creation_still_returns_201_and_the_same_body(
-        self, api_client_doer, world
-    ):
+    def test_creation_still_returns_201_and_the_same_body(self, api_client_doer, world):
         resp = _post(api_client_doer, world)
         assert resp.status_code == 201, resp.content
         body = resp.json()
@@ -523,21 +527,18 @@ class TestSnapshotApi:
         snapshot = AssessmentSnapshot.objects.get()
         # Values the service derived from the formulation, not from the body.
         assert snapshot.formulation_component_public_id == world["component"].public_id
-        assert snapshot.proposed_quantity_per_unit == (
-            world["component"].quantity_per_dosage_unit
-        )
+        assert snapshot.proposed_quantity_per_unit == (world["component"].quantity_per_dosage_unit)
 
     def test_unknown_formulation_version_is_404(self, api_client_doer, world):
         resp = _post(
-            api_client_doer, world,
+            api_client_doer,
+            world,
             formulation_version_public_id="11111111-1111-1111-1111-111111111111",
         )
         assert resp.status_code == 404
         assert AssessmentSnapshot.objects.count() == 0
 
-    def test_another_tenants_formulation_version_is_404(
-        self, api_client_doer, world, tenant_b
-    ):
+    def test_another_tenants_formulation_version_is_404(self, api_client_doer, world, tenant_b):
         world["product"].tenant = tenant_b
         world["product"].save(update_fields=["tenant", "updated_at"])
         resp = _post(api_client_doer, world)
@@ -546,9 +547,7 @@ class TestSnapshotApi:
         assert str(world["formulation_version"].public_id) not in resp.content.decode()
         assert AssessmentSnapshot.objects.count() == 0
 
-    def test_a_component_from_another_formulation_is_404(
-        self, api_client_doer, world, user_a
-    ):
+    def test_a_component_from_another_formulation_is_404(self, api_client_doer, world, user_a):
         from formulations.models import (
             FormulationComponent,
             FormulationVersion,
@@ -556,22 +555,33 @@ class TestSnapshotApi:
         )
 
         other_product = ProductDevelopmentRecord.objects.create(
-            tenant=world["tenant"], product_code="OTHER-API",
-            proposed_product_name="Other", active_ingredient="Other",
-            dosage_form="tablet", route="oral", created_by=user_a,
+            tenant=world["tenant"],
+            product_code="OTHER-API",
+            proposed_product_name="Other",
+            active_ingredient="Other",
+            dosage_form="tablet",
+            route="oral",
+            created_by=user_a,
         )
         other_version = FormulationVersion.objects.create(
-            product=other_product, version_number=1, status="approved",
+            product=other_product,
+            version_number=1,
+            status="approved",
             total_dosage_unit_weight=Decimal("500.000000"),
-            total_dosage_unit_weight_unit="milligram", created_by=user_a,
+            total_dosage_unit_weight_unit="milligram",
+            created_by=user_a,
         )
         foreign = FormulationComponent.objects.create(
-            formulation_version=other_version, component_type="inactive",
-            ingredient_name="Other", quantity_per_dosage_unit=Decimal("10.000000"),
-            quantity_unit="milligram", display_order=1,
+            formulation_version=other_version,
+            component_type="inactive",
+            ingredient_name="Other",
+            quantity_per_dosage_unit=Decimal("10.000000"),
+            quantity_unit="milligram",
+            display_order=1,
         )
         resp = _post(
-            api_client_doer, world,
+            api_client_doer,
+            world,
             formulation_component_public_id=str(foreign.public_id),
         )
         assert resp.status_code == 404
@@ -579,7 +589,8 @@ class TestSnapshotApi:
 
     def test_unknown_release_is_404(self, api_client_doer, world):
         resp = _post(
-            api_client_doer, world,
+            api_client_doer,
+            world,
             active_release_public_id="22222222-2222-2222-2222-222222222222",
         )
         assert resp.status_code == 404
@@ -589,12 +600,15 @@ class TestSnapshotApi:
         from fda_data.models import FDADataSourceRelease, FDAReleaseStatus
 
         staged = FDADataSourceRelease.objects.create(
-            dataset_type="fda_iid", source_name="staged",
-            official_source_reference="ref", source_checksum_sha256="7" * 64,
+            dataset_type="fda_iid",
+            source_name="staged",
+            official_source_reference="ref",
+            source_checksum_sha256="7" * 64,
             status=FDAReleaseStatus.STAGED,
         )
         resp = _post(
-            api_client_doer, world,
+            api_client_doer,
+            world,
             active_release_public_id=str(staged.public_id),
         )
         assert resp.status_code == 400
@@ -613,7 +627,8 @@ class TestSnapshotApi:
 
         before = AuditEvent.objects.count()
         _post(
-            api_client_doer, world,
+            api_client_doer,
+            world,
             formulation_version_public_id="11111111-1111-1111-1111-111111111111",
         )
         assert AuditEvent.objects.count() == before
@@ -676,9 +691,7 @@ class TestClientDosingValueProhibited:
         ["0", "1", "999", None, "-5", "not-a-number", 7, 7.5],
         ids=["zero", "one", "large", "null", "negative", "string", "int", "float"],
     )
-    def test_no_client_value_of_any_shape_is_accepted(
-        self, api_client_doer, world, supplied
-    ):
+    def test_no_client_value_of_any_shape_is_accepted(self, api_client_doer, world, supplied):
         self._worst_case_fixture(world)
         resp = _post(api_client_doer, world, maximum_dosage_units_per_day=supplied)
         assert resp.status_code == 400, (supplied, resp.content)
@@ -692,9 +705,7 @@ class TestClientDosingValueProhibited:
             "maximum_units_per_day",
         ],
     )
-    def test_an_alternate_spelling_cannot_reintroduce_it(
-        self, api_client_doer, world, field
-    ):
+    def test_an_alternate_spelling_cannot_reintroduce_it(self, api_client_doer, world, field):
         """An unknown field is inert: nothing reads it, so nothing changes."""
         self._worst_case_fixture(world)
         resp = _post(api_client_doer, world, **{field: "1"})
@@ -706,13 +717,12 @@ class TestClientDosingValueProhibited:
     def test_a_nested_attempt_cannot_reintroduce_it(self, api_client_doer, world):
         self._worst_case_fixture(world)
         resp = _post(
-            api_client_doer, world,
+            api_client_doer,
+            world,
             dosing={"maximum_dosage_units_per_day": "1"},
         )
         assert resp.status_code == 201, resp.content
-        assert AssessmentSnapshot.objects.get().decision_status == (
-            "EXCEEDS_IID_PRECEDENT"
-        )
+        assert AssessmentSnapshot.objects.get().decision_status == ("EXCEEDS_IID_PRECEDENT")
 
     def test_the_field_is_not_advertised_on_the_persisted_endpoint(self):
         from iid_assessment.serializers import (
@@ -749,12 +759,7 @@ class TestClientDosingValueProhibited:
         assert "percentage_of_iid_mde" in snapshot.calculation_results
         assert "difference_from_iid_mde" in snapshot.calculation_results
 
-        assert (
-            AuditEvent.objects.filter(
-                event_type="iid_assessment.snapshot.created"
-            ).count()
-            == 1
-        )
+        assert AuditEvent.objects.filter(event_type="iid_assessment.snapshot.created").count() == 1
 
     def test_null_version_scalar_uses_the_regimen(self, api_client_doer, world):
         fv = world["formulation_version"]
@@ -770,9 +775,7 @@ class TestClientDosingValueProhibited:
         assert daily["value"] == "240.0000000000"
         assert "percentage_of_iid_mde" in snapshot.calculation_results
 
-    def test_version_scalar_higher_than_every_regimen_wins(
-        self, api_client_doer, world
-    ):
+    def test_version_scalar_higher_than_every_regimen_wins(self, api_client_doer, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal("12.0000")
         fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
@@ -811,9 +814,7 @@ class TestClientDosingValueProhibited:
         assert snapshot.decision_status != "PASS_WITH_IID_PRECEDENT"
 
     @pytest.mark.parametrize("scalar", ["0.0000", "-3.0000"])
-    def test_non_positive_scalar_alone_fails_closed(
-        self, api_client_doer, world, scalar
-    ):
+    def test_non_positive_scalar_alone_fails_closed(self, api_client_doer, world, scalar):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal(scalar)
         fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
@@ -824,9 +825,7 @@ class TestClientDosingValueProhibited:
         assert daily["status"] == "DATA_REQUIRED"
         assert daily["value"] is None
 
-    def test_zero_scalar_with_a_valid_regimen_uses_the_regimen(
-        self, api_client_doer, world
-    ):
+    def test_zero_scalar_with_a_valid_regimen_uses_the_regimen(self, api_client_doer, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal("0.0000")
         fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
@@ -845,9 +844,7 @@ class TestClientDosingValueProhibited:
         from iid_assessment import views
 
         assert "governed_maximum_daily_units_value" in inspect.getsource(views)
-        assert "data.get(\"maximum_dosage_units_per_day\")" not in inspect.getsource(
-            views
-        )
+        assert 'data.get("maximum_dosage_units_per_day")' not in inspect.getsource(views)
         # The helper delegates; it implements no comparison of its own.
         helper_source = inspect.getsource(dosing)
         assert "select_maximum_daily_units" in helper_source
@@ -861,7 +858,4 @@ class TestClientDosingValueProhibited:
         from formulations.dosing import governed_maximum_daily_units_value
         from iid_assessment import views
 
-        assert (
-            views.governed_maximum_daily_units_value
-            is governed_maximum_daily_units_value
-        )
+        assert views.governed_maximum_daily_units_value is governed_maximum_daily_units_value

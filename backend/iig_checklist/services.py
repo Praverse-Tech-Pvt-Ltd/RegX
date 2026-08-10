@@ -944,9 +944,7 @@ def update_checklist_response(
     # Object lookup first -- a cross-tenant id is a 404 through visible_to(),
     # never a 403, so existence is not disclosed to a foreign tenant.
     try:
-        execution = ChecklistExecution.objects.visible_to(tenant).get(
-            public_id=execution_public_id
-        )
+        execution = ChecklistExecution.objects.visible_to(tenant).get(public_id=execution_public_id)
     except ChecklistExecution.DoesNotExist:
         from rest_framework.exceptions import NotFound
 
@@ -996,9 +994,7 @@ def update_checklist_response(
     # stored form as ``REVIEW_REQUIRED:<reason_code>`` and no clause defines any
     # trimming, folding or normalisation, so none is invented here.
     supplied_reason = data.get("not_applicable_reason")
-    if isinstance(supplied_reason, str) and supplied_reason.startswith(
-        RESERVED_REASON_PREFIX
-    ):
+    if isinstance(supplied_reason, str) and supplied_reason.startswith(RESERVED_REASON_PREFIX):
         raise ResponseUpdateReservedReasonPrefix()
 
     # M4D3-TXN-003 -- the same governed structural gate the calculation writer
@@ -1018,9 +1014,7 @@ def update_checklist_response(
         # M4D3-TXN-001 / M4D3-TXN-006 -- the execution first; it is the
         # serialization barrier every governed operation on this execution
         # shares, and the cascade re-enters it below on the same transaction.
-        locked_execution = ChecklistExecution.objects.select_for_update().get(
-            pk=execution.pk
-        )
+        locked_execution = ChecklistExecution.objects.select_for_update().get(pk=execution.pk)
         # Re-read under the lock: the status examined must be committed state,
         # not what the Phase A scan happened to see.
         if locked_execution.status not in EDITABLE_EXECUTION_STATUSES:

@@ -1,4 +1,4 @@
-﻿"""Milestone 4D-3 -- database-free foundation coverage.
+"""Milestone 4D-3 -- database-free foundation coverage.
 
 Every test here is provably database-free: no ``django_db`` marker, no ORM
 manager call, no model factory, no network and no Docker.  The modules under
@@ -82,13 +82,8 @@ class TestVocabularies:
         assert code not in vocab.ALLOWED_HISTORY_REASON_CODES
 
     def test_no_cross_vocabulary_overlap(self):
-        assert not (
-            translation.ALLOWED_REASON_CODES
-            & translation.ALLOWED_RESOLVER_DETAIL_CODES
-        )
-        assert not (
-            vocab.ALLOWED_HISTORY_REASON_CODES & vocab.ALLOWED_SERVICE_DETAIL_CODES
-        )
+        assert not (translation.ALLOWED_REASON_CODES & translation.ALLOWED_RESOLVER_DETAIL_CODES)
+        assert not (vocab.ALLOWED_HISTORY_REASON_CODES & vocab.ALLOWED_SERVICE_DETAIL_CODES)
 
 
 # ===========================================================================
@@ -99,9 +94,7 @@ class TestVocabularies:
 class TestFailureMapping:
     def test_mapping_has_one_row_per_code(self):
         assert len(translation.INPUT_FAILURE_MAPPING) == 30
-        assert set(translation.INPUT_FAILURE_MAPPING) == (
-            translation.ALLOWED_INPUT_FAILURE_CODES
-        )
+        assert set(translation.INPUT_FAILURE_MAPPING) == (translation.ALLOWED_INPUT_FAILURE_CODES)
 
     @pytest.mark.parametrize("code", sorted(translation.ALLOWED_INPUT_FAILURE_CODES))
     def test_every_code_maps_deterministically(self, code):
@@ -114,16 +107,12 @@ class TestFailureMapping:
 
     def test_upstream_component_mismatch_mapping(self):
         """The 29th row: distinct from both adjacent codes."""
-        mapping = translation.INPUT_FAILURE_MAPPING[
-            "UPSTREAM_CALCULATION_COMPONENT_MISMATCH"
-        ]
+        mapping = translation.INPUT_FAILURE_MAPPING["UPSTREAM_CALCULATION_COMPONENT_MISMATCH"]
         assert mapping.status == "error"
         assert mapping.reason_code == "INPUT_RESOLUTION_FAILED"
         assert mapping.value_rule == translation.VALUE_RULE_NULL
         assert mapping.reason_code != (
-            translation.INPUT_FAILURE_MAPPING[
-                "ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH"
-            ].reason_code
+            translation.INPUT_FAILURE_MAPPING["ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH"].reason_code
         )
         assert mapping.status != (
             translation.INPUT_FAILURE_MAPPING["UPSTREAM_CALCULATION_MISSING"].status
@@ -174,9 +163,7 @@ def _result(status: str, value=None, generated_at: str | None = None):
         formula_version=engine.FORMULA_VERSION,
         status=status,
         value=value,
-        generated_at=(
-            generated_at if generated_at is not None else "2026-01-01T00:00:00+00:00"
-        ),
+        generated_at=(generated_at if generated_at is not None else "2026-01-01T00:00:00+00:00"),
     )
 
 
@@ -196,9 +183,7 @@ class TestStatusTranslation:
         ],
     )
     def test_every_engine_status(self, engine_status, expected_status, expected_reason):
-        out = translation.translate_engine_status(
-            _result(engine_status, value=Decimal("1.5"))
-        )
+        out = translation.translate_engine_status(_result(engine_status, value=Decimal("1.5")))
         assert out.status == expected_status
         assert out.reason_code == expected_reason
         if expected_status != "complete":
@@ -210,9 +195,7 @@ class TestStatusTranslation:
         assert out.value == Decimal("42.5")
 
     def test_unknown_status_fails_closed(self):
-        out = translation.translate_engine_status(
-            _result("SOMETHING_NEW", value=Decimal("1"))
-        )
+        out = translation.translate_engine_status(_result("SOMETHING_NEW", value=Decimal("1")))
         assert out.status == "error"
         assert out.reason_code == "UNKNOWN_ENGINE_STATUS"
         assert out.value is None
@@ -380,9 +363,7 @@ class TestResolverDeclarations:
 
     def test_registry_component_code_selector_disabled(self):
         """M4D3-FCR-012 -- form B is rejected with the approved detail."""
-        with pytest.raises(
-            RegistryConfigurationError, match="component_selector_form_disabled"
-        ):
+        with pytest.raises(RegistryConfigurationError, match="component_selector_form_disabled"):
             registry_mod.validate_resolver_declaration(
                 "x",
                 {
@@ -634,9 +615,7 @@ class TestCalculationGraph:
             _node("n-pct", "Q_MDE_PCT", "percentage_of_iid_mde"),
         )
         graph = graph_mod.build_graph(nodes)
-        affected = graph_mod.affected_nodes_for_trigger(
-            graph, registry_mod.Q_SUBJECT_COMPONENT
-        )
+        affected = graph_mod.affected_nodes_for_trigger(graph, registry_mod.Q_SUBJECT_COMPONENT)
         assert affected == ("n-exposure", "n-pct")
 
     def test_unrelated_trigger_affects_nothing(self):
@@ -734,16 +713,12 @@ def _synthetic_registry(*, chain: int = 0, fanout: int = 0):
 
 
 def _chain_nodes(length: int) -> tuple[CalculationNode, ...]:
-    return tuple(
-        CalculationNode(f"n{i}", f"QC_{i}", f"chain_{i}") for i in range(length)
-    )
+    return tuple(CalculationNode(f"n{i}", f"QC_{i}", f"chain_{i}") for i in range(length))
 
 
 def _star_nodes(leaves: int) -> tuple[CalculationNode, ...]:
     nodes = [CalculationNode("nroot", "QC_ROOT", "root")]
-    nodes += [
-        CalculationNode(f"nl{i}", f"QC_L{i}", f"leaf_{i}") for i in range(leaves)
-    ]
+    nodes += [CalculationNode(f"nl{i}", f"QC_L{i}", f"leaf_{i}") for i in range(leaves)]
     return tuple(nodes)
 
 
@@ -859,9 +834,7 @@ class TestResolverKeyImmutability:
             )
 
     def test_nested_key_sets_are_frozen(self):
-        required, optional = registry_mod._RESOLVER_KEYS[
-            registry_mod.SOURCE_QUESTION_RESPONSE
-        ]
+        required, optional = registry_mod._RESOLVER_KEYS[registry_mod.SOURCE_QUESTION_RESPONSE]
         assert isinstance(required, frozenset)
         assert isinstance(optional, frozenset)
         with pytest.raises(AttributeError):
@@ -869,17 +842,13 @@ class TestResolverKeyImmutability:
             required.add("smuggled")
 
     def test_form_count_unchanged(self):
-        assert set(registry_mod._RESOLVER_KEYS) == (
-            registry_mod.ALLOWED_RESOLVER_SOURCES
-        )
+        assert set(registry_mod._RESOLVER_KEYS) == (registry_mod.ALLOWED_RESOLVER_SOURCES)
 
 
 class TestCanonicalCodePredicate:
     """The named predicate replacing the former lambda -- identical behaviour."""
 
-    @pytest.mark.parametrize(
-        "value", ["DATA_REQUIRED", "A", "A1", "COMPONENT_REBOUND", "X_9_Y"]
-    )
+    @pytest.mark.parametrize("value", ["DATA_REQUIRED", "A", "A1", "COMPONENT_REBOUND", "X_9_Y"])
     def test_accepts_canonical_codes(self, value):
         assert translation.is_canonical_code(value) is True
 
@@ -1089,9 +1058,7 @@ class TestUnitAdapter:
         )
         assert not out.ok
         assert out.failure_code == "INPUT_UNIT_UNSUPPORTED"
-        assert translation.INPUT_FAILURE_MAPPING[out.failure_code].reason_code == (
-            "UNIT_MISMATCH"
-        )
+        assert translation.INPUT_FAILURE_MAPPING[out.failure_code].reason_code == ("UNIT_MISMATCH")
 
     def test_mass_to_volume_without_density(self):
         out = unit_adapter.convert_for_calculation(
@@ -1102,20 +1069,14 @@ class TestUnitAdapter:
         assert translation.INPUT_FAILURE_MAPPING[out.failure_code].status == "error"
 
     def test_missing_unit_is_data_required(self):
-        out = unit_adapter.convert_for_calculation(
-            value=Decimal("1"), from_unit="", to_unit="gram"
-        )
+        out = unit_adapter.convert_for_calculation(value=Decimal("1"), from_unit="", to_unit="gram")
         assert not out.ok
         assert out.failure_code == "INPUT_UNIT_MISSING"
-        assert translation.INPUT_FAILURE_MAPPING[out.failure_code].status == (
-            "data_required"
-        )
+        assert translation.INPUT_FAILURE_MAPPING[out.failure_code].status == ("data_required")
 
     @pytest.mark.parametrize("bad", [1.5, True, "2", None])
     def test_non_decimal_value_rejected(self, bad):
-        out = unit_adapter.convert_for_calculation(
-            value=bad, from_unit="gram", to_unit="milligram"
-        )
+        out = unit_adapter.convert_for_calculation(value=bad, from_unit="gram", to_unit="milligram")
         assert not out.ok
         assert out.failure_code == "INPUT_VALUE_INVALID"
 
@@ -1132,9 +1093,7 @@ class TestUnitAdapter:
         assert out.provenance["original_unit"] == "gram"
         assert out.provenance["converted_unit"] == "milligram"
         assert out.provenance["conversion_factor"] == "1000"
-        assert out.provenance["conversion_rule_version"] == (
-            unit_adapter.CONVERSION_RULE_VERSION
-        )
+        assert out.provenance["conversion_rule_version"] == (unit_adapter.CONVERSION_RULE_VERSION)
 
     def test_every_failure_code_is_in_the_vocabulary(self):
         for code in unit_adapter._REASON_TO_FAILURE.values():

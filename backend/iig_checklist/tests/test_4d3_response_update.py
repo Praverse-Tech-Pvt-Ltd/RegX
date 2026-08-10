@@ -70,31 +70,34 @@ def _iid_setup():
         IIDPrecedentRecord,
     )
 
-    route = ControlledRoute.objects.create(
-        code="oral", canonical_label="Oral", lifecycle="active"
-    )
+    route = ControlledRoute.objects.create(code="oral", canonical_label="Oral", lifecycle="active")
     dosage_form = ControlledDosageForm.objects.create(
         code="tablet", canonical_label="Tablet", lifecycle="active"
     )
-    gram = ControlledUnit.objects.create(
-        code="gram", symbol="G", dimension="mass", active=True
-    )
+    gram = ControlledUnit.objects.create(code="gram", symbol="G", dimension="mass", active=True)
     release = FDADataSourceRelease.objects.create(
-        dataset_type="fda_iid", source_name="FDA IID",
-        official_source_reference="ref", source_checksum_sha256="e" * 64,
+        dataset_type="fda_iid",
+        source_name="FDA IID",
+        official_source_reference="ref",
+        source_checksum_sha256="e" * 64,
         status=FDAReleaseStatus.ACTIVE,
     )
     ingredient = IIDIngredient.objects.create(
         canonical_name="Update Excipient", normalized_name="UPDATE EXCIPIENT"
     )
     IIDPrecedentRecord.objects.create(
-        release=release, ingredient=ingredient,
+        release=release,
+        ingredient=ingredient,
         ingredient_name_raw="Update Excipient",
-        route_raw="ORAL", route_normalized=route,
-        dosage_form_raw="TABLET", dosage_form_normalized=dosage_form,
-        potency_amount=Decimal("1.000000"), potency_unit_raw="G",
+        route_raw="ORAL",
+        route_normalized=route,
+        dosage_form_raw="TABLET",
+        dosage_form_normalized=dosage_form,
+        potency_amount=Decimal("1.000000"),
+        potency_unit_raw="G",
         potency_unit_normalized=gram,
-        maximum_daily_exposure=Decimal("2.000000"), mde_unit_raw="G",
+        maximum_daily_exposure=Decimal("2.000000"),
+        mde_unit_raw="G",
         mde_unit_normalized=gram,
         raw_row_checksum="f" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
@@ -106,9 +109,14 @@ def _question(section, code, *, answer_type, classification, binding="", order=1
     from iig_checklist.models import ChecklistQuestion
 
     return ChecklistQuestion.objects.create(
-        section=section, code=code, question_text=f"Q {code}", display_order=order,
-        answer_type=answer_type, data_source_classification=classification,
-        calculation_binding_identifier=binding, criticality=Criticality.LOW,
+        section=section,
+        code=code,
+        question_text=f"Q {code}",
+        display_order=order,
+        answer_type=answer_type,
+        data_source_classification=classification,
+        calculation_binding_identifier=binding,
+        criticality=Criticality.LOW,
     )
 
 
@@ -130,40 +138,58 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
 
     ingredient = _iid_setup()
     product = ProductDevelopmentRecord.objects.create(
-        tenant=tenant_a, product_code="PROD-UPD-01",
+        tenant=tenant_a,
+        product_code="PROD-UPD-01",
         proposed_product_name="Update Product",
-        active_ingredient="Update Ingredient", dosage_form="tablet", route="oral",
+        active_ingredient="Update Ingredient",
+        dosage_form="tablet",
+        route="oral",
         created_by=user_a,
     )
     formulation = FormulationVersion.objects.create(
-        product=product, version_number=1, status="approved",
+        product=product,
+        version_number=1,
+        status="approved",
         total_dosage_unit_weight=Decimal("1.000000"),
         total_dosage_unit_weight_unit="gram",
-        maximum_dosage_units_per_day=Decimal("4.0000"), created_by=user_a,
+        maximum_dosage_units_per_day=Decimal("4.0000"),
+        created_by=user_a,
     )
     component = FormulationComponent.objects.create(
-        formulation_version=formulation, component_type="inactive",
+        formulation_version=formulation,
+        component_type="inactive",
         ingredient_name="Update Excipient",
         resolved_ingredient_public_id=ingredient.public_id,
-        quantity_per_dosage_unit=Decimal("0.250000"), quantity_unit="gram",
+        quantity_per_dosage_unit=Decimal("0.250000"),
+        quantity_unit="gram",
         display_order=1,
     )
     version = ChecklistVersion.objects.create(
-        definition=tenant_definition, version_number=1, status="active",
+        definition=tenant_definition,
+        version_number=1,
+        status="active",
         created_by=user_a,
     )
     section = ChecklistSection.objects.create(
-        checklist_version=version, code="S1", title="Section S1",
-        display_order=1, criticality=Criticality.MEDIUM,
+        checklist_version=version,
+        code="S1",
+        title="Section S1",
+        display_order=1,
+        criticality=Criticality.MEDIUM,
     )
     selector_q = _question(
-        section, registry_mod.Q_SUBJECT_COMPONENT,
+        section,
+        registry_mod.Q_SUBJECT_COMPONENT,
         answer_type=AnswerType.FORMULATION_COMPONENT_REFERENCE,
-        classification=DataSourceClassification.USER_REQUIRED, order=1,
+        classification=DataSourceClassification.USER_REQUIRED,
+        order=1,
     )
     free_q = _question(
-        section, "Q_FREE_TEXT", answer_type=AnswerType.SHORT_TEXT,
-        classification=DataSourceClassification.USER_REQUIRED, order=8,
+        section,
+        "Q_FREE_TEXT",
+        answer_type=AnswerType.SHORT_TEXT,
+        classification=DataSourceClassification.USER_REQUIRED,
+        order=8,
     )
     calc_codes = {
         "percentage_w_w": "Q_PCT_WW",
@@ -175,9 +201,12 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
     }
     questions = {
         key: _question(
-            section, code, answer_type=AnswerType.CALCULATED_VALUE,
+            section,
+            code,
+            answer_type=AnswerType.CALCULATED_VALUE,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
-            binding=key, order=index + 2,
+            binding=key,
+            order=index + 2,
         )
         for index, (key, code) in enumerate(calc_codes.items())
     }
@@ -192,18 +221,20 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
         for key, q in questions.items()
     }
     return {
-        "tenant": tenant_a, "user": user_a, "execution": execution,
-        "component": component, "formulation": formulation, "version": version,
-        "questions": questions, "responses": responses,
+        "tenant": tenant_a,
+        "user": user_a,
+        "execution": execution,
+        "component": component,
+        "formulation": formulation,
+        "version": version,
+        "questions": questions,
+        "responses": responses,
         "selector_response": ChecklistResponse.objects.get(
             execution=execution, question=selector_q
         ),
-        "free_response": ChecklistResponse.objects.get(
-            execution=execution, question=free_q
-        ),
+        "free_response": ChecklistResponse.objects.get(execution=execution, question=free_q),
         "outcomes": {
-            key: CalculationOutcome.objects.get(response=r)
-            for key, r in responses.items()
+            key: CalculationOutcome.objects.get(response=r) for key, r in responses.items()
         },
     }
 
@@ -225,9 +256,7 @@ def _select_component(world, client, *, expected_version=None, response=None):
     target.refresh_from_db()
     body = {
         "raw_value": {"public_id": str(world["component"].public_id)},
-        "expected_version": (
-            target.version if expected_version is None else expected_version
-        ),
+        "expected_version": (target.version if expected_version is None else expected_version),
     }
     return client.patch(_url(world, target), body, format="json")
 
@@ -272,14 +301,14 @@ def _fingerprint(world):
             for key in ALL_KEYS
         },
         "responses": dict(
-            ChecklistResponse.objects.filter(
-                execution=world["execution"]
-            ).values_list("pk", "version")
+            ChecklistResponse.objects.filter(execution=world["execution"]).values_list(
+                "pk", "version"
+            )
         ),
         "raw_values": dict(
-            ChecklistResponse.objects.filter(
-                execution=world["execution"]
-            ).values_list("pk", "raw_value")
+            ChecklistResponse.objects.filter(execution=world["execution"]).values_list(
+                "pk", "raw_value"
+            )
         ),
         "history": ChecklistResponseHistory.objects.count(),
         "snapshots": AssessmentSnapshot.objects.count(),
@@ -337,13 +366,21 @@ class TestExpectedVersionContract:
         "bad",
         [None, True, False, 1.0, 1.5, "1", "1.0", "abc", 0, -1, [], {}],
         ids=[
-            "none", "true", "false", "float_one", "float_frac", "str_one",
-            "str_float_one", "str_abc", "zero", "negative", "list", "dict",
+            "none",
+            "true",
+            "false",
+            "float_one",
+            "float_frac",
+            "str_one",
+            "str_float_one",
+            "str_abc",
+            "zero",
+            "negative",
+            "list",
+            "dict",
         ],
     )
-    def test_a_malformed_expected_version_is_rejected(
-        self, world, api_client_doer, bad
-    ):
+    def test_a_malformed_expected_version_is_rejected(self, world, api_client_doer, bad):
         """M4D3-TXN-003 through the transport layer, with no coercion.
 
         ``1.0``, ``"1"`` and ``"1.0"`` are the values a DRF ``IntegerField``
@@ -399,9 +436,7 @@ class TestExpectedVersionContract:
         from iig_checklist import calculation_execution as exec_mod
         from iig_checklist import services as services_mod
 
-        src = textwrap.dedent(
-            inspect.getsource(services_mod.update_checklist_response)
-        )
+        src = textwrap.dedent(inspect.getsource(services_mod.update_checklist_response))
         called = {
             node.func.id
             for node in ast.walk(ast.parse(src))
@@ -504,9 +539,7 @@ class TestServerControlledValues:
 
 
 class TestCascadeTrigger:
-    def test_updating_the_selector_recalculates_every_calculation(
-        self, world, api_client_doer
-    ):
+    def test_updating_the_selector_recalculates_every_calculation(self, world, api_client_doer):
         for key in ALL_KEYS:
             assert _outcome(world, key).status == CalculationStatus.DATA_REQUIRED
 
@@ -535,9 +568,7 @@ class TestCascadeTrigger:
         from audit.models import AuditEvent
 
         target = world["free_response"]
-        calc_versions = {
-            key: world["responses"][key].version for key in ALL_KEYS
-        }
+        calc_versions = {key: world["responses"][key].version for key in ALL_KEYS}
         audit_before = AuditEvent.objects.filter(event_type=CALCULATED_EVENT).count()
 
         resp = api_client_doer.patch(
@@ -552,10 +583,7 @@ class TestCascadeTrigger:
             response.refresh_from_db()
             assert response.version == calc_versions[key]
             assert _outcome(world, key).status == CalculationStatus.DATA_REQUIRED
-        assert (
-            AuditEvent.objects.filter(event_type=CALCULATED_EVENT).count()
-            == audit_before
-        )
+        assert AuditEvent.objects.filter(event_type=CALCULATED_EVENT).count() == audit_before
 
     def test_the_trigger_decision_is_not_duplicated_in_the_service(self):
         """The registry owns the trigger rules; the service must not restate them.
@@ -676,9 +704,7 @@ class TestAudit:
             resp = _select_component(world, api_client_doer)
         assert resp.status_code == 200
 
-        events = AuditEvent.objects.filter(
-            resource_id=str(world["selector_response"].public_id)
-        )
+        events = AuditEvent.objects.filter(resource_id=str(world["selector_response"].public_id))
         assert events.count() == 1
         payload = events.first().payload
         assert payload["prior_response_version"] == 1
@@ -726,9 +752,16 @@ class TestViewIsThin:
                 names.add(node.id)
 
         forbidden = {
-            "emit", "on_commit", "atomic", "select_for_update",
-            "full_clean", "save", "objects", "IigChecklistEvent",
-            "ChecklistResponseUpdateSerializer", "has_iig_checklist_permission",
+            "emit",
+            "on_commit",
+            "atomic",
+            "select_for_update",
+            "full_clean",
+            "save",
+            "objects",
+            "IigChecklistEvent",
+            "ChecklistResponseUpdateSerializer",
+            "has_iig_checklist_permission",
         }
         assert names.isdisjoint(forbidden), sorted(names & forbidden)
 
@@ -753,9 +786,7 @@ class TestViewIsThin:
 
 
 class TestAuthorization:
-    def test_a_reader_without_edit_permission_is_refused(
-        self, world, api_client_reviewer
-    ):
+    def test_a_reader_without_edit_permission_is_refused(self, world, api_client_reviewer):
         before = _fingerprint(world)
         resp = _select_component(world, api_client_reviewer)
         assert resp.status_code == 403
@@ -788,7 +819,6 @@ class TestAuthorization:
         assert _error_code(resp) == "response_immutable"
         assert _fingerprint(world) == before
 
-
     def test_an_unknown_response_is_a_404(self, world, api_client_doer):
         import uuid
 
@@ -809,9 +839,7 @@ class TestAuthorization:
 
 
 class TestModelLevelRejection:
-    def test_a_model_validation_failure_is_a_structured_400(
-        self, world, api_client_doer
-    ):
+    def test_a_model_validation_failure_is_a_structured_400(self, world, api_client_doer):
         """``is_not_applicable`` without a reason passes the serializer and fails
         ``ChecklistResponse.clean()`` -- the service must surface that as the
         governed payload error, not as a 500.
@@ -927,12 +955,8 @@ class TestReservedReasonPrefixAtTheDomainBoundary:
 
         from iig_checklist import services as services_mod
 
-        src = textwrap.dedent(
-            inspect.getsource(services_mod.update_checklist_response)
-        )
-        names = {
-            n.id for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Name)
-        }
+        src = textwrap.dedent(inspect.getsource(services_mod.update_checklist_response))
+        names = {n.id for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Name)}
         assert "RESERVED_REASON_PREFIX" in names
 
     def test_the_prefix_constant_matches_the_persisted_marker_form(self):
@@ -1008,16 +1032,12 @@ class TestReservedReasonPrefixOverHttp:
                 format="json",
             )
         assert resp.status_code == 403
-        assert not any(
-            "FOR UPDATE" in q["sql"].upper() for q in ctx.captured_queries
-        )
+        assert not any("FOR UPDATE" in q["sql"].upper() for q in ctx.captured_queries)
         verbs = {q["sql"].lstrip().split()[0].upper() for q in ctx.captured_queries}
         assert "UPDATE" not in verbs
         assert "INSERT" not in verbs
 
-    def test_a_calculated_response_is_still_refused_first(
-        self, world, api_client_doer
-    ):
+    def test_a_calculated_response_is_still_refused_first(self, world, api_client_doer):
         """Ordering is unchanged: server-controlled classification wins."""
         target = world["responses"]["daily_exposure"]
         resp = api_client_doer.patch(

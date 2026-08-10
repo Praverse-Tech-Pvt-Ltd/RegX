@@ -403,14 +403,20 @@ def _resolve_response(
     questions = _questions_with_code(execution, code)
     if not questions:
         _fail(
-            failures, kwarg=kwarg, code=F_RESPONSE_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESPONSE_MISSING,
+            source_kind=source_kind,
             message=f"No question with code {code!r} exists in this execution's version.",
             question_code=code,
         )
         return None, None
     if len(questions) > 1:
         _fail(
-            failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=(
                 f"Question code {code!r} resolves to {len(questions)} questions in this "
                 "execution's version; the binding is ambiguous."
@@ -423,14 +429,20 @@ def _resolve_response(
     responses = _responses_for_question(execution, question)
     if not responses:
         _fail(
-            failures, kwarg=kwarg, code=F_RESPONSE_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESPONSE_MISSING,
+            source_kind=source_kind,
             message=f"No response exists for question {code!r} in this execution.",
             question_code=code,
         )
         return None, None
     if len(responses) > 1:  # pragma: no cover - unique constraint prevents this
         _fail(
-            failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=f"Question {code!r} has more than one response in this execution.",
             question_code=code,
         )
@@ -440,16 +452,24 @@ def _resolve_response(
     outcome = _applicability_outcome(response)
     if outcome == "not_applicable":
         _fail(
-            failures, kwarg=kwarg, code=F_RESPONSE_NOT_APPLICABLE, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESPONSE_NOT_APPLICABLE,
+            source_kind=source_kind,
             message=f"Response for {code!r} is marked not applicable.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None, None
     if outcome == "review_required":
         _fail(
-            failures, kwarg=kwarg, code=F_REVIEW_REQUIRED, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_REVIEW_REQUIRED,
+            source_kind=source_kind,
             message=f"Response for {code!r} carries a REVIEW_REQUIRED marker.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None, None
     return response, question
@@ -482,7 +502,10 @@ def _target_unit(
     if isinstance(required, SnapshotUnitRef):
         if snapshot is None:
             _fail(
-                failures, kwarg=kwarg, code=F_SNAPSHOT_MISSING, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_SNAPSHOT_MISSING,
+                source_kind=source_kind,
                 message=(
                     f"Target unit for {kwarg!r} is the snapshot field "
                     f"{required.unit_field!r}, but no assessment snapshot was supplied."
@@ -492,14 +515,20 @@ def _target_unit(
         accessor = _SNAPSHOT_UNIT_FIELDS.get(required.unit_field)
         if accessor is None:  # pragma: no cover - registry validates the name
             _fail(
-                failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_RESOLVER_UNKNOWN,
+                source_kind=source_kind,
                 message=f"{required.unit_field!r} is not a readable snapshot unit field.",
             )
             return None, False
         unit = accessor(snapshot)
         if not unit:
             _fail(
-                failures, kwarg=kwarg, code=F_UNIT_MISSING, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_UNIT_MISSING,
+                source_kind=source_kind,
                 message=(
                     f"Snapshot unit field {required.unit_field!r} is empty, so "
                     f"{kwarg!r} has no target unit."
@@ -511,7 +540,10 @@ def _target_unit(
 
     if not isinstance(required, str) or not required.strip():
         _fail(
-            failures, kwarg=kwarg, code=F_UNIT_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UNIT_MISSING,
+            source_kind=source_kind,
             message=f"Declared target unit for {kwarg!r} is empty.",
         )
         return None, False
@@ -534,24 +566,29 @@ def _convert(
         return value, {}
     if not source_unit or not str(source_unit).strip():
         _fail(
-            failures, kwarg=kwarg, code=F_UNIT_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UNIT_MISSING,
+            source_kind=source_kind,
             message=f"{kwarg!r} requires {target_unit!r} but its source unit is absent.",
-            question_code=question_code, public_uuid=public_uuid,
+            question_code=question_code,
+            public_uuid=public_uuid,
         )
         return None, {}
 
-    outcome = convert_for_calculation(
-        value=value, from_unit=str(source_unit), to_unit=target_unit
-    )
+    outcome = convert_for_calculation(value=value, from_unit=str(source_unit), to_unit=target_unit)
     if not outcome.ok:
         code = outcome.failure_code or "UNKNOWN_INTERNAL_FAILURE"
         _fail(
-            failures, kwarg=kwarg, code=code, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=code,
+            source_kind=source_kind,
             message=(
-                f"{kwarg!r} could not be expressed in {target_unit!r} from "
-                f"{str(source_unit)!r}."
+                f"{kwarg!r} could not be expressed in {target_unit!r} from {str(source_unit)!r}."
             ),
-            question_code=question_code, public_uuid=public_uuid,
+            question_code=question_code,
+            public_uuid=public_uuid,
         )
         return None, {}
     return outcome.value, dict(outcome.provenance)
@@ -596,14 +633,20 @@ def _resolve_selector_component(
 
     if selector is None:  # pragma: no cover - caller only passes selector decls
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
+            source_kind=source_kind,
             message=f"{kwarg!r} reads a component but declares no selector.",
         )
         return None
     selector_type = selector.get("type")
     if selector_type in DISABLED_SELECTOR_TYPES or selector_type != SELECTOR_RESPONSE_REFERENCE:
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
+            source_kind=source_kind,
             message=f"Component selector form {selector_type!r} is not enabled.",
         )
         return None
@@ -617,30 +660,42 @@ def _resolve_selector_component(
 
     if question.answer_type != AnswerType.FORMULATION_COMPONENT_REFERENCE:
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_REFERENCE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_REFERENCE_INVALID,
+            source_kind=source_kind,
             message=(
                 f"Selector question {code!r} has answer type {question.answer_type!r}; "
                 "formulation_component_reference is required."
             ),
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
 
     payload = response.raw_value
     if not isinstance(payload, dict) or set(payload) != {"public_id"}:
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_REFERENCE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_REFERENCE_INVALID,
+            source_kind=source_kind,
             message=f"Selector response {code!r} does not hold exactly {{'public_id'}}.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
     try:
         component_uuid = uuid.UUID(str(payload["public_id"]))
     except (ValueError, AttributeError, TypeError):
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_REFERENCE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_REFERENCE_INVALID,
+            source_kind=source_kind,
             message=f"Selector response {code!r} does not hold a valid UUID.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
 
@@ -653,14 +708,20 @@ def _resolve_selector_component(
     )
     if not matches:
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_MISSING,
+            source_kind=source_kind,
             message=f"Selector response {code!r} references no existing component.",
             question_code=code,
         )
         return None
     if len(matches) > 1:  # pragma: no cover - public_id is unique
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_AMBIGUOUS, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_AMBIGUOUS,
+            source_kind=source_kind,
             message=f"Selector response {code!r} resolves to more than one component.",
             question_code=code,
         )
@@ -669,7 +730,10 @@ def _resolve_selector_component(
     component = matches[0]
     if component.formulation_version_id != execution.formulation_version_id:
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_WRONG_FORMULATION, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_WRONG_FORMULATION,
+            source_kind=source_kind,
             message=(
                 f"Selector response {code!r} references a component outside this "
                 "execution's formulation version."
@@ -679,7 +743,10 @@ def _resolve_selector_component(
         return None
     if component.formulation_version.product.tenant_id != execution.tenant_id:
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_TENANT_MISMATCH, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_TENANT_MISMATCH,
+            source_kind=source_kind,
             message=f"Selector response {code!r} references another tenant's component.",
             question_code=code,
         )
@@ -688,12 +755,16 @@ def _resolve_selector_component(
     required_type = declaration.get("required_component_type")
     if required_type in COMPONENT_TYPES and component.component_type != required_type:
         _fail(
-            failures, kwarg=kwarg, code=F_COMPONENT_TYPE_MISMATCH, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_COMPONENT_TYPE_MISMATCH,
+            source_kind=source_kind,
             message=(
                 f"Subject component is {component.component_type!r}; this calculation "
                 f"requires {required_type!r}."
             ),
-            question_code=code, public_uuid=str(component.public_id),
+            question_code=code,
+            public_uuid=str(component.public_id),
         )
         return None
     return component
@@ -731,30 +802,40 @@ def _locate_upstream(execution, kwarg, declaration, failures) -> _Upstream | Non
 
     if question.data_source_classification != DataSourceClassification.SYSTEM_CALCULATED:
         _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UPSTREAM_MISSING,
+            source_kind=source_kind,
             message=f"Upstream question {code!r} is not system_calculated.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
 
-    outcomes = list(
-        CalculationOutcome.objects.filter(response=response).order_by("public_id")
-    )
+    outcomes = list(CalculationOutcome.objects.filter(response=response).order_by("public_id"))
     if not outcomes:
         _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UPSTREAM_MISSING,
+            source_kind=source_kind,
             message=f"No calculation outcome exists for upstream question {code!r}.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
     if len(outcomes) > 1:
         _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_DUPLICATE, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UPSTREAM_DUPLICATE,
+            source_kind=source_kind,
             message=(
                 f"Upstream question {code!r} has {len(outcomes)} calculation outcomes; "
                 "the current result is ambiguous."
             ),
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
 
@@ -763,19 +844,26 @@ def _locate_upstream(execution, kwarg, declaration, failures) -> _Upstream | Non
     required_status = declaration.get("required_status", CalculationStatus.COMPLETE)
     if outcome.status != required_status:
         _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_INCOMPLETE, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UPSTREAM_INCOMPLETE,
+            source_kind=source_kind,
             message=(
-                f"Upstream outcome for {code!r} is {outcome.status!r}, not "
-                f"{required_status!r}."
+                f"Upstream outcome for {code!r} is {outcome.status!r}, not {required_status!r}."
             ),
-            question_code=code, public_uuid=outcome_uuid,
+            question_code=code,
+            public_uuid=outcome_uuid,
         )
         return None
     if outcome.value is None:
         _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_INCOMPLETE, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UPSTREAM_INCOMPLETE,
+            source_kind=source_kind,
             message=f"Upstream outcome for {code!r} holds no value.",
-            question_code=code, public_uuid=outcome_uuid,
+            question_code=code,
+            public_uuid=outcome_uuid,
         )
         return None
 
@@ -785,29 +873,35 @@ def _locate_upstream(execution, kwarg, declaration, failures) -> _Upstream | Non
     upstream_entry = get_entry((question.calculation_binding_identifier or "").strip())
     if upstream_entry is None:
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
+            source_kind=source_kind,
             message=(
                 f"Upstream question {code!r} declares a calculation binding that is "
                 "not an approved registry entry."
             ),
-            question_code=code, public_uuid=outcome_uuid,
+            question_code=code,
+            public_uuid=outcome_uuid,
         )
         return None
     if outcome.calculation_name != upstream_entry.calculation_name:
         _fail(
-            failures, kwarg=kwarg, code=F_UPSTREAM_NAME_MISMATCH, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_UPSTREAM_NAME_MISMATCH,
+            source_kind=source_kind,
             message=(
                 f"Upstream outcome for {code!r} records calculation "
                 f"{outcome.calculation_name!r}; its binding declares "
                 f"{upstream_entry.calculation_name!r}."
             ),
-            question_code=code, public_uuid=outcome_uuid,
+            question_code=code,
+            public_uuid=outcome_uuid,
         )
         return None
 
-    return _Upstream(
-        kwarg=kwarg, code=code, response=response, question=question, outcome=outcome
-    )
+    return _Upstream(kwarg=kwarg, code=code, response=response, question=question, outcome=outcome)
 
 
 def _upstream_component_id(execution, upstream, failures) -> tuple[str | None, bool]:
@@ -837,37 +931,48 @@ def _upstream_component_id(execution, upstream, failures) -> tuple[str | None, b
     if recorded is None:
         if component_scoped:
             _fail(
-                failures, kwarg=upstream.kwarg, code=F_UPSTREAM_COMPONENT_MISMATCH,
+                failures,
+                kwarg=upstream.kwarg,
+                code=F_UPSTREAM_COMPONENT_MISMATCH,
                 source_kind=source_kind,
                 message=(
                     f"Upstream outcome for {upstream.code!r} records no subject "
                     "component, so it cannot be proven to describe this component."
                 ),
-                question_code=upstream.code, public_uuid=outcome_uuid,
+                question_code=upstream.code,
+                public_uuid=outcome_uuid,
             )
             return None, False
         return None, True
 
     if not isinstance(recorded, str):
         _fail(
-            failures, kwarg=upstream.kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=upstream.kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=(
                 f"Upstream outcome for {upstream.code!r} records a malformed subject "
                 "component provenance value."
             ),
-            question_code=upstream.code, public_uuid=outcome_uuid,
+            question_code=upstream.code,
+            public_uuid=outcome_uuid,
         )
         return None, False
     try:
         component_uuid = uuid.UUID(recorded)
     except (ValueError, AttributeError, TypeError):
         _fail(
-            failures, kwarg=upstream.kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=upstream.kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=(
                 f"Upstream outcome for {upstream.code!r} records a subject component "
                 "value that is not a valid UUID."
             ),
-            question_code=upstream.code, public_uuid=outcome_uuid,
+            question_code=upstream.code,
+            public_uuid=outcome_uuid,
         )
         return None, False
 
@@ -878,24 +983,31 @@ def _upstream_component_id(execution, upstream, failures) -> tuple[str | None, b
     # prevent in a regulated record.
     if recorded != str(component_uuid):
         _fail(
-            failures, kwarg=upstream.kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=upstream.kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=(
                 f"Upstream outcome for {upstream.code!r} records a subject component "
                 "UUID that is not in canonical lowercase hyphenated form."
             ),
-            question_code=upstream.code, public_uuid=outcome_uuid,
+            question_code=upstream.code,
+            public_uuid=outcome_uuid,
         )
         return None, False
 
     if _component_in_execution(execution, component_uuid) is None:
         _fail(
-            failures, kwarg=upstream.kwarg, code=F_UPSTREAM_COMPONENT_MISMATCH,
+            failures,
+            kwarg=upstream.kwarg,
+            code=F_UPSTREAM_COMPONENT_MISMATCH,
             source_kind=source_kind,
             message=(
                 f"Upstream outcome for {upstream.code!r} names a subject component "
                 "that is not part of this execution's formulation version."
             ),
-            question_code=upstream.code, public_uuid=outcome_uuid,
+            question_code=upstream.code,
+            public_uuid=outcome_uuid,
         )
         return None, False
     return str(component_uuid), True
@@ -949,7 +1061,9 @@ def _resolve_subject_component(
         # Every relevant source must agree; there is no precedence order that
         # could make one of two different components the right answer.
         _fail(
-            failures, kwarg="", code=F_UPSTREAM_COMPONENT_MISMATCH,
+            failures,
+            kwarg="",
+            code=F_UPSTREAM_COMPONENT_MISMATCH,
             source_kind=SOURCE_KIND_FORMULATION_COMPONENT,
             message=(
                 "The subject component identities implied by this calculation's "
@@ -988,21 +1102,29 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
     # form A may never be used to read one as a calculation result.
     if question.data_source_classification == DataSourceClassification.SYSTEM_CALCULATED:
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
+            source_kind=source_kind,
             message=(
                 f"Question {code!r} is system_calculated; form A cannot read a "
                 "calculated result. Use a calculation_outcome resolver."
             ),
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
 
     raw = response.raw_value
     if raw is None:
         _fail(
-            failures, kwarg=kwarg, code=F_RESPONSE_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESPONSE_MISSING,
+            source_kind=source_kind,
             message=f"Response for {code!r} holds no value.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
 
@@ -1010,14 +1132,21 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
 
     try:
         validate_raw_value_shape(
-            question.answer_type, raw, question=question, execution=execution,
+            question.answer_type,
+            raw,
+            question=question,
+            execution=execution,
             tenant=execution.tenant,
         )
     except InvalidRawValueShape:
         _fail(
-            failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=f"Response for {code!r} does not match its declared answer shape.",
-            question_code=code, public_uuid=str(response.public_id),
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         return None
 
@@ -1025,17 +1154,25 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
     if expected_type == "decimal":
         if not isinstance(raw, dict) or "value" not in raw:
             _fail(
-                failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_VALUE_INVALID,
+                source_kind=source_kind,
                 message=f"Response for {code!r} carries no decimal value.",
-                question_code=code, public_uuid=str(response.public_id),
+                question_code=code,
+                public_uuid=str(response.public_id),
             )
             return None
         value = _decimal_from_string(raw.get("value"))
         if value is None:
             _fail(
-                failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_VALUE_INVALID,
+                source_kind=source_kind,
                 message=f"Response for {code!r} does not hold a valid decimal string.",
-                question_code=code, public_uuid=str(response.public_id),
+                question_code=code,
+                public_uuid=str(response.public_id),
             )
             return None
         source_unit = raw.get("unit") or declaration.get("unit_source")
@@ -1045,8 +1182,14 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
         if not ok:
             return None
         converted, conversion = _convert(
-            value, source_unit, target, kwarg=kwarg, source_kind=source_kind,
-            failures=failures, question_code=code, public_uuid=str(response.public_id),
+            value,
+            source_unit,
+            target,
+            kwarg=kwarg,
+            source_kind=source_kind,
+            failures=failures,
+            question_code=code,
+            public_uuid=str(response.public_id),
         )
         if converted is None:
             return None
@@ -1074,14 +1217,21 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
         text = raw.get("value") if isinstance(raw, dict) else raw
         if not isinstance(text, str) or not text.strip():
             _fail(
-                failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_VALUE_INVALID,
+                source_kind=source_kind,
                 message=f"Response for {code!r} does not hold a non-empty string.",
-                question_code=code, public_uuid=str(response.public_id),
+                question_code=code,
+                public_uuid=str(response.public_id),
             )
             return None
         return ResolvedInput(
-            kwarg_name=kwarg, value=text, expected_type=expected_type,
-            source_kind=source_kind, source_public_uuid=str(response.public_id),
+            kwarg_name=kwarg,
+            value=text,
+            expected_type=expected_type,
+            source_kind=source_kind,
+            source_public_uuid=str(response.public_id),
             source_question_code=code,
             provenance=freeze(
                 {"response_public_id": str(response.public_id), "question_code": code}
@@ -1089,7 +1239,10 @@ def _resolve_question_response(execution, kwarg, declaration, snapshot, failures
         )
 
     _fail(
-        failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+        failures,
+        kwarg=kwarg,
+        code=F_RESOLVER_UNKNOWN,
+        source_kind=source_kind,
         message=f"expected_type {expected_type!r} is not supported for form A.",
         question_code=code,
     )
@@ -1123,15 +1276,14 @@ def _resolve_formulation_field(
         from formulations.dosing import current_formulation_version
 
         source_kind = SOURCE_KIND_FORMULATION_VERSION
-        formulation_version = current_formulation_version(
-            execution.formulation_version_id
-        )
+        formulation_version = current_formulation_version(execution.formulation_version_id)
         if formulation_version.product.tenant_id != execution.tenant_id:
             _fail(
-                failures, kwarg=kwarg, code=F_TENANT_MISMATCH, source_kind=source_kind,
-                message=(
-                    "This execution's formulation version belongs to another tenant."
-                ),
+                failures,
+                kwarg=kwarg,
+                code=F_TENANT_MISMATCH,
+                source_kind=source_kind,
+                message=("This execution's formulation version belongs to another tenant."),
                 public_uuid=str(formulation_version.public_id),
             )
             return None
@@ -1145,7 +1297,10 @@ def _resolve_formulation_field(
             # Phase B already recorded its own governed failure; this kwarg
             # cannot resolve without a subject component.
             _fail(
-                failures, kwarg=kwarg, code=F_COMPONENT_MISSING, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_COMPONENT_MISSING,
+                source_kind=source_kind,
                 message=f"{kwarg!r} needs a subject component, which did not resolve.",
             )
             return None
@@ -1155,7 +1310,9 @@ def _resolve_formulation_field(
         public_uuid = str(target_object.public_id)
     else:  # pragma: no cover - registry validates the object name
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
             source_kind=SOURCE_KIND_FORMULATION_VERSION,
             message=f"{obj!r} is not a readable formulation object.",
         )
@@ -1164,7 +1321,10 @@ def _resolve_formulation_field(
     accessor = value_fields.get(field_name)
     if accessor is None:
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
+            source_kind=source_kind,
             message=f"{field_name!r} is not an approved readable field on {obj!r}.",
             public_uuid=public_uuid,
         )
@@ -1173,14 +1333,20 @@ def _resolve_formulation_field(
     raw_value = accessor(target_object)
     if raw_value is None:
         _fail(
-            failures, kwarg=kwarg, code=F_FORMULATION_FIELD_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_FORMULATION_FIELD_MISSING,
+            source_kind=source_kind,
             message=f"{obj!r}.{field_name} holds no value.",
             public_uuid=public_uuid,
         )
         return None
     if isinstance(raw_value, bool) or not isinstance(raw_value, Decimal):
         _fail(
-            failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=f"{obj!r}.{field_name} is not a Decimal.",
             public_uuid=public_uuid,
         )
@@ -1191,7 +1357,10 @@ def _resolve_formulation_field(
         unit_accessor = unit_fields.get(unit_field)
         if unit_accessor is None:
             _fail(
-                failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_RESOLVER_UNKNOWN,
+                source_kind=source_kind,
                 message=f"{unit_field!r} is not an approved unit field on {obj!r}.",
                 public_uuid=public_uuid,
             )
@@ -1204,8 +1373,13 @@ def _resolve_formulation_field(
     if not ok:
         return None
     converted, conversion = _convert(
-        raw_value, source_unit, target, kwarg=kwarg, source_kind=source_kind,
-        failures=failures, public_uuid=public_uuid,
+        raw_value,
+        source_unit,
+        target,
+        kwarg=kwarg,
+        source_kind=source_kind,
+        failures=failures,
+        public_uuid=public_uuid,
     )
     if converted is None:
         return None
@@ -1256,11 +1430,11 @@ def _resolve_maximum_daily_units(execution, kwarg, declaration, failures):
 
     if not selection.resolved or selection.value is None:
         _fail(
-            failures, kwarg=kwarg, code=F_FORMULATION_FIELD_MISSING, source_kind=source_kind,
-            message=(
-                "No valid maximum daily units candidate exists for this formulation "
-                "version."
-            ),
+            failures,
+            kwarg=kwarg,
+            code=F_FORMULATION_FIELD_MISSING,
+            source_kind=source_kind,
+            message=("No valid maximum daily units candidate exists for this formulation version."),
             public_uuid=formulation_public_id,
         )
         return None
@@ -1277,7 +1451,12 @@ def _resolve_maximum_daily_units(execution, kwarg, declaration, failures):
 
 
 def _resolve_assessment_snapshot(
-    execution, kwarg, declaration, snapshot, component_public_id, expected_release,
+    execution,
+    kwarg,
+    declaration,
+    snapshot,
+    component_public_id,
+    expected_release,
     failures,
 ):
     """Form D -- M4D3-INP-006.
@@ -1293,7 +1472,10 @@ def _resolve_assessment_snapshot(
 
     if snapshot is None:
         _fail(
-            failures, kwarg=kwarg, code=F_SNAPSHOT_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_SNAPSHOT_MISSING,
+            source_kind=source_kind,
             message=f"{kwarg!r} requires an assessment snapshot, which was not supplied.",
         )
         return None
@@ -1301,16 +1483,22 @@ def _resolve_assessment_snapshot(
     public_uuid = str(snapshot.public_id)
     if snapshot.tenant_id != execution.tenant_id:
         _fail(
-            failures, kwarg=kwarg, code=F_SNAPSHOT_TENANT_MISMATCH, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_SNAPSHOT_TENANT_MISMATCH,
+            source_kind=source_kind,
             message="The supplied assessment snapshot belongs to another tenant.",
             public_uuid=public_uuid,
         )
         return None
-    if component_public_id is not None and str(
-        snapshot.formulation_component_public_id
-    ) != str(component_public_id):
+    if component_public_id is not None and str(snapshot.formulation_component_public_id) != str(
+        component_public_id
+    ):
         _fail(
-            failures, kwarg=kwarg, code=F_SNAPSHOT_COMPONENT_MISMATCH, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_SNAPSHOT_COMPONENT_MISMATCH,
+            source_kind=source_kind,
             message="The supplied snapshot describes a different subject component.",
             public_uuid=public_uuid,
         )
@@ -1319,7 +1507,10 @@ def _resolve_assessment_snapshot(
         expected_release
     ):
         _fail(
-            failures, kwarg=kwarg, code=F_SNAPSHOT_RELEASE_MISMATCH, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_SNAPSHOT_RELEASE_MISMATCH,
+            source_kind=source_kind,
             message="The supplied snapshot was frozen from a different FDA release.",
             public_uuid=public_uuid,
         )
@@ -1328,7 +1519,10 @@ def _resolve_assessment_snapshot(
     accessor = _SNAPSHOT_VALUE_FIELDS.get(field_name)
     if accessor is None:
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
+            source_kind=source_kind,
             message=f"{field_name!r} is not an approved readable snapshot value field.",
             public_uuid=public_uuid,
         )
@@ -1337,7 +1531,10 @@ def _resolve_assessment_snapshot(
     value = accessor(snapshot)
     if value is None:
         _fail(
-            failures, kwarg=kwarg, code=F_ASSESSMENT_FIELD_MISSING, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_ASSESSMENT_FIELD_MISSING,
+            source_kind=source_kind,
             message=f"Snapshot field {field_name!r} holds no value.",
             public_uuid=public_uuid,
         )
@@ -1349,7 +1546,10 @@ def _resolve_assessment_snapshot(
         unit_accessor = _SNAPSHOT_UNIT_FIELDS.get(unit_field)
         if unit_accessor is None:
             _fail(
-                failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_RESOLVER_UNKNOWN,
+                source_kind=source_kind,
                 message=f"{unit_field!r} is not an approved snapshot unit field.",
                 public_uuid=public_uuid,
             )
@@ -1362,8 +1562,13 @@ def _resolve_assessment_snapshot(
     if not ok:
         return None
     converted, conversion = _convert(
-        value, source_unit, target, kwarg=kwarg, source_kind=source_kind,
-        failures=failures, public_uuid=public_uuid,
+        value,
+        source_unit,
+        target,
+        kwarg=kwarg,
+        source_kind=source_kind,
+        failures=failures,
+        public_uuid=public_uuid,
     )
     if converted is None:
         return None
@@ -1378,15 +1583,11 @@ def _resolve_assessment_snapshot(
         target_unit=target,
         conversion_factor=conversion.get("conversion_factor"),
         conversion_rule_version=conversion.get("conversion_rule_version"),
-        provenance=freeze(
-            {"snapshot_public_id": public_uuid, "field": field_name, **conversion}
-        ),
+        provenance=freeze({"snapshot_public_id": public_uuid, "field": field_name, **conversion}),
     )
 
 
-def _build_outcome_input(
-    upstream, declaration, snapshot, component_public_id, failures
-):
+def _build_outcome_input(upstream, declaration, snapshot, component_public_id, failures):
     """Form E value assembly, using the outcome Phase B already validated."""
     source_kind = SOURCE_KIND_CALCULATION_OUTCOME
     outcome = upstream.outcome
@@ -1401,8 +1602,14 @@ def _build_outcome_input(
     if not ok:
         return None
     converted, conversion = _convert(
-        outcome.value, source_unit, target, kwarg=kwarg, source_kind=source_kind,
-        failures=failures, question_code=code, public_uuid=outcome_uuid,
+        outcome.value,
+        source_unit,
+        target,
+        kwarg=kwarg,
+        source_kind=source_kind,
+        failures=failures,
+        question_code=code,
+        public_uuid=outcome_uuid,
     )
     if converted is None:
         return None
@@ -1443,7 +1650,10 @@ def _resolve_constant(kwarg, declaration, failures):
 
     if callable(value) or isinstance(value, list | dict | set):
         _fail(
-            failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_VALUE_INVALID,
+            source_kind=source_kind,
             message=f"Constant {kwarg!r} is not an immutable scalar.",
         )
         return None
@@ -1455,21 +1665,30 @@ def _resolve_constant(kwarg, declaration, failures):
             resolved_value = _decimal_from_string(value)
         if resolved_value is None:
             _fail(
-                failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_VALUE_INVALID,
+                source_kind=source_kind,
                 message=f"Constant {kwarg!r} is not a valid decimal.",
             )
             return None
     elif declared_type == "string":
         if not isinstance(value, str):
             _fail(
-                failures, kwarg=kwarg, code=F_VALUE_INVALID, source_kind=source_kind,
+                failures,
+                kwarg=kwarg,
+                code=F_VALUE_INVALID,
+                source_kind=source_kind,
                 message=f"Constant {kwarg!r} is not a string.",
             )
             return None
         resolved_value = value
     else:  # pragma: no cover - registry validates the type
         _fail(
-            failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind=source_kind,
+            failures,
+            kwarg=kwarg,
+            code=F_RESOLVER_UNKNOWN,
+            source_kind=source_kind,
             message=f"Constant type {declared_type!r} is not approved.",
         )
         return None
@@ -1516,9 +1735,7 @@ def _validate_target_contract(execution, target_question, entry) -> None:
             "target_question does not belong to the execution's checklist version"
         )
     if target_question.data_source_classification != DataSourceClassification.SYSTEM_CALCULATED:
-        raise CalculationInputContractError(
-            "target_question is not a system_calculated question"
-        )
+        raise CalculationInputContractError("target_question is not a system_calculated question")
     if target_question.answer_type != entry.allowed_answer_type:
         raise CalculationInputContractError(
             "target_question answer type does not match the registry entry"
@@ -1573,13 +1790,9 @@ def resolve_subject_component(
     component = _resolve_subject_component(execution, entry, upstreams, failures)
 
     if component.state == STATE_NOT_REQUIRED:
-        return SubjectComponentResolution(
-            required=False, resolved=True, failures=tuple(failures)
-        )
+        return SubjectComponentResolution(required=False, resolved=True, failures=tuple(failures))
     if component.state == STATE_FAILED:
-        return SubjectComponentResolution(
-            required=True, resolved=False, failures=tuple(failures)
-        )
+        return SubjectComponentResolution(required=True, resolved=False, failures=tuple(failures))
     return SubjectComponentResolution(
         required=True,
         resolved=True,
@@ -1632,9 +1845,7 @@ def resolve_calculation_inputs(
                     kwarg_name="",
                     failure_code=F_RESOLVER_UNKNOWN,
                     source_kind="registry",
-                    message=(
-                        f"{registry_identifier!r} is not an approved registry entry."
-                    ),
+                    message=(f"{registry_identifier!r} is not an approved registry entry."),
                 ),
             ),
         )
@@ -1658,9 +1869,7 @@ def resolve_calculation_inputs(
         source = declaration.get("source")
 
         if source == SOURCE_QUESTION_RESPONSE:
-            resolved = _resolve_question_response(
-                execution, kwarg, declaration, snapshot, failures
-            )
+            resolved = _resolve_question_response(execution, kwarg, declaration, snapshot, failures)
         elif source == SOURCE_FORMULATION_FIELD:
             resolved = _resolve_formulation_field(
                 execution, kwarg, declaration, component_object, snapshot, failures
@@ -1669,8 +1878,13 @@ def resolve_calculation_inputs(
             resolved = _resolve_maximum_daily_units(execution, kwarg, declaration, failures)
         elif source == SOURCE_ASSESSMENT_SNAPSHOT:
             resolved = _resolve_assessment_snapshot(
-                execution, kwarg, declaration, snapshot, component_public_id,
-                expected_release, failures,
+                execution,
+                kwarg,
+                declaration,
+                snapshot,
+                component_public_id,
+                expected_release,
+                failures,
             )
         elif source == SOURCE_CALCULATION_OUTCOME:
             upstream = upstreams.get(kwarg)
@@ -1685,7 +1899,10 @@ def resolve_calculation_inputs(
             resolved = _resolve_constant(kwarg, declaration, failures)
         else:  # pragma: no cover - registry validates the source
             _fail(
-                failures, kwarg=kwarg, code=F_RESOLVER_UNKNOWN, source_kind="unknown",
+                failures,
+                kwarg=kwarg,
+                code=F_RESOLVER_UNKNOWN,
+                source_kind="unknown",
                 message=f"Resolver source {source!r} is not approved.",
             )
             resolved = None
@@ -1712,9 +1929,7 @@ def resolve_calculation_inputs(
         failures=ordered_failures,
         subject_component_public_id=component_public_id,
         subject_component_sources=component.sources,
-        assessment_snapshot_public_id=(
-            str(snapshot.public_id) if snapshot is not None else None
-        ),
+        assessment_snapshot_public_id=(str(snapshot.public_id) if snapshot is not None else None),
         upstream_outcome_public_ids=tuple(sorted(upstream_outcome_ids)),
     )
 

@@ -116,9 +116,7 @@ def _validate() -> None:
                 )
 
     if ALLOWED_HISTORY_REASON_CODES & ALLOWED_SERVICE_DETAIL_CODES:
-        raise VocabularyConfigurationError(
-            "history and service-detail vocabularies overlap"
-        )
+        raise VocabularyConfigurationError("history and service-detail vocabularies overlap")
 
 
 _validate()

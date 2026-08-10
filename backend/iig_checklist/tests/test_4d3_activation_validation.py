@@ -145,17 +145,11 @@ def _prepare_for_activation(version):
 def _approve_then_activate(version, api_client_doer, api_client_vp):
     """Drive the real governed lifecycle: submit -> approve -> activate."""
     pid = version.public_id
-    submit = api_client_doer.post(
-        f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={}
-    )
+    submit = api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
     assert submit.status_code == 200, submit.data
-    approve = api_client_vp.post(
-        f"{BASE}/iig-checklists/versions/{pid}/approve/", data={}
-    )
+    approve = api_client_vp.post(f"{BASE}/iig-checklists/versions/{pid}/approve/", data={})
     assert approve.status_code == 200, approve.data
-    return api_client_vp.post(
-        f"{BASE}/iig-checklists/versions/{pid}/activate/", data={}
-    )
+    return api_client_vp.post(f"{BASE}/iig-checklists/versions/{pid}/activate/", data={})
 
 
 def _codes(findings):
@@ -246,9 +240,7 @@ def _chain(monkeypatch, version, length):
 
     section = _section(version)
     for index in range(1, length + 1):
-        _calculated_question(
-            section, f"Q_CHAIN_{index}", f"chain_{index}", order=index
-        )
+        _calculated_question(section, f"Q_CHAIN_{index}", f"chain_{index}", order=index)
     return version
 
 
@@ -262,9 +254,7 @@ def _fan_out(monkeypatch, version, dependants):
     section = _section(version)
     _calculated_question(section, "Q_FAN_ROOT", "fan_root", order=1)
     for index in range(1, dependants + 1):
-        _calculated_question(
-            section, f"Q_FAN_{index}", f"fan_{index}", order=index + 1
-        )
+        _calculated_question(section, f"Q_FAN_{index}", f"fan_{index}", order=index + 1)
     return version
 
 
@@ -304,9 +294,7 @@ class TestValidActivation:
         _valid_percentage_w_w_version(draft_version)
         assert validate_version_calculation_bindings(draft_version) == ()
 
-    def test_activation_succeeds_end_to_end(
-        self, draft_version, api_client_doer, api_client_vp
-    ):
+    def test_activation_succeeds_end_to_end(self, draft_version, api_client_doer, api_client_vp):
         _valid_percentage_w_w_version(draft_version)
         _prepare_for_activation(draft_version)
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
@@ -315,9 +303,7 @@ class TestValidActivation:
         assert draft_version.status == ChecklistVersionStatus.ACTIVE
         assert draft_version.activated_at is not None
 
-    def test_activation_emits_success_audit(
-        self, draft_version, api_client_doer, api_client_vp
-    ):
+    def test_activation_emits_success_audit(self, draft_version, api_client_doer, api_client_vp):
         from audit.models import AuditEvent
 
         _valid_percentage_w_w_version(draft_version)
@@ -327,14 +313,10 @@ class TestValidActivation:
             event_type=ACTIVATED_EVENT, resource_id=str(draft_version.public_id)
         ).exists()
 
-    def test_valid_acyclic_graph_activates(
-        self, draft_version, api_client_doer, api_client_vp
-    ):
+    def test_valid_acyclic_graph_activates(self, draft_version, api_client_doer, api_client_vp):
         """The real two-node daily-exposure -> MDE graph passes end to end."""
         section = _section(draft_version)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "daily_exposure", order=1
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "daily_exposure", order=1)
         _calculated_question(section, "Q_MDE_PCT", "percentage_of_iid_mde", order=2)
         _selector_question(section)
         _prepare_for_activation(draft_version)
@@ -444,8 +426,7 @@ class TestMissingBindings:
         )
         findings = validate_version_calculation_bindings(draft_version)
         assert any(
-            f.validation_code == SYSTEM_CALCULATED_BINDING_MISSING
-            and f.question_code == "Q_ORPHAN"
+            f.validation_code == SYSTEM_CALCULATED_BINDING_MISSING and f.question_code == "Q_ORPHAN"
             for f in findings
         )
 
@@ -528,9 +509,7 @@ class TestDuplicateBindings:
         assert prior.status == ChecklistVersionStatus.ACTIVE
         _assert_no_success_audit(draft_version)
 
-    def test_duplicate_blocks_activation(
-        self, draft_version, api_client_doer, api_client_vp
-    ):
+    def test_duplicate_blocks_activation(self, draft_version, api_client_doer, api_client_vp):
         section_one = _section(draft_version, code="S1", order=1)
         section_two = _section(draft_version, code="S2", order=2)
         _calculated_question(section_one, "Q_PCT_WW", "percentage_w_w")
@@ -668,9 +647,7 @@ class TestRegistryIntegrity:
     def test_full_mde_chain_validates(self, draft_version):
         """daily_exposure -> percentage_of_iid_mde resolves end to end."""
         section = _section(draft_version)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "daily_exposure", order=1
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "daily_exposure", order=1)
         _calculated_question(section, "Q_MDE_PCT", "percentage_of_iid_mde", order=2)
         _selector_question(section)
         assert validate_version_calculation_bindings(draft_version) == ()
@@ -690,9 +667,7 @@ class TestCalculationGraph:
         patching needed to reach it.
         """
         section = _section(draft_version)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "percentage_of_iid_mde"
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "percentage_of_iid_mde")
         findings = validate_version_calculation_bindings(draft_version)
         assert CALCULATION_GRAPH_CYCLE in _codes(findings)
 
@@ -709,9 +684,7 @@ class TestCalculationGraph:
             effective_date=datetime.date(2025, 1, 1),
         )
         section = _section(draft_version)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "percentage_of_iid_mde"
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "percentage_of_iid_mde")
         _prepare_for_activation(draft_version)
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
@@ -826,9 +799,7 @@ class TestCalculationGraph:
 
     def test_graph_findings_carry_no_raw_exception_text(self, draft_version):
         section = _section(draft_version)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "percentage_of_iid_mde"
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "percentage_of_iid_mde")
         graph_findings = [
             f
             for f in validate_version_calculation_bindings(draft_version)
@@ -864,9 +835,7 @@ class TestUpstreamProducer:
     def test_upstream_with_unknown_registry_identifier(self, draft_version):
         section = _section(draft_version)
         _calculated_question(section, "Q_MDE_PCT", "percentage_of_iid_mde", order=1)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "no_such_entry", order=2
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "no_such_entry", order=2)
         findings = validate_version_calculation_bindings(draft_version)
         assert UPSTREAM_REGISTRY_IDENTIFIER_UNKNOWN in _codes(findings)
 
@@ -880,9 +849,7 @@ class TestUpstreamProducer:
         """
         section = _section(draft_version)
         _calculated_question(section, "Q_MDE_PCT", "percentage_of_iid_mde", order=1)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "percentage_w_w", order=2
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "percentage_w_w", order=2)
         _selector_question(section)
         findings = validate_version_calculation_bindings(draft_version)
         assert any(
@@ -905,9 +872,7 @@ class TestUpstreamProducer:
         )
         section = _section(draft_version)
         _calculated_question(section, "Q_MDE_PCT", "percentage_of_iid_mde", order=1)
-        _calculated_question(
-            section, registry_mod.Q_DAILY_EXPOSURE, "percentage_w_w", order=2
-        )
+        _calculated_question(section, registry_mod.Q_DAILY_EXPOSURE, "percentage_w_w", order=2)
         _selector_question(section)
         _prepare_for_activation(draft_version)
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
@@ -940,9 +905,7 @@ class TestUpstreamProducer:
         findings = validate_version_calculation_bindings(draft_version)
         assert UPSTREAM_ANSWER_TYPE_MISMATCH in _codes(findings)
 
-    def test_upstream_producer_must_emit_a_calculated_source(
-        self, draft_version, monkeypatch
-    ):
+    def test_upstream_producer_must_emit_a_calculated_source(self, draft_version, monkeypatch):
         """The producing entry itself must declare a system_calculated output.
 
         An entry that emits an FDA-derived or user-entered value can never
@@ -1144,9 +1107,7 @@ class TestIsolationAndLifecycle:
             for f in findings
         )
 
-    def test_another_tenants_question_cannot_satisfy_binding(
-        self, draft_version, tenant_b, user_a
-    ):
+    def test_another_tenants_question_cannot_satisfy_binding(self, draft_version, tenant_b, user_a):
         """Build real second-tenant content holding the required code.
 
         Tenant B's checklist contains a perfectly valid Q_SUBJECT_COMPONENT.
@@ -1178,9 +1139,7 @@ class TestIsolationAndLifecycle:
             for f in findings
         )
 
-    def test_cross_tenant_activation_returns_404(
-        self, draft_version, tenant_b, api_client_vp
-    ):
+    def test_cross_tenant_activation_returns_404(self, draft_version, tenant_b, api_client_vp):
         """A caller who *has* the permission still cannot see another tenant.
 
         The actor is a VP who can legitimately activate in their own tenant, so
@@ -1221,9 +1180,7 @@ class TestIsolationAndLifecycle:
         assert len(set(runs)) == 1
         assert runs[0] != ()
 
-    def test_mixed_graph_and_binding_error_ordering_is_stable(
-        self, draft_version, monkeypatch
-    ):
+    def test_mixed_graph_and_binding_error_ordering_is_stable(self, draft_version, monkeypatch):
         """Several simultaneous failures of different categories stay ordered.
 
         Ordering is keyed on governed fields -- question code, registry

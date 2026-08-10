@@ -4,20 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('iig_checklist', '0002_execution'),
+        ("iig_checklist", "0002_execution"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='calculationoutcome',
-            name='input_provenance',
+            model_name="calculationoutcome",
+            name="input_provenance",
             field=models.JSONField(blank=True, default=dict),
         ),
         migrations.AlterField(
-            model_name='calculationoutcome',
-            name='inputs',
+            model_name="calculationoutcome",
+            name="inputs",
             field=models.JSONField(blank=True, default=dict),
         ),
     ]

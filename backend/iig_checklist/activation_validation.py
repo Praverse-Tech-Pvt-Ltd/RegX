@@ -414,7 +414,10 @@ def _validate_bound_question(question, grouped, findings: list[ValidationFinding
             code = declaration["question_code"]
             declared_triggers.add(code)
             _resolve_unique(
-                grouped, code, identifier=identifier, findings=findings,
+                grouped,
+                code,
+                identifier=identifier,
+                findings=findings,
                 context=context,
             )
 
@@ -423,15 +426,15 @@ def _validate_bound_question(question, grouped, findings: list[ValidationFinding
             declared_form_e.add(code)
             declared_triggers.add(code)
             upstream = _resolve_unique(
-                grouped, code, identifier=identifier, findings=findings,
+                grouped,
+                code,
+                identifier=identifier,
+                findings=findings,
                 context=context,
             )
             if upstream is None:
                 continue
-            if (
-                upstream.data_source_classification
-                != DataSourceClassification.SYSTEM_CALCULATED
-            ):
+            if upstream.data_source_classification != DataSourceClassification.SYSTEM_CALCULATED:
                 findings.append(
                     ValidationFinding(
                         question_code=code,
@@ -477,12 +480,14 @@ def _validate_bound_question(question, grouped, findings: list[ValidationFinding
             code = selector["question_code"]
             declared_triggers.add(code)
             selector_question = _resolve_unique(
-                grouped, code, identifier=identifier, findings=findings,
+                grouped,
+                code,
+                identifier=identifier,
+                findings=findings,
                 context=f"{context} component selector",
             )
             if selector_question is not None and (
-                selector_question.answer_type
-                != AnswerType.FORMULATION_COMPONENT_REFERENCE
+                selector_question.answer_type != AnswerType.FORMULATION_COMPONENT_REFERENCE
             ):
                 findings.append(
                     ValidationFinding(
@@ -539,9 +544,7 @@ def _validate_bound_question(question, grouped, findings: list[ValidationFinding
     # one absent code.
 
 
-def _validate_calculation_graph(
-    bound_questions: list, findings: list[ValidationFinding]
-) -> None:
+def _validate_calculation_graph(bound_questions: list, findings: list[ValidationFinding]) -> None:
     """M4D3-DEP-005 -- delegate graph validation to the pure graph module.
 
     One node per bound calculated question, identified by the governed public
@@ -607,8 +610,7 @@ def validate_version_calculation_bindings(version) -> tuple[ValidationFinding, .
         for question in questions:
             identifier = (question.calculation_binding_identifier or "").strip()
             is_calculated = (
-                question.data_source_classification
-                == DataSourceClassification.SYSTEM_CALCULATED
+                question.data_source_classification == DataSourceClassification.SYSTEM_CALCULATED
             )
             if identifier:
                 bound_questions.append(question)

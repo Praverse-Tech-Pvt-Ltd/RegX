@@ -82,8 +82,12 @@ def _product(tenant, user, code="PROD-CAS-01"):
     from formulations.models import ProductDevelopmentRecord
 
     return ProductDevelopmentRecord.objects.create(
-        tenant=tenant, product_code=code, proposed_product_name="Cascade Product",
-        active_ingredient="Cascade Ingredient", dosage_form="tablet", route="oral",
+        tenant=tenant,
+        product_code=code,
+        proposed_product_name="Cascade Product",
+        active_ingredient="Cascade Ingredient",
+        dosage_form="tablet",
+        route="oral",
         created_by=user,
     )
 
@@ -92,24 +96,28 @@ def _formulation(product, user, *, weight="1.000000", max_units="4.0000"):
     from formulations.models import FormulationVersion
 
     return FormulationVersion.objects.create(
-        product=product, version_number=1, status="approved",
+        product=product,
+        version_number=1,
+        status="approved",
         total_dosage_unit_weight=Decimal(weight),
         total_dosage_unit_weight_unit="gram",
-        maximum_dosage_units_per_day=Decimal(max_units), created_by=user,
+        maximum_dosage_units_per_day=Decimal(max_units),
+        created_by=user,
     )
 
 
-def _component(formulation, *, quantity="0.250000", order=1, ingredient=None,
-               name="Cascade Excipient"):
+def _component(
+    formulation, *, quantity="0.250000", order=1, ingredient=None, name="Cascade Excipient"
+):
     from formulations.models import FormulationComponent
 
     return FormulationComponent.objects.create(
-        formulation_version=formulation, component_type="inactive",
+        formulation_version=formulation,
+        component_type="inactive",
         ingredient_name=name,
-        resolved_ingredient_public_id=(
-            ingredient.public_id if ingredient is not None else None
-        ),
-        quantity_per_dosage_unit=Decimal(quantity), quantity_unit="gram",
+        resolved_ingredient_public_id=(ingredient.public_id if ingredient is not None else None),
+        quantity_per_dosage_unit=Decimal(quantity),
+        quantity_unit="gram",
         display_order=order,
     )
 
@@ -127,31 +135,34 @@ def _iid_setup(*, potency="1.000000", mde="2.000000"):
         IIDPrecedentRecord,
     )
 
-    route = ControlledRoute.objects.create(
-        code="oral", canonical_label="Oral", lifecycle="active"
-    )
+    route = ControlledRoute.objects.create(code="oral", canonical_label="Oral", lifecycle="active")
     dosage_form = ControlledDosageForm.objects.create(
         code="tablet", canonical_label="Tablet", lifecycle="active"
     )
-    gram = ControlledUnit.objects.create(
-        code="gram", symbol="G", dimension="mass", active=True
-    )
+    gram = ControlledUnit.objects.create(code="gram", symbol="G", dimension="mass", active=True)
     release = FDADataSourceRelease.objects.create(
-        dataset_type="fda_iid", source_name="FDA IID",
-        official_source_reference="ref", source_checksum_sha256="c" * 64,
+        dataset_type="fda_iid",
+        source_name="FDA IID",
+        official_source_reference="ref",
+        source_checksum_sha256="c" * 64,
         status=FDAReleaseStatus.ACTIVE,
     )
     ingredient = IIDIngredient.objects.create(
         canonical_name="Cascade Excipient", normalized_name="CASCADE EXCIPIENT"
     )
     record = IIDPrecedentRecord.objects.create(
-        release=release, ingredient=ingredient,
+        release=release,
+        ingredient=ingredient,
         ingredient_name_raw="Cascade Excipient",
-        route_raw="ORAL", route_normalized=route,
-        dosage_form_raw="TABLET", dosage_form_normalized=dosage_form,
-        potency_amount=Decimal(potency), potency_unit_raw="G",
+        route_raw="ORAL",
+        route_normalized=route,
+        dosage_form_raw="TABLET",
+        dosage_form_normalized=dosage_form,
+        potency_amount=Decimal(potency),
+        potency_unit_raw="G",
         potency_unit_normalized=gram,
-        maximum_daily_exposure=Decimal(mde), mde_unit_raw="G",
+        maximum_daily_exposure=Decimal(mde),
+        mde_unit_raw="G",
         mde_unit_normalized=gram,
         raw_row_checksum="d" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
@@ -163,8 +174,11 @@ def _section(version, code="S1", order=1):
     from iig_checklist.models import ChecklistSection
 
     return ChecklistSection.objects.create(
-        checklist_version=version, code=code, title=f"Section {code}",
-        display_order=order, criticality=Criticality.MEDIUM,
+        checklist_version=version,
+        code=code,
+        title=f"Section {code}",
+        display_order=order,
+        criticality=Criticality.MEDIUM,
     )
 
 
@@ -172,17 +186,25 @@ def _question(section, code, *, answer_type, classification, binding="", order=1
     from iig_checklist.models import ChecklistQuestion
 
     return ChecklistQuestion.objects.create(
-        section=section, code=code, question_text=f"Q {code}", display_order=order,
-        answer_type=answer_type, data_source_classification=classification,
-        calculation_binding_identifier=binding, criticality=Criticality.LOW,
+        section=section,
+        code=code,
+        question_text=f"Q {code}",
+        display_order=order,
+        answer_type=answer_type,
+        data_source_classification=classification,
+        calculation_binding_identifier=binding,
+        criticality=Criticality.LOW,
     )
 
 
 def _calculated(section, code, identifier, *, order=1):
     return _question(
-        section, code, answer_type=AnswerType.CALCULATED_VALUE,
+        section,
+        code,
+        answer_type=AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding=identifier, order=order,
+        binding=identifier,
+        order=order,
     )
 
 
@@ -226,18 +248,25 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
     formulation = _formulation(product, user_a)
     component = _component(formulation, ingredient=iid["ingredient"])
     version = ChecklistVersion.objects.create(
-        definition=tenant_definition, version_number=1, status="active",
+        definition=tenant_definition,
+        version_number=1,
+        status="active",
         created_by=user_a,
     )
     section = _section(version)
     selector_q = _question(
-        section, registry_mod.Q_SUBJECT_COMPONENT,
+        section,
+        registry_mod.Q_SUBJECT_COMPONENT,
         answer_type=AnswerType.FORMULATION_COMPONENT_REFERENCE,
-        classification=DataSourceClassification.USER_REQUIRED, order=1,
+        classification=DataSourceClassification.USER_REQUIRED,
+        order=1,
     )
     free_q = _question(
-        section, "Q_FREE_TEXT", answer_type=AnswerType.SHORT_TEXT,
-        classification=DataSourceClassification.USER_REQUIRED, order=8,
+        section,
+        "Q_FREE_TEXT",
+        answer_type=AnswerType.SHORT_TEXT,
+        classification=DataSourceClassification.USER_REQUIRED,
+        order=8,
     )
     questions = {
         "percentage_w_w": _calculated(section, "Q_PCT_WW", "percentage_w_w", order=2),
@@ -263,9 +292,7 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
         formulation_version_public_id=str(formulation.public_id),
         actor=user_a,
     )
-    selector_response = ChecklistResponse.objects.get(
-        execution=execution, question=selector_q
-    )
+    selector_response = ChecklistResponse.objects.get(execution=execution, question=selector_q)
     selector_response.raw_value = {"public_id": str(component.public_id)}
     selector_response.save(update_fields=["raw_value", "updated_at"])
 
@@ -274,24 +301,29 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
         for key, q in questions.items()
     }
     return {
-        "tenant": tenant_a, "user": user_a, "formulation": formulation,
-        "component": component, "version": version, "section": section,
-        "definition": tenant_definition, "execution": execution,
-        "questions": questions, "responses": responses,
-        "selector_q": selector_q, "selector_response": selector_response,
-        "free_response": ChecklistResponse.objects.get(
-            execution=execution, question=free_q
-        ),
+        "tenant": tenant_a,
+        "user": user_a,
+        "formulation": formulation,
+        "component": component,
+        "version": version,
+        "section": section,
+        "definition": tenant_definition,
+        "execution": execution,
+        "questions": questions,
+        "responses": responses,
+        "selector_q": selector_q,
+        "selector_response": selector_response,
+        "free_response": ChecklistResponse.objects.get(execution=execution, question=free_q),
         "iid": iid,
         "outcomes": {
-            key: CalculationOutcome.objects.get(response=r)
-            for key, r in responses.items()
+            key: CalculationOutcome.objects.get(response=r) for key, r in responses.items()
         },
     }
 
 
-def _cascade(world, response=None, *, expected_version=None, actor=None,
-             tenant=None, execution=None):
+def _cascade(
+    world, response=None, *, expected_version=None, actor=None, tenant=None, execution=None
+):
     """Run the governed cascade from the subject-component selector by default."""
     changed = response if response is not None else world["selector_response"]
     return recalculate_dependents(
@@ -299,9 +331,7 @@ def _cascade(world, response=None, *, expected_version=None, actor=None,
         execution=execution if execution is not None else world["execution"],
         changed_response=changed,
         actor=actor or world["user"],
-        expected_version=(
-            changed.version if expected_version is None else expected_version
-        ),
+        expected_version=(changed.version if expected_version is None else expected_version),
     )
 
 
@@ -324,9 +354,7 @@ def _sibling_execution(world, user, *, code="PROD-CAS-02"):
         formulation_version_public_id=str(formulation.public_id),
         actor=user,
     )
-    selector = ChecklistResponse.objects.get(
-        execution=execution, question=world["selector_q"]
-    )
+    selector = ChecklistResponse.objects.get(execution=execution, question=world["selector_q"])
     selector.raw_value = {"public_id": str(component.public_id)}
     selector.save(update_fields=["raw_value", "updated_at"])
     return execution, selector
@@ -358,9 +386,7 @@ class TestGraphDiscovery:
     def test_node_identity_is_the_response_public_id(self, world):
         """M4D3-DEP-007 -- not the calculation function name."""
         graph = build_execution_graph(world["execution"])
-        assert set(graph.nodes) == {
-            str(world["responses"][key].public_id) for key in ALL_KEYS
-        }
+        assert set(graph.nodes) == {str(world["responses"][key].public_id) for key in ALL_KEYS}
 
     def test_user_input_questions_are_not_nodes(self, world):
         """The selector drives the cascade but is not part of the graph."""
@@ -433,7 +459,9 @@ def _synthetic_world(world, monkeypatch, entries, codes):
         question.calculation_binding_identifier = identifier
         question.save(
             update_fields=[
-                "code", "calculation_binding_identifier", "updated_at",
+                "code",
+                "calculation_binding_identifier",
+                "updated_at",
             ]
         )
     for key in set(world["questions"]) - set(codes):
@@ -448,7 +476,8 @@ class TestGraphFaults:
     def test_a_cycle_is_rejected(self, world, monkeypatch):
         """M4D3-DAG-005 -- a cycle is a governed configuration error."""
         _synthetic_world(
-            world, monkeypatch,
+            world,
+            monkeypatch,
             {
                 "cyc_a": _entry(calculation_dependencies=("Q_CYC_B",)),
                 "cyc_b": _entry(calculation_dependencies=("Q_CYC_A",)),
@@ -465,7 +494,8 @@ class TestGraphFaults:
 
     def test_a_self_dependency_is_a_cycle(self, world, monkeypatch):
         _synthetic_world(
-            world, monkeypatch,
+            world,
+            monkeypatch,
             {"self_dep": _entry(calculation_dependencies=("Q_SELF",))},
             {"percentage_w_w": ("Q_SELF", "self_dep")},
         )
@@ -476,7 +506,8 @@ class TestGraphFaults:
     def test_a_dependency_outside_the_version_is_rejected(self, world, monkeypatch):
         """M4D3-DAG-009 -- an edge may not point at a code this version lacks."""
         _synthetic_world(
-            world, monkeypatch,
+            world,
+            monkeypatch,
             {"needs_absent": _entry(calculation_dependencies=("Q_NOT_HERE",))},
             {"percentage_w_w": ("Q_PRESENT", "needs_absent")},
         )
@@ -508,9 +539,7 @@ class TestGraphFaults:
         """Dropping the node would leave the rest of the graph silently stale."""
         question = world["questions"]["percentage_w_w"]
         question.calculation_binding_identifier = "not_a_registered_calculation"
-        question.save(
-            update_fields=["calculation_binding_identifier", "updated_at"]
-        )
+        question.save(update_fields=["calculation_binding_identifier", "updated_at"])
         with pytest.raises(CascadeGraphInvalid) as caught:
             build_execution_graph(world["execution"])
         assert caught.value.error_code == "UNKNOWN_REGISTRY_IDENTIFIER"
@@ -521,9 +550,7 @@ class TestGraphFaults:
 
         question = world["questions"]["percentage_of_iid_mde"]
         question.calculation_binding_identifier = "not_a_registered_calculation"
-        question.save(
-            update_fields=["calculation_binding_identifier", "updated_at"]
-        )
+        question.save(update_fields=["calculation_binding_identifier", "updated_at"])
         audit_before = AuditEvent.objects.count()
         with pytest.raises(CascadeGraphInvalid):
             _cascade(world)
@@ -535,9 +562,7 @@ class TestGraphFaults:
     def test_the_error_carries_no_database_id(self, world):
         question = world["questions"]["percentage_w_w"]
         question.calculation_binding_identifier = "not_a_registered_calculation"
-        question.save(
-            update_fields=["calculation_binding_identifier", "updated_at"]
-        )
+        question.save(update_fields=["calculation_binding_identifier", "updated_at"])
         with pytest.raises(CascadeGraphInvalid) as caught:
             build_execution_graph(world["execution"])
         text = str(caught.value) + repr(caught.value.question_codes)
@@ -567,9 +592,7 @@ class TestTriggerIdentification:
 
         free = world["free_response"]
         audit_before = AuditEvent.objects.count()
-        versions_before = {
-            key: world["responses"][key].version for key in ALL_KEYS
-        }
+        versions_before = {key: world["responses"][key].version for key in ALL_KEYS}
 
         result = _cascade(world, free)
         assert result.triggered is False
@@ -624,9 +647,7 @@ class TestOrdering:
         """M4D3-DAG-006 -- the tie-break is the governed code, ascending."""
         result = _cascade(world)
         independent = [
-            code
-            for code in result.question_codes
-            if code not in {"Q_PCT_MDE", "Q_DIF_MDE"}
+            code for code in result.question_codes if code not in {"Q_PCT_MDE", "Q_DIF_MDE"}
         ]
         assert independent == sorted(independent)
 
@@ -664,9 +685,7 @@ class TestOrdering:
         assert mde.status == CalculationStatus.COMPLETE
         # 1 g of a 2 g precedent maximum daily exposure.
         assert mde.value == Decimal("50")
-        assert mde.input_provenance["upstream_outcome_public_ids"] == [
-            str(exposure.public_id)
-        ]
+        assert mde.input_provenance["upstream_outcome_public_ids"] == [str(exposure.public_id)]
 
 
 # ===========================================================================
@@ -675,8 +694,7 @@ class TestOrdering:
 
 
 class TestCascadeIsNotASecondWriter:
-    def test_every_target_goes_through_the_execution_service(self, world,
-                                                             monkeypatch):
+    def test_every_target_goes_through_the_execution_service(self, world, monkeypatch):
         from iig_checklist import calculation_execution as exec_mod
 
         seen = []
@@ -713,16 +731,28 @@ class TestCascadeIsNotASecondWriter:
 
         forbidden = {
             # the engine and its translation layer
-            "calculate_percentage_w_w", "calculate_daily_exposure",
-            "calculate_percentage_of_potency", "calculate_difference_from_potency",
-            "calculate_percentage_of_mde", "calculate_difference_from_mde",
-            "translate_result", "engine",
+            "calculate_percentage_w_w",
+            "calculate_daily_exposure",
+            "calculate_percentage_of_potency",
+            "calculate_difference_from_potency",
+            "calculate_percentage_of_mde",
+            "calculate_difference_from_mde",
+            "translate_result",
+            "engine",
             # outcome persistence and provenance
-            "full_clean", "input_provenance", "inputs", "generated_at",
-            "rounding_rule", "formula_version", "calculation_name",
+            "full_clean",
+            "input_provenance",
+            "inputs",
+            "generated_at",
+            "rounding_rule",
+            "formula_version",
+            "calculation_name",
             # snapshot creation and audit dispatch
-            "create_assessment_snapshot", "AssessmentSnapshot",
-            "on_commit", "emit", "IigChecklistEvent",
+            "create_assessment_snapshot",
+            "AssessmentSnapshot",
+            "on_commit",
+            "emit",
+            "IigChecklistEvent",
         }
         assert names.isdisjoint(forbidden), sorted(names & forbidden)
 
@@ -755,8 +785,7 @@ class TestOutcomePersistence:
         from iig_checklist.models import CalculationOutcome
 
         before = {
-            key: (world["outcomes"][key].pk, world["outcomes"][key].public_id)
-            for key in ALL_KEYS
+            key: (world["outcomes"][key].pk, world["outcomes"][key].public_id) for key in ALL_KEYS
         }
         total_before = CalculationOutcome.objects.count()
 
@@ -808,9 +837,7 @@ class TestOutcomePersistence:
 
 
 class TestAudit:
-    def test_one_event_per_recalculated_target(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_one_event_per_recalculated_target(self, world, django_capture_on_commit_callbacks):
         from audit.models import AuditEvent
 
         with django_capture_on_commit_callbacks(execute=True):
@@ -818,13 +845,9 @@ class TestAudit:
 
         events = AuditEvent.objects.filter(event_type=CALCULATED_EVENT)
         assert events.count() == result.recalculated_count == len(ALL_KEYS)
-        assert {e.resource_id for e in events} == set(
-            result.recalculated_response_public_ids
-        )
+        assert {e.resource_id for e in events} == set(result.recalculated_response_public_ids)
 
-    def test_no_cascade_summary_event_is_invented(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_no_cascade_summary_event_is_invented(self, world, django_capture_on_commit_callbacks):
         """Only the per-calculation event the specification defines is emitted.
 
         The snapshot service's own ``iid_assessment.snapshot.created`` events are
@@ -837,9 +860,7 @@ class TestAudit:
         with django_capture_on_commit_callbacks(execute=True):
             _cascade(world)
         emitted = set(AuditEvent.objects.values_list("event_type", flat=True))
-        assert {e for e in emitted if e.startswith("iig_checklist.")} == {
-            CALCULATED_EVENT
-        }
+        assert {e for e in emitted if e.startswith("iig_checklist.")} == {CALCULATED_EVENT}
         assert not any("cascade" in e or "recalc" in e for e in emitted)
 
     def test_an_unchanged_recalculation_emits_no_audit(
@@ -867,9 +888,7 @@ class TestAudit:
         assert emitted - after_first == second.audited_count
         assert emitted - after_first < second.recalculated_count
 
-    def test_a_changed_recalculation_still_audits(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_a_changed_recalculation_still_audits(self, world, django_capture_on_commit_callbacks):
         """The suppression must be conditional, not a blanket cascade silence."""
         from audit.models import AuditEvent
 
@@ -887,14 +906,11 @@ class TestAudit:
 
         changed = [t for t in result.targets if not t.audit_suppressed]
         assert changed
-        assert (
-            AuditEvent.objects.filter(event_type=CALCULATED_EVENT).count() - baseline
-            == len(changed)
+        assert AuditEvent.objects.filter(event_type=CALCULATED_EVENT).count() - baseline == len(
+            changed
         )
 
-    def test_direct_execution_always_audits(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_direct_execution_always_audits(self, world, django_capture_on_commit_callbacks):
         """The M4D3-RCL-004 hook is opt-in; single-response behaviour is unchanged."""
         from audit.models import AuditEvent
         from iig_checklist.calculation_execution import execute_calculation_response
@@ -905,8 +921,10 @@ class TestAudit:
             response.refresh_from_db()
             with django_capture_on_commit_callbacks(execute=True):
                 result = execute_calculation_response(
-                    tenant=world["tenant"], execution=world["execution"],
-                    response=response, actor=world["user"],
+                    tenant=world["tenant"],
+                    execution=world["execution"],
+                    response=response,
+                    actor=world["user"],
                     expected_version=response.version,
                 )
             assert result.audit_suppressed is False
@@ -917,9 +935,7 @@ class TestAudit:
             == 2
         )
 
-    def test_a_rolled_back_cascade_emits_no_audit(
-        self, world, django_capture_on_commit_callbacks
-    ):
+    def test_a_rolled_back_cascade_emits_no_audit(self, world, django_capture_on_commit_callbacks):
         from audit.models import AuditEvent
 
         before = AuditEvent.objects.count()
@@ -937,9 +953,7 @@ class TestAudit:
 
 
 class TestAtomicity:
-    def test_a_failure_part_way_through_discards_the_whole_cascade(
-        self, world, monkeypatch
-    ):
+    def test_a_failure_part_way_through_discards_the_whole_cascade(self, world, monkeypatch):
         """One transaction: an outcome written before the failure must not survive."""
         from iig_checklist.calculation_execution import CalculationEngineFailure
 
@@ -958,9 +972,7 @@ class TestAtomicity:
                 {
                     **dict(registry_mod.CALCULATION_BINDING_REGISTRY),
                     "percentage_of_iid_potency": dataclasses.replace(
-                        registry_mod.CALCULATION_BINDING_REGISTRY[
-                            "percentage_of_iid_potency"
-                        ],
+                        registry_mod.CALCULATION_BINDING_REGISTRY["percentage_of_iid_potency"],
                         function=exploding,
                     ),
                 }
@@ -991,9 +1003,7 @@ class TestAtomicity:
                 {
                     **dict(registry_mod.CALCULATION_BINDING_REGISTRY),
                     "difference_from_iid_mde": dataclasses.replace(
-                        registry_mod.CALCULATION_BINDING_REGISTRY[
-                            "difference_from_iid_mde"
-                        ],
+                        registry_mod.CALCULATION_BINDING_REGISTRY["difference_from_iid_mde"],
                         function=exploding,
                     ),
                 }
@@ -1016,9 +1026,7 @@ class TestAtomicity:
 
         selector = world["selector_response"]
         stale_version = selector.version
-        ChecklistResponse.objects.filter(pk=selector.pk).update(
-            version=stale_version + 1
-        )
+        ChecklistResponse.objects.filter(pk=selector.pk).update(version=stale_version + 1)
         with pytest.raises(StaleResponseVersion):
             _cascade(world, expected_version=stale_version)
 
@@ -1040,9 +1048,7 @@ class TestSnapshots:
             if registry_mod.CALCULATION_BINDING_REGISTRY[key].input_resolvers
             and any(
                 d.get("source") == registry_mod.SOURCE_ASSESSMENT_SNAPSHOT
-                for d in registry_mod.CALCULATION_BINDING_REGISTRY[
-                    key
-                ].input_resolvers.values()
+                for d in registry_mod.CALCULATION_BINDING_REGISTRY[key].input_resolvers.values()
             )
         ]
         assert snapshot_backed
@@ -1065,14 +1071,11 @@ class TestSnapshots:
         _cascade(world)
         first = {
             str(public_id)
-            for public_id in AssessmentSnapshot.objects.values_list(
-                "public_id", flat=True
-            )
+            for public_id in AssessmentSnapshot.objects.values_list("public_id", flat=True)
         }
         _cascade(world)
         referenced = {
-            _outcome(world, key).source_assessment_snapshot_public_id
-            for key in ALL_KEYS
+            _outcome(world, key).source_assessment_snapshot_public_id for key in ALL_KEYS
         } - {None, ""}
         assert referenced
         assert referenced.isdisjoint(first)
@@ -1097,23 +1100,17 @@ class TestExecutionState:
     def test_non_recalculable_statuses_are_refused(self, world, status):
         from iig_checklist.models import ChecklistExecution
 
-        ChecklistExecution.objects.filter(pk=world["execution"].pk).update(
-            status=status
-        )
+        ChecklistExecution.objects.filter(pk=world["execution"].pk).update(status=status)
         with pytest.raises(CascadeExecutionNotRecalculable):
             _cascade(world)
         for key in ALL_KEYS:
             assert _outcome(world, key).status == CalculationStatus.DATA_REQUIRED
 
-    @pytest.mark.parametrize(
-        "status", [ExecutionStatus.DRAFT, ExecutionStatus.RETURNED]
-    )
+    @pytest.mark.parametrize("status", [ExecutionStatus.DRAFT, ExecutionStatus.RETURNED])
     def test_recalculable_statuses_proceed(self, world, status):
         from iig_checklist.models import ChecklistExecution
 
-        ChecklistExecution.objects.filter(pk=world["execution"].pk).update(
-            status=status
-        )
+        ChecklistExecution.objects.filter(pk=world["execution"].pk).update(status=status)
         result = _cascade(world)
         assert result.triggered is True
 
@@ -1132,9 +1129,7 @@ class TestExecutionState:
 
         stale = world["execution"]
         assert stale.status == ExecutionStatus.DRAFT
-        ChecklistExecution.objects.filter(pk=stale.pk).update(
-            status=ExecutionStatus.APPROVED
-        )
+        ChecklistExecution.objects.filter(pk=stale.pk).update(status=ExecutionStatus.APPROVED)
         assert stale.status == ExecutionStatus.DRAFT  # the copy is genuinely stale
         with pytest.raises(CascadeExecutionNotRecalculable):
             _cascade(world)
@@ -1182,9 +1177,7 @@ class TestIsolation:
 class TestLockOrder:
     @staticmethod
     def _locking(ctx):
-        return [
-            q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"].upper()
-        ]
+        return [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"].upper()]
 
     def test_the_execution_is_locked_first(self, world):
         with CaptureQueriesContext(connection) as ctx:
@@ -1204,8 +1197,10 @@ class TestLockOrder:
         with CaptureQueriesContext(connection) as ctx:
             _cascade(world)
         tables = [
-            "checklistresponse" if "checklistresponse" in sql.lower()
-            else "calculationoutcome" if "calculationoutcome" in sql.lower()
+            "checklistresponse"
+            if "checklistresponse" in sql.lower()
+            else "calculationoutcome"
+            if "calculationoutcome" in sql.lower()
             else "other"
             for sql in self._locking(ctx)
         ]
@@ -1237,9 +1232,7 @@ class TestLockOrder:
 
         assert marks and result.recalculated_count == len(ALL_KEYS)
         before_first_target = [q["sql"] for q in ctx.captured_queries[: marks[0]]]
-        response_pks = {
-            world["responses"][key].pk for key in ALL_KEYS
-        }
+        response_pks = {world["responses"][key].pk for key in ALL_KEYS}
 
         response_locks = [
             sql
@@ -1258,9 +1251,9 @@ class TestLockOrder:
         # Every affected response id appears in the batched lock, and the
         # outcome lock follows it.
         assert all(str(pk) in response_locks[-1] for pk in response_pks)
-        assert before_first_target.index(
-            response_locks[-1]
-        ) < before_first_target.index(outcome_locks[-1])
+        assert before_first_target.index(response_locks[-1]) < before_first_target.index(
+            outcome_locks[-1]
+        )
 
 
 # ===========================================================================
@@ -1272,17 +1265,13 @@ class TestResultContract:
     def test_the_result_identifies_the_origin(self, world):
         result = _cascade(world)
         assert result.execution_public_id == str(world["execution"].public_id)
-        assert result.origin_response_public_id == str(
-            world["selector_response"].public_id
-        )
+        assert result.origin_response_public_id == str(world["selector_response"].public_id)
         assert result.origin_question_code == registry_mod.Q_SUBJECT_COMPONENT
 
     def test_targets_carry_governed_identities_only(self, world):
         result = _cascade(world)
         for target in result.targets:
-            assert target.registry_identifier in (
-                registry_mod.CALCULATION_BINDING_REGISTRY
-            )
+            assert target.registry_identifier in (registry_mod.CALCULATION_BINDING_REGISTRY)
             assert target.status in set(CalculationStatus.values)
             assert len(target.response_public_id) == 36
             assert len(target.outcome_public_id) == 36
@@ -1365,9 +1354,9 @@ def _mutation_fingerprint(world):
             for key in ALL_KEYS
         },
         "responses": dict(
-            ChecklistResponse.objects.filter(
-                execution=world["execution"]
-            ).values_list("pk", "version")
+            ChecklistResponse.objects.filter(execution=world["execution"]).values_list(
+                "pk", "version"
+            )
         ),
         "snapshots": AssessmentSnapshot.objects.count(),
         "audit": AuditEvent.objects.count(),
@@ -1379,10 +1368,7 @@ class TestExpectedVersionStructuralGate:
         """No second implementation: cascade imports the writer's own gate."""
         from iig_checklist import calculation_execution as exec_mod
 
-        assert (
-            cascade_mod.validate_expected_version
-            is exec_mod.validate_expected_version
-        )
+        assert cascade_mod.validate_expected_version is exec_mod.validate_expected_version
 
     def test_the_cascade_restates_none_of_the_validation_rules(self):
         """The rules live in one place; cascade must not re-derive them.
@@ -1417,9 +1403,7 @@ class TestExpectedVersionStructuralGate:
         assert _mutation_fingerprint(world) == before
 
     @pytest.mark.parametrize("bad", INVALID_EXPECTED_VERSIONS)
-    def test_a_malformed_expected_version_invokes_no_calculation(
-        self, world, bad, monkeypatch
-    ):
+    def test_a_malformed_expected_version_invokes_no_calculation(self, world, bad, monkeypatch):
         from iig_checklist.calculation_execution import InvalidExpectedVersion
 
         calls = []
@@ -1440,9 +1424,7 @@ class TestExpectedVersionStructuralGate:
         with CaptureQueriesContext(connection) as ctx:
             with pytest.raises(InvalidExpectedVersion):
                 _raw_cascade(world, bad)
-        assert not any(
-            "FOR UPDATE" in query["sql"].upper() for query in ctx.captured_queries
-        )
+        assert not any("FOR UPDATE" in query["sql"].upper() for query in ctx.captured_queries)
         verbs = {q["sql"].lstrip().split()[0].upper() for q in ctx.captured_queries}
         assert "UPDATE" not in verbs
         assert "INSERT" not in verbs
@@ -1578,9 +1560,7 @@ class TestStaleDownstreamTarget:
     def test_the_cascade_has_at_least_three_calculated_targets(self, world):
         assert len(build_execution_graph(world["execution"]).nodes) >= 3
 
-    def test_a_stale_target_raises_and_rolls_the_whole_cascade_back(
-        self, world, monkeypatch
-    ):
+    def test_a_stale_target_raises_and_rolls_the_whole_cascade_back(self, world, monkeypatch):
         seen = []
         before = _mutation_fingerprint(world)
         self._stale_at_third(monkeypatch, seen)
@@ -1678,9 +1658,7 @@ class TestRealChainCascade:
         graph = build_execution_graph(chain["execution"])
         by_code = {n.question_code: node_id for node_id, n in graph.nodes.items()}
         assert set(by_code) == {registry_mod.Q_DAILY_EXPOSURE, "Q_PCT_MDE"}
-        assert graph.edges[by_code["Q_PCT_MDE"]] == (
-            by_code[registry_mod.Q_DAILY_EXPOSURE],
-        )
+        assert graph.edges[by_code["Q_PCT_MDE"]] == (by_code[registry_mod.Q_DAILY_EXPOSURE],)
         assert graph.edges[by_code[registry_mod.Q_DAILY_EXPOSURE]] == ()
 
     def test_each_link_runs_exactly_once_and_in_order(self, chain, monkeypatch):
@@ -1694,9 +1672,7 @@ class TestRealChainCascade:
         assert seen.index(b_id) < seen.index(c_id)
         assert list(result.recalculated_response_public_ids) == [b_id, c_id]
 
-    def test_the_downstream_link_reads_the_upstream_outcome_written_this_cascade(
-        self, chain
-    ):
+    def test_the_downstream_link_reads_the_upstream_outcome_written_this_cascade(self, chain):
         result = _cascade(chain)
         assert result.triggered is True
 
@@ -1708,9 +1684,7 @@ class TestRealChainCascade:
         # 1 g against the precedent's 2 g maximum daily exposure.
         assert downstream.value == Decimal("50")
 
-    def test_the_downstream_provenance_names_the_current_upstream_outcome(
-        self, chain
-    ):
+    def test_the_downstream_provenance_names_the_current_upstream_outcome(self, chain):
         _cascade(chain)
         upstream = _outcome(chain, "daily_exposure")
         downstream = _outcome(chain, "percentage_of_iid_mde")
@@ -1788,9 +1762,7 @@ class TestRealDiamondCascade:
                     sink,
                     input_resolvers=MappingProxyType(
                         {
-                            "converted_proposed_daily_exposure": _from_outcome(
-                                self.B_CODE
-                            ),
+                            "converted_proposed_daily_exposure": _from_outcome(self.B_CODE),
                             "selected_iid_mde": _from_outcome(self.C_CODE),
                         }
                     ),
@@ -1828,9 +1800,7 @@ class TestRealDiamondCascade:
             by_code[self.C_CODE],
         }
 
-    def test_every_node_runs_exactly_once_with_the_sink_last(
-        self, diamond, monkeypatch
-    ):
+    def test_every_node_runs_exactly_once_with_the_sink_last(self, diamond, monkeypatch):
         seen = _recording_writer(monkeypatch)
         result = _cascade(diamond["world"])
 
@@ -1845,9 +1815,7 @@ class TestRealDiamondCascade:
         assert list(result.recalculated_response_public_ids) == [b_id, c_id, d_id]
         assert list(result.question_codes) == [self.B_CODE, self.C_CODE, self.D_CODE]
 
-    def test_the_sink_is_not_executed_twice_for_its_two_parents(
-        self, diamond, monkeypatch
-    ):
+    def test_the_sink_is_not_executed_twice_for_its_two_parents(self, diamond, monkeypatch):
         """M4D3-DAG-010 -- the visited set, on the topology that would expose it."""
         seen = _recording_writer(monkeypatch)
         _cascade(diamond["world"])
@@ -1887,9 +1855,9 @@ class TestRealDiamondCascade:
         ):
             descriptor = d_outcome.input_provenance[kwarg]
             assert descriptor["source_public_id"] == str(parent.public_id)
-            assert descriptor["resolver_provenance"][
-                "upstream_outcome_public_id"
-            ] == str(parent.public_id)
+            assert descriptor["resolver_provenance"]["upstream_outcome_public_id"] == str(
+                parent.public_id
+            )
 
     def test_a_changed_parent_moves_the_sink(self, diamond):
         """Both parents are live inputs, so the sink tracks them."""
@@ -1898,9 +1866,7 @@ class TestRealDiamondCascade:
         first = _outcome(world, "difference_from_iid_mde").value
 
         world["component"].quantity_per_dosage_unit = Decimal("0.125000")
-        world["component"].save(
-            update_fields=["quantity_per_dosage_unit", "updated_at"]
-        )
+        world["component"].save(update_fields=["quantity_per_dosage_unit", "updated_at"])
         _cascade(world)
 
         b_outcome = _outcome(world, "daily_exposure")

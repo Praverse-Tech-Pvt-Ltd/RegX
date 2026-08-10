@@ -246,13 +246,9 @@ def _build_provenance(entry, resolved_inputs, snapshot) -> dict:
     # declare a selector would drop the component at the first inherited link
     # and break component provenance through deeper dependency chains.
     if resolved_inputs.subject_component_public_id is not None:
-        provenance[SUBJECT_COMPONENT_PROVENANCE_KEY] = (
-            resolved_inputs.subject_component_public_id
-        )
+        provenance[SUBJECT_COMPONENT_PROVENANCE_KEY] = resolved_inputs.subject_component_public_id
     if resolved_inputs.subject_component_sources:
-        provenance["subject_component_sources"] = list(
-            resolved_inputs.subject_component_sources
-        )
+        provenance["subject_component_sources"] = list(resolved_inputs.subject_component_sources)
     if snapshot is not None:
         provenance["assessment_snapshot_public_id"] = str(snapshot.public_id)
     if resolved_inputs.upstream_outcome_public_ids:
@@ -295,9 +291,7 @@ def _related_response_ids(execution, entry, target_pk) -> list[int]:
     if not codes:
         return []
     return list(
-        ChecklistResponse.objects.filter(
-            execution=execution, question__code__in=sorted(codes)
-        )
+        ChecklistResponse.objects.filter(execution=execution, question__code__in=sorted(codes))
         .exclude(pk=target_pk)
         .order_by("pk")
         .values_list("pk", flat=True)
@@ -310,11 +304,7 @@ def _lock_responses(response_ids) -> None:
 
     if not response_ids:
         return
-    list(
-        ChecklistResponse.objects.filter(pk__in=response_ids)
-        .select_for_update()
-        .order_by("pk")
-    )
+    list(ChecklistResponse.objects.filter(pk__in=response_ids).select_for_update().order_by("pk"))
 
 
 def _lock_outcomes(response_ids) -> list:
@@ -552,9 +542,7 @@ def execute_calculation_response(
     with db_transaction.atomic():
         # 1. the execution -- also the barrier that serializes every governed
         #    operation on this execution (M4D3-TXN-006).
-        list(
-            ChecklistExecution.objects.filter(pk=execution.pk).select_for_update()
-        )
+        list(ChecklistExecution.objects.filter(pk=execution.pk).select_for_update())
         # 2. the target response.
         locked_response = (
             ChecklistResponse.objects.select_for_update()
@@ -574,9 +562,7 @@ def execute_calculation_response(
         # 4. every involved outcome -- upstream and target together -- as one
         #    ascending primary-key set, then classified in memory.
         locked_outcomes = _lock_outcomes([*related_ids, locked_response.pk])
-        outcomes = [
-            row for row in locked_outcomes if row.response_id == locked_response.pk
-        ]
+        outcomes = [row for row in locked_outcomes if row.response_id == locked_response.pk]
         if not outcomes:
             raise PlaceholderMissing(question.code)
         if len(outcomes) > 1:
@@ -589,14 +575,17 @@ def execute_calculation_response(
 
         def audit_unless_unchanged(result, snapshot_public_id):
             """M4D3-RCL-004 -- withhold the event when nothing governed moved."""
-            if _suppress_unchanged_audit and _outcome_signature(outcome) == (
-                outcome_before
-            ):
+            if _suppress_unchanged_audit and _outcome_signature(outcome) == (outcome_before):
                 return replace(result, audit_suppressed=True)
             _schedule_audit(
-                tenant=tenant, execution=execution, response=locked_response,
-                question=question, identifier=identifier, entry=entry,
-                actor=actor, result=result,
+                tenant=tenant,
+                execution=execution,
+                response=locked_response,
+                question=question,
+                identifier=identifier,
+                entry=entry,
+                actor=actor,
+                result=result,
                 snapshot_public_id=snapshot_public_id,
             )
             return result
@@ -611,11 +600,7 @@ def execute_calculation_response(
         if supplied_snapshot is not None:
             from iid_assessment.models import AssessmentSnapshot
 
-            list(
-                AssessmentSnapshot.objects.filter(
-                    pk=supplied_snapshot.pk
-                ).select_for_update()
-            )
+            list(AssessmentSnapshot.objects.filter(pk=supplied_snapshot.pk).select_for_update())
         elif _entry_needs_snapshot(entry):
             try:
                 resolution_context, _ = _create_governed_snapshot(
@@ -657,7 +642,15 @@ def execute_calculation_response(
 
 
 def _schedule_audit(
-    *, tenant, execution, response, question, identifier, entry, actor, result,
+    *,
+    tenant,
+    execution,
+    response,
+    question,
+    identifier,
+    entry,
+    actor,
+    result,
     snapshot_public_id,
 ):
     """One governed audit event, dispatched only after the commit succeeds."""
@@ -773,8 +766,7 @@ def _persist_engine_result(outcome, entry, resolved_inputs, engine_result, snaps
         else ""
     )
     outcome.inputs = {
-        resolved.kwarg_name: _json_safe(resolved.value)
-        for resolved in resolved_inputs.inputs
+        resolved.kwarg_name: _json_safe(resolved.value) for resolved in resolved_inputs.inputs
     }
     outcome.input_provenance = _build_provenance(entry, resolved_inputs, snapshot)
     outcome.source_assessment_snapshot_public_id = (

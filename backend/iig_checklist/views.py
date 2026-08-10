@@ -1276,8 +1276,7 @@ class ChecklistResponseUpdateView(APIView):
                 {
                     "error_code": "invalid_expected_version",
                     "detail": (
-                        "expected_version must be an integer of at least 1. "
-                        "Reload and retry."
+                        "expected_version must be an integer of at least 1. Reload and retry."
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,

@@ -56,6 +56,7 @@ def format_decimal_plain(value: object) -> str:
         return str(value)
     return format(value, "f")
 
+
 # ---------------------------------------------------------------------------
 # Stored CalculationStatus values (iig_checklist.enums.CalculationStatus)
 #
@@ -273,13 +274,9 @@ INPUT_FAILURE_MAPPING: MappingProxyType[str, OutcomeMapping] = MappingProxyType(
         "INPUT_VALUE_NOT_COMPARABLE": OutcomeMapping(
             STATUS_ERROR, "NOT_COMPARABLE", VALUE_RULE_NULL
         ),
-        "INPUT_DENSITY_REQUIRED": OutcomeMapping(
-            STATUS_ERROR, "NOT_COMPARABLE", VALUE_RULE_NULL
-        ),
+        "INPUT_DENSITY_REQUIRED": OutcomeMapping(STATUS_ERROR, "NOT_COMPARABLE", VALUE_RULE_NULL),
         # -- Unit faults ------------------------------------------------------
-        "INPUT_UNIT_UNSUPPORTED": OutcomeMapping(
-            STATUS_ERROR, "UNIT_MISMATCH", VALUE_RULE_NULL
-        ),
+        "INPUT_UNIT_UNSUPPORTED": OutcomeMapping(STATUS_ERROR, "UNIT_MISMATCH", VALUE_RULE_NULL),
         "INPUT_UNIT_DIMENSION_MISMATCH": OutcomeMapping(
             STATUS_ERROR, "UNIT_MISMATCH", VALUE_RULE_NULL
         ),
@@ -361,9 +358,7 @@ UNKNOWN_ENGINE_STATUS_MAPPING = OutcomeMapping(
 )
 
 # M4D3-TRL-005 -- malformed / naive generated_at.
-INVALID_GENERATED_AT_MAPPING = OutcomeMapping(
-    STATUS_ERROR, "INVALID_GENERATED_AT", VALUE_RULE_NULL
-)
+INVALID_GENERATED_AT_MAPPING = OutcomeMapping(STATUS_ERROR, "INVALID_GENERATED_AT", VALUE_RULE_NULL)
 
 
 @dataclass(frozen=True, slots=True)
@@ -419,11 +414,7 @@ def translate_engine_status(engine_result: CalculationResult) -> TranslatedOutco
             generated_at=None,
         )
 
-    value = (
-        engine_result.value
-        if mapping.value_rule == VALUE_RULE_ENGINE_VALUE
-        else None
-    )
+    value = engine_result.value if mapping.value_rule == VALUE_RULE_ENGINE_VALUE else None
     return TranslatedOutcome(
         status=mapping.status,
         reason_code=mapping.reason_code,
@@ -438,9 +429,7 @@ def translate_input_failure(detail_code: str) -> OutcomeMapping:
     An unrecognised detail code is treated as ``UNKNOWN_INTERNAL_FAILURE`` and
     can never yield ``complete``.
     """
-    return INPUT_FAILURE_MAPPING.get(
-        detail_code, INPUT_FAILURE_MAPPING["UNKNOWN_INTERNAL_FAILURE"]
-    )
+    return INPUT_FAILURE_MAPPING.get(detail_code, INPUT_FAILURE_MAPPING["UNKNOWN_INTERNAL_FAILURE"])
 
 
 # ---------------------------------------------------------------------------
@@ -543,9 +532,7 @@ def _validate_vocabularies() -> None:
         "ASSESSMENT_SNAPSHOT_TENANT_MISMATCH",
     ):
         if INPUT_FAILURE_MAPPING[code].reason_code != "TENANT_ISOLATION_VIOLATION":
-            raise VocabularyConfigurationError(
-                f"{code} must map to TENANT_ISOLATION_VIOLATION"
-            )
+            raise VocabularyConfigurationError(f"{code} must map to TENANT_ISOLATION_VIOLATION")
     if INPUT_FAILURE_MAPPING["UPSTREAM_CALCULATION_DUPLICATE"].reason_code != (
         "DUPLICATE_UPSTREAM_OUTCOME"
     ):

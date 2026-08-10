@@ -1,4 +1,4 @@
-﻿"""Milestone 4D-3 -- calculation binding registry and resolver declarations.
+"""Milestone 4D-3 -- calculation binding registry and resolver declarations.
 
 Database-free by construction.  This module defines *what* each approved
 calculation needs and validates those declarations at import time.  It never
@@ -67,43 +67,39 @@ ALLOWED_RESOLVER_SOURCES: frozenset[str] = frozenset(
 # The dict literal is wrapped immediately, so no mutable alias is ever bound:
 # the outer mapping is read-only and each key set is already a frozenset, so no
 # caller can add a resolver form or widen an existing one.
-_RESOLVER_KEYS: MappingProxyType[str, tuple[frozenset[str], frozenset[str]]] = (
-    MappingProxyType(
-        {
-            # source: (required keys, optional keys)
-            SOURCE_QUESTION_RESPONSE: (
-                frozenset({"source", "question_code", "value_field", "expected_type"}),
-                frozenset({"required_unit", "unit_source"}),
+_RESOLVER_KEYS: MappingProxyType[str, tuple[frozenset[str], frozenset[str]]] = MappingProxyType(
+    {
+        # source: (required keys, optional keys)
+        SOURCE_QUESTION_RESPONSE: (
+            frozenset({"source", "question_code", "value_field", "expected_type"}),
+            frozenset({"required_unit", "unit_source"}),
+        ),
+        SOURCE_FORMULATION_FIELD: (
+            frozenset({"source", "object", "field", "expected_type"}),
+            frozenset(
+                {"unit_field", "required_unit", "component_selector", "required_component_type"}
             ),
-            SOURCE_FORMULATION_FIELD: (
-                frozenset({"source", "object", "field", "expected_type"}),
-                frozenset({"unit_field", "required_unit", "component_selector",
-                           "required_component_type"}),
-            ),
-            SOURCE_MAXIMUM_DAILY_UNITS: (
-                frozenset({"source", "resolver_version", "expected_type"}),
-                frozenset(),
-            ),
-            SOURCE_ASSESSMENT_SNAPSHOT: (
-                frozenset({"source", "field", "expected_type"}),
-                frozenset({"unit_field", "required_unit"}),
-            ),
-            SOURCE_CALCULATION_OUTCOME: (
-                frozenset({"source", "question_code", "field", "required_status",
-                           "expected_type"}),
-                frozenset({"required_unit", "unit_source"}),
-            ),
-            SOURCE_CONSTANT: (
-                frozenset({"source", "value", "type", "binding_version"}),
-                frozenset(),
-            ),
-        }
-    )
+        ),
+        SOURCE_MAXIMUM_DAILY_UNITS: (
+            frozenset({"source", "resolver_version", "expected_type"}),
+            frozenset(),
+        ),
+        SOURCE_ASSESSMENT_SNAPSHOT: (
+            frozenset({"source", "field", "expected_type"}),
+            frozenset({"unit_field", "required_unit"}),
+        ),
+        SOURCE_CALCULATION_OUTCOME: (
+            frozenset({"source", "question_code", "field", "required_status", "expected_type"}),
+            frozenset({"required_unit", "unit_source"}),
+        ),
+        SOURCE_CONSTANT: (
+            frozenset({"source", "value", "type", "binding_version"}),
+            frozenset(),
+        ),
+    }
 )
 
-FORMULATION_OBJECTS: frozenset[str] = frozenset(
-    {"formulation_version", "formulation_component"}
-)
+FORMULATION_OBJECTS: frozenset[str] = frozenset({"formulation_version", "formulation_component"})
 
 # M4D3-INP-006 -- the only snapshot fields a resolver may read.  These are the
 # actual AssessmentSnapshot field names; ``selected_iid_*`` are kwargs, not
@@ -127,9 +123,7 @@ ENABLED_SELECTOR_TYPES: frozenset[str] = frozenset({SELECTOR_RESPONSE_REFERENCE}
 
 COMPONENT_TYPE_ACTIVE = "active"
 COMPONENT_TYPE_INACTIVE = "inactive"
-COMPONENT_TYPES: frozenset[str] = frozenset(
-    {COMPONENT_TYPE_ACTIVE, COMPONENT_TYPE_INACTIVE}
-)
+COMPONENT_TYPES: frozenset[str] = frozenset({COMPONENT_TYPE_ACTIVE, COMPONENT_TYPE_INACTIVE})
 
 
 @dataclass(frozen=True, slots=True)
@@ -424,8 +418,7 @@ def _validate_unit(where: str, value: Any) -> None:
     # M4D3-UNC-003 -- canonical full-word units only; no shorthand.
     if value not in DIMENSION_OF_UNIT:
         raise RegistryConfigurationError(
-            f"{where}: {value!r} is not a canonical unit "
-            f"(expected e.g. 'gram', not 'g')"
+            f"{where}: {value!r} is not a canonical unit (expected e.g. 'gram', not 'g')"
         )
 
 
@@ -440,14 +433,11 @@ def _validate_component_selector(where: str, selector: Any) -> None:
             "enabled in 4D-3; use response_reference"
         )
     if sel_type not in ENABLED_SELECTOR_TYPES:
-        raise RegistryConfigurationError(
-            f"{where}: unknown component selector type {sel_type!r}"
-        )
+        raise RegistryConfigurationError(f"{where}: unknown component selector type {sel_type!r}")
     expected = {"type", "question_code"}
     if set(selector) != expected:
         raise RegistryConfigurationError(
-            f"{where}: component_selector keys {sorted(set(selector))} != "
-            f"{sorted(expected)}"
+            f"{where}: component_selector keys {sorted(set(selector))} != {sorted(expected)}"
         )
     if not isinstance(selector["question_code"], str) or not selector["question_code"]:
         raise RegistryConfigurationError(f"{where}: selector question_code must be set")
@@ -500,14 +490,12 @@ def validate_resolver_declaration(kwarg: str, decl: Any) -> None:
         if decl["object"] == "formulation_component":
             if "component_selector" not in keys:
                 raise RegistryConfigurationError(
-                    f"{where}: component_selector is mandatory for "
-                    "object='formulation_component'"
+                    f"{where}: component_selector is mandatory for object='formulation_component'"
                 )
             _validate_component_selector(where, decl["component_selector"])
             if decl.get("required_component_type") not in COMPONENT_TYPES:
                 raise RegistryConfigurationError(
-                    f"{where}: required_component_type must be one of "
-                    f"{sorted(COMPONENT_TYPES)}"
+                    f"{where}: required_component_type must be one of {sorted(COMPONENT_TYPES)}"
                 )
         elif "component_selector" in keys:
             raise RegistryConfigurationError(
@@ -528,13 +516,9 @@ def validate_resolver_declaration(kwarg: str, decl: Any) -> None:
 
     elif source == SOURCE_CALCULATION_OUTCOME:
         if decl["field"] != "value":
-            raise RegistryConfigurationError(
-                f"{where}: calculation_outcome may only read 'value'"
-            )
+            raise RegistryConfigurationError(f"{where}: calculation_outcome may only read 'value'")
         if decl["required_status"] != "complete":
-            raise RegistryConfigurationError(
-                f"{where}: required_status must be 'complete'"
-            )
+            raise RegistryConfigurationError(f"{where}: required_status must be 'complete'")
         if not isinstance(decl["question_code"], str) or not decl["question_code"]:
             raise RegistryConfigurationError(f"{where}: question_code must be set")
 
@@ -591,9 +575,7 @@ def _validate_registry() -> None:
         if not isinstance(identifier, str) or not identifier:
             raise RegistryConfigurationError("registry key must be a non-empty string")
         if identifier != identifier.lower() or not identifier.replace("_", "").isalnum():
-            raise RegistryConfigurationError(
-                f"{where}: identifier must be a lowercase ASCII slug"
-            )
+            raise RegistryConfigurationError(f"{where}: identifier must be a lowercase ASCII slug")
         if len(identifier) > 100:
             raise RegistryConfigurationError(
                 f"{where}: identifier exceeds CharField(max_length=100)"
@@ -677,8 +659,7 @@ def _validate_registry() -> None:
         if entry.output_unit and entry.output_unit not in DIMENSION_OF_UNIT:
             # Percentage-style outputs are dimensionless labels, not convertible
             # units; only reject an unknown *convertible* unit declaration.
-            if entry.output_unit not in {"percent_w_w", "percent_of_potency",
-                                         "percent_of_mde"}:
+            if entry.output_unit not in {"percent_w_w", "percent_of_potency", "percent_of_mde"}:
                 raise RegistryConfigurationError(
                     f"{where}: unknown output unit {entry.output_unit!r}"
                 )

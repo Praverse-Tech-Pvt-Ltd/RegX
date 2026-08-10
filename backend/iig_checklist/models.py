@@ -838,9 +838,7 @@ class CalculationOutcome(PublicIDModel, TimeStampedModel):
 
         provenance = self.input_provenance
         if not isinstance(provenance, dict):
-            errors["input_provenance"] = (
-                "input_provenance must be a mapping on a complete outcome."
-            )
+            errors["input_provenance"] = "input_provenance must be a mapping on a complete outcome."
             raise ValidationError(errors)
 
         binding_version = provenance.get(REGISTRY_BINDING_VERSION_PROVENANCE_KEY)

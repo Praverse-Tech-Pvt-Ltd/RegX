@@ -63,9 +63,7 @@ class CalculationGraph:
 
     def dependants_of(self, node_id: str) -> tuple[str, ...]:
         """Node ids that consume ``node_id`` directly."""
-        return tuple(
-            sorted(n for n, ups in self.edges.items() if node_id in ups)
-        )
+        return tuple(sorted(n for n, ups in self.edges.items() if node_id in ups))
 
     def downstream_closure(self, node_id: str) -> tuple[str, ...]:
         """All transitively affected nodes, in stable topological order."""

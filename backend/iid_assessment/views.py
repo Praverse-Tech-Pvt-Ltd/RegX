@@ -137,9 +137,7 @@ class SnapshotView(APIView):
         formulation_version = _require_formulation_version(
             tenant, data["formulation_version_public_id"]
         )
-        component = _require_component(
-            formulation_version, data["formulation_component_public_id"]
-        )
+        component = _require_component(formulation_version, data["formulation_component_public_id"])
         # The client names the exact release it is assessing against; the
         # service verifies it is an eligible fda_iid release and never
         # substitutes a newer one. The checklist execution path instead
@@ -152,9 +150,9 @@ class SnapshotView(APIView):
                 # the transaction, never from the request. The same helper backs
                 # the checklist calculation-execution path, so both callers
                 # reach one answer for one formulation.
-                current_version = FormulationVersion.objects.select_related(
-                    "product"
-                ).get(pk=formulation_version.pk)
+                current_version = FormulationVersion.objects.select_related("product").get(
+                    pk=formulation_version.pk
+                )
                 result = create_assessment_snapshot(
                     tenant=tenant,
                     formulation_version=current_version,

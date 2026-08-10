@@ -77,9 +77,7 @@ def convert_for_calculation(
     if not to_unit or not str(to_unit).strip():
         return _failure(FAILURE_UNIT_MISSING, value, from_unit, to_unit)
 
-    result = unit_conversion.convert(
-        value, from_unit, to_unit, density_g_per_ml=density_g_per_ml
-    )
+    result = unit_conversion.convert(value, from_unit, to_unit, density_g_per_ml=density_g_per_ml)
 
     if not result.ok:
         failure = _REASON_TO_FAILURE.get(result.reason_code or "", FAILURE_UNKNOWN)
@@ -122,9 +120,7 @@ def _failure(
         failure_code=failure_code,
         provenance=MappingProxyType(
             {
-                "original_value": (
-                    None if value is None else format_decimal_plain(value)
-                ),
+                "original_value": (None if value is None else format_decimal_plain(value)),
                 "original_unit": from_unit,
                 "converted_value": None,
                 "converted_unit": to_unit,

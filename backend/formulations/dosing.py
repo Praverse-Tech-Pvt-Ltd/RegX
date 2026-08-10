@@ -53,9 +53,7 @@ def collect_dosing_regimen_candidates(formulation_version):
     )
 
 
-def resolve_governed_maximum_daily_units(
-    *, formulation_version
-) -> MaxDailyUnitsSelection:
+def resolve_governed_maximum_daily_units(*, formulation_version) -> MaxDailyUnitsSelection:
     """The conservative worst-case selection for one formulation version.
 
     Both governed sources are supplied -- the version scalar and every dosing
@@ -79,9 +77,7 @@ def resolve_governed_maximum_daily_units(
 
 def governed_maximum_daily_units_value(*, formulation_version):
     """The selected ``Decimal``, or ``None`` when the selection failed closed."""
-    selection = resolve_governed_maximum_daily_units(
-        formulation_version=formulation_version
-    )
+    selection = resolve_governed_maximum_daily_units(formulation_version=formulation_version)
     return selection.value if selection.resolved else None
 
 
@@ -95,14 +91,10 @@ def current_formulation_version(formulation_version_id):
     """
     from .models import FormulationVersion
 
-    return FormulationVersion.objects.select_related("product").get(
-        pk=formulation_version_id
-    )
+    return FormulationVersion.objects.select_related("product").get(pk=formulation_version_id)
 
 
-def resolve_current_maximum_daily_units(
-    *, formulation_version_id
-) -> MaxDailyUnitsSelection:
+def resolve_current_maximum_daily_units(*, formulation_version_id) -> MaxDailyUnitsSelection:
     """Fresh read plus governed selection, for a caller holding an identity.
 
     The one entry point for callers that do not already hold a current

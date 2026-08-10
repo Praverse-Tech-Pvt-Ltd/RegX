@@ -119,8 +119,11 @@ def _section(version, code="S1", order=1):
     from iig_checklist.models import ChecklistSection
 
     return ChecklistSection.objects.create(
-        checklist_version=version, code=code, title=f"Section {code}",
-        display_order=order, criticality=Criticality.MEDIUM,
+        checklist_version=version,
+        code=code,
+        title=f"Section {code}",
+        display_order=order,
+        criticality=Criticality.MEDIUM,
     )
 
 
@@ -130,9 +133,14 @@ def _question(
     from iig_checklist.models import ChecklistQuestion
 
     return ChecklistQuestion.objects.create(
-        section=section, code=code, question_text=f"Q {code}", display_order=order,
-        answer_type=answer_type, data_source_classification=classification,
-        calculation_binding_identifier=binding, criticality=Criticality.LOW,
+        section=section,
+        code=code,
+        question_text=f"Q {code}",
+        display_order=order,
+        answer_type=answer_type,
+        data_source_classification=classification,
+        calculation_binding_identifier=binding,
+        criticality=Criticality.LOW,
         allowed_units=allowed_units or [],
     )
 
@@ -141,8 +149,11 @@ def _execution(tenant, version, formulation, user):
     from iig_checklist.models import ChecklistExecution
 
     return ChecklistExecution.objects.create(
-        tenant=tenant, checklist_version=version, formulation_version=formulation,
-        status=ExecutionStatus.DRAFT, created_by=user,
+        tenant=tenant,
+        checklist_version=version,
+        formulation_version=formulation,
+        status=ExecutionStatus.DRAFT,
+        created_by=user,
     )
 
 
@@ -150,15 +161,23 @@ def _response(execution, question, *, raw=None, na=False, reason=None):
     from iig_checklist.models import ChecklistResponse
 
     return ChecklistResponse.objects.create(
-        execution=execution, question=question,
+        execution=execution,
+        question=question,
         data_source_type_snapshot=question.data_source_classification,
-        raw_value=raw, is_not_applicable=na, not_applicable_reason=reason,
+        raw_value=raw,
+        is_not_applicable=na,
+        not_applicable_reason=reason,
     )
 
 
 def _outcome(
-    response, *, name="calculate_daily_exposure", status=CalculationStatus.COMPLETE,
-    value="0.750000", unit="gram", component_public_id=None,
+    response,
+    *,
+    name="calculate_daily_exposure",
+    status=CalculationStatus.COMPLETE,
+    value="0.750000",
+    unit="gram",
+    component_public_id=None,
 ):
     from iig_checklist.models import CalculationOutcome
 
@@ -166,14 +185,26 @@ def _outcome(
     if component_public_id is not None:
         provenance[SUBJECT_COMPONENT_PROVENANCE_KEY] = str(component_public_id)
     return CalculationOutcome.objects.create(
-        response=response, calculation_name=name, status=status,
-        value=Decimal(value) if value is not None else None, unit=unit,
+        response=response,
+        calculation_name=name,
+        status=status,
+        value=Decimal(value) if value is not None else None,
+        unit=unit,
         input_provenance=provenance,
     )
 
 
-def _snapshot(tenant, component, formulation, *, potency="1.000000", potency_unit="gram",
-              mde="2.000000", mde_unit="gram", release=None):
+def _snapshot(
+    tenant,
+    component,
+    formulation,
+    *,
+    potency="1.000000",
+    potency_unit="gram",
+    mde="2.000000",
+    mde_unit="gram",
+    release=None,
+):
     from iid_assessment.models import AssessmentSnapshot
 
     return AssessmentSnapshot.objects.create(
@@ -232,24 +263,34 @@ def world(db, tenant_a, tenant_definition, user_a):
     version = _active_version(tenant_definition, user_a)
     section = _section(version)
     target = _question(
-        section, "Q_PCT_WW", answer_type=AnswerType.CALCULATED_VALUE,
+        section,
+        "Q_PCT_WW",
+        answer_type=AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding="percentage_w_w", order=1,
+        binding="percentage_w_w",
+        order=1,
     )
     selector = _question(
-        section, registry_mod.Q_SUBJECT_COMPONENT,
+        section,
+        registry_mod.Q_SUBJECT_COMPONENT,
         answer_type=AnswerType.FORMULATION_COMPONENT_REFERENCE,
-        classification=DataSourceClassification.USER_REQUIRED, order=2,
+        classification=DataSourceClassification.USER_REQUIRED,
+        order=2,
     )
     execution = _execution(tenant_a, version, formulation, user_a)
-    selector_response = _response(
-        execution, selector, raw={"public_id": str(component.public_id)}
-    )
+    selector_response = _response(execution, selector, raw={"public_id": str(component.public_id)})
     return {
-        "tenant": tenant_a, "user": user_a, "product": product,
-        "formulation": formulation, "component": component, "version": version,
-        "section": section, "target": target, "selector": selector,
-        "execution": execution, "selector_response": selector_response,
+        "tenant": tenant_a,
+        "user": user_a,
+        "product": product,
+        "formulation": formulation,
+        "component": component,
+        "version": version,
+        "section": section,
+        "target": target,
+        "selector": selector,
+        "execution": execution,
+        "selector_response": selector_response,
     }
 
 
@@ -276,9 +317,7 @@ class TestServiceContract:
     def test_successful_resolution_produces_all_kwargs(self, world):
         result = _resolve(world)
         assert result.resolved, result.failure_codes
-        assert set(result.kwargs) == {
-            "quantity_per_unit_grams", "total_dosage_unit_weight_grams"
-        }
+        assert set(result.kwargs) == {"quantity_per_unit_grams", "total_dosage_unit_weight_grams"}
         assert result.kwargs["quantity_per_unit_grams"] == Decimal("0.250000")
         assert result.kwargs["total_dosage_unit_weight_grams"] == Decimal("1.000000")
         assert result.calculation_name == "calculate_percentage_w_w"
@@ -303,7 +342,8 @@ class TestServiceContract:
     def test_target_question_from_another_version_is_a_contract_error(self, world, user_a):
         other_version = _draft_version(world["version"].definition, user_a, number=2)
         other_target = _question(
-            _section(other_version, code="OTHER"), "Q_PCT_WW",
+            _section(other_version, code="OTHER"),
+            "Q_PCT_WW",
             answer_type=AnswerType.CALCULATED_VALUE,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
             binding="percentage_w_w",
@@ -313,17 +353,23 @@ class TestServiceContract:
 
     def test_non_calculated_target_is_a_contract_error(self, world):
         plain = _question(
-            world["section"], "Q_PLAIN", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=50,
+            world["section"],
+            "Q_PLAIN",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=50,
         )
         with pytest.raises(CalculationInputContractError):
             _resolve(world, target=plain)
 
     def test_target_answer_type_mismatch_is_a_contract_error(self, world):
         mismatched = _question(
-            world["section"], "Q_WRONG_TYPE", answer_type=AnswerType.CALCULATED_STATUS,
+            world["section"],
+            "Q_WRONG_TYPE",
+            answer_type=AnswerType.CALCULATED_STATUS,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
-            binding="percentage_w_w", order=60,
+            binding="percentage_w_w",
+            order=60,
         )
         with pytest.raises(CalculationInputContractError):
             _resolve(world, target=mismatched)
@@ -389,8 +435,7 @@ class TestServiceContract:
 
     def test_repeated_resolution_is_byte_stable(self, world):
         runs = {
-            tuple((i.kwarg_name, str(i.value)) for i in _resolve(world).inputs)
-            for _ in range(5)
+            tuple((i.kwarg_name, str(i.value)) for i in _resolve(world).inputs) for _ in range(5)
         }
         assert len(runs) == 1
 
@@ -400,8 +445,7 @@ class TestServiceContract:
 # ===========================================================================
 
 
-def _form_a_registry(monkeypatch, *, expected_type="decimal", required_unit=None,
-                     unit_source=None):
+def _form_a_registry(monkeypatch, *, expected_type="decimal", required_unit=None, unit_source=None):
     declaration = {
         "source": registry_mod.SOURCE_QUESTION_RESPONSE,
         "question_code": "Q_INPUT_A",
@@ -427,8 +471,11 @@ class TestFormAQuestionResponse:
     def test_valid_decimal_response(self, world, monkeypatch):
         _form_a_registry(monkeypatch)
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "12.5"})
         result = _resolve(world, identifier="form_a")
@@ -443,8 +490,11 @@ class TestFormAQuestionResponse:
     def test_missing_response_row(self, world, monkeypatch):
         _form_a_registry(monkeypatch)
         _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         result = _resolve(world, identifier="form_a")
         assert _codes(result) == {"INPUT_RESPONSE_MISSING"}
@@ -462,8 +512,11 @@ class TestFormAQuestionResponse:
         second = _section(world["version"], code="S2", order=2)
         for section in (world["section"], second):
             question = _question(
-                section, "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-                classification=DataSourceClassification.USER_REQUIRED, order=10,
+                section,
+                "Q_INPUT_A",
+                answer_type=AnswerType.DECIMAL,
+                classification=DataSourceClassification.USER_REQUIRED,
+                order=10,
             )
             _response(world["execution"], question, raw={"value": "1.0"})
         result = _resolve(world, identifier="form_a")
@@ -486,8 +539,11 @@ class TestFormAQuestionResponse:
     def test_not_applicable_response(self, world, monkeypatch):
         _form_a_registry(monkeypatch)
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, na=True, reason="Not required here")
         result = _resolve(world, identifier="form_a")
@@ -497,11 +553,16 @@ class TestFormAQuestionResponse:
         """M4D3-PST-002 -- the reserved marker blocks resolution."""
         _form_a_registry(monkeypatch)
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(
-            world["execution"], question, raw={"value": "3.0"},
+            world["execution"],
+            question,
+            raw={"value": "3.0"},
             reason=f"{REVIEW_REQUIRED_MARKER}route_unconfirmed",
         )
         result = _resolve(world, identifier="form_a")
@@ -510,8 +571,11 @@ class TestFormAQuestionResponse:
     def test_malformed_payload(self, world, monkeypatch):
         _form_a_registry(monkeypatch)
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "not-a-number"})
         result = _resolve(world, identifier="form_a")
@@ -521,9 +585,12 @@ class TestFormAQuestionResponse:
         """M4D3-INP-003 -- raw_value is permanently null for calculated rows."""
         _form_a_registry(monkeypatch)
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.CALCULATED_VALUE,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.CALCULATED_VALUE,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
-            binding="percentage_w_w", order=10,
+            binding="percentage_w_w",
+            order=10,
         )
         _response(world["execution"], question)
         result = _resolve(world, identifier="form_a")
@@ -532,8 +599,11 @@ class TestFormAQuestionResponse:
     def test_string_expected_type(self, world, monkeypatch):
         _form_a_registry(monkeypatch, expected_type="string")
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.SHORT_TEXT,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.SHORT_TEXT,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "oral"})
         result = _resolve(world, identifier="form_a")
@@ -543,8 +613,11 @@ class TestFormAQuestionResponse:
     def test_blank_string_is_invalid(self, world, monkeypatch):
         _form_a_registry(monkeypatch, expected_type="string")
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.SHORT_TEXT,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.SHORT_TEXT,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "   "})
         result = _resolve(world, identifier="form_a")
@@ -553,8 +626,11 @@ class TestFormAQuestionResponse:
     def test_unsupported_expected_type(self, world, monkeypatch):
         _form_a_registry(monkeypatch, expected_type="uuid")
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.SHORT_TEXT,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.SHORT_TEXT,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "oral"})
         result = _resolve(world, identifier="form_a")
@@ -563,8 +639,11 @@ class TestFormAQuestionResponse:
     def test_quantity_with_unit_is_converted(self, world, monkeypatch):
         _form_a_registry(monkeypatch, required_unit="gram")
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.QUANTITY_WITH_UNIT,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.QUANTITY_WITH_UNIT,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
             allowed_units=["milligram"],
         )
         _response(world["execution"], question, raw={"value": "500", "unit": "milligram"})
@@ -576,8 +655,11 @@ class TestFormAQuestionResponse:
         """Carried forward from the activation review: absent unit != mismatch."""
         _form_a_registry(monkeypatch, required_unit="gram")
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "5"})
         result = _resolve(world, identifier="form_a")
@@ -586,8 +668,11 @@ class TestFormAQuestionResponse:
     def test_unsupported_unit(self, world, monkeypatch):
         _form_a_registry(monkeypatch, required_unit="gram", unit_source="furlong")
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "5"})
         result = _resolve(world, identifier="form_a")
@@ -596,8 +681,11 @@ class TestFormAQuestionResponse:
     def test_dimension_mismatch(self, world, monkeypatch):
         _form_a_registry(monkeypatch, required_unit="gram", unit_source="millilitre")
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         _response(world["execution"], question, raw={"value": "5"})
         result = _resolve(world, identifier="form_a")
@@ -733,11 +821,7 @@ class TestFormBFormulationFreshness:
 
     @staticmethod
     def _weight_input(result):
-        return next(
-            i
-            for i in result.inputs
-            if i.kwarg_name == "total_dosage_unit_weight_grams"
-        )
+        return next(i for i in result.inputs if i.kwarg_name == "total_dosage_unit_weight_grams")
 
     def test_stale_cached_scalar_is_bypassed(self, world):
         """The cache is proven stale first, then Form B is proven to ignore it."""
@@ -752,9 +836,7 @@ class TestFormBFormulationFreshness:
         other.save(update_fields=["total_dosage_unit_weight", "updated_at"])
 
         # Without this the test would prove nothing: the cache must still be old.
-        assert execution.formulation_version.total_dosage_unit_weight == Decimal(
-            "1.000000"
-        )
+        assert execution.formulation_version.total_dosage_unit_weight == Decimal("1.000000")
 
         result = _resolve(world)
         assert result.resolved, result.failure_codes
@@ -781,9 +863,7 @@ class TestFormBFormulationFreshness:
                 "updated_at",
             ]
         )
-        assert (
-            execution.formulation_version.total_dosage_unit_weight_unit == "gram"
-        )
+        assert execution.formulation_version.total_dosage_unit_weight_unit == "gram"
 
         result = _resolve(world)
         assert result.resolved, result.failure_codes
@@ -929,7 +1009,8 @@ class TestFormDAssessmentSnapshot:
     def test_valid_exact_object(self, world):
         snapshot = _snapshot(world["tenant"], world["component"], world["formulation"])
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert result.resolved, result.failure_codes
@@ -943,7 +1024,8 @@ class TestFormDAssessmentSnapshot:
     def test_wrong_tenant_snapshot(self, world, tenant_b):
         snapshot = _snapshot(tenant_b, world["component"], world["formulation"])
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert "ASSESSMENT_SNAPSHOT_TENANT_MISMATCH" in _codes(result)
@@ -952,26 +1034,31 @@ class TestFormDAssessmentSnapshot:
         other = _component(world["formulation"], quantity="0.100000", order=2)
         snapshot = _snapshot(world["tenant"], other, world["formulation"])
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert "ASSESSMENT_SNAPSHOT_COMPONENT_MISMATCH" in _codes(result)
 
     def test_missing_snapshot_field(self, world):
-        snapshot = _snapshot(world["tenant"], world["component"], world["formulation"],
-                             potency=None)
+        snapshot = _snapshot(
+            world["tenant"], world["component"], world["formulation"], potency=None
+        )
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert "ASSESSMENT_FIELD_MISSING" in _codes(result)
 
     def test_missing_snapshot_unit_field(self, world):
         """A reference unit that is empty is missing data, not a mismatch."""
-        snapshot = _snapshot(world["tenant"], world["component"], world["formulation"],
-                             potency_unit="")
+        snapshot = _snapshot(
+            world["tenant"], world["component"], world["formulation"], potency_unit=""
+        )
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert "INPUT_UNIT_MISSING" in _codes(result)
@@ -979,11 +1066,15 @@ class TestFormDAssessmentSnapshot:
     def test_snapshot_reference_unit_drives_conversion(self, world):
         """SnapshotUnitRef is resolved explicitly, not compared as a string."""
         snapshot = _snapshot(
-            world["tenant"], world["component"], world["formulation"],
-            potency="500.000000", potency_unit="milligram",
+            world["tenant"],
+            world["component"],
+            world["formulation"],
+            potency="500.000000",
+            potency_unit="milligram",
         )
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(assessment_snapshot=snapshot),
         )
         assert result.resolved, result.failure_codes
@@ -996,11 +1087,14 @@ class TestFormDAssessmentSnapshot:
 
         chosen_release = uuid_module.uuid4()
         snapshot = _snapshot(
-            world["tenant"], world["component"], world["formulation"],
+            world["tenant"],
+            world["component"],
+            world["formulation"],
             release=uuid_module.uuid4(),
         )
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(
                 assessment_snapshot=snapshot,
                 expected_iid_release_public_id=chosen_release,
@@ -1013,10 +1107,14 @@ class TestFormDAssessmentSnapshot:
 
         release = uuid_module.uuid4()
         snapshot = _snapshot(
-            world["tenant"], world["component"], world["formulation"], release=release,
+            world["tenant"],
+            world["component"],
+            world["formulation"],
+            release=release,
         )
         result = _resolve(
-            world, identifier="percentage_of_iid_potency",
+            world,
+            identifier="percentage_of_iid_potency",
             context=ResolutionContext(
                 assessment_snapshot=snapshot, expected_iid_release_public_id=release
             ),
@@ -1040,15 +1138,20 @@ class TestFormDAssessmentSnapshot:
 def mde_world(world):
     """Adds the upstream daily-exposure question and response."""
     upstream = _question(
-        world["section"], registry_mod.Q_DAILY_EXPOSURE,
+        world["section"],
+        registry_mod.Q_DAILY_EXPOSURE,
         answer_type=AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding="daily_exposure", order=20,
+        binding="daily_exposure",
+        order=20,
     )
     target = _question(
-        world["section"], "Q_MDE_PCT", answer_type=AnswerType.CALCULATED_VALUE,
+        world["section"],
+        "Q_MDE_PCT",
+        answer_type=AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding="percentage_of_iid_mde", order=21,
+        binding="percentage_of_iid_mde",
+        order=21,
     )
     upstream_response = _response(world["execution"], upstream)
     world["upstream"] = upstream
@@ -1059,8 +1162,10 @@ def mde_world(world):
 
 def _resolve_mde(world, context=None):
     return resolve_calculation_inputs(
-        execution=world["execution"], target_question=world["mde_target"],
-        registry_identifier="percentage_of_iid_mde", actor=world["user"],
+        execution=world["execution"],
+        target_question=world["mde_target"],
+        registry_identifier="percentage_of_iid_mde",
+        actor=world["user"],
         locked_context=context,
     )
 
@@ -1071,18 +1176,14 @@ class TestFormECalculationOutcome:
             mde_world["upstream_response"],
             component_public_id=mde_world["component"].public_id,
         )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert result.resolved, result.failure_codes
         assert result.kwargs["converted_proposed_daily_exposure"] == Decimal("0.750000")
         assert len(result.upstream_outcome_public_ids) == 1
 
     def test_missing_outcome(self, mde_world):
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert "UPSTREAM_CALCULATION_MISSING" in _codes(result)
 
@@ -1092,49 +1193,41 @@ class TestFormECalculationOutcome:
                 mde_world["upstream_response"],
                 component_public_id=mde_world["component"].public_id,
             )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert "UPSTREAM_CALCULATION_DUPLICATE" in _codes(result)
 
     def test_incomplete_status(self, mde_world):
         _outcome(
-            mde_world["upstream_response"], status=CalculationStatus.DATA_REQUIRED,
+            mde_world["upstream_response"],
+            status=CalculationStatus.DATA_REQUIRED,
             component_public_id=mde_world["component"].public_id,
         )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert "UPSTREAM_CALCULATION_INCOMPLETE" in _codes(result)
 
     def test_null_value(self, mde_world):
         _outcome(
-            mde_world["upstream_response"], value=None,
+            mde_world["upstream_response"],
+            value=None,
             component_public_id=mde_world["component"].public_id,
         )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert "UPSTREAM_CALCULATION_INCOMPLETE" in _codes(result)
 
     def test_outcome_without_recorded_component_is_rejected(self, mde_world):
         """A component-scoped producer must prove which component it described."""
         _outcome(mde_world["upstream_response"])
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" in _codes(result)
 
     def test_outcome_for_another_component_is_rejected(self, mde_world):
         other = _component(mde_world["formulation"], quantity="0.100000", order=3)
         _outcome(mde_world["upstream_response"], component_public_id=other.public_id)
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         # The MDE entry has no component input of its own; it inherits from the
         # upstream outcome, and the snapshot must then describe that component.
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
@@ -1149,33 +1242,33 @@ class TestFormECalculationOutcome:
         )
         other_response = _response(other_execution, mde_world["upstream"])
         _outcome(other_response, component_public_id=mde_world["component"].public_id)
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert "UPSTREAM_CALCULATION_MISSING" in _codes(result)
 
     def test_incompatible_upstream_unit(self, mde_world):
         _outcome(
-            mde_world["upstream_response"], unit="millilitre",
+            mde_world["upstream_response"],
+            unit="millilitre",
             component_public_id=mde_world["component"].public_id,
         )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
-        assert _codes(result) & {
-            "INPUT_UNIT_DIMENSION_MISMATCH", "INPUT_DENSITY_REQUIRED"
-        }
+        assert _codes(result) & {"INPUT_UNIT_DIMENSION_MISMATCH", "INPUT_DENSITY_REQUIRED"}
 
     def test_upstream_unit_is_converted_to_the_snapshot_unit(self, mde_world):
         _outcome(
-            mde_world["upstream_response"], value="1.000000", unit="gram",
+            mde_world["upstream_response"],
+            value="1.000000",
+            unit="gram",
             component_public_id=mde_world["component"].public_id,
         )
         snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"],
-            mde="2000.000000", mde_unit="milligram",
+            mde_world["tenant"],
+            mde_world["component"],
+            mde_world["formulation"],
+            mde="2000.000000",
+            mde_unit="milligram",
         )
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert result.resolved, result.failure_codes
@@ -1206,8 +1299,11 @@ class TestFormECalculationOutcome:
             },
         )
         upstream = _question(
-            world["section"], "Q_UPSTREAM", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=30,
+            world["section"],
+            "Q_UPSTREAM",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=30,
         )
         _response(world["execution"], upstream, raw={"value": "1.0"})
         result = _resolve(world, identifier="consumes")
@@ -1218,9 +1314,7 @@ class TestFormECalculationOutcome:
         _install(
             monkeypatch,
             {
-                "daily_exposure": registry_mod.CALCULATION_BINDING_REGISTRY[
-                    "daily_exposure"
-                ],
+                "daily_exposure": registry_mod.CALCULATION_BINDING_REGISTRY["daily_exposure"],
                 "scoped_consumer": _entry(
                     input_resolvers=MappingProxyType(
                         {
@@ -1235,9 +1329,7 @@ class TestFormECalculationOutcome:
                                     "component_selector": MappingProxyType(
                                         {
                                             "type": registry_mod.SELECTOR_RESPONSE_REFERENCE,
-                                            "question_code": (
-                                                registry_mod.Q_SUBJECT_COMPONENT
-                                            ),
+                                            "question_code": (registry_mod.Q_SUBJECT_COMPONENT),
                                         }
                                     ),
                                     "required_component_type": "inactive",
@@ -1264,18 +1356,23 @@ class TestFormECalculationOutcome:
             },
         )
         upstream = _question(
-            world["section"], registry_mod.Q_DAILY_EXPOSURE,
+            world["section"],
+            registry_mod.Q_DAILY_EXPOSURE,
             answer_type=AnswerType.CALCULATED_VALUE,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
-            binding="daily_exposure", order=40,
+            binding="daily_exposure",
+            order=40,
         )
         upstream_response = _response(world["execution"], upstream)
         other = _component(world["formulation"], quantity="0.100000", order=7)
         _outcome(upstream_response, component_public_id=other.public_id)
         target = _question(
-            world["section"], "Q_SCOPED", answer_type=AnswerType.CALCULATED_VALUE,
+            world["section"],
+            "Q_SCOPED",
+            answer_type=AnswerType.CALCULATED_VALUE,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
-            binding="scoped_consumer", order=41,
+            binding="scoped_consumer",
+            order=41,
         )
         result = _resolve(world, identifier="scoped_consumer", target=target)
         assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" in _codes(result)
@@ -1285,9 +1382,7 @@ class TestFormECalculationOutcome:
             mde_world["upstream_response"],
             component_public_id=mde_world["component"].public_id,
         )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         resolved = next(
             i for i in result.inputs if i.kwarg_name == "converted_proposed_daily_exposure"
@@ -1390,16 +1485,17 @@ class TestSubjectComponent:
         assert "INPUT_RESPONSE_NOT_APPLICABLE" in _codes(result)
 
     def test_selector_review_required(self, world):
-        world["selector_response"].not_applicable_reason = (
-            f"{REVIEW_REQUIRED_MARKER}component_unconfirmed"
-        )
+        world[
+            "selector_response"
+        ].not_applicable_reason = f"{REVIEW_REQUIRED_MARKER}component_unconfirmed"
         world["selector_response"].save(update_fields=["not_applicable_reason", "updated_at"])
         result = _resolve(world)
         assert "INPUT_REVIEW_REQUIRED" in _codes(result)
 
     def test_selector_payload_must_be_exact(self, world):
         world["selector_response"].raw_value = {
-            "public_id": str(world["component"].public_id), "extra": "x"
+            "public_id": str(world["component"].public_id),
+            "extra": "x",
         }
         world["selector_response"].save(update_fields=["raw_value", "updated_at"])
         result = _resolve(world)
@@ -1452,9 +1548,7 @@ class TestSubjectComponent:
                                     "expected_type": "decimal",
                                     "component_selector": MappingProxyType(
                                         {
-                                            "type": (
-                                                registry_mod.SELECTOR_REGISTRY_COMPONENT_CODE
-                                            ),
+                                            "type": (registry_mod.SELECTOR_REGISTRY_COMPONENT_CODE),
                                             "question_code": "Q_ANY",
                                         }
                                     ),
@@ -1489,14 +1583,15 @@ class TestIsolationAndSanitization:
     def test_another_executions_response_cannot_satisfy(self, world, user_a, monkeypatch):
         _form_a_registry(monkeypatch)
         question = _question(
-            world["section"], "Q_INPUT_A", answer_type=AnswerType.DECIMAL,
-            classification=DataSourceClassification.USER_REQUIRED, order=10,
+            world["section"],
+            "Q_INPUT_A",
+            answer_type=AnswerType.DECIMAL,
+            classification=DataSourceClassification.USER_REQUIRED,
+            order=10,
         )
         sibling_product = _product(world["tenant"], user_a, code="PROD-CI-SIB")
         sibling_formulation = _formulation(sibling_product, user_a)
-        sibling = _execution(
-            world["tenant"], world["version"], sibling_formulation, user_a
-        )
+        sibling = _execution(world["tenant"], world["version"], sibling_formulation, user_a)
         _response(sibling, question, raw={"value": "42"})
         result = _resolve(world, identifier="form_a")
         assert _codes(result) == {"INPUT_RESPONSE_MISSING"}
@@ -1505,7 +1600,8 @@ class TestIsolationAndSanitization:
         _form_a_registry(monkeypatch)
         other_version = _draft_version(world["version"].definition, user_a, number=3)
         other_question = _question(
-            _section(other_version, code="OV"), "Q_INPUT_A",
+            _section(other_version, code="OV"),
+            "Q_INPUT_A",
             answer_type=AnswerType.DECIMAL,
             classification=DataSourceClassification.USER_REQUIRED,
         )
@@ -1649,16 +1745,19 @@ def _install_consumer(monkeypatch, snapshot_kwarg, upstream_kwarg):
     )
 
 
-def _upstream_with_outcome(world, *, component_public_id, name="calculate_daily_exposure",
-                           provenance=None):
+def _upstream_with_outcome(
+    world, *, component_public_id, name="calculate_daily_exposure", provenance=None
+):
     """Persist the upstream daily-exposure question, response and outcome."""
     from iig_checklist.models import CalculationOutcome
 
     upstream = _question(
-        world["section"], registry_mod.Q_DAILY_EXPOSURE,
+        world["section"],
+        registry_mod.Q_DAILY_EXPOSURE,
         answer_type=AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding="daily_exposure", order=20,
+        binding="daily_exposure",
+        order=20,
     )
     response = _response(world["execution"], upstream)
     recorded = provenance
@@ -1667,8 +1766,11 @@ def _upstream_with_outcome(world, *, component_public_id, name="calculate_daily_
         if component_public_id is not None:
             recorded[SUBJECT_COMPONENT_PROVENANCE_KEY] = str(component_public_id)
     CalculationOutcome.objects.create(
-        response=response, calculation_name=name,
-        status=CalculationStatus.COMPLETE, value=Decimal("0.750000"), unit="gram",
+        response=response,
+        calculation_name=name,
+        status=CalculationStatus.COMPLETE,
+        value=Decimal("0.750000"),
+        unit="gram",
         input_provenance=recorded,
     )
     return response
@@ -1676,16 +1778,21 @@ def _upstream_with_outcome(world, *, component_public_id, name="calculate_daily_
 
 def _consumer_target(world, order=21):
     return _question(
-        world["section"], "Q_CONSUMER", answer_type=AnswerType.CALCULATED_VALUE,
+        world["section"],
+        "Q_CONSUMER",
+        answer_type=AnswerType.CALCULATED_VALUE,
         classification=DataSourceClassification.SYSTEM_CALCULATED,
-        binding="consumer", order=order,
+        binding="consumer",
+        order=order,
     )
 
 
 def _resolve_consumer(world, target, snapshot):
     return resolve_calculation_inputs(
-        execution=world["execution"], target_question=target,
-        registry_identifier="consumer", actor=world["user"],
+        execution=world["execution"],
+        target_question=target,
+        registry_identifier="consumer",
+        actor=world["user"],
         locked_context=ResolutionContext(assessment_snapshot=snapshot),
     )
 
@@ -1790,13 +1897,18 @@ class TestOrderingIndependence:
             {**dict(registry_mod.CALCULATION_BINDING_REGISTRY), "conflicting": conflicting},
         )
         target = _question(
-            world["section"], "Q_CONFLICT", answer_type=AnswerType.CALCULATED_VALUE,
+            world["section"],
+            "Q_CONFLICT",
+            answer_type=AnswerType.CALCULATED_VALUE,
             classification=DataSourceClassification.SYSTEM_CALCULATED,
-            binding="conflicting", order=30,
+            binding="conflicting",
+            order=30,
         )
         result = resolve_calculation_inputs(
-            execution=world["execution"], target_question=target,
-            registry_identifier="conflicting", actor=world["user"],
+            execution=world["execution"],
+            target_question=target,
+            registry_identifier="conflicting",
+            actor=world["user"],
         )
         assert not result.resolved
         assert "UPSTREAM_CALCULATION_COMPONENT_MISMATCH" in _codes(result)
@@ -1813,7 +1925,8 @@ class TestOrderingIndependence:
     def test_malformed_component_provenance_is_rejected(self, world, monkeypatch):
         """Malformed provenance is distinct from missing provenance."""
         _upstream_with_outcome(
-            world, component_public_id=None,
+            world,
+            component_public_id=None,
             provenance={SUBJECT_COMPONENT_PROVENANCE_KEY: "not-a-uuid"},
         )
         target = _consumer_target(world)
@@ -1831,10 +1944,9 @@ class TestOrderingIndependence:
         foreign_formulation = _formulation(foreign_product, user_a)
         foreign_component = _component(foreign_formulation)
         _upstream_with_outcome(
-            world, component_public_id=None,
-            provenance={
-                SUBJECT_COMPONENT_PROVENANCE_KEY: str(foreign_component.public_id)
-            },
+            world,
+            component_public_id=None,
+            provenance={SUBJECT_COMPONENT_PROVENANCE_KEY: str(foreign_component.public_id)},
         )
         target = _consumer_target(world)
         _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
@@ -1856,9 +1968,7 @@ class TestOrderingIndependence:
         with CaptureQueriesContext(connection) as captured:
             result = _resolve_consumer(world, target, wrong)
         assert not result.resolved
-        verbs = [
-            q["sql"].strip().split(None, 1)[0].upper() for q in captured.captured_queries
-        ]
+        verbs = [q["sql"].strip().split(None, 1)[0].upper() for q in captured.captured_queries]
         assert not {"INSERT", "UPDATE", "DELETE"} & set(verbs), verbs
 
 
@@ -1884,10 +1994,9 @@ class TestProvenanceContract:
     def test_unprefixed_legacy_key_is_not_accepted(self, world, monkeypatch):
         """No alias: the pre-remediation spelling must not satisfy form E."""
         _upstream_with_outcome(
-            world, component_public_id=None,
-            provenance={
-                "subject_component_public_id": str(world["component"].public_id)
-            },
+            world,
+            component_public_id=None,
+            provenance={"subject_component_public_id": str(world["component"].public_id)},
         )
         target = _consumer_target(world)
         _install_consumer(monkeypatch, "a_snapshot", "z_upstream")
@@ -1898,23 +2007,21 @@ class TestProvenanceContract:
     def test_outcome_calculation_name_must_match_the_binding(self, mde_world):
         """A result produced by another calculation is a different quantity."""
         _outcome(
-            mde_world["upstream_response"], name="calculate_percentage_w_w",
+            mde_world["upstream_response"],
+            name="calculate_percentage_w_w",
             component_public_id=mde_world["component"].public_id,
         )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert "UPSTREAM_CALCULATION_NAME_MISMATCH" in _codes(result)
 
     def test_matching_outcome_calculation_name_is_accepted(self, mde_world):
         _outcome(
-            mde_world["upstream_response"], name="calculate_daily_exposure",
+            mde_world["upstream_response"],
+            name="calculate_daily_exposure",
             component_public_id=mde_world["component"].public_id,
         )
-        snapshot = _snapshot(
-            mde_world["tenant"], mde_world["component"], mde_world["formulation"]
-        )
+        snapshot = _snapshot(mde_world["tenant"], mde_world["component"], mde_world["formulation"])
         result = _resolve_mde(mde_world, ResolutionContext(assessment_snapshot=snapshot))
         assert result.resolved, result.failure_codes
 
