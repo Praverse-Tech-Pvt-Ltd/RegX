@@ -1506,11 +1506,24 @@ export const iigChecklists = {
           { headers: { "X-Tenant-Slug": tenantSlug } }
         ).then((dtos) => dtos.map(toChecklistResponse)),
 
+      /**
+       * Update one governed response.
+       *
+       * ``expected_version`` is mandatory (M4D3-VER-002): the backend rejects a
+       * payload without it with ``expected_version_required``, and optimistic
+       * concurrency is not opt-in. It must be the ``version`` of the response
+       * currently loaded from the server — never defaulted, never synthesised,
+       * and never remembered across a refetch.
+       *
+       * A ``409`` with ``stale_version`` means the row moved underneath us; the
+       * caller must refetch authoritative state rather than retry blindly.
+       */
       update: (
         tenantSlug: string,
         executionPublicId: string,
         responsePublicId: string,
         data: {
+          expected_version: number;
           raw_value?: unknown;
           is_not_applicable?: boolean;
           not_applicable_reason?: string | null;
