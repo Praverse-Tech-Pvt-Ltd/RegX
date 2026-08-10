@@ -11,7 +11,11 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, type ChecklistResponse } from "@/lib/api";
+import {
+  ApiError,
+  type CalculationOutcomeSummary,
+  type ChecklistResponse,
+} from "@/lib/api";
 
 const api = vi.hoisted(() => ({
   responsesList: vi.fn(),
@@ -58,6 +62,20 @@ function response(overrides: Partial<ChecklistResponse> & { publicId: string }):
     overrideReason: "",
     systemDerivedValue: null,
     version: 1,
+    calculation: null,
+    ...overrides,
+  };
+}
+
+function outcome(
+  overrides: Partial<CalculationOutcomeSummary> = {}
+): CalculationOutcomeSummary {
+  return {
+    outcomePublicId: "outcome-public-0001",
+    status: "complete",
+    value: "12.5000000000",
+    unit: "gram",
+    reasonCode: null,
     ...overrides,
   };
 }
@@ -70,13 +88,14 @@ const manual = (version = 1, rawValue: unknown = "50") =>
     version,
   });
 
-const calculated = (version = 1) =>
+const calculated = (version = 1, calculation: CalculationOutcomeSummary | null = null) =>
   response({
     publicId: CALC_ID,
     dataSourceTypeSnapshot: "system_calculated",
     // M4D3-MDL-006: calculated responses keep raw_value null at all times.
     rawValue: null,
     version,
+    calculation,
   });
 
 const fdaDefault = (version = 1) =>
@@ -329,5 +348,158 @@ describe("ChecklistResponses — governed editing and refresh", () => {
     const row = await screen.findByTestId(`response-${MANUAL_ID}`);
     expect(row).toHaveAttribute("data-editable", "false");
     expect(within(row).queryByRole("button")).toBeNull();
+  });
+});
+
+describe("ChecklistResponses — governed calculated-result display", () => {
+  it("shows the current value for a complete outcome", async () => {
+    api.responsesList.mockResolvedValue([calculated(2, outcome())]);
+    renderResponses();
+
+    const value = await screen.findByTestId("calculation-value");
+    expect(value).toHaveAttribute("data-status", "complete");
+    expect(value).toHaveTextContent("12.5000000000");
+  });
+
+  it("shows the unit alongside a complete value", async () => {
+    api.responsesList.mockResolvedValue([calculated(2, outcome({ unit: "gram" }))]);
+    renderResponses();
+
+    expect(await screen.findByTestId("calculation-unit")).toHaveTextContent("gram");
+  });
+
+  it("omits the unit when the outcome has none", async () => {
+    api.responsesList.mockResolvedValue([calculated(2, outcome({ unit: null }))]);
+    renderResponses();
+
+    await screen.findByTestId("calculation-value");
+    expect(screen.queryByTestId("calculation-unit")).toBeNull();
+  });
+
+  it("renders DATA_REQUIRED as its own state with no value", async () => {
+    api.responsesList.mockResolvedValue([
+      calculated(
+        2,
+        outcome({ status: "data_required", value: null, unit: null, reasonCode: "DATA_REQUIRED" })
+      ),
+    ]);
+    renderResponses();
+
+    const state = await screen.findByTestId("calculation-state");
+    expect(state).toHaveAttribute("data-status", "data_required");
+    expect(state).toHaveTextContent("Data required");
+    expect(screen.queryByTestId("calculation-value")).toBeNull();
+  });
+
+  it("renders NOT_COMPARABLE from the reason code, not a status", async () => {
+    api.responsesList.mockResolvedValue([
+      calculated(
+        2,
+        outcome({ status: "error", value: null, unit: null, reasonCode: "NOT_COMPARABLE" })
+      ),
+    ]);
+    renderResponses();
+
+    const state = await screen.findByTestId("calculation-state");
+    expect(state).toHaveAttribute("data-status", "error");
+    expect(state).toHaveAttribute("data-reason-code", "NOT_COMPARABLE");
+    expect(state).toHaveTextContent("Not comparable");
+  });
+
+  it("renders a generic error safely without engine detail", async () => {
+    api.responsesList.mockResolvedValue([
+      calculated(
+        2,
+        outcome({
+          status: "error",
+          value: null,
+          unit: null,
+          reasonCode: "INPUT_RESOLUTION_FAILED",
+        })
+      ),
+    ]);
+    renderResponses();
+
+    const state = await screen.findByTestId("calculation-state");
+    expect(state).toHaveTextContent("Calculation unavailable");
+    // A governed code may drive the label, but is not rendered as prose.
+    expect(state).not.toHaveTextContent("INPUT_RESOLUTION_FAILED");
+  });
+
+  it("never treats systemDerivedValue as the calculated result", async () => {
+    api.responsesList.mockResolvedValue([
+      response({
+        publicId: CALC_ID,
+        dataSourceTypeSnapshot: "system_calculated",
+        rawValue: null,
+        // Neither of these is a result carrier; only `calculation` is.
+        systemDerivedValue: "999-must-not-render",
+        calculation: outcome({ value: "7.0000000000" }),
+      }),
+    ]);
+    renderResponses();
+
+    expect(await screen.findByTestId("calculation-value")).toHaveTextContent("7.0000000000");
+    expect(screen.queryByText(/999-must-not-render/)).toBeNull();
+  });
+
+  it("replaces a complete value with DATA_REQUIRED after the cascade refetch", async () => {
+    const user = userEvent.setup();
+    api.responsesList
+      .mockResolvedValueOnce([manual(4, "50"), calculated(2, outcome({ value: "42.0000000000" }))])
+      // The user cleared the upstream answer; the cascade moved the dependent
+      // outcome to data_required and dropped its value.
+      .mockResolvedValueOnce([
+        manual(5, ""),
+        calculated(
+          3,
+          outcome({ status: "data_required", value: null, unit: null, reasonCode: "DATA_REQUIRED" })
+        ),
+      ]);
+    api.responsesUpdate.mockResolvedValue(manual(5, ""));
+
+    renderResponses();
+    expect(await screen.findByTestId("calculation-value")).toHaveTextContent("42.0000000000");
+
+    const row = screen.getByTestId(`response-${MANUAL_ID}`);
+    await user.clear(within(row).getByRole("textbox"));
+    await user.click(within(row).getByRole("button", { name: /save/i }));
+
+    const state = await screen.findByTestId("calculation-state");
+    expect(state).toHaveAttribute("data-status", "data_required");
+    // The superseded result is gone from the screen entirely.
+    expect(screen.queryByTestId("calculation-value")).toBeNull();
+    expect(screen.queryByText(/42\.0000000000/)).toBeNull();
+  });
+
+  it("shows the new value after a second upstream change", async () => {
+    const user = userEvent.setup();
+    api.responsesList
+      .mockResolvedValueOnce([manual(4), calculated(2, outcome({ value: "1.0000000000" }))])
+      .mockResolvedValueOnce([manual(5), calculated(3, outcome({ value: "2.0000000000" }))])
+      .mockResolvedValueOnce([manual(6), calculated(4, outcome({ value: "3.0000000000" }))]);
+    api.responsesUpdate.mockResolvedValue(manual(5));
+
+    renderResponses();
+    expect(await screen.findByTestId("calculation-value")).toHaveTextContent("1.0000000000");
+
+    await user.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("calculation-value")).toHaveTextContent("2.0000000000")
+    );
+
+    await user.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("calculation-value")).toHaveTextContent("3.0000000000")
+    );
+    expect(screen.queryByText(/1\.0000000000/)).toBeNull();
+  });
+
+  it("renders a calculated response with no outcome without inventing one", async () => {
+    api.responsesList.mockResolvedValue([calculated(2, null)]);
+    renderResponses();
+
+    expect(await screen.findByTestId("calculation-unavailable")).toBeInTheDocument();
+    expect(screen.queryByTestId("calculation-value")).toBeNull();
   });
 });
