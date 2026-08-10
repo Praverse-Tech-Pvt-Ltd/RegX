@@ -1298,6 +1298,9 @@ export type {
   ChecklistResponse,
   ChecklistExecutionDTO,
   ChecklistResponseDTO,
+  CalculationOutcomeSummary,
+  CalculationOutcomeSummaryDTO,
+  CalculationStatus,
 } from "./api/execution-mappers";
 
 export const iigChecklists = {
@@ -1500,11 +1503,19 @@ export const iigChecklists = {
       ).then(toChecklistExecution),
 
     responses: {
+      /**
+       * The response collection for one execution.
+       *
+       * The endpoint is paginated (PageNumberPagination), so the payload is
+       * `{count, next, previous, results}` — not a bare array. This helper had
+       * no caller until the 4D-3 editing UI, so the earlier array typing was
+       * never exercised; calling `.map` on the envelope threw at runtime.
+       */
       list: (tenantSlug: string, executionPublicId: string) =>
-        apiRequest<ChecklistResponseDTO[]>(
+        apiRequest<PaginatedResponse<ChecklistResponseDTO>>(
           `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/`,
           { headers: { "X-Tenant-Slug": tenantSlug } }
-        ).then((dtos) => dtos.map(toChecklistResponse)),
+        ).then((page) => page.results.map(toChecklistResponse)),
 
       /**
        * Update one governed response.

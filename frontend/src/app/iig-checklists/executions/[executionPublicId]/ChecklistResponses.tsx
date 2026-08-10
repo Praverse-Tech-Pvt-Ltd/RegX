@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ApiError,
   iigChecklists,
+  type CalculationOutcomeSummary,
   type ChecklistQuestion,
   type ChecklistResponse,
 } from "@/lib/api";
@@ -96,6 +97,63 @@ export function toPayloadValue(answerType: string | undefined, text: string): un
     default:
       return text;
   }
+}
+
+/** The reason code the backend uses for a not-comparable engine result. */
+const REASON_NOT_COMPARABLE = "NOT_COMPARABLE";
+
+/**
+ * Read-only rendering of a governed calculation outcome.
+ *
+ * The outcome is the single source of truth. `rawValue` is always null on a
+ * calculated response and `systemDerivedValue` belongs to a different governed
+ * concern, so neither is consulted here.
+ *
+ * A value is shown only for `complete`. Every other state renders its own label
+ * and no number — the backend already stores null there, and this component
+ * never keeps a previous result around, so a superseded value cannot be
+ * presented as current.
+ */
+export function CalculationResult({ calculation }: { calculation: CalculationOutcomeSummary | null }) {
+  if (calculation === null) {
+    return (
+      <p data-testid="calculation-unavailable" style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+        No calculated result available.
+      </p>
+    );
+  }
+
+  const { status, value, unit, reasonCode } = calculation;
+
+  if (status === "complete") {
+    return (
+      <p data-testid="calculation-value" data-status="complete" style={{ margin: "0.25rem 0" }}>
+        <strong>{value ?? "—"}</strong>
+        {unit && <span data-testid="calculation-unit"> {unit}</span>}
+      </p>
+    );
+  }
+
+  // Distinguished by reason code, because NOT_COMPARABLE is not a status.
+  const label =
+    status === "data_required"
+      ? "Data required"
+      : status === "calculating"
+        ? "Calculating"
+        : reasonCode === REASON_NOT_COMPARABLE
+          ? "Not comparable"
+          : "Calculation unavailable";
+
+  return (
+    <p
+      data-testid="calculation-state"
+      data-status={status}
+      data-reason-code={reasonCode ?? ""}
+      style={{ margin: "0.25rem 0", color: "#4b5563" }}
+    >
+      {label}
+    </p>
+  );
 }
 
 interface Draft {
@@ -271,10 +329,7 @@ export function ChecklistResponses({
               {isServerControlled(classification) ? (
                 <div data-testid={`readonly-${response.publicId}`}>
                   {classification === "system_calculated" ? (
-                    <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
-                      Calculated by the system. This value is server-owned and
-                      refreshes automatically when its inputs change.
-                    </p>
+                    <CalculationResult calculation={response.calculation} />
                   ) : (
                     <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
                       FDA-derived default. Server-owned and not editable here.

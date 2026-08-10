@@ -37,6 +37,32 @@ export interface ChecklistExecutionDTO {
   updated_at: string;
 }
 
+/**
+ * The governed CalculationStatus vocabulary, exactly as stored.
+ *
+ * NOT_COMPARABLE is deliberately absent: it is a `reason_code`, not a status.
+ * A not-comparable engine result persists as `status: "error"` with
+ * `reason_code: "NOT_COMPARABLE"`, so callers distinguish it by reason code.
+ * `calculating` is reserved for a future async engine and is never written by
+ * 4D-3, but it is part of the stored vocabulary so it is represented here.
+ */
+export type CalculationStatus = "data_required" | "calculating" | "complete" | "error";
+
+const CALCULATION_STATUSES: readonly CalculationStatus[] = [
+  "data_required",
+  "calculating",
+  "complete",
+  "error",
+];
+
+export interface CalculationOutcomeSummaryDTO {
+  outcome_public_id: string;
+  status: string;
+  value: string | null;
+  unit: string | null;
+  reason_code: string | null;
+}
+
 export interface ChecklistResponseDTO {
   public_id: string;
   question_public_id: string;
@@ -51,6 +77,8 @@ export interface ChecklistResponseDTO {
   override_reason: string;
   system_derived_value: unknown | null;
   version: number;
+  /** Read-only projection of the governed CalculationOutcome; null when none. */
+  calculation?: CalculationOutcomeSummaryDTO | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +113,21 @@ export interface ChecklistExecution {
   updatedAt: string;
 }
 
+export interface CalculationOutcomeSummary {
+  outcomePublicId: string;
+  status: CalculationStatus;
+  /**
+   * The current value, as the exact decimal string the backend persisted.
+   * Kept as a string so no digit is lost to JS float conversion. Null for every
+   * non-complete status — the backend only ever stores a value on `complete`,
+   * so a previous result can never appear as the current one.
+   */
+  value: string | null;
+  unit: string | null;
+  /** Closed governed vocabulary (e.g. DATA_REQUIRED, NOT_COMPARABLE). */
+  reasonCode: string | null;
+}
+
 export interface ChecklistResponse {
   publicId: string;
   questionPublicId: string;
@@ -99,6 +142,12 @@ export interface ChecklistResponse {
   overrideReason: string;
   systemDerivedValue: unknown | null;
   version: number;
+  /**
+   * The authoritative calculated result. Null when the response has no outcome
+   * (every manual answer). This — never `rawValue` or `systemDerivedValue` — is
+   * where a calculated result comes from.
+   */
+  calculation: CalculationOutcomeSummary | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +182,26 @@ export function toChecklistExecution(dto: ChecklistExecutionDTO): ChecklistExecu
   };
 }
 
+function isCalculationStatus(value: string): value is CalculationStatus {
+  return (CALCULATION_STATUSES as readonly string[]).includes(value);
+}
+
+export function toCalculationOutcomeSummary(
+  dto: CalculationOutcomeSummaryDTO
+): CalculationOutcomeSummary | null {
+  // An unrecognised status means the backend vocabulary moved ahead of this
+  // client. Treating it as "no result" is the safe reading: better to show
+  // nothing than to render a regulated value under a status we cannot explain.
+  if (!isCalculationStatus(dto.status)) return null;
+  return {
+    outcomePublicId: dto.outcome_public_id,
+    status: dto.status,
+    value: dto.value,
+    unit: dto.unit,
+    reasonCode: dto.reason_code,
+  };
+}
+
 export function toChecklistResponse(dto: ChecklistResponseDTO): ChecklistResponse {
   return {
     publicId: dto.public_id,
@@ -148,5 +217,6 @@ export function toChecklistResponse(dto: ChecklistResponseDTO): ChecklistRespons
     overrideReason: dto.override_reason,
     systemDerivedValue: dto.system_derived_value,
     version: dto.version,
+    calculation: dto.calculation ? toCalculationOutcomeSummary(dto.calculation) : null,
   };
 }
