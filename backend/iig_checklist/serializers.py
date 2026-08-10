@@ -269,10 +269,69 @@ class ChecklistExecutionCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class CalculationOutcomeSummarySerializer(serializers.Serializer):
+    """Read-only client projection of a governed ``CalculationOutcome``.
+
+    A SYSTEM_CALCULATED response keeps ``raw_value`` null at all times
+    (M4D3-MDL-006) and the writer is forbidden from touching
+    ``system_derived_value`` (M4D3-SVC-006), so the outcome row is the only
+    place a calculated result exists. Without this projection a client cannot
+    render one at all.
+
+    Deliberately an explicit field list rather than a ``ModelSerializer``: the
+    outcome row also carries ``inputs``, ``input_provenance``, ``rounding_rule``,
+    ``formula_version`` and ``source_assessment_snapshot_public_id``, which are
+    regulated provenance and reproducibility evidence, not display data. Naming
+    each exposed field means a future column is never published by accident.
+
+    ``NOT_COMPARABLE`` is deliberately **not** a status: the governed
+    ``CalculationStatus`` vocabulary is only
+    ``data_required``/``calculating``/``complete``/``error``, and a
+    not-comparable engine result persists as ``status=error`` with
+    ``reason_code="NOT_COMPARABLE"`` (see ENGINE_STATUS_MAPPING). Clients must
+    therefore read ``reason_code`` to distinguish it, and this serializer
+    reports the stored vocabulary exactly rather than inventing a display state.
+    """
+
+    outcome_public_id = serializers.UUIDField(source="public_id", read_only=True)
+    status = serializers.CharField(read_only=True)
+    value = serializers.SerializerMethodField()
+    unit = serializers.SerializerMethodField()
+    reason_code = serializers.SerializerMethodField()
+
+    def get_value(self, obj):
+        """The current value, or null.
+
+        Only a ``complete`` outcome may carry a value — the translation layer
+        enforces that at import time — so a non-success outcome renders null
+        here because the stored row *is* null, not because this serializer
+        blanks it. A previous complete value can never leak into a later
+        data_required or error state.
+
+        Rendered with the same plain-notation formatter the writer uses at the
+        persistence boundary, so the API and the stored record never disagree on
+        how a regulated number reads.
+        """
+        from .calculation_translation import format_decimal_plain
+
+        return None if obj.value is None else format_decimal_plain(obj.value)
+
+    def get_unit(self, obj):
+        # ``unit`` is blank=True, never null; a placeholder holds "". Normalise
+        # the empty case to null so a client is not handed a meaningless "".
+        return obj.unit or None
+
+    def get_reason_code(self, obj):
+        # Closed governed vocabulary (ALLOWED_REASON_CODES), validated at import
+        # time — a canonical code, never free text and never exception detail.
+        return obj.reason_code or None
+
+
 class ChecklistResponseSerializer(serializers.ModelSerializer):
     question_public_id = serializers.UUIDField(source="question.public_id", read_only=True)
     entered_by_email = serializers.SerializerMethodField()
     confirmed_by_email = serializers.SerializerMethodField()
+    calculation = serializers.SerializerMethodField()
 
     class Meta:
         model = ChecklistResponse
@@ -290,6 +349,7 @@ class ChecklistResponseSerializer(serializers.ModelSerializer):
             "override_reason",
             "system_derived_value",
             "version",
+            "calculation",
         ]
         read_only_fields = fields
 
@@ -298,6 +358,26 @@ class ChecklistResponseSerializer(serializers.ModelSerializer):
 
     def get_confirmed_by_email(self, obj):
         return getattr(obj.confirmed_by, "email", None)
+
+    def get_calculation(self, obj):
+        """The current outcome for this response, or ``None``.
+
+        ``None`` for every response that has no outcome row at all — a manual
+        answer never has one, so the key is present and null rather than
+        pretending a calculation exists.
+
+        Uses ``.all()`` so a prefetched queryset is reused rather than re-queried
+        per row (see ChecklistResponseListView). Exactly one outcome per
+        response is a governed invariant, enforced by the writer, which raises
+        PlaceholderMissing/PlaceholderAmbiguous otherwise; ordering by
+        ``public_id`` matches how the writer and the input resolver select it, so
+        the API can never disagree with them about which row is current.
+        """
+        outcomes = list(obj.calculation_outcomes.all())
+        if not outcomes:
+            return None
+        current = min(outcomes, key=lambda row: str(row.public_id))
+        return CalculationOutcomeSummarySerializer(current).data
 
 
 class ChecklistResponseUpdateSerializer(serializers.Serializer):

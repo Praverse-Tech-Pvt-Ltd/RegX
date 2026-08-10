@@ -1182,6 +1182,12 @@ class ChecklistResponseListView(APIView):
                 execution=execution,
             )
             .select_related("question", "entered_by", "confirmed_by")
+            # One extra query for every outcome on the page instead of one per
+            # response: the serializer reads `calculation_outcomes.all()`, which
+            # reuses this prefetch rather than re-querying per row. The current
+            # row is chosen in Python by public_id, matching the writer, so no
+            # per-row ordered queryset is needed here.
+            .prefetch_related("calculation_outcomes")
             .order_by("created_at")
         )
         paginator = _Pagination()
