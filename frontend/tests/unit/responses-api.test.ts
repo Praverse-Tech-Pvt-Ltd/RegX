@@ -15,6 +15,8 @@ import type { ChecklistResponseDTO } from "@/lib/api";
 const TENANT = "alpha";
 const EXECUTION = "exec-public-0001";
 const RESPONSE = "resp-public-0001";
+/** Matches the client's default API base, so `next` links look like DRF's. */
+const API_ROOT = "http://localhost:8000";
 
 function responseDTO(overrides: Partial<ChecklistResponseDTO> = {}): ChecklistResponseDTO {
   return {
@@ -226,6 +228,116 @@ describe("responses.list - paginated envelope and calculation projection", () =>
     expect(row?.calculation?.status).toBe("error");
     expect(row?.calculation?.reasonCode).toBe("NOT_COMPARABLE");
     expect(row?.calculation?.value).toBeNull();
+  });
+
+  it("returns a single page unchanged and issues no second request", async () => {
+    const fetchMock = stubFetch(() => json(paginate([responseDTO()])));
+
+    const rows = await iigChecklists.executions.responses.list(TENANT, EXECUTION);
+
+    expect(rows).toHaveLength(1);
+    const listCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes("/responses/")
+    );
+    // next was null, so the walk stopped immediately.
+    expect(listCalls).toHaveLength(1);
+  });
+
+  it("follows next and returns both pages", async () => {
+    const page2 = `${API_ROOT}/api/regx/v1/iig-checklists/executions/${EXECUTION}/responses/?page=2`;
+    const fetchMock = stubFetch((url) => {
+      if (url.includes("page=2")) {
+        return json({
+          count: 4,
+          next: null,
+          previous: null,
+          results: [responseDTO({ public_id: "r3" }), responseDTO({ public_id: "r4" })],
+        });
+      }
+      return json({
+        count: 4,
+        next: page2,
+        previous: null,
+        results: [responseDTO({ public_id: "r1" }), responseDTO({ public_id: "r2" })],
+      });
+    });
+
+    const rows = await iigChecklists.executions.responses.list(TENANT, EXECUTION);
+
+    expect(rows.map((r) => r.publicId)).toEqual(["r1", "r2", "r3", "r4"]);
+    const listCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes("/responses/")
+    );
+    expect(listCalls).toHaveLength(2);
+    // The cursor was carried over, and the tenant header with it.
+    expect(String(listCalls[1]?.[0])).toContain("page=2");
+    const headers = (listCalls[1]?.[1] as RequestInit | undefined)?.headers as Record<
+      string,
+      string
+    >;
+    expect(headers["X-Tenant-Slug"]).toBe(TENANT);
+  });
+
+  it("preserves server order across pages", async () => {
+    const page2 = `${API_ROOT}/api/regx/v1/iig-checklists/executions/${EXECUTION}/responses/?page=2`;
+    stubFetch((url) =>
+      url.includes("page=2")
+        ? json({
+            count: 4,
+            next: null,
+            previous: null,
+            results: [responseDTO({ public_id: "c" }), responseDTO({ public_id: "d" })],
+          })
+        : json({
+            count: 4,
+            next: page2,
+            previous: null,
+            results: [responseDTO({ public_id: "a" }), responseDTO({ public_id: "b" })],
+          })
+    );
+
+    const rows = await iigChecklists.executions.responses.list(TENANT, EXECUTION);
+    // Ordering is the server's (created_at); pages are appended, never sorted.
+    expect(rows.map((r) => r.publicId)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("handles an empty collection", async () => {
+    stubFetch(() => json(paginate([])));
+
+    const rows = await iigChecklists.executions.responses.list(TENANT, EXECUTION);
+    expect(rows).toEqual([]);
+  });
+
+  it("does not duplicate rows or loop when the server keeps returning the same link", async () => {
+    const same = `${API_ROOT}/api/regx/v1/iig-checklists/executions/${EXECUTION}/responses/`;
+    const fetchMock = stubFetch(() =>
+      // A misbehaving paginator whose `next` points back at the current page.
+      json({ count: 1, next: same, previous: null, results: [responseDTO({ public_id: "r1" })] })
+    );
+
+    const rows = await iigChecklists.executions.responses.list(TENANT, EXECUTION);
+
+    expect(rows.map((r) => r.publicId)).toEqual(["r1"]);
+    const listCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).includes("/responses/")
+    );
+    expect(listCalls).toHaveLength(1);
+  });
+
+  it("walks past 25 rows, the page size that would otherwise truncate", async () => {
+    const page2 = `${API_ROOT}/api/regx/v1/iig-checklists/executions/${EXECUTION}/responses/?page=2`;
+    const first = Array.from({ length: 25 }, (_, i) =>
+      responseDTO({ public_id: `r${i + 1}` })
+    );
+    stubFetch((url) =>
+      url.includes("page=2")
+        ? json({ count: 26, next: null, previous: null, results: [responseDTO({ public_id: "r26" })] })
+        : json({ count: 26, next: page2, previous: null, results: first })
+    );
+
+    const rows = await iigChecklists.executions.responses.list(TENANT, EXECUTION);
+    expect(rows).toHaveLength(26);
+    expect(rows[25]?.publicId).toBe("r26");
   });
 
   it("treats an unrecognised status as no result rather than rendering it", async () => {

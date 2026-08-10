@@ -60,6 +60,24 @@ export async function apiRequest<T>(
   return resp.json() as Promise<T>;
 }
 
+/**
+ * Reduce a paginator `next`/`previous` link to a path `apiRequest` can take.
+ *
+ * DRF builds those links as absolute URLs from the incoming request, so they
+ * cannot be passed to `apiRequest` (which prefixes API_BASE) as-is. Keeping the
+ * query string matters: it carries the page cursor. A value that is already a
+ * path, or one that will not parse, is returned unchanged rather than throwing —
+ * a malformed link should not take down a page load.
+ */
+export function toApiPath(link: string): string {
+  try {
+    const url = new URL(link, API_BASE);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return link;
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -1504,18 +1522,45 @@ export const iigChecklists = {
 
     responses: {
       /**
-       * The response collection for one execution.
+       * The complete response collection for one execution.
        *
-       * The endpoint is paginated (PageNumberPagination), so the payload is
-       * `{count, next, previous, results}` — not a bare array. This helper had
-       * no caller until the 4D-3 editing UI, so the earlier array typing was
-       * never exercised; calling `.map` on the envelope threw at runtime.
+       * The endpoint is paginated (PageNumberPagination, page_size 25), so the
+       * payload is `{count, next, previous, results}` — not a bare array. This
+       * helper had no caller until the 4D-3 editing UI, so the earlier array
+       * typing was never exercised; calling `.map` on the envelope threw.
+       *
+       * Every page is followed, because nothing bounds an execution to one
+       * page: `create_execution()` creates one response per question and no
+       * enforced maximum question count exists. Returning only the first page
+       * would silently hide responses — and, worse for 4D-3, could omit a
+       * recalculated dependent, so the cascade would look like it had not run.
+       *
+       * Termination is driven by `next === null` rather than a page ceiling, so
+       * there is no arbitrary limit. `next` is an absolute URL, so it is reduced
+       * to a path for `apiRequest`, which preserves the tenant header on each
+       * request. A repeated path aborts the walk rather than looping forever.
        */
-      list: (tenantSlug: string, executionPublicId: string) =>
-        apiRequest<PaginatedResponse<ChecklistResponseDTO>>(
-          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/`,
-          { headers: { "X-Tenant-Slug": tenantSlug } }
-        ).then((page) => page.results.map(toChecklistResponse)),
+      list: async (tenantSlug: string, executionPublicId: string) => {
+        const headers = { "X-Tenant-Slug": tenantSlug };
+        let path: string | null =
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/`;
+        const seen = new Set<string>();
+        const dtos: ChecklistResponseDTO[] = [];
+
+        while (path !== null) {
+          if (seen.has(path)) break; // defensive: a server that never advances
+          seen.add(path);
+          const page: PaginatedResponse<ChecklistResponseDTO> = await apiRequest<
+            PaginatedResponse<ChecklistResponseDTO>
+          >(path, { headers });
+          // Server order is authoritative (created_at) and is preserved by
+          // appending each page in the order received.
+          dtos.push(...page.results);
+          path = page.next === null ? null : toApiPath(page.next);
+        }
+
+        return dtos.map(toChecklistResponse);
+      },
 
       /**
        * Update one governed response.
