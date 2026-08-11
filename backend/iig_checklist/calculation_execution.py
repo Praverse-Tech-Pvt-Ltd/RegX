@@ -81,6 +81,7 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
+from common.immutable import immutable_value_object
 from formulations.dosing import governed_maximum_daily_units_value
 
 from .calculation_inputs import (
@@ -156,6 +157,7 @@ class CalculationEngineFailure(CalculationExecutionError):
     """
 
 
+@immutable_value_object
 @dataclass(frozen=True, slots=True)
 class CalculationExecutionResult:
     """Immutable summary of one governed execution."""

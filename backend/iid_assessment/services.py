@@ -58,6 +58,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from types import MappingProxyType
 
+from common.immutable import immutable_value_object
+
 # ---------------------------------------------------------------------------
 # Governed rejections
 #
@@ -100,6 +102,7 @@ class ReleaseNotEligible(AssessmentSnapshotError):
 ELIGIBLE_RELEASE_STATUSES: frozenset[str] = frozenset({"active", "approved"})
 
 
+@immutable_value_object
 @dataclass(frozen=True, slots=True)
 class AssessmentSnapshotCreationResult:
     """Immutable summary of one governed snapshot creation.
