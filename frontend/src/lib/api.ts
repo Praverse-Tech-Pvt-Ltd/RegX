@@ -1307,6 +1307,14 @@ export interface ChecklistQuestion {
   data_source_classification: string;
   criticality: string;
   required: boolean;
+  /**
+   * Set when an applicability rule governs this question (M4D3-APP-008).
+   * Its `is_not_applicable` / `not_applicable_reason` are then server-owned and
+   * the governed update service rejects a client-supplied value for either
+   * (M4D3-APP-009, 403 `applicability_server_controlled`). Already served by the
+   * existing question representation — declared here, not newly exposed.
+   */
+  applicability_rule_public_id?: string | null;
 }
 
 // 4D-2 Execution types — re-exported from the centralised mapper module.

@@ -103,6 +103,21 @@ export function toPayloadValue(answerType: string | undefined, text: string): un
 const REASON_NOT_COMPARABLE = "NOT_COMPARABLE";
 
 /**
+ * Is this question's applicability governed by a rule (M4D3-APP-008)?
+ *
+ * When it is, `is_not_applicable` and `not_applicable_reason` are server-owned:
+ * the governed update service rejects a client-supplied value for either with
+ * 403 `applicability_server_controlled` (M4D3-APP-009). The UI therefore offers
+ * no applicability control and omits both fields from the payload — sending
+ * them would fail every save, even one that only meant to change the answer.
+ *
+ * The answer itself stays editable: APP-009 owns applicability, not the answer.
+ */
+export function isApplicabilityRuleGoverned(question: ChecklistQuestion | undefined): boolean {
+  return Boolean(question?.applicability_rule_public_id);
+}
+
+/**
  * Read-only rendering of a governed calculation outcome.
  *
  * The outcome is the single source of truth. `rawValue` is always null on a
@@ -242,20 +257,24 @@ export function ChecklistResponses({
     setSaveError(null);
     setNotice(null);
     try {
+      const question = questions[response.questionPublicId];
+      const payload: Parameters<typeof iigChecklists.executions.responses.update>[3] = {
+        // Straight from the loaded response — never defaulted or synthesised.
+        expected_version: response.version,
+        raw_value: toPayloadValue(question?.answer_type, draft.text),
+      };
+      // M4D3-APP-009: omit the server-owned fields entirely for a rule-governed
+      // response. Their mere presence is refused, so including them would break
+      // an otherwise valid answer edit.
+      if (!isApplicabilityRuleGoverned(question)) {
+        payload.is_not_applicable = draft.isNotApplicable;
+        payload.not_applicable_reason = draft.notApplicableReason || null;
+      }
       await iigChecklists.executions.responses.update(
         tenantSlug,
         executionPublicId,
         response.publicId,
-        {
-          // Straight from the loaded response — never defaulted or synthesised.
-          expected_version: response.version,
-          raw_value: toPayloadValue(
-            questions[response.questionPublicId]?.answer_type,
-            draft.text
-          ),
-          is_not_applicable: draft.isNotApplicable,
-          not_applicable_reason: draft.notApplicableReason || null,
-        }
+        payload
       );
       // Option B: the PATCH body describes only the edited response, so the
       // dependent calculations the backend just cascaded are read back here.
@@ -350,34 +369,47 @@ export function ChecklistResponses({
                     />
                   </label>
                   <br />
-                  <label>
-                    <input
-                      type="checkbox"
-                      aria-label={`Not applicable for ${question?.code ?? response.publicId}`}
-                      checked={draft.isNotApplicable}
-                      disabled={busy}
-                      onChange={(e) =>
-                        setDraft(response.publicId, { isNotApplicable: e.target.checked })
-                      }
-                    />{" "}
-                    Not applicable
-                  </label>
-                  {draft.isNotApplicable && (
+                  {isApplicabilityRuleGoverned(question) ? (
+                    <span
+                      data-testid={`applicability-governed-${response.publicId}`}
+                      style={{ color: "#4b5563" }}
+                    >
+                      Applicability is determined by a rule and is not editable here.
+                    </span>
+                  ) : (
                     <>
-                      <br />
                       <label>
-                        Reason
-                        <br />
                         <input
-                          type="text"
-                          aria-label={`Not applicable reason for ${question?.code ?? response.publicId}`}
-                          value={draft.notApplicableReason}
+                          type="checkbox"
+                          aria-label={`Not applicable for ${question?.code ?? response.publicId}`}
+                          checked={draft.isNotApplicable}
                           disabled={busy}
                           onChange={(e) =>
-                            setDraft(response.publicId, { notApplicableReason: e.target.value })
+                            setDraft(response.publicId, { isNotApplicable: e.target.checked })
                           }
-                        />
+                        />{" "}
+                        Not applicable
                       </label>
+                      {draft.isNotApplicable && (
+                        <>
+                          <br />
+                          <label>
+                            Reason
+                            <br />
+                            <input
+                              type="text"
+                              aria-label={`Not applicable reason for ${question?.code ?? response.publicId}`}
+                              value={draft.notApplicableReason}
+                              disabled={busy}
+                              onChange={(e) =>
+                                setDraft(response.publicId, {
+                                  notApplicableReason: e.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                        </>
+                      )}
                     </>
                   )}
                   <br />
