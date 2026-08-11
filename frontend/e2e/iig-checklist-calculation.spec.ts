@@ -101,7 +101,8 @@ function responseFixture(overrides: Record<string, unknown> = {}) {
     public_id: MANUAL_ID,
     question_public_id: `q-${MANUAL_ID}`,
     data_source_type_snapshot: "user_required",
-    raw_value: "50",
+    // raw_value is always enveloped: {"value": …} per response_validation.py.
+    raw_value: { value: "50" },
     is_not_applicable: false,
     not_applicable_reason: null,
     entered_by_email: "doer@example.com",
@@ -181,7 +182,10 @@ async function mockExecutionPage(
     (route) =>
       jsonRoute(
         paginate([
-          responseFixture({ raw_value: state.manualValue, version: state.manualVersion }),
+          responseFixture({
+            raw_value: state.manualValue === "" ? null : { value: state.manualValue },
+            version: state.manualVersion,
+          }),
           calculatedFixture(state.manualVersion + 1, state.calc),
         ])
       )(route)
@@ -194,11 +198,17 @@ async function mockExecutionPage(
       patchBodies.push(body);
       // The governed write succeeded and the backend cascaded; the next
       // collection read reflects both.
-      state.manualValue = String(body["raw_value"] ?? "");
+      // The client sends the enveloped shape, so unwrap it the way the real
+      // serializer would before storing.
+      const envelope = body["raw_value"] as { value?: unknown } | null | undefined;
+      state.manualValue = envelope == null ? "" : String(envelope.value ?? "");
       state.manualVersion += 1;
       state.calc = state.manualValue === "" ? DATA_REQUIRED : COMPLETE_AFTER;
       await jsonRoute(
-        responseFixture({ raw_value: state.manualValue, version: state.manualVersion })
+        responseFixture({
+          raw_value: state.manualValue === "" ? null : { value: state.manualValue },
+          version: state.manualVersion,
+        })
       )(route);
     }
   );
@@ -244,7 +254,10 @@ test.describe("Milestone 4D-3 calculated results", () => {
 
     // 6. the governed write carried the version that was loaded, not a default.
     expect(patchBodies).toHaveLength(1);
-    expect(patchBodies[0]).toMatchObject({ expected_version: 4, raw_value: "75" });
+    expect(patchBodies[0]).toMatchObject({
+      expected_version: 4,
+      raw_value: { value: "75" },
+    });
 
     // 11-12. a reload still serves the recalculated value.
     await page.reload();

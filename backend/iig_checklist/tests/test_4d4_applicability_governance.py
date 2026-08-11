@@ -459,7 +459,9 @@ class TestUnchangedContracts:
         resp = _patch(api_client_doer, world, world["governed"], {"is_not_applicable": True})
         assert resp.status_code == 400
 
-    def test_ownership_is_checked_before_the_payload_is_deserialized(self, world, api_client_doer):
+    def test_payload_is_deserialized_before_applicability_ownership_check(
+        self, world, api_client_doer
+    ):
         """An unknown field must not mask the ownership objection, or vice versa.
 
         Pins the order deliberately: the payload is deserialized first, so a

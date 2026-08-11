@@ -230,7 +230,8 @@ describe("ChecklistResponses — governed editing and refresh", () => {
 
     await waitFor(() => expect(api.responsesUpdate).toHaveBeenCalledTimes(1));
     const payload = api.responsesUpdate.mock.calls[0]?.[3];
-    expect(payload).toMatchObject({ expected_version: 4, raw_value: "75" });
+    // raw_value is enveloped per the backend contract, not a bare scalar.
+    expect(payload).toMatchObject({ expected_version: 4, raw_value: { value: "75" } });
 
     // Option B: the authoritative collection is re-read after the write.
     await waitFor(() => expect(api.responsesList).toHaveBeenCalledTimes(2));
