@@ -858,6 +858,28 @@ class ResponseUpdateReservedReasonPrefix(ResponseUpdateError):
     """
 
 
+class ResponseUpdateApplicabilityServerControlled(ResponseUpdateError):
+    """M4D3-APP-009 -- the client supplied applicability for a rule-governed response.
+
+    M4D3-APP-008 makes ``is_not_applicable`` and ``not_applicable_reason``
+    server-owned whenever ``question.applicability_rule`` is set: the governed
+    applicability service is their only writer. A client-supplied value for
+    either field on such a response is rejected, whether it sets, changes or
+    clears the state.
+
+    M4D3-APP-009 fixes ``error_code = "applicability_server_controlled"`` and
+    HTTP 403 -- the same status as its siblings M4D3-SVC-005 (server-controlled
+    stored value) and M4D3-APP-011 (reserved marker), because the objection is
+    the same in kind: the value is owned by the server, not by the caller.
+
+    Deliberately distinct from :class:`ResponseUpdateReservedReasonPrefix`. That
+    one is about a *value* no client may write anywhere; this one is about
+    *ownership* of two fields on a particular class of response. Collapsing them
+    would report the wrong reason and would wrongly imply that a non-reserved
+    applicability value is acceptable on a rule-governed response.
+    """
+
+
 class ResponseUpdateInvalidExpectedVersion(ResponseUpdateError):
     """M4D3-TXN-003 -- ``expected_version`` is structurally invalid.
 
@@ -985,6 +1007,34 @@ def update_checklist_response(
         raise ResponseUpdateInvalidPayload(serializer.errors)
 
     data = serializer.validated_data
+
+    # M4D3-APP-009 -- applicability is server-owned wherever a rule governs it.
+    #
+    # M4D3-APP-008 makes ``is_not_applicable`` and ``not_applicable_reason``
+    # server-owned for any response whose question carries an applicability rule;
+    # the governed applicability service is their only writer. A client that
+    # supplies either field for such a response is authoring state it does not
+    # own, so the request is refused outright rather than partially applied --
+    # setting *and* clearing are both authorship.
+    #
+    # Checked here, in the governed service, so a direct domain call is bound by
+    # it exactly as an HTTP request is, and before the transaction opens so a
+    # rejected attempt writes nothing, increments no version, runs no cascade and
+    # emits no success audit.
+    #
+    # Presence is what matters, not value: a payload naming the field at all is
+    # an attempt to author it. ``is_not_applicable=False`` on an already-N/A
+    # response is a clear, and is refused for the same reason.
+    #
+    # Ordered before the M4D3-APP-011 marker check because ownership is the more
+    # fundamental objection -- on a rule-governed response the client may not
+    # author the field at all, so the value it carries is never reached.
+    # M4D3-APP-010 keeps a client-declared N/A permitted where no rule governs
+    # the question, so this guard is scoped strictly to rule-governed responses.
+    if response.question.applicability_rule_id is not None and (
+        "is_not_applicable" in data or "not_applicable_reason" in data
+    ):
+        raise ResponseUpdateApplicabilityServerControlled()
 
     # M4D3-APP-011 -- the reserved server-owned marker is never client-supplied,
     # for any response, rule-governed or not. Checked in the governed service so

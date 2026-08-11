@@ -1205,6 +1205,7 @@ class ChecklistResponseUpdateView(APIView):
 
     def patch(self, request, public_id, response_public_id):
         from .services import (
+            ResponseUpdateApplicabilityServerControlled,
             ResponseUpdateInvalidExpectedVersion,
             ResponseUpdateInvalidPayload,
             ResponseUpdateInvalidState,
@@ -1254,6 +1255,21 @@ class ChecklistResponseUpdateView(APIView):
                     "detail": (
                         "This response is populated by a governed service and is not "
                         "client-writable."
+                    ),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except ResponseUpdateApplicabilityServerControlled:
+            # M4D3-APP-009 fixes both the error_code and the status. 403 matches
+            # its siblings M4D3-SVC-005 and M4D3-APP-011: the field is
+            # server-owned, so this is an authorization objection, not a
+            # malformed-payload one.
+            return Response(
+                {
+                    "error_code": "applicability_server_controlled",
+                    "detail": (
+                        "Applicability for this response is governed by an "
+                        "applicability rule and is not client-writable."
                     ),
                 },
                 status=status.HTTP_403_FORBIDDEN,
