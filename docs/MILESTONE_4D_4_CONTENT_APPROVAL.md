@@ -44,20 +44,28 @@ The repository distinguishes two categories, and the gate constrains only one.
 | Approval gate | **not required** | **required — this document** |
 | Basis | 4D-1…4D-3 "use only synthetic `ChecklistDefinition` content" (L1089) | L1089 |
 
-**Reading:** the gate is scoped to *shipped production templates*. It does not
-restrict synthetic fixtures, which 4D-1 through 4D-3 already used freely and
-which remain the basis of the merged test suites. Engineering work on the other
-three 4D-4 workstreams (overrides, reviewer conclusion, exports) can therefore
-proceed on synthetic content.
+**Resolved — `4D4-DEC-001`, approved by the project owner 2026-08-11.** The gate
+is scoped to the **production-content workstream only**. Synthetic engineering
+content may be used for generic 4D-4 engineering before this package is
+approved; 4D-1 through 4D-3 already proceeded that way and their fixtures remain
+the basis of the merged test suites.
 
-**However** — L1089 says the gate is "required before 4D-4 begins", and 4D-4 as
-defined includes production content as one of its four workstreams. Whether that
-sentence gates *the whole milestone* or *only its content workstream* is
-genuinely ambiguous in the source. This document does **not** resolve it.
+**Allowed before this package is approved:** generic override/deviation
+infrastructure; reviewer-conclusion completion; controlled-export
+infrastructure; unit, integration and E2E tests on synthetic fixtures; API and
+frontend engineering containing no real regulatory questions.
 
-> **DECISION REQUIRED (item 0 below):** does the gate block all 4D-4 engineering,
-> or only the production-content workstream? Recorded as ambiguous rather than
-> interpreted for convenience.
+**Not allowed before this package is approved:** authoring production regulatory
+checklist questions; loading production regulatory templates; activating
+production regulatory templates; shipping production regulatory checklist
+content.
+
+This preserves L1089's stated purpose — that implementation "must never silently
+invent real regulatory questions" — without stopping engineering that does not
+touch regulatory content.
+
+**Nothing in items 1–20 below is affected by this resolution. Production content
+remains fully blocked, 0 of 20 approved.**
 
 ## 4. Approval table
 
@@ -66,7 +74,7 @@ content must satisfy; it is not a proposed answer.
 
 | # | Item | Decision | Owner | Status | Evidence / constraint | Approver | Date | Comments |
 |---|---|---|---|---|---|---|---|---|
-| 0 | Gate scope: whole milestone or content workstream only | TBD | Regulatory + Eng lead | **PENDING** | `4D_DISCOVERY.md:1089` ambiguity, §3 above | | | Blocks sequencing |
+| 0 | Gate scope: whole milestone or content workstream only | **Content workstream only** | Project owner | **APPROVED** | `4D_DISCOVERY.md:1089` ambiguity, §3 above; `4D4-DEC-001` | Project owner | 2026-08-11 | Not a production-content item — a sequencing decision. Items 1–20 unaffected. |
 | 1 | `ChecklistDefinition` identity — which templates ship (oral solid, oral liquid, parenteral, topical, …) | TBD | Regulatory | **PENDING** | L1089 names these as candidates only | | | Set is undecided |
 | 2 | Checklist title per definition | TBD | Regulatory | **PENDING** | §1 definition governance | | | |
 | 3 | Jurisdiction | TBD | Regulatory | **PENDING** | — | | | US FDA assumed but unstated |
@@ -129,5 +137,10 @@ calculations, or approve its own content.
 
 **REGULATORY-CONTENT GATE: OPEN**
 
-0 of 21 items approved. Until item 20 is signed off, no production regulatory
-checklist content may be added to the repository.
+**0 of 20 production-content items approved.** Until item 20 is signed off, no
+production regulatory checklist content may be added to the repository.
+
+Item 0 (gate scope) is approved and is deliberately not counted among the
+production-content items — it decides *sequencing*, not content. Generic 4D-4
+engineering on synthetic fixtures is therefore unblocked; production regulatory
+content is not.

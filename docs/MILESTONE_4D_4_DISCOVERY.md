@@ -70,8 +70,13 @@ DEFERRAL*):
 > separate approval.
 
 This is a governance restriction on *content*, not on engineering generally.
-See §8 of `MILESTONE_4D_4_CONTENT_APPROVAL.md` for the synthetic-vs-production
-boundary this document reads from the same evidence.
+
+**Scope resolved — `4D4-DEC-001`, approved 2026-08-11:** the gate blocks the
+**production-content workstream only**. Generic 4D-4 engineering may proceed on
+synthetic fixtures. Production regulatory checklist content remains blocked in
+full until the content-approval package is signed off. See §AB for the allowed
+and not-allowed lists, and `MILESTONE_4D_4_CONTENT_APPROVAL.md` for the gate
+itself.
 
 ## F. Existing reusable capabilities
 
@@ -395,19 +400,16 @@ Stated as facts, with the decision left open.
    facts above interact; that interaction is not resolved anywhere in the
    repository, and 4D-3 dispositioned APP-009 without an export surface existing.
 
-**This document does not conclude that APP-009 must be fixed.** That is
-`4D4-DEC-009`'s to decide. Outcomes that could satisfy the gate include, without
-preference or approval:
+**Dispositioned — `4D4-DEC-009`, approved 2026-08-11.** The project owner
+selected **closure**: APP-009 must be closed before controlled exports are
+released. The two alternatives considered — excluding the affected applicability
+state from the export payload, or an alternative governed control such as
+recording applicability provenance — are recorded here for traceability and are
+**no longer live options**.
 
-- close APP-009 before controlled export ships;
-- exclude the affected applicability state from the export payload, **if**
-  normatively permitted by §17/§18's reproducibility requirement;
-- an alternative governed control approved by specification authority (for
-  example, recording applicability provenance so a rule-governed value that was
-  client-set is distinguishable in the export).
-
-None of these is approved. What is required is an explicit, recorded decision
-before the export slice is released — not a particular one.
+Scope: the block applies to the controlled-export **release** only. Export
+infrastructure may be built beforehand; it may not ship. No other 4D-4 slice is
+blocked by APP-009. See §AB.
 
 **Inconsistency recorded, not silently reconciled:** `docs/ROADMAP.md` stated
 *"Milestone 4D (regulatory checklist execution): NOT STARTED"* while 4D-1, 4D-2
@@ -419,30 +421,96 @@ conflicts with a milestone document, the milestone document governs.
 
 ## AA. Decision register
 
-The authoritative list of what must be decided before 4D-4 engineering. **None of
-these is resolved by this document.** Status is `OPEN` (no repository evidence
-decides it) or `PENDING APPROVAL` (a specific human authority must sign off).
+The authoritative list of what must be decided before 4D-4 engineering.
+Six decisions were **approved by the project owner on 2026-08-11**; four remain
+open. Status is `APPROVED`, `OPEN` (no repository evidence decides it) or
+`PENDING APPROVAL` (a specific human authority must sign off).
 
-Nothing in this register may be treated as approved because a recommendation
-appears beside it elsewhere in this repository or in a task report.
+An `OPEN` item may not be treated as approved because a recommendation appears
+beside it elsewhere in this repository or in a task report.
 
 | ID | Decision / question | Why required | Repository evidence | Owner | Status | Blocks | Resolution |
 |---|---|---|---|---|---|---|---|
-| **4D4-DEC-001** | Does regulatory-content approval block **all** 4D-4 engineering, or only the production-content workstream? | L1089 says the gate is required "before 4D-4 begins", but 4D-1…4D-3 proceeded on synthetic content. The two readings give different sequencing. | `MILESTONE_4D_DISCOVERY.md:1089`; 4D-1…4D-3 synthetic usage | Regulatory authority + Eng lead | **PENDING APPROVAL** | All slices (sequencing) | — |
-| **4D4-DEC-002** | `expected_version` semantics for the override write path | 4D-3 made optimistic concurrency mandatory on governed writes; §12 predates it and is silent. An override is a fourth governed write. | §12 (L715–754); 4D-3 `validate_expected_version()` | Eng lead | **OPEN** | Slice 2 | — |
-| **4D4-DEC-003** | Lifecycle states in which an override may be recorded | §12 does not state them. `EDITABLE_EXECUTION_STATUSES` (`draft`, `returned`) is the analogue but is not stated for overrides. | §12; `services.py` `EDITABLE_EXECUTION_STATUSES` | Eng lead + Regulatory | **OPEN** | Slice 2 | — |
+| **4D4-DEC-001** | Does regulatory-content approval block **all** 4D-4 engineering, or only the production-content workstream? | L1089 says the gate is required "before 4D-4 begins", but 4D-1…4D-3 proceeded on synthetic content. The two readings give different sequencing. | `MILESTONE_4D_DISCOVERY.md:1089`; 4D-1…4D-3 synthetic usage | Project owner | **APPROVED** 2026-08-11 | — (unblocked) | **Content workstream only.** Synthetic engineering content may be used for generic 4D-4 engineering before content approval. Production regulatory content stays blocked. See §AB. |
+| **4D4-DEC-002** | `expected_version` semantics for the override write path | 4D-3 made optimistic concurrency mandatory on governed writes; §12 predates it and is silent. An override is a fourth governed write. | §12 (L715–754); 4D-3 `validate_expected_version()` | Project owner | **APPROVED** 2026-08-11 | — | Override writes **reuse the shared `validate_expected_version()`**. No second structural rule. |
+| **4D4-DEC-003** | Lifecycle states in which an override may be recorded | §12 does not state them. `EDITABLE_EXECUTION_STATUSES` (`draft`, `returned`) is the analogue but is not stated for overrides. | §12; `services.py` `EDITABLE_EXECUTION_STATUSES` | Project owner | **APPROVED** 2026-08-11 | — | Override permitted **only in the existing editable execution states: `draft` and `returned`** — i.e. exactly `EDITABLE_EXECUTION_STATUSES`. |
 | **4D4-DEC-004** | History reason-code vocabulary for override/deviation | `ALLOWED_HISTORY_REASON_CODES` is a closed vocabulary holding only `APPLICABILITY_REEVALUATED` and `COMPONENT_REBOUND`; neither describes an override. Adding one is a governed vocabulary change. | `governed_vocabularies.py`; M4D3-HST-005 | Eng lead + Regulatory | **OPEN** | Slice 2 | — |
 | **4D4-DEC-005** | Export payload provenance depth | §18 requires "full per-question provenance"; 4D-3 deliberately excludes `input_provenance` from the API projection. Different audiences, unresolved tension. | §17 (L887); §18; 4D-3 projection | Regulatory + Eng lead | **OPEN** | Slice 1 | — |
-| **4D4-DEC-006** | Canonical export serialization + checksum contract | §17 mandates a SHA-256 over the "canonical serialized export payload" but does not define canonical form (key order, decimal rendering, timestamp format). Without it the checksum is not reproducible. | §17 (L888); 4D-3 `format_decimal_plain()` | Eng lead | **OPEN** | Slice 1 | — |
-| **4D4-DEC-007** | Override API shape — dedicated action endpoint vs. extension of the governed response PATCH | §12 requires enforcement "at the transition boundary, not just serializer validation", which suggests an action; the repository does not decide. | §12 (L718); `_ChecklistActionViewBase` pattern | Eng lead | **OPEN** | Slice 2 | — |
+| **4D4-DEC-006** | Canonical export serialization + checksum contract | §17 mandates a SHA-256 over the "canonical serialized export payload" but does not define canonical form (key order, decimal rendering, timestamp format). Without it the checksum is not reproducible. | §17 (L888); 4D-3 `format_decimal_plain()` | Project owner | **APPROVED** 2026-08-11 | — | Canonical form: **deterministic key ordering; `format_decimal_plain()` for decimals; UTC ISO-8601 timestamps; stable UTF-8 bytes.** |
+| **4D4-DEC-007** | Override API shape — dedicated action endpoint vs. extension of the governed response PATCH | §12 requires enforcement "at the transition boundary, not just serializer validation", which suggests an action; the repository does not decide. | §12 (L718); `_ChecklistActionViewBase` pattern | Project owner | **APPROVED** 2026-08-11 | — | **Dedicated governed action endpoint**, not the ordinary response PATCH. |
 | **4D4-DEC-008** | `approval_metadata` schema and mutability | 4D-2 records it as `null` with "shape defined in 4D-4". No source defines the shape. §V holds a **PROPOSED, non-normative** sketch only. | `MILESTONE_4D_2_DISCOVERY.md:529`; `4D_1_..._SPEC.md:353` | Regulatory + Eng lead | **PENDING APPROVAL** | Slice 2/3 | — |
-| **4D4-DEC-009** | APP-009 disposition before controlled exports are released | A client can currently set `is_not_applicable` on a rule-governed response; §17 would seal applicability state into a checksummed export. Interaction is unresolved. Acceptable outcomes are listed in §Z — none approved. | `..._EVIDENCE.md:3322`; §17 (L888) | Specification authority | **OPEN** | Slice 1 (release) | — |
+| **4D4-DEC-009** | APP-009 disposition before controlled exports are released | A client can currently set `is_not_applicable` on a rule-governed response; §17 would seal applicability state into a checksummed export. | `..._EVIDENCE.md:3322`; §17 (L888) | Project owner | **APPROVED** 2026-08-11 | Export **release** only | **APP-009 must be closed before controlled exports are released.** Exporting a rule-governed applicability value that remains client-mutable is not acceptable. Does **not** block unrelated 4D-4 slices. |
 | **4D4-DEC-010** | Are `EVIDENCE_DERIVED` and `REVIEWER_CONFIRMED` responses overridable? | §12 names only `FDA_DERIVED_DEFAULT`. Read conservatively as *not* overridable, but the exclusion is inferred rather than stated. | §12 (L717, L732) | Regulatory | **OPEN** | Slice 2 | — |
 
-**No 4D-4 engineering may begin until the decisions blocking its slice are
-resolved.** `4D4-DEC-001` blocks sequencing for every slice; per §E and the
-content-approval package, production regulatory content specifically may not be
-added while the content gate is open.
+**Sequencing consequence.** With `4D4-DEC-001` approved, generic 4D-4 engineering
+on synthetic content is unblocked. Slice 2 (overrides) still requires
+`4D4-DEC-004` and `4D4-DEC-010`; slice 1's *release* requires `4D4-DEC-009`'s
+closure of APP-009 and, for payload shape, `4D4-DEC-005`. Production regulatory
+content remains blocked in full by the content-approval package.
+
+---
+
+## AB. Approved governance position (2026-08-11)
+
+### Synthetic vs. production content — `4D4-DEC-001`
+
+**Approved:** synthetic engineering content **MAY** be used for generic 4D-4
+engineering before production regulatory-content approval. Production regulatory
+checklist content remains **BLOCKED** until the separate content-approval package
+is approved.
+
+| Allowed before content approval | Not allowed before content approval |
+|---|---|
+| Generic override/deviation infrastructure | Authoring production regulatory checklist questions |
+| Reviewer-conclusion completion | Loading production regulatory templates |
+| Controlled-export infrastructure | Activating production regulatory templates |
+| Unit / integration / E2E on synthetic fixtures | Shipping production regulatory checklist content |
+| API and frontend engineering containing no real regulatory questions | |
+
+This preserves L1089's actual purpose — that implementation "must never silently
+invent real regulatory questions" — while allowing the engineering that does not
+touch regulatory content, exactly as 4D-1 through 4D-3 proceeded.
+
+### APP-009 and controlled exports — `4D4-DEC-009`
+
+**Approved:** APP-009 **must be closed before controlled exports are released.**
+Controlled exports persist and checksum applicability state, so exporting a
+rule-governed applicability value that remains client-mutable is not acceptable.
+
+Scope of the block: the **controlled-export release** only. APP-009 does not
+block override infrastructure, reviewer-conclusion completion, or any other 4D-4
+slice, and export infrastructure may be built before APP-009 closes — it may not
+be *released*.
+
+The alternatives previously listed in §Z (excluding applicability state from the
+payload; an alternative governed control) are **no longer live options**: the
+owner selected closure.
+
+### Approved engineering conventions
+
+| ID | Convention |
+|---|---|
+| `4D4-DEC-002` | Override writes reuse the shared `validate_expected_version()` — one structural rule across all governed writes. |
+| `4D4-DEC-003` | Override permitted only in `draft` and `returned` (`EDITABLE_EXECUTION_STATUSES`). |
+| `4D4-DEC-006` | Checksum canonical form: deterministic key ordering, `format_decimal_plain()` decimals, UTC ISO-8601 timestamps, stable UTF-8 bytes. |
+| `4D4-DEC-007` | Override uses a dedicated governed action endpoint, not the ordinary response PATCH. |
+
+None contradicts repository evidence: `4D4-DEC-002` extends 4D-3's single-validator
+principle; `4D4-DEC-003` matches the existing constant; `4D4-DEC-006` reuses
+4D-3's established decimal renderer; `4D4-DEC-007` matches §12's
+transition-boundary requirement and the existing `_ChecklistActionViewBase`
+pattern.
+
+### Gate status
+
+| Gate | Status |
+|---|---|
+| Engineering may start | **YES** — synthetic content only |
+| Production content may start | **NO** |
+| Controlled export **release** | **BLOCKED** pending APP-009 closure (`4D4-DEC-009`) |
+| Override implementation | **PARTIALLY READY** — `DEC-002/003/007` approved; `DEC-004`, `DEC-010` open |
+| Reviewer conclusion | **PARTIALLY READY** — service exists; serializer-coercion disposition open |
+| Production checklist content | **BLOCKED** — content-approval package, 0 of 21 approved |
 
 **Already decided by repository evidence — recorded here so they are not
 re-litigated as open questions:** override is permitted only on
