@@ -7,7 +7,7 @@ Tracks milestone status on the `regx-main` line. This branch is a clean-room imp
 **Milestone 4A–4C technical foundation: COMPLETE**
 **Production FDA data ingestion: NOT STARTED**
 **Production client formulation use: NOT STARTED**
-**Milestone 4D (regulatory checklist execution): NOT STARTED**
+**Milestone 4D (regulatory checklist execution): IN PROGRESS** — 4D-1 COMPLETE, 4D-2 COMPLETE, 4D-3 COMPLETE; 4D-4 PENDING (discovery recorded, governance gate open)
 
 Three apps: `fda_data` (platform-level FDA source-data governance), `formulations` (tenant-scoped product/formulation records), and `iid_assessment` (IID precedent matching, unit conversion, calculation, and decision engine). See [FDA_DATA_GOVERNANCE.md](FDA_DATA_GOVERNANCE.md), [FDA_IID_INGESTION.md](FDA_IID_INGESTION.md), [FDA_TERMINOLOGY_MAPPING.md](FDA_TERMINOLOGY_MAPPING.md), [FORMULATION_DATA_MODEL.md](FORMULATION_DATA_MODEL.md), [IID_MATCHING_ENGINE.md](IID_MATCHING_ENGINE.md), [IID_CALCULATION_RULES.md](IID_CALCULATION_RULES.md), and [IID_DECISION_STATUSES.md](IID_DECISION_STATUSES.md) for architecture.
 
@@ -52,7 +52,7 @@ Three apps: `fda_data` (platform-level FDA source-data governance), `formulation
 
 1. Only synthetic, non-confidential fixtures are included — no real FDA source file (Orange Book, IID) has been imported.
 2. No real client formulation/product data is included; all formulation fixtures are synthetic.
-3. Milestone 4D (final regulatory checklist execution and approval workflow) is not implemented.
+3. Milestone 4D (final regulatory checklist execution and approval workflow) is partially implemented: 4D-1 (definition governance), 4D-2 (execution/response/outcome foundation) and 4D-3 (draft-answer generation, FDA-derived population, system-calculated computation and cascade recalculation) are complete on `regx-main`. 4D-4 (overrides/deviations, reviewer conclusion, controlled exports, production checklist content) is pending: discovery is recorded in [MILESTONE_4D_4_DISCOVERY.md](MILESTONE_4D_4_DISCOVERY.md), and the regulatory-content approval gate in [MILESTONE_4D_4_CONTENT_APPROVAL.md](MILESTONE_4D_4_CONTENT_APPROVAL.md) is open. No 4D-4 implementation has started.
 4. Only one production substance-mapping creation path exists (the manual proposal API); an import-generated candidate path is a natural follow-on, not a blocking gap.
 5. No 21 CFR Part 11 compliance is claimed by this milestone.
 6. Human regulatory review remains mandatory at every mapping and assessment decision point — an IID precedent match is a comparison reference only, never an automatic safety or regulatory-approval determination.
@@ -169,7 +169,10 @@ Branch and tenancy/identity/authorization/audit foundation preceding the documen
 Milestone 4A–4C (FDA data governance, formulation foundation, IID matching/
 calculation/decision engine) is technically complete on `regx-main` as of
 the merge and release tag recorded above. **Milestone 4D (final regulatory
-checklist-execution engine) has not been planned or started.** Production
+checklist-execution engine) is in progress: 4D-1, 4D-2 and 4D-3 are complete on
+`regx-main`; 4D-4 is planned but not started, pending the open governance and
+regulatory-content gates recorded in
+[MILESTONE_4D_4_DISCOVERY.md](MILESTONE_4D_4_DISCOVERY.md).** Production
 FDA data ingestion (importing, reviewing, approving, and activating a real
 Orange Book/IID source release) and production client formulation use are
 both not started and require, respectively, a confirmed real source file
