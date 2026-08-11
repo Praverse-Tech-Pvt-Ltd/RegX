@@ -172,3 +172,84 @@ owner.
 This closes the APP-009 prerequisite and satisfies `4D4-DEC-009`'s condition for
 controlled-export release. It does not implement exports, overrides, reviewer
 conclusion, or any production content, and Milestone 4D-4 remains open.
+
+---
+
+## 11. Addendum — response payload interoperability defect
+
+**Found during the independent APP-009 review. Unrelated to APP-009, and
+APP-009's closure is unaffected: the guard is evaluated before any raw-value
+shape concern and both were re-verified after this remediation.**
+
+### The defect
+
+`response_validation.py` gives every answer type an exact `raw_value` shape, and
+all eight types the response editor supports require an **envelope**:
+`{"value": <typed value>}`. The merged editor's `toPayloadValue()` returned bare
+scalars, so every save was refused with `invalid_raw_value_shape` (400). The
+editor could not save **any** answer type against a real backend.
+
+It escaped 4D-3 because both suites mocked past the wire: the unit tests mocked
+`responses.update()` and asserted only that it had been *called*, and the E2E
+mocked the backend with the same incorrect shape it was itself sending. Nothing
+compared the two languages. The backend APP-009 tests, which construct real
+payloads, are what surfaced it.
+
+Two errors, not one:
+
+1. **Missing envelope** on all eight supported types.
+2. **`yes_no_na` sent a boolean**, where the backend requires the closed string
+   vocabulary `"yes" | "no" | "not_applicable"`.
+
+A third trap sits next to them and is now pinned by test: `yes_no` requires a
+JSON **boolean** while `yes_no_na` requires a **string** — near-synonymous names,
+different inner types.
+
+### Corrected contract
+
+| Answer type | Payload | Inner type |
+|---|---|---|
+| `short_text` / `long_narrative` | `{"value": …}` | non-empty string |
+| `integer` | `{"value": …}` | JSON integer (bool refused) |
+| `decimal` / `percentage` | `{"value": …}` | decimal **string** — never a JS number, so no precision is lost |
+| `date` | `{"value": …}` | `"YYYY-MM-DD"` |
+| `yes_no` | `{"value": …}` | JSON boolean |
+| `yes_no_na` | `{"value": …}` | `"yes"` / `"no"` / `"not_applicable"` |
+
+An empty edit still clears the answer with a bare `null`, which is distinct from
+declaring the response not-applicable.
+
+`yes_no` and `yes_no_na` now use select controls: a boolean and a closed
+vocabulary cannot be produced deterministically from a free-text box. The
+`yes_no_na` answer value `not_applicable` is deliberately **not** collapsed into
+the response-level `is_not_applicable` applicability flag — they are separate
+concepts and the backend treats them separately.
+
+### Types deliberately not offered
+
+`quantity_with_unit`, `single_select`, `multi_select`, `fda_record_reference`,
+`formulation_component_reference` and `attachment_reference` each require a shape
+a single value control cannot produce (a unit, an option code, a sorted code
+list, or a resolved public id). They are rendered read-only rather than given a
+control whose every save would be refused. `calculated_value`,
+`calculated_status` and `approval_metadata` are never client-writable, and
+`reviewer_conclusion` has its own endpoint.
+
+### Regression evidence
+
+The fix is pinned from both sides, which is what was missing before:
+
+- **Frontend, wire level** — 11 tests drive the real `toPayloadValue()` through
+  the real `responses.update()` and read the request body off a stubbed `fetch`.
+  `responses.update()` itself is **not** mocked.
+- **Backend, cross-language** — 34 tests in
+  `test_4d4_frontend_payload_contract.py` assert the exact payloads the frontend
+  emits against the real `validate_raw_value_shape()`, and assert that the
+  pre-fix bare scalars are **rejected**, so a future refactor cannot quietly
+  reintroduce them.
+- **Obsolete mocks corrected, not preserved** — the 4D-3 unit assertion and the
+  4D-3 E2E mock both encoded the wrong shape and were updated to the real
+  contract.
+
+Gates after remediation: frontend type-check and lint clean, unit 182, E2E 91;
+backend APP-009 19, payload contract 34, response-update 60, applicability 15.
