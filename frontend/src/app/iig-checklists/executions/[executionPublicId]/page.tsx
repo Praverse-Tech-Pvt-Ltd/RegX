@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { iigChecklists, type ChecklistExecution, ApiError } from "@/lib/api";
+import { ChecklistResponses } from "./ChecklistResponses";
 
 const TERMINAL_STATUSES = new Set(["rejected", "cancelled", "superseded"]);
 
@@ -222,6 +223,13 @@ function ExecutionDetailPageInner() {
           )}
         </div>
       )}
+
+      <ChecklistResponses
+        tenantSlug={tenantSlug}
+        executionPublicId={executionPublicId}
+        checklistVersionPublicId={execution.checklistVersion.publicId}
+        executionStatus={execution.status}
+      />
     </div>
   );
 }

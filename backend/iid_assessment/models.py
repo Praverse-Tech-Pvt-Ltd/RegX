@@ -49,7 +49,15 @@ class AssessmentSnapshot(PublicIDModel, TimeStampedModel):
         max_digits=20, decimal_places=6, null=True, blank=True
     )
 
-    calculation_results = models.JSONField(default=dict)
+    # blank=True because {} is the truthful value when no IID precedent
+    # matched: run_preview() computes nothing, and the snapshot is still the
+    # reproducible record that no precedent existed (M4D3-SNO-006). Django
+    # counts {} among Field.empty_values, so with blank=False a row holding
+    # this field's own default could not pass full_clean() and the governed
+    # service could not record a no-match event at all. null stays False: the
+    # column is always a JSON object, never SQL NULL. Same defect and same
+    # remedy as CalculationOutcome.inputs/input_provenance in §6G.
+    calculation_results = models.JSONField(default=dict, blank=True)
     match_status = models.CharField(max_length=40, blank=True)
     decision_status = models.CharField(max_length=40, blank=True)
     decision_note = models.TextField(blank=True)

@@ -423,6 +423,70 @@ _CALCULATION_NAMES = frozenset(
     }
 )
 
+_GOVERNED_VERSION_PARTS = 3
+
+
+def _is_governed_version(value) -> bool:
+    """A three-part numeric version, matching the registry's own rule."""
+    if not isinstance(value, str):
+        return False
+    parts = value.split(".")
+    return len(parts) == _GOVERNED_VERSION_PARTS and all(p.isdigit() for p in parts)
+
+
+def _is_canonical_uuid(value) -> bool:
+    """Canonical lowercase hyphenated rendering only (M4D3-PRV-005)."""
+    import uuid as uuid_module
+
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = uuid_module.UUID(value)
+    except (ValueError, AttributeError, TypeError):
+        return False
+    return str(parsed) == value
+
+
+def _has_input_descriptor(provenance: dict) -> bool:
+    """True when provenance carries something beyond the reserved keys.
+
+    M4D3-PRV-002 requires the reserved binding version "alongside a per-input
+    source descriptor", so a completed outcome whose provenance holds only
+    reserved keys has recorded no inputs at all.
+    """
+    from .calculation_translation import RESERVED_PROVENANCE_KEYS
+
+    return any(key not in RESERVED_PROVENANCE_KEYS for key in provenance)
+
+
+def _registry_entry_for_calculation(calculation_name: str):
+    """Resolve the approved entry by its calculation function name.
+
+    The registry is keyed by binding identifier, and ``_validate_registry()``
+    guarantees each entry's ``calculation_name`` is unique, so this reverse
+    lookup is unambiguous. Server registry only -- nothing client-controlled.
+    """
+    from .calculation_registry import CALCULATION_BINDING_REGISTRY
+
+    for entry in CALCULATION_BINDING_REGISTRY.values():
+        if entry.calculation_name == calculation_name:
+            return entry
+    return None
+
+
+def _entry_is_component_scoped(entry) -> bool:
+    """M4D3-PRV-007 -- the entry declares a component selector."""
+    return any(
+        declaration.get("component_selector") is not None
+        for declaration in entry.input_resolvers.values()
+    )
+
+
+def _entry_inherits_component(entry) -> bool:
+    """Consumes an upstream outcome, so it inherits that component
+    (M4D3-MAP-010) and may legitimately record one without a selector."""
+    return bool(entry.calculation_dependencies)
+
 
 class ChecklistExecutionManager(models.Manager):
     def visible_to(self, tenant):
@@ -727,8 +791,15 @@ class CalculationOutcome(PublicIDModel, TimeStampedModel):
     )
     value = models.DecimalField(null=True, blank=True, max_digits=20, decimal_places=10)
     unit = models.CharField(blank=True, max_length=50)
-    inputs = models.JSONField(default=dict)
-    input_provenance = models.JSONField(default=dict)
+    # blank=True because a placeholder legitimately holds {} until governed
+    # calculation execution fills it, and Django counts {} among
+    # Field.empty_values -- with blank=False a row holding its own defaults
+    # could not pass full_clean(), so no placeholder could be created at all.
+    # null stays False: the column is always a JSON object, never SQL NULL.
+    # The completed-outcome provenance requirements are enforced in clean()
+    # instead, where they can be applied only to the status that has them.
+    inputs = models.JSONField(default=dict, blank=True)
+    input_provenance = models.JSONField(default=dict, blank=True)
     rounding_rule = models.CharField(blank=True, max_length=100)
     reason_code = models.CharField(blank=True, max_length=100)
     generated_at = models.DateTimeField(null=True, blank=True)
@@ -740,3 +811,82 @@ class CalculationOutcome(PublicIDModel, TimeStampedModel):
                 f"calculation_name {self.calculation_name!r} is not one of the six "
                 "approved iid_assessment calculation function names."
             )
+        self._validate_completed_outcome()
+
+    # -- completed-outcome invariant (M4D3-PRV-002/005/007) -----------------
+    #
+    # ``inputs`` and ``input_provenance`` are blank=True so a placeholder can
+    # hold {}. That relaxation must not let a *completed* row -- one carrying a
+    # real regulated number -- be saved without the provenance that makes the
+    # number reproducible. These checks therefore apply to the COMPLETE status
+    # only; data_required, calculating and error rows carry no value and are
+    # left alone.
+
+    def _validate_completed_outcome(self):
+        from .calculation_translation import (
+            REGISTRY_BINDING_VERSION_PROVENANCE_KEY,
+            SUBJECT_COMPONENT_PROVENANCE_KEY,
+        )
+
+        if self.status != CalculationStatus.COMPLETE:
+            return
+
+        errors: dict[str, str] = {}
+
+        if self.value is None:
+            errors["value"] = "A complete calculation outcome must carry a value."
+
+        provenance = self.input_provenance
+        if not isinstance(provenance, dict):
+            errors["input_provenance"] = "input_provenance must be a mapping on a complete outcome."
+            raise ValidationError(errors)
+
+        binding_version = provenance.get(REGISTRY_BINDING_VERSION_PROVENANCE_KEY)
+        if binding_version is None:
+            errors["input_provenance"] = (
+                "A complete outcome must record "
+                f"{REGISTRY_BINDING_VERSION_PROVENANCE_KEY!r} (M4D3-PRV-002)."
+            )
+        elif not _is_governed_version(binding_version):
+            # The recorded version is historical evidence: it is the binding
+            # the result was produced under, which may legitimately predate the
+            # registry's current value. The format is enforced; equality with
+            # today's registry deliberately is not.
+            errors["input_provenance"] = (
+                f"{REGISTRY_BINDING_VERSION_PROVENANCE_KEY!r} must be a governed "
+                "three-part numeric version."
+            )
+        elif not _has_input_descriptor(provenance):
+            errors["input_provenance"] = (
+                "A complete outcome must record at least one per-input source "
+                "descriptor alongside the reserved keys (M4D3-PRV-002)."
+            )
+
+        entry = _registry_entry_for_calculation(self.calculation_name)
+        if entry is None:
+            errors["calculation_name"] = (
+                f"calculation_name {self.calculation_name!r} does not resolve to an "
+                "approved registry entry."
+            )
+        else:
+            component = provenance.get(SUBJECT_COMPONENT_PROVENANCE_KEY)
+            if _entry_is_component_scoped(entry):
+                if component is None:
+                    errors[SUBJECT_COMPONENT_PROVENANCE_KEY] = (
+                        "A component-scoped calculation must record "
+                        f"{SUBJECT_COMPONENT_PROVENANCE_KEY!r} (M4D3-PRV-005/007)."
+                    )
+            elif not _entry_inherits_component(entry) and component is not None:
+                errors[SUBJECT_COMPONENT_PROVENANCE_KEY] = (
+                    f"{SUBJECT_COMPONENT_PROVENANCE_KEY!r} is not permitted on a "
+                    "calculation that neither selects nor inherits a component "
+                    "(M4D3-PRV-007)."
+                )
+            if component is not None and not _is_canonical_uuid(component):
+                errors[SUBJECT_COMPONENT_PROVENANCE_KEY] = (
+                    f"{SUBJECT_COMPONENT_PROVENANCE_KEY!r} must be a canonical "
+                    "lowercase hyphenated public UUID string."
+                )
+
+        if errors:
+            raise ValidationError(errors)

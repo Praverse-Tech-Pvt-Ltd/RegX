@@ -37,6 +37,8 @@ class IigChecklistEvent:
     EXECUTION_SUPERSEDED = "iig_checklist.execution.superseded"
     RESPONSE_ENTERED = "iig_checklist.response.entered"
     RESPONSE_UPDATED = "iig_checklist.response.updated"
+    # 4D-3 governed calculation execution
+    RESPONSE_CALCULATED = "iig_checklist.response.calculated"
     RESPONSE_REVIEWER_CONCLUSION_ENTERED = "checklist_response.reviewer_conclusion_entered"
     RESPONSE_REVIEWER_CONCLUSION_UPDATED = "checklist_response.reviewer_conclusion_updated"
 

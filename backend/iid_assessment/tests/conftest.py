@@ -118,3 +118,53 @@ def active_iid_setup(db):
         "ingredient": ingredient,
         "record": record,
     }
+
+
+@pytest.fixture
+def snapshot_formulation(db, tenant_a, user_a, active_iid_setup):
+    """A real tenant-owned formulation whose component matches the IID setup.
+
+    ``create_assessment_snapshot()`` derives every frozen value from these rows,
+    so a snapshot test needs genuine formulation objects rather than arbitrary
+    UUIDs. Route and dosage form match the controlled terms of
+    ``active_iid_setup`` and the component carries the resolved ingredient, so
+    the preview reaches an exact match.
+    """
+    from formulations.models import (
+        FormulationComponent,
+        FormulationVersion,
+        ProductDevelopmentRecord,
+    )
+
+    product = ProductDevelopmentRecord.objects.create(
+        tenant=tenant_a,
+        product_code="SNAP-PROD-01",
+        proposed_product_name="Snapshot Product",
+        active_ingredient="Synthetic Starch",
+        dosage_form="tablet",
+        route="oral",
+        created_by=user_a,
+    )
+    formulation_version = FormulationVersion.objects.create(
+        product=product,
+        version_number=1,
+        status="approved",
+        total_dosage_unit_weight=Decimal("500.000000"),
+        total_dosage_unit_weight_unit="milligram",
+        maximum_dosage_units_per_day=Decimal("4.0000"),
+        created_by=user_a,
+    )
+    component = FormulationComponent.objects.create(
+        formulation_version=formulation_version,
+        component_type="inactive",
+        ingredient_name="Synthetic Starch",
+        resolved_ingredient_public_id=active_iid_setup["ingredient"].public_id,
+        quantity_per_dosage_unit=Decimal("30.000000"),
+        quantity_unit="milligram",
+        display_order=1,
+    )
+    return {
+        "product": product,
+        "formulation_version": formulation_version,
+        "component": component,
+    }

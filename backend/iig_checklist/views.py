@@ -37,7 +37,6 @@ from .permissions import (
     PERM_CREATE_DEFINITION,
     PERM_DELETE_DRAFT,
     PERM_EDIT_DRAFT,
-    PERM_EDIT_EXECUTION,
     PERM_REVIEW_EXECUTION,
     PERM_SUBMIT_EXECUTION,
     PERM_SUPERSEDE_EXECUTION,
@@ -65,7 +64,6 @@ from .serializers import (
     ChecklistExecutionSerializer,
     ChecklistQuestionSerializer,
     ChecklistResponseSerializer,
-    ChecklistResponseUpdateSerializer,
     ChecklistSectionSerializer,
     ChecklistVersionSerializer,
     CloneDefinitionSerializer,
@@ -83,6 +81,7 @@ from .services import (
     FormulationVersionNotApproved,
     FormulationVersionTenantMismatch,
     IncompleteExecution,
+    InvalidCalculationBinding,
     InvalidQuantityUnitConfig,
     MissingReturnReason,
     ReviewerConclusionCorrectionReasonRequired,
@@ -540,6 +539,21 @@ class _ChecklistVersionActionViewBase(APIView):
 
             if self.action == VersionAction.ACTIVATE and not version.effective_date:
                 raise ValidationError("effective_date is required before activation.")
+
+            if self.action == VersionAction.ACTIVATE:
+                # Milestone 4D-3 (M4D3-REG-018/019): every calculation-registry
+                # binding referenced by this version must resolve against its own
+                # persisted content before the version becomes executable.  This
+                # runs before any lifecycle mutation -- including superseding a
+                # prior active version -- so a failure leaves everything intact.
+                from .activation_validation import (
+                    format_activation_errors,
+                    validate_version_calculation_bindings,
+                )
+
+                binding_findings = validate_version_calculation_bindings(version)
+                if binding_findings:
+                    raise ValidationError(format_activation_errors(binding_findings))
 
             if self.action == VersionAction.ACTIVATE:
                 other_active = (
@@ -1032,6 +1046,20 @@ class ChecklistExecutionListCreateView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except InvalidCalculationBinding as exc:
+            return Response(
+                {
+                    "error_code": "execution_invalid_calculation_binding",
+                    "detail": (
+                        f"Question {exc} is system_calculated but its calculation binding is"
+                        " not an approved registry entry, or disagrees with the question's"
+                        " answer type or source classification. Contact the checklist"
+                        " administrator to correct the definition version before creating an"
+                        " execution."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return Response(
             ChecklistExecutionSerializer(execution).data,
             status=status.HTTP_201_CREATED,
@@ -1154,6 +1182,12 @@ class ChecklistResponseListView(APIView):
                 execution=execution,
             )
             .select_related("question", "entered_by", "confirmed_by")
+            # One extra query for every outcome on the page instead of one per
+            # response: the serializer reads `calculation_outcomes.all()`, which
+            # reuses this prefetch rather than re-querying per row. The current
+            # row is chosen in Python by public_id, matching the writer, so no
+            # per-row ordered queryset is needed here.
+            .prefetch_related("calculation_outcomes")
             .order_by("created_at")
         )
         paginator = _Pagination()
@@ -1162,19 +1196,39 @@ class ChecklistResponseListView(APIView):
 
 
 class ChecklistResponseUpdateView(APIView):
-    def patch(self, request, public_id, response_public_id):
-        from django.utils import timezone
+    """M4D3-SVC-004 -- a thin adapter over ``update_checklist_response()``.
 
-        from .audit import IigChecklistEvent, emit
-        from .enums import AnswerType
+    It validates nothing itself, mutates no model, emits no audit and holds no
+    business rule: it calls the governed service and maps the governed
+    exceptions onto the structured HTTP contract of Part 5.
+    """
+
+    def patch(self, request, public_id, response_public_id):
+        from .services import (
+            ResponseUpdateInvalidExpectedVersion,
+            ResponseUpdateInvalidPayload,
+            ResponseUpdateInvalidState,
+            ResponseUpdatePermissionDenied,
+            ResponseUpdateReservedReasonPrefix,
+            ResponseUpdateServerControlledValue,
+            ResponseUpdateStaleVersion,
+            ResponseUpdateWrongAnswerType,
+            update_checklist_response,
+        )
 
         tenant = _require_tenant()
-        # Object lookup first — cross-tenant IDs return 404 via visible_to().
-        execution = _get_execution_or_404(public_id, tenant)
-        if not has_iig_checklist_permission(request.user, tenant, PERM_EDIT_EXECUTION):
-            raise PermissionDenied()
 
-        if execution.status not in {"draft", "returned"}:
+        try:
+            result = update_checklist_response(
+                tenant=tenant,
+                execution_public_id=public_id,
+                response_public_id=response_public_id,
+                actor=request.user,
+                payload=request.data,
+            )
+        except ResponseUpdatePermissionDenied:
+            raise PermissionDenied() from None
+        except ResponseUpdateInvalidState:
             return Response(
                 {
                     "error_code": "response_immutable",
@@ -1182,16 +1236,7 @@ class ChecklistResponseUpdateView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        try:
-            response = ChecklistResponse.objects.select_related("question").get(
-                public_id=response_public_id,
-                execution=execution,
-            )
-        except ChecklistResponse.DoesNotExist:
-            raise NotFound() from None
-
-        if response.question.answer_type == AnswerType.REVIEWER_CONCLUSION:
+        except ResponseUpdateWrongAnswerType:
             return Response(
                 {
                     "error_code": "reviewer_conclusion_wrong_answer_type",
@@ -1201,54 +1246,62 @@ class ChecklistResponseUpdateView(APIView):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        serializer = ChecklistResponseUpdateSerializer(
-            data=request.data,
-            context={"question": response.question, "execution": execution, "tenant": tenant},
-        )
-        if not serializer.is_valid():
-            raise ValidationError(serializer.errors)
-
-        prior_entered_by = response.entered_by_id
-
-        data = serializer.validated_data
-        for field in ("raw_value", "is_not_applicable", "not_applicable_reason", "override_reason"):
-            if field in data:
-                setattr(response, field, data[field])
-        response.entered_by = request.user
-        response.entered_at = timezone.now()
-
-        try:
-            response.full_clean()
-            response.save()
-        except DjangoValidationError as exc:
-            raise ValidationError(
-                {"error_code": "invalid_raw_value_shape", "detail": str(exc)}
-            ) from exc
-
-        event_type = (
-            IigChecklistEvent.RESPONSE_UPDATED
-            if prior_entered_by
-            else IigChecklistEvent.RESPONSE_ENTERED
-        )
-
-        def _audit():
-            emit(
-                event_type=event_type,
-                resource_id=str(response.public_id),
-                actor_id=request.user.id,
-                actor_email=getattr(request.user, "email", ""),
-                tenant_id=getattr(tenant, "id", None),
-                payload={
-                    "execution_public_id": str(execution.public_id),
-                    "response_public_id": str(response.public_id),
-                    "question_public_id": str(response.question.public_id),
-                    "data_source_type_snapshot": response.data_source_type_snapshot,
+        except ResponseUpdateServerControlledValue:
+            # M4D3-SVC-005 -- the stored value is owned by a governed service.
+            return Response(
+                {
+                    "error_code": "server_controlled_value",
+                    "detail": (
+                        "This response is populated by a governed service and is not "
+                        "client-writable."
+                    ),
                 },
+                status=status.HTTP_403_FORBIDDEN,
             )
+        except ResponseUpdateReservedReasonPrefix:
+            # M4D3-APP-011 fixes the error_code and is silent on the status.
+            # 403 matches its sibling M4D3-APP-009 and the M4D3-SVC-005
+            # server-controlled rejection above: the value is server-owned.
+            return Response(
+                {
+                    "error_code": "reserved_reason_prefix",
+                    "detail": (
+                        "not_applicable_reason must not begin with the reserved "
+                        "REVIEW_REQUIRED: prefix; it is written only by a governed "
+                        "server-side determination."
+                    ),
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except ResponseUpdateInvalidExpectedVersion:
+            # M4D3-TXN-003 structural rejection. No clause names an API code for
+            # it, so this follows the repository's existing structured-400
+            # convention (as `invalid_raw_value_shape` does) rather than
+            # inventing external vocabulary M4D3-OUT-005 still defers.
+            return Response(
+                {
+                    "error_code": "invalid_expected_version",
+                    "detail": (
+                        "expected_version must be an integer of at least 1. Reload and retry."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ResponseUpdateStaleVersion:
+            # M4D3-VER-005 -- nothing was written; the client reloads and retries.
+            return Response(
+                {
+                    "error_code": "stale_version",
+                    "detail": (
+                        "expected_version does not match current version. Reload and retry."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        except ResponseUpdateInvalidPayload as exc:
+            raise ValidationError(exc.errors) from None
 
-        transaction.on_commit(_audit)
-        return Response(ChecklistResponseSerializer(response).data)
+        return Response(ChecklistResponseSerializer(result.response).data)
 
 
 class ChecklistReviewerConclusionView(APIView):

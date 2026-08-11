@@ -31,8 +31,56 @@ class MatchPreviewRequestSerializer(serializers.Serializer):
 
 
 class SnapshotRequestSerializer(MatchPreviewRequestSerializer):
+    """Transport shape for the **persisted** snapshot endpoint.
+
+    M4D3-MDU-006: "no dosing value shall ever be accepted from a client request
+    payload", and the acceptance matrix names the request serializer as the
+    enforcement point. ``maximum_dosage_units_per_day`` is therefore removed from
+    the accepted fields here and derived server-side through the governed Part
+    14.1 selection instead.
+
+    It stays on ``MatchPreviewRequestSerializer``: that endpoint persists
+    nothing, so a caller exploring a hypothetical dosing figure freezes no
+    regulated record. Only the snapshot -- an immutable record whose
+    ``decision_status`` depends on the value -- is governed by M4D3-MDU-006.
+
+    A request that supplies the field is **rejected**, never silently ignored: a
+    caller who believes they set the dosing basis for a regulated assessment must
+    not be told it succeeded.
+    """
+
+    #: Fields the persisted endpoint refuses rather than accepts or drops.
+    PROHIBITED_FIELDS = ("maximum_dosage_units_per_day",)
+
     formulation_component_public_id = serializers.UUIDField()
     formulation_version_public_id = serializers.UUIDField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Not merely unused -- not part of this endpoint's contract at all, so it
+        # is absent from the generated schema too.
+        for name in self.PROHIBITED_FIELDS:
+            self.fields.pop(name, None)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        supplied = sorted(
+            name
+            for name in self.PROHIBITED_FIELDS
+            if isinstance(self.initial_data, dict) and name in self.initial_data
+        )
+        if supplied:
+            raise serializers.ValidationError(
+                {
+                    "error_code": "prohibited_request_field",
+                    "detail": (
+                        "Dosing values are derived from the governed formulation "
+                        "and cannot be supplied by a client (M4D3-MDU-006)."
+                    ),
+                    "fields": supplied,
+                }
+            )
+        return attrs
 
 
 class AssessmentSnapshotSerializer(serializers.ModelSerializer):
