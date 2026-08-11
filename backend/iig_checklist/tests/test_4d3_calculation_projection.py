@@ -333,7 +333,13 @@ class TestGovernedStatuses:
 
         assert second["status"] == "data_required"
         assert second["value"] is None
-        assert "42" not in str(second)
+        # The superseded figure is gone from every field that could carry it.
+        # Scoped to those fields deliberately: stringifying the whole projection
+        # also caught outcome_public_id, and ~15% of random UUIDs contain "42",
+        # which made this assertion fail roughly one run in seven.
+        assert "42" not in str(second["value"])
+        assert "42" not in str(second["unit"])
+        assert "42" not in str(second["reason_code"])
 
 
 # ---------------------------------------------------------------------------
