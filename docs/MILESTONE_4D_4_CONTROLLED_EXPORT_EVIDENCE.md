@@ -11,6 +11,23 @@ Base: `origin/regx-main` @ `63f4473d824c3cc8a76fa1fa12445c1fbd7c9707` (PR #14, `
 
 ---
 
+## 0. Review history
+
+This slice went through independent review, **failed**, and was remediated. The findings
+are recorded here rather than erased:
+
+| Finding | Severity | Status |
+|---|---|---|
+| **MAJOR-1** — `generated_at` excluded from the hashed payload, contradicting `4D4-DEC-005` "Checksum coverage" and §17's tamper-evidence purpose | Major | **FIXED** — §3.1 |
+| **MAJOR-2** — governed reviewer-amendment provenance (`ChecklistResponseHistory`) omitted entirely, contradicting `4D4-DEC-005` conditional reviewer provenance | Major | **FIXED** — §3.2 |
+| **MINOR-1** — `reviewer_conclusion_note` emitted unconditionally as `null` | Minor | **FIXED** — now omitted when absent |
+| **MINOR-2** — `DEC-006`'s UTC-timestamp canonical rule governed nothing hashed | Minor | **FIXED** — resolved by MAJOR-1 |
+| **MINOR-3** — reconciliation tests bound only the private compatibility alias | Minor | **FIXED** — tests now exercise `common.csv_safety.csv_safe_cell` directly, plus an identity test proving the alias delegates rather than duplicates |
+
+Critical findings: **0**. The permission boundary, tenant isolation, lifecycle gate,
+allow-listed input provenance, ordinary-API separation and CSV safety all passed review
+unchanged.
+
 ## 1. Scope delivered
 
 | # | Item | Where |
@@ -20,7 +37,8 @@ Base: `origin/regx-main` @ `63f4473d824c3cc8a76fa1fa12445c1fbd7c9707` (PR #14, `
 | 3 | Dedicated export permission, granted to VP only | `backend/iig_checklist/permissions.py` |
 | 4 | Export audit event | `backend/iig_checklist/audit.py` |
 | 5 | Thin HTTP adapter + route | `backend/iig_checklist/views.py`, `urls.py` |
-| 6 | Test matrix (49 tests) | `backend/iig_checklist/tests/test_4d4_controlled_export.py` |
+| 6 | Test matrix (64 tests) | `backend/iig_checklist/tests/test_4d4_controlled_export.py` |
+| 7 | Conditional reviewer-amendment provenance projection | `controlled_export.py` — `ALLOWED_AMENDMENT_FIELDS`, `_amendment_projection()` |
 
 ### Explicitly NOT delivered in this slice
 
@@ -53,13 +71,13 @@ Base: `origin/regx-main` @ `63f4473d824c3cc8a76fa1fa12445c1fbd7c9707` (PR #14, `
 
 ```
 {
-  "generated_at":  "<ISO-8601 UTC, Z-suffixed>",
-  "checksum":      {"algorithm": "sha256", "value": "<hex>"},
-  "payload": {
+  "checksum": {"algorithm": "sha256", "value": "<hex>"},   <-- envelope: cannot hash itself
+  "payload": {                                             <-- everything below is hashed
     "export_schema_version": "1",
+    "generated_at":          "<ISO-8601 UTC, Z-suffixed>",
     "execution":             {execution_public_id, status,
                               formulation_version_public_id,
-                              reviewer_conclusion_note},
+                              reviewer_conclusion_note?},   <-- ? = conditional
     "checklist_definition":  {definition_public_id, definition_code,
                               version_public_id, version_number},
     "responses": [
@@ -68,32 +86,105 @@ Base: `origin/regx-main` @ `63f4473d824c3cc8a76fa1fa12445c1fbd7c9707` (PR #14, `
        is_not_applicable, not_applicable_reason,
        data_source_type_snapshot, system_derived_value,
        calculation: null | {outcome_public_id, status, value, unit,
-                            reason_code, provenance}}
+                            reason_code, provenance},
+       reviewer_amendments?: [                              <-- ? = conditional
+         {amendment_public_id, prior_version, new_version,
+          prior_raw_value, new_raw_value,
+          prior_is_not_applicable, new_is_not_applicable,
+          prior_not_applicable_reason, new_not_applicable_reason,
+          correction_reason, amended_by_public_id, amended_at,
+          prior_entered_by_public_id, prior_entered_at,
+          source_classification_snapshot}
+       ]}
     ]
   }
 }
 ```
 
-### 3.1 Checksum scope — a deliberate decision, recorded
+### 3.1 Checksum scope — corrected after independent review
 
-§17 requires "a SHA-256 checksum computed over the canonical serialized export
-payload" — **singular** and format-independent — and `4D4-DEC-006` defines canonical
-form in *data* terms (key ordering, decimal rendering, timestamp form, UTF-8), not in
-CSV-row terms. Accordingly:
+**An earlier revision of this branch got this wrong, and the error is recorded here
+rather than quietly rewritten.**
 
-- There is **one** governed `payload`, hashed **once**. JSON and CSV are two
-  renderings of that same payload and both carry the same checksum value.
-- `generated_at` and the checksum itself sit in the **envelope, outside the hashed
-  bytes**. Hashing the issue timestamp would make two exports of *identical regulatory
-  state* disagree, destroying the property that makes the checksum useful: that a
-  verifier can re-derive it from the state it attests to.
-- `export_schema_version` **is** inside the payload, so a change to the artifact shape
-  is itself tamper-evident.
+The **canonical object** was correct and is unchanged: §17 requires "a SHA-256 checksum
+computed over the canonical serialized export **payload**" — singular and
+format-independent — and `4D4-DEC-006` defines canonical form in *data* terms (key
+ordering, decimal rendering, timestamp form, UTF-8), not CSV-row terms. So there is
+**one** governed `payload`, hashed **once**; JSON and CSV are two renderings of it and
+both carry the same checksum value.
 
-This resolves the checksum-scope ambiguity noted during implementation; it is recorded
-here rather than left implicit, and is covered by tests
-(`TestChecksum::test_json_and_csv_carry_the_same_checksum`,
-`test_regenerating_at_a_different_time_does_not_move_the_checksum`).
+**What was wrong:** `generated_at` was placed in an unhashed envelope, justified by the
+claim that two exports of identical regulatory state ought to produce the same checksum.
+Independent review found that property **appears nowhere in the specification** — it was
+invented — and that excluding the timestamp actively defeats the purpose §17 states for
+the checksum:
+
+> This lets a later dispute verify a previously-issued export was not altered after the
+> fact (`MILESTONE_4D_DISCOVERY.md:890`)
+
+An issued artifact whose `generated_at` can be rewritten without breaking its checksum is
+not tamper-evident in the field a back-dating dispute would turn on.
+
+`4D4-DEC-005` settles it directly:
+
+> **Checksum coverage.** All provenance included in the controlled export participates in
+> the canonical serialized payload covered by the SHA-256 checksum
+> (`MILESTONE_4D_4_DISCOVERY.md:301`)
+
+and `generated_at` is listed as included artifact provenance in both the inclusion table
+(L223) and the approved contract's `Artifact` group (L253).
+
+Two further signals corroborated the correction: `DEC-006` fixes a canonical form for
+"UTC ISO-8601 timestamps", yet under the old shape the hashed payload contained **no
+timestamp at all**, leaving that rule governing nothing; and the exclusion made the
+checksum silent on the one artifact field an adversary can most cheaply alter.
+
+**Corrected contract, now implemented:**
+
+- `generated_at` is **inside** the hashed payload, canonicalised to UTC `Z`.
+- `export_schema_version` is inside, so a shape change is tamper-evident.
+- **Only the checksum itself** is outside — a hash cannot cover itself.
+- The envelope is now `{checksum, payload}`. `generated_at` is **not** duplicated into
+  the envelope: a second copy could drift from the one the checksum attests to.
+- Two export runs at different times **legitimately produce different checksums.**
+  Reproducibility means *the same complete canonical payload yields the same hash*, not
+  that two separate export runs agree.
+
+Covered by `TestChecksum::test_generated_at_lives_in_the_hashed_payload_not_the_envelope`,
+`test_a_different_generated_at_changes_the_checksum`,
+`test_the_checksum_field_is_not_recursively_hashed`,
+`test_generated_at_is_canonical_utc_z`.
+
+### 3.2 Conditional reviewer-amendment provenance — added after independent review
+
+The first revision omitted reviewer-amendment provenance entirely, carrying only
+`reviewer_conclusion_note`. `4D4-DEC-005` requires reviewer provenance "included
+conditionally, only where governed reviewer conclusion **or amendment records** exist",
+and names what must be carried as "current state plus conditional reviewer-amendment
+provenance".
+
+`ChecklistResponseHistory` is the repository's only such record — append-only, one row
+per reviewer-conclusion amendment, never written on first entry — so it is exactly the
+governed record the decision describes. **No general response history is invented**, as
+the decision forbids.
+
+- **Allow-listed**, field-by-field, against the real model (`ALLOWED_AMENDMENT_FIELDS`),
+  with a runtime guard that raises if the projection ever produces an unlisted key.
+- **Public identity only.** Actors are `public_id`; email is deliberately excluded —
+  audit events may carry it because the audit trail is access-controlled, but an export
+  artifact is a document that leaves the system. DB primary keys, `response_id` and the
+  `TimeStampedModel` columns are excluded.
+- **Conditional.** The `reviewer_amendments` key is *omitted* where no amendment exists,
+  not emitted as an empty list. `reviewer_conclusion_note` is likewise omitted rather
+  than emitted as `null` (**MINOR-1**).
+- **Sequence preserved.** Ordered by `new_version`, then `amended_at`, then `public_id`.
+  Canonicalisation sorts object *keys* only and never reorders a list, so the governed
+  chronology survives hashing.
+- **Checksum-covered**, per the same `Checksum coverage` clause.
+
+This was the first reader of `ChecklistResponseHistory` anywhere in the codebase — it has
+no serializer and no API — so the projection was written against the model directly
+rather than inherited from an existing read contract.
 
 ### 3.2 Canonicalisation (`4D4-DEC-006`)
 
@@ -147,6 +238,19 @@ all touched files returned **NONE**.
 | 3b | Both ordering layers removed (recursive sort **and** `sort_keys`) | **2 failed** | `test_key_order_does_not_affect_canonical_bytes`, `test_nested_key_order_does_not_affect_canonical_bytes` |
 | 4 | Permission check removed from `export_execution()` | **3 failed** | `test_doer_cannot_export_despite_holding_view`, `test_reviewer_cannot_export`, `test_direct_service_call_enforces_permission` |
 
+**Post-review remediation mutations** (re-run after MAJOR-1/MAJOR-2 were fixed):
+
+| # | Mutation | Result | Failing tests |
+|---|---|---|---|
+| A | `generated_at` removed from the governed payload | **14 failed** overall; **3** in `TestChecksum` | `test_generated_at_lives_in_the_hashed_payload_not_the_envelope`, `test_a_different_generated_at_changes_the_checksum`, `test_generated_at_is_canonical_utc_z` |
+| B | Reviewer-amendment projection removed | **6 failed** | `test_included_when_a_governed_amendment_exists`, `test_projection_is_allow_listed_and_carries_no_db_ids`, `test_amendment_order_is_governed_sequence_not_alphabetical`, `test_adding_an_amendment_changes_the_checksum`, +2 |
+| C | Amendments present in the artifact but excluded from the hashed bytes | **5 failed** | `test_adding_an_amendment_changes_the_checksum`, `test_changing_an_exported_amendment_field_changes_the_checksum`, +3 governed-state checksum tests |
+| D | Public `csv_safe_cell()` bypassed | **15 failed** | reconciliation + controlled-export CSV safety |
+
+Mutation C is the one that matters for MAJOR-2: B proves the data is *projected*, C proves
+it is *hashed*. Without C, an implementation could export amendments while leaving them
+outside the tamper-evidence boundary.
+
 **Note on 3a — reported rather than hidden.** Disabling `sort_keys` alone did *not*
 fail any test, because `_canonicalise()` already sorts recursively. That is not a test
 gap: the two layers are deliberate defense-in-depth, and either alone is sufficient for
@@ -166,8 +270,8 @@ shared — which is the point of the promotion.
 | `ruff check .` | All checks passed |
 | `ruff format --check .` | 274 files already formatted |
 | `lint-imports` | exit 0 — `common` still has no domain imports |
-| `templates_registry` suite | 99 passed (CSV helper repointing) |
-| New controlled-export suite | 49 passed |
+| `templates_registry` suite | 100 passed (CSV helper repointing + MINOR-3 delegation test) |
+| New controlled-export suite | 64 passed |
 
 Full-backend result and coverage are recorded in §7.
 
@@ -175,20 +279,29 @@ Full-backend result and coverage are recorded in §7.
 
 ## 7. Full backend suite
 
-| | Baseline (`regx-main` @ `63f4473`) | This branch | Delta |
-|---|---|---|---|
-| Passed | 1814 | **1863** | **+49** |
-| Failed | 0 | **0** | 0 |
-| Skipped / xfailed | 0 | **0** | 0 |
-| Coverage | 94.56% | **94.66%** | **+0.10 pp** |
+| | Baseline (`regx-main` @ `63f4473`) | Pre-review | **Post-remediation** | Delta vs base |
+|---|---|---|---|---|
+| Passed | 1814 | 1863 | **1879** | **+65** |
+| Failed | 0 | 0 | **0** | 0 |
+| Skipped / xfailed | 0 | 0 | **0** | 0 |
+| Coverage | 94.56% | 94.66% | **94.68%** | **+0.12 pp** |
 
-`1863 passed, 4 warnings in 745.46s` — `Required test coverage of 55% reached. Total
-coverage: 94.66%`.
+`1879 passed, 4 warnings in 624.69s` — `Required test coverage of 55% reached. Total
+coverage: 94.68%`.
 
-The delta is exactly the 49 new controlled-export tests: no pre-existing test was
-skipped, xfailed, removed, or weakened. In particular the APP-009 tests, the response
-payload-contract tests, and the frozen-dataclass immutability tests are byte-identical
-to `regx-main`. Coverage moved **up**, not down.
+The +65 is 64 controlled-export tests plus the reconciliation alias-delegation test
+(MINOR-3). No pre-existing test was skipped, xfailed, removed, or weakened. In
+particular the APP-009 tests, the response payload-contract tests, and the
+frozen-dataclass immutability tests are byte-identical to `regx-main`.
+
+**Three pre-existing tests in this branch's own suite were rewritten, not weakened.**
+`test_generated_at_is_outside_the_hashed_bytes` asserted the contract MAJOR-1 found to be
+wrong; it is replaced by four tests asserting the corrected contract. The other two
+(`test_same_state_yields_the_same_checksum`,
+`test_an_excluded_internal_field_does_not_move_the_checksum`) now pin `generated_at`
+through a narrowly frozen clock constant so they compare like with like — the service's
+own UTC normalisation is untouched and still exercised by
+`test_generated_at_is_canonical_utc_z`. Coverage moved **up**, not down.
 
 ---
 
