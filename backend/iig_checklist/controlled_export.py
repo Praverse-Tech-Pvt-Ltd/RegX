@@ -26,12 +26,24 @@ serialized export payload" -- singular and format-independent, and ``DEC-006``
 defines canonical form in *data* terms (key ordering, decimal rendering,
 timestamps, UTF-8), not CSV-row terms. So there is one governed ``payload``,
 hashed once; JSON and CSV are two renderings of it and both carry that same
-checksum. ``generated_at`` and the checksum itself live in the **envelope** and
-are deliberately outside the hashed bytes: hashing the timestamp would make two
-exports of identical regulatory state disagree, which would destroy the property
-that makes the checksum useful -- that the checksum can be re-derived from the
-state it attests to. ``export_schema_version`` *is* inside the payload, so a
-shape change is itself tamper-evident.
+checksum.
+
+``generated_at`` is **inside** the hashed payload. ``4D4-DEC-005`` is explicit --
+"All provenance included in the controlled export participates in the canonical
+serialized payload covered by the SHA-256 checksum" -- and it lists
+``generated_at`` as included artifact provenance. An earlier revision of this
+module placed it in an unhashed envelope on the theory that two exports of
+identical regulatory state ought to agree; independent review found that property
+is nowhere in the specification, and that excluding the timestamp defeated §17's
+stated purpose, which is to "verify a previously-issued export was not altered
+after the fact" -- an issued artifact whose timestamp can be rewritten without
+breaking its checksum is not tamper-evident. Two exports taken at different times
+legitimately differ. Reproducibility means *the same complete canonical payload
+yields the same hash*, not that two separate export runs agree.
+
+Only the checksum itself stays outside the hashed bytes, because a hash cannot
+cover itself. ``export_schema_version`` is inside, so a shape change is also
+tamper-evident.
 """
 
 from __future__ import annotations
@@ -310,6 +322,9 @@ def build_export_artifact(*, execution, generated_at):
     version = execution.checklist_version
     payload = {
         "export_schema_version": EXPORT_SCHEMA_VERSION,
+        # 4D4-DEC-005 "Checksum coverage": included artifact provenance
+        # participates in the hashed payload. See the module docstring.
+        "generated_at": _iso_utc(generated_at),
         "execution": {
             "execution_public_id": str(execution.public_id),
             "status": execution.status,
@@ -327,8 +342,10 @@ def build_export_artifact(*, execution, generated_at):
         ],
     }
 
+    # The envelope carries only what cannot be hashed: the checksum itself.
+    # generated_at lives in the payload alone -- duplicating it here would create
+    # a second copy that could drift from the one the checksum attests to.
     return {
-        "generated_at": _iso_utc(generated_at),
         "checksum": {"algorithm": CHECKSUM_ALGORITHM, "value": checksum_for(payload)},
         "payload": payload,
     }
@@ -394,7 +411,7 @@ def export_execution(*, tenant, execution_public_id, actor, fmt="json"):
                 "format": fmt,
                 "checksum_algorithm": artifact["checksum"]["algorithm"],
                 "checksum": artifact["checksum"]["value"],
-                "generated_at": artifact["generated_at"],
+                "generated_at": artifact["payload"]["generated_at"],
                 "response_count": len(artifact["payload"]["responses"]),
                 "checklist_version_public_id": (
                     artifact["payload"]["checklist_definition"]["version_public_id"]
@@ -460,7 +477,7 @@ def render_csv(artifact) -> str:
     writer.writerow(["field", "value"])
     metadata = [
         ("export_schema_version", payload["export_schema_version"]),
-        ("generated_at", artifact["generated_at"]),
+        ("generated_at", payload["generated_at"]),
         ("checksum_algorithm", artifact["checksum"]["algorithm"]),
         ("checksum_value", artifact["checksum"]["value"]),
         ("execution_public_id", payload["execution"]["execution_public_id"]),
