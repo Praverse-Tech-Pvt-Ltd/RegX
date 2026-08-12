@@ -26,6 +26,11 @@ PERM_APPROVE_EXECUTION = "iig_checklist.approve_execution"
 PERM_CANCEL_EXECUTION = "iig_checklist.cancel_execution"
 PERM_SUPERSEDE_EXECUTION = "iig_checklist.supersede_execution"
 PERM_VIEW_EXECUTION = "iig_checklist.view_execution"
+#: MILESTONE_4D_DISCOVERY.md §17 -- controlled export requires its own dedicated
+#: permission, "not implicit from `view`", matching the
+#: `fda_data.export_reconciliation` pattern. Holding view_execution must never by
+#: itself confer authority to emit a checksummed regulatory artifact.
+PERM_EXPORT_CHECKLIST = "iig_checklist.export_checklist"
 
 # Deliberately NOT granted to any built-in role below. Platform-master
 # checklist definitions are globally visible to every tenant, so
@@ -71,6 +76,12 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_APPROVE_EXECUTION,
         PERM_SUPERSEDE_EXECUTION,
         PERM_VIEW_EXECUTION,
+        # 4D-4 §17. Granted to VP only, matching the established
+        # templates_registry/fda_data export convention where Doer can run the
+        # work and Reviewer can view it, but neither may emit the artifact.
+        # Doer and Reviewer both hold PERM_VIEW_EXECUTION and still cannot
+        # export, which is exactly the "not implicit from view" requirement.
+        PERM_EXPORT_CHECKLIST,
     ],
     Role.BuiltIn.TENANT_ADMIN: [
         PERM_VIEW_DEFINITION,

@@ -149,6 +149,11 @@ urlpatterns = [
         name="execution-response-update",
     ),
     path(
+        "iig-checklists/executions/<uuid:public_id>/export/",
+        views.ChecklistExecutionExportView.as_view(),
+        name="execution-export",
+    ),
+    path(
         "iig-checklists/executions/<uuid:public_id>/responses/<uuid:response_public_id>/reviewer-conclusion/",
         views.ChecklistReviewerConclusionView.as_view(),
         name="execution-reviewer-conclusion",
