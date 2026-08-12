@@ -57,6 +57,7 @@ from decimal import Decimal
 from common.csv_safety import csv_safe_cell
 
 from .calculation_translation import format_decimal_plain
+from .governed_vocabularies import HISTORY_REASON_ANSWER_OVERRIDDEN
 
 __all__ = [
     "EXPORT_SCHEMA_VERSION",
@@ -161,6 +162,22 @@ ALLOWED_AMENDMENT_FIELDS: frozenset[str] = frozenset(
         "prior_entered_by_public_id",
         "prior_entered_at",
         "source_classification_snapshot",
+    }
+)
+
+#: `4D4-DEC-010` / §AC.5 -- the governed override group. Same positive-list
+#: discipline as the two allow-lists above: a column added to the override
+#: contract later cannot reach a regulatory artifact without a governed
+#: decision. Actor identity is `public_id` only; no email, no database keys.
+ALLOWED_OVERRIDE_FIELDS: frozenset[str] = frozenset(
+    {
+        "override_reason",
+        "original_system_derived_value",
+        "overridden_value",
+        "overridden_by_public_id",
+        "overridden_at",
+        "response_version",
+        "data_source_type_snapshot",
     }
 )
 
@@ -343,7 +360,42 @@ def _amendment_projection(amendment) -> dict:
     return projected
 
 
-def _response_projection(response, outcome, amendments=()) -> dict:
+def _override_projection(response) -> dict | None:
+    """The governed override group (`4D4-DEC-010` / §AC.5), or ``None``.
+
+    Conditional in exactly the sense `4D4-DEC-005` uses for reviewer provenance:
+    absent unless an override is actually recorded. The marker is a non-empty
+    ``override_reason``, matching the override service -- keying off
+    ``system_derived_value`` would misread a response whose original default was
+    legitimately null.
+
+    Both values appear here even though ``raw_value`` and ``system_derived_value``
+    are already top-level fields. The regulatory point of the group is that the
+    two are *distinguishable as an override pair* with the reason and actor that
+    justify them; a reader should not have to infer the relationship from two
+    unrelated columns.
+    """
+    if not (response.override_reason or "").strip():
+        return None
+
+    projected = {
+        "override_reason": response.override_reason,
+        "original_system_derived_value": response.system_derived_value,
+        "overridden_value": response.raw_value,
+        "overridden_by_public_id": (
+            str(response.entered_by.public_id) if response.entered_by_id else None
+        ),
+        "overridden_at": response.entered_at,
+        "response_version": response.version,
+        "data_source_type_snapshot": response.data_source_type_snapshot,
+    }
+    unexpected = set(projected) - ALLOWED_OVERRIDE_FIELDS
+    if unexpected:
+        raise ControlledExportError(f"override fields not in the allow-list: {sorted(unexpected)}")
+    return projected
+
+
+def _response_projection(response, outcome, amendments=(), override_history=()) -> dict:
     question = response.question
     projection = {
         "question_public_id": str(question.public_id),
@@ -365,6 +417,18 @@ def _response_projection(response, outcome, amendments=()) -> dict:
     if amendments:
         projection["reviewer_amendments"] = [
             _amendment_projection(amendment) for amendment in amendments
+        ]
+    # §AC.5 -- the override group and its governed ANSWER_OVERRIDDEN history.
+    # Kept separate from `reviewer_amendments`: both live in
+    # ChecklistResponseHistory, but a row written by the override service is not
+    # a reviewer-conclusion amendment, and filing it under that key would
+    # misdescribe the record. The governed code is what separates them.
+    override = _override_projection(response)
+    if override is not None:
+        projection["override"] = override
+    if override_history:
+        projection["override_history"] = [
+            _amendment_projection(amendment) for amendment in override_history
         ]
     return projection
 
@@ -389,7 +453,8 @@ def build_export_artifact(*, execution, generated_at):
 
     responses = list(
         ChecklistResponse.objects.filter(execution=execution)
-        .select_related("question")
+        # `entered_by` joined for the override group's actor public_id (§AC.5).
+        .select_related("question", "entered_by")
         .order_by("question__display_order", "question__code", "public_id")
     )
 
@@ -405,13 +470,23 @@ def build_export_artifact(*, execution, generated_at):
     # the amendment produced, with the append-only timestamp and public_id only as
     # deterministic tie-breakers -- never re-sorted for canonicalisation, which
     # would destroy the chronology the record exists to preserve.
+    #
+    # Partitioned by governed code: a row the override service wrote is not a
+    # reviewer-conclusion amendment, so the two are projected under different
+    # keys rather than blurred into one list.
     amendments: dict[int, list] = {}
+    override_history: dict[int, list] = {}
     for amendment in (
         ChecklistResponseHistory.objects.filter(response__execution=execution)
         .select_related("amended_by", "prior_entered_by")
         .order_by("new_version", "amended_at", "public_id")
     ):
-        amendments.setdefault(amendment.response_id, []).append(amendment)
+        bucket = (
+            override_history
+            if amendment.correction_reason == HISTORY_REASON_ANSWER_OVERRIDDEN
+            else amendments
+        )
+        bucket.setdefault(amendment.response_id, []).append(amendment)
 
     version = execution.checklist_version
     execution_block = {
@@ -438,7 +513,10 @@ def build_export_artifact(*, execution, generated_at):
         },
         "responses": [
             _response_projection(
-                response, outcomes.get(response.pk), amendments.get(response.pk, ())
+                response,
+                outcomes.get(response.pk),
+                amendments.get(response.pk, ()),
+                override_history.get(response.pk, ()),
             )
             for response in responses
         ],
@@ -543,6 +621,8 @@ CSV_RESPONSE_COLUMNS = (
     "calculation_reason_code",
     "calculation_provenance",
     "reviewer_amendments",
+    "override",
+    "override_history",
 )
 
 
@@ -628,6 +708,8 @@ def render_csv(artifact) -> str:
                 # _canonicalise sorts keys within each amendment but never
                 # reorders the list itself.
                 _csv_cell(response.get("reviewer_amendments")),
+                _csv_cell(response.get("override")),
+                _csv_cell(response.get("override_history")),
             ]
         )
 
