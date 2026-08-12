@@ -11,6 +11,7 @@ from rest_framework import serializers
 
 from .codes import CodeValidationError, normalize_code
 from .execution_constants import (
+    MAX_FREE_TEXT_CHARS,
     MAX_NOT_APPLICABLE_REASON_CHARS,
     MAX_RAW_VALUE_BYTES,
     MAX_RETURN_REASON_CHARS,
@@ -402,7 +403,13 @@ class ChecklistResponseUpdateSerializer(serializers.Serializer):
         max_length=MAX_NOT_APPLICABLE_REASON_CHARS,
         required=False,
     )
-    override_reason = serializers.CharField(allow_blank=True, required=False, default="")
+    # `override_reason` is deliberately NOT a field here. It is server-controlled
+    # on the ordinary update path (M4D3-SVC-006, and `_UPDATABLE_FIELDS` never
+    # applied it), so accepting and silently discarding it let a client believe
+    # it had recorded a governed reason when nothing was written. 4D-4 §AC.5
+    # keeps both override columns off this path entirely: the dedicated override
+    # action (`4D4-DEC-007`) is their only writer, and naming either field here
+    # now fails as `unknown_field` rather than being ignored.
 
     def validate(self, attrs):
         unknown = set(self.initial_data) - set(self.fields)
@@ -467,6 +474,107 @@ class ChecklistResponseUpdateSerializer(serializers.Serializer):
                     "detail": f"{question.answer_type} does not support is_not_applicable.",
                 }
             )
+        return attrs
+
+    def validate_raw_value(self, value):
+        if value is None:
+            return value
+        size = len(json.dumps(value).encode("utf-8"))
+        if size > MAX_RAW_VALUE_BYTES:
+            raise serializers.ValidationError(
+                {"error_code": "payload_too_large", "detail": "raw_value exceeds byte limit."}
+            )
+        return value
+
+
+class ChecklistResponseOverrideSerializer(serializers.Serializer):
+    """Transport shape for the dedicated override action (`4D4-DEC-007`).
+
+    Deliberately a separate serializer rather than a mode of the ordinary update
+    serializer: the override path accepts a different field set, and §AC.5 keeps
+    the two override columns off the ordinary PATCH entirely.
+    """
+
+    #: Same passthrough treatment as the ordinary update path -- presence is
+    #: checked here, structural validity by the shared governed validator in the
+    #: service, so `1.0` / `"1"` / `"1.0"` are not silently coerced to 1.
+    expected_version = serializers.JSONField(required=False, allow_null=True)
+    #: `allow_null=True` so a null value reaches the service and is refused there
+    #: with the governed `override_clear_not_supported` code (§AC.4) rather than
+    #: DRF's generic "may not be null" -- an attempted clear gets a governed
+    #: answer, not a transport-layer one.
+    raw_value = serializers.JSONField(required=False, allow_null=True)
+    #: §12 L718 -- mandatory, and enforced in the *service* so a direct domain
+    #: call is bound by it too. Blank and whitespace-only both pass the transport
+    #: layer untouched and are refused there with one governed code.
+    #:
+    #: `trim_whitespace=False` is load-bearing: DRF trims by default, which would
+    #: turn `"   "` into `""` and trip `allow_blank`, answering a governed
+    #: requirement with a transport-layer message. Leaving the value intact keeps
+    #: every form of "no reason" on the same path.
+    override_reason = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        trim_whitespace=False,
+        max_length=MAX_FREE_TEXT_CHARS,
+    )
+
+    def validate(self, attrs):
+        unknown = set(self.initial_data) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError(
+                {"error_code": "unknown_field", "detail": f"Unknown fields: {unknown}"}
+            )
+        # §AC.5 -- the preserved original is server-owned. Naming it is an
+        # attempt to author it, refused whatever value it carries.
+        for server_owned in ("system_derived_value", "version"):
+            if server_owned in self.initial_data:
+                raise serializers.ValidationError(
+                    {
+                        "error_code": "unknown_field",
+                        "detail": f"{server_owned} is not client-writable.",
+                    }
+                )
+        if "expected_version" not in attrs:
+            raise serializers.ValidationError(
+                {
+                    "error_code": "expected_version_required",
+                    "detail": "expected_version is required on a governed override.",
+                }
+            )
+        if "raw_value" not in attrs:
+            raise serializers.ValidationError(
+                {
+                    "error_code": "override_value_required",
+                    "detail": "raw_value is required on a governed override.",
+                }
+            )
+        if attrs.get("override_reason") is None:
+            raise serializers.ValidationError(
+                {
+                    "error_code": "override_reason_required",
+                    "detail": "override_reason is required on a governed override.",
+                }
+            )
+
+        question = self.context.get("question")
+        raw_value = attrs.get("raw_value")
+        if question is not None and raw_value is not None:
+            from .response_validation import InvalidRawValueShape, validate_raw_value_shape
+
+            try:
+                validate_raw_value_shape(
+                    question.answer_type,
+                    raw_value,
+                    question=question,
+                    execution=self.context.get("execution"),
+                    tenant=self.context.get("tenant"),
+                )
+            except InvalidRawValueShape as exc:
+                raise serializers.ValidationError(
+                    {"error_code": "invalid_raw_value_shape", "detail": str(exc)}
+                ) from exc
         return attrs
 
     def validate_raw_value(self, value):

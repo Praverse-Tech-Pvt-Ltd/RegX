@@ -33,10 +33,25 @@ from .calculation_translation import (
 HISTORY_REASON_APPLICABILITY_REEVALUATED = "APPLICABILITY_REEVALUATED"
 HISTORY_REASON_COMPONENT_REBOUND = "COMPONENT_REBOUND"
 
+#: ``4D4-DEC-004`` (APPROVED 2026-08-12, MILESTONE_4D_4_DISCOVERY.md §AC.2).
+#: Exactly one new code, covering **both** the first application of an override
+#: and the update of an active one. Apply and update are reconstructed from the
+#: history row's ``prior_*``/``new_*`` state and ``prior_version``/``new_version``
+#: -- the first override-coded row for a response is an apply, later ones are
+#: updates -- so no ``ANSWER_OVERRIDE_APPLIED`` / ``ANSWER_OVERRIDE_UPDATED``
+#: split is minted. There is deliberately **no clear code**: §12 specifies no
+#: governed clear transition, so §AC.4 defers it to its own decision.
+#:
+#: Neither existing code could be reused: M4D3-HST-005 instructs that no code
+#: shall be applied to an event type it does not describe, and an override is
+#: neither an applicability re-evaluation nor a component rebinding.
+HISTORY_REASON_ANSWER_OVERRIDDEN = "ANSWER_OVERRIDDEN"
+
 ALLOWED_HISTORY_REASON_CODES: frozenset[str] = frozenset(
     {
         HISTORY_REASON_APPLICABILITY_REEVALUATED,
         HISTORY_REASON_COMPONENT_REBOUND,
+        HISTORY_REASON_ANSWER_OVERRIDDEN,
     }
 )
 

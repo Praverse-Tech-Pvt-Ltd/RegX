@@ -45,6 +45,10 @@ class IigChecklistEvent:
     # full decision-detail payload including the artifact checksum, so a later
     # dispute can verify a previously-issued export against the audit trail.
     EXECUTION_EXPORTED = "iig_checklist.execution.exported"
+    #: MILESTONE_4D_DISCOVERY.md §12 L725 names this event exactly. Distinct from
+    #: the plain response.entered/updated events so an override is never
+    #: mistaken for an ordinary edit in the trail.
+    ANSWER_OVERRIDDEN = "iig_checklist.answer.overridden"
 
 
 def emit(
