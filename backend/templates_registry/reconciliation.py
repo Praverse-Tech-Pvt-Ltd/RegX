@@ -9,6 +9,8 @@ import io
 
 from django.db.models import Q
 
+from common.csv_safety import CSV_FORMULA_TRIGGER_CHARS, csv_safe_cell
+
 from .models import (
     MigrationRecordResult,
     MigrationRecordResultType,
@@ -19,24 +21,13 @@ from .models import (
 )
 from .serializers import NormalizationMappingSerializer, TemplateDuplicateCandidateSerializer
 
-# Any string whose effective first character (after skipping plain leading
-# spaces) is one of these is a formula/DDE trigger in Excel, Google Sheets,
-# and LibreOffice (CWE-1236). A leading apostrophe is the standard,
-# universally-supported "force text" escape: it makes the affected cell
-# display its original value verbatim while never being evaluated.
-_CSV_FORMULA_TRIGGER_CHARS = ("=", "+", "-", "@", "\t", "\r", "\n")
-
-
-def _csv_safe_cell(value) -> str:
-    """Neutralize a single CSV cell value against spreadsheet formula
-    injection. This only affects the rendered export -- it never touches
-    the underlying database value (callers pass in already-fetched strings;
-    nothing here performs a .save())."""
-    text = "" if value is None else str(value)
-    effective_first_char = text.lstrip(" ")[:1]
-    if effective_first_char in _CSV_FORMULA_TRIGGER_CHARS:
-        return "'" + text
-    return text
+# The CSV formula-injection guard now lives in ``common.csv_safety`` so there is
+# exactly one implementation platform-wide (MILESTONE_4D_DISCOVERY.md §17, former
+# Open Question 3). The module-local names are retained as aliases so this
+# module's existing call sites and tests keep working against the shared
+# implementation rather than a second copy that happens to agree today.
+_CSV_FORMULA_TRIGGER_CHARS = CSV_FORMULA_TRIGGER_CHARS
+_csv_safe_cell = csv_safe_cell
 
 
 def duplicate_candidates_for_source_package(source_package):
