@@ -128,6 +128,42 @@ _PROVENANCE_LIST_KEYS = {
     "subject_component_sources": "subject_component_sources",
 }
 
+#: ``4D4-DEC-005`` conditional reviewer provenance. ``ChecklistResponseHistory``
+#: is the repository's *only* governed amendment record -- append-only, one row
+#: per reviewer-conclusion amendment, never written on first entry -- so it is
+#: exactly the "current state plus conditional reviewer-amendment provenance"
+#: the decision describes, and no general response history is invented.
+#:
+#: Nothing else in the codebase reads this model: it has no serializer and no
+#: API. The export is its first reader, so the projection below is written
+#: field-by-field against the model rather than derived from an existing
+#: read contract, and actors are identified by ``public_id`` only. Email is
+#: deliberately excluded: audit events may carry it because the audit trail is
+#: access-controlled, but an export artifact is a document that leaves the
+#: system, and User's own docstring fixes ``public_id`` as the external identity.
+#: Database primary keys, ``response_id`` and the ``TimeStampedModel`` columns are
+#: excluded -- parent identity is already implied by nesting, and ``amended_at``
+#: is the governed amendment timestamp.
+ALLOWED_AMENDMENT_FIELDS: frozenset[str] = frozenset(
+    {
+        "amendment_public_id",
+        "prior_version",
+        "new_version",
+        "prior_raw_value",
+        "new_raw_value",
+        "prior_is_not_applicable",
+        "new_is_not_applicable",
+        "prior_not_applicable_reason",
+        "new_not_applicable_reason",
+        "correction_reason",
+        "amended_by_public_id",
+        "amended_at",
+        "prior_entered_by_public_id",
+        "prior_entered_at",
+        "source_classification_snapshot",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Canonicalisation -- 4D4-DEC-006
@@ -270,9 +306,46 @@ def _outcome_projection(outcome) -> dict | None:
     }
 
 
-def _response_projection(response, outcome) -> dict:
+def _amendment_projection(amendment) -> dict:
+    """One governed reviewer-conclusion amendment, explicitly allow-listed.
+
+    Built key-by-key rather than by iterating model fields, so a column added to
+    ``ChecklistResponseHistory`` later cannot reach a regulatory artifact without
+    a governed decision -- the same discipline ``4D4-DEC-005`` requires of
+    ``input_provenance``.
+    """
+    projected = {
+        "amendment_public_id": str(amendment.public_id),
+        "prior_version": amendment.prior_version,
+        "new_version": amendment.new_version,
+        "prior_raw_value": amendment.prior_raw_value,
+        "new_raw_value": amendment.new_raw_value,
+        "prior_is_not_applicable": amendment.prior_is_not_applicable,
+        "new_is_not_applicable": amendment.new_is_not_applicable,
+        "prior_not_applicable_reason": amendment.prior_not_applicable_reason or None,
+        "new_not_applicable_reason": amendment.new_not_applicable_reason or None,
+        "correction_reason": amendment.correction_reason,
+        "amended_by_public_id": (
+            str(amendment.amended_by.public_id) if amendment.amended_by_id else None
+        ),
+        "amended_at": amendment.amended_at,
+        "prior_entered_by_public_id": (
+            str(amendment.prior_entered_by.public_id) if amendment.prior_entered_by_id else None
+        ),
+        "prior_entered_at": amendment.prior_entered_at,
+        "source_classification_snapshot": amendment.source_classification_snapshot,
+    }
+    # Defence in depth: the literal above is the contract, and this makes a typo
+    # or an unreviewed addition fail loudly here rather than silently ship.
+    unexpected = set(projected) - ALLOWED_AMENDMENT_FIELDS
+    if unexpected:
+        raise ControlledExportError(f"amendment fields not in the allow-list: {sorted(unexpected)}")
+    return projected
+
+
+def _response_projection(response, outcome, amendments=()) -> dict:
     question = response.question
-    return {
+    projection = {
         "question_public_id": str(question.public_id),
         "question_code": question.code,
         "answer_type": question.answer_type,
@@ -285,6 +358,15 @@ def _response_projection(response, outcome) -> dict:
         "system_derived_value": response.system_derived_value,
         "calculation": _outcome_projection(outcome),
     }
+    # Conditional per 4D4-DEC-005: reviewer provenance appears "only where
+    # governed reviewer conclusion or amendment records exist". An empty list on
+    # every response would be an invented record and would also put a meaningless
+    # key into the hashed bytes, so the key is omitted instead.
+    if amendments:
+        projection["reviewer_amendments"] = [
+            _amendment_projection(amendment) for amendment in amendments
+        ]
+    return projection
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +382,7 @@ def build_export_artifact(*, execution, generated_at):
     re-queried, so a later change to reference data cannot alter a previously
     exported regulatory state.
     """
-    from .models import CalculationOutcome, ChecklistResponse
+    from .models import CalculationOutcome, ChecklistResponse, ChecklistResponseHistory
 
     if execution.status not in EXPORTABLE_EXECUTION_STATUSES:
         raise ExecutionNotExportable(execution.status)
@@ -319,18 +401,35 @@ def build_export_artifact(*, execution, generated_at):
         # writer; first-by-public_id matches how the writer and resolver select.
         outcomes.setdefault(outcome.response_id, outcome)
 
+    # Amendment history is *sequence* data. It is ordered by the governed version
+    # the amendment produced, with the append-only timestamp and public_id only as
+    # deterministic tie-breakers -- never re-sorted for canonicalisation, which
+    # would destroy the chronology the record exists to preserve.
+    amendments: dict[int, list] = {}
+    for amendment in (
+        ChecklistResponseHistory.objects.filter(response__execution=execution)
+        .select_related("amended_by", "prior_entered_by")
+        .order_by("new_version", "amended_at", "public_id")
+    ):
+        amendments.setdefault(amendment.response_id, []).append(amendment)
+
     version = execution.checklist_version
+    execution_block = {
+        "execution_public_id": str(execution.public_id),
+        "status": execution.status,
+        "formulation_version_public_id": str(execution.formulation_version.public_id),
+    }
+    # Conditional per 4D4-DEC-005 -- omitted rather than emitted as a null
+    # placeholder when no governed reviewer conclusion exists.
+    if execution.reviewer_conclusion_note:
+        execution_block["reviewer_conclusion_note"] = execution.reviewer_conclusion_note
+
     payload = {
         "export_schema_version": EXPORT_SCHEMA_VERSION,
         # 4D4-DEC-005 "Checksum coverage": included artifact provenance
         # participates in the hashed payload. See the module docstring.
         "generated_at": _iso_utc(generated_at),
-        "execution": {
-            "execution_public_id": str(execution.public_id),
-            "status": execution.status,
-            "formulation_version_public_id": str(execution.formulation_version.public_id),
-            "reviewer_conclusion_note": execution.reviewer_conclusion_note or None,
-        },
+        "execution": execution_block,
         "checklist_definition": {
             "definition_public_id": str(version.definition.public_id),
             "definition_code": version.definition.code,
@@ -338,13 +437,16 @@ def build_export_artifact(*, execution, generated_at):
             "version_number": version.version_number,
         },
         "responses": [
-            _response_projection(response, outcomes.get(response.pk)) for response in responses
+            _response_projection(
+                response, outcomes.get(response.pk), amendments.get(response.pk, ())
+            )
+            for response in responses
         ],
     }
 
     # The envelope carries only what cannot be hashed: the checksum itself.
     # generated_at lives in the payload alone -- duplicating it here would create
-    # a second copy that could drift from the one the checksum attests to.
+    # a second copy that could drift from the one the checksum actually attests to.
     return {
         "checksum": {"algorithm": CHECKSUM_ALGORITHM, "value": checksum_for(payload)},
         "payload": payload,
@@ -440,6 +542,7 @@ CSV_RESPONSE_COLUMNS = (
     "calculation_unit",
     "calculation_reason_code",
     "calculation_provenance",
+    "reviewer_amendments",
 )
 
 
@@ -486,7 +589,10 @@ def render_csv(artifact) -> str:
             "formulation_version_public_id",
             payload["execution"]["formulation_version_public_id"],
         ),
-        ("reviewer_conclusion_note", payload["execution"]["reviewer_conclusion_note"]),
+        # Conditional in the payload, so read conditionally here. The CSV stays a
+        # flattening of the governed artifact rather than a second model: an
+        # absent governed record renders as an empty cell, not an invented value.
+        ("reviewer_conclusion_note", payload["execution"].get("reviewer_conclusion_note")),
         ("definition_public_id", payload["checklist_definition"]["definition_public_id"]),
         ("definition_code", payload["checklist_definition"]["definition_code"]),
         ("version_public_id", payload["checklist_definition"]["version_public_id"]),
@@ -518,6 +624,10 @@ def render_csv(artifact) -> str:
                 _csv_cell(calculation.get("unit")),
                 _csv_cell(calculation.get("reason_code")),
                 _csv_cell(calculation.get("provenance")),
+                # Sequence preserved: _csv_cell JSON-encodes the list as-is, and
+                # _canonicalise sorts keys within each amendment but never
+                # reorders the list itself.
+                _csv_cell(response.get("reviewer_amendments")),
             ]
         )
 
