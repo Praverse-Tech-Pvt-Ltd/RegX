@@ -197,10 +197,18 @@ Source: `MILESTONE_4D_DISCOVERY.md` §17 (L858–901). Also decided, not open.
   plus the pinned definition version — it must **never** re-query live
   FDA/formulation data (L907).
 
-**Payload content — partly open.** §18 requires "full per-question provenance",
-but 4D-3 deliberately keeps `input_provenance` out of the API projection. These
-are different audiences (a regulatory export vs. a UI read model) and the tension
-is **not** resolved by the repository.
+**Payload content — resolved by `4D4-DEC-005`, APPROVED.** §18 requires "full
+per-question provenance" while 4D-3 keeps `input_provenance` out of the API
+projection. The apparent tension resolved on inspection: those decisions answer
+different questions. `_input_descriptor()` is documented as producing "public
+identifiers, governed codes and unit evidence only — never a database primary
+key, model repr or regulated answer body beyond the exact governed input value"
+(M4D3-PRV-002), and `InputFailure` "carries public UUIDs and governed codes
+only". 4D-3 excluded provenance from the read model because it is **not display
+data**, not because it is unsafe to disclose.
+
+The approved contract is **Option C — a normalized, export-safe provenance
+projection**, recorded in full below.
 
 | Field | Include? | Basis |
 |---|---|---|
@@ -210,9 +218,89 @@ is **not** resolved by the repository.
 | Override: effective value, original, reason, actor | YES | §12 audit intent |
 | Reviewer conclusion | YES | §13 |
 | `CalculationOutcome` value / status / unit / `reason_code` | YES | §11, 4D-3 projection |
-| `input_provenance` / `inputs` | **OPEN** | §18 says provenance; 4D-3 excludes it |
+| Normalized calculation input provenance | YES | `4D4-DEC-005` |
+| `outcome.inputs` (raw kwargs) | **NO** | redundant — `4D4-DEC-005` §6 |
 | `generated_at`, SHA-256 checksum | YES | §17 |
+| `export_schema_version` | YES | `4D4-DEC-005` §13 |
 | Tenant scoping | YES | platform invariant |
+
+### I.1 Approved export provenance contract — `4D4-DEC-005`
+
+**Status: APPROVED** by the project Regulatory + Engineering authority.
+**Option C — normalized, export-safe provenance projection.**
+
+The controlled regulatory export shall include provenance sufficient to identify
+and reproduce the governed exported state **without widening the ordinary 4D-3
+API/read projection**.
+
+**Identifiers.** Stable public identifiers only.
+
+**Excluded outright:** database primary keys; model representations;
+exception/debug text; unrestricted or full audit-log dumps; implementation-internal
+fields not required for regulatory traceability.
+
+**Included where applicable:**
+
+| Group | Fields |
+|---|---|
+| Execution identity | checklist execution / assessment public identifier; checklist definition and version public identifier |
+| Question / response | question public identifier and governed question code; response public identifier; **response version** |
+| Answer state | raw governed answer value; applicability state and applicability reason; `data_source_type_snapshot`; `system_derived_value` where present |
+| Calculated result | `CalculationOutcome` public identifier; calculation status; calculated value; calculated unit; safe `reason_code` |
+| Calculation identity | calculation name / governed calculation identity; formula version; registry/binding version where part of the existing calculation contract |
+| Dependency chain | `assessment_snapshot_public_id`; upstream outcome public identifiers; subject/component public identifier where applicable |
+| Inputs | normalized calculation input provenance (below) |
+| Artifact | `generated_at`; SHA-256 checksum; `export_schema_version` |
+
+**Normalized calculation input provenance** shall follow the existing
+export-safe discipline (M4D3-PRV-002) and carry only governed/public fields:
+`source_kind`; `source_public_id`; `source_question_code` where applicable; the
+governed input value; unit evidence; `conversion_factor` and
+`conversion_rule_version` where applicable; and the governed detail/status code
+where applicable.
+
+**Allow-list, not a column dump.** The raw internal storage object must **not**
+be exported by serializing the entire `input_provenance` column unchanged. The
+export layer shall explicitly project an allow-listed, versioned contract, so a
+field added to the column in future cannot reach a regulatory artifact without a
+governed decision.
+
+**Redundancy.** `outcome.inputs`, and any other raw calculation kwargs, shall not
+be included where the normalized provenance projection already carries the
+governed input evidence.
+
+**Conditional groups.**
+
+- **Reviewer provenance** — included conditionally, only where governed reviewer
+  conclusion or amendment records exist.
+- **Override provenance** — CONDITIONAL; **not finalized until `4D4-DEC-004` is
+  resolved.**
+- **`approval_metadata`** — CONDITIONAL; **not finalized until `4D4-DEC-008` is
+  resolved.**
+
+**No invented history.** A full general response history shall not be invented
+where the repository maintains none. `ChecklistResponseHistory` is scoped to
+reviewer-conclusion amendments and is never written on first entry, so
+"current state plus conditional reviewer-amendment provenance" is what exists,
+not a minimisation choice.
+
+**Projection boundary.** The ordinary `CalculationOutcome` / UI API projection
+remains unchanged. No `input_provenance` widening is authorized for the normal
+frontend read path. Export provenance is assembled **server-side** through the
+permission-gated export service.
+
+**Schema versioning.** The export shall carry an explicit export schema version.
+No repository convention already covers this — `APP_VERSION` identifies the
+application, not the artifact — so **`export_schema_version` is approved as the
+initial contract name**. This is required rather than cosmetic: §17's SHA-256 is
+computed over a *canonical serialized payload*, so without a recorded shape
+version a later change silently renders previously issued checksums
+unverifiable. Schema-version changes are themselves governed, and historical
+exported artifacts must remain interpretable when the shape evolves.
+
+**Checksum coverage.** All provenance included in the controlled export
+participates in the canonical serialized payload covered by the SHA-256 checksum
+(`4D4-DEC-006` fixes the canonical form).
 
 ## J. Production checklist content
 
@@ -423,7 +511,10 @@ blocked by APP-009. See §AB.
 >
 > The `4D4-DEC-009` precondition on controlled-export **release** is therefore
 > met. **This does not make controlled exports implemented** — none of §I exists
-> yet, and the export payload still depends on the open `4D4-DEC-005`.
+> yet. Its payload provenance contract is now settled by `4D4-DEC-005`
+> (APPROVED, §I.1); what remains outstanding for exports is implementation, plus
+> the conditional override and `approval_metadata` groups that wait on
+> `4D4-DEC-004` and `4D4-DEC-008`.
 
 **Inconsistency recorded, not silently reconciled:** `docs/ROADMAP.md` stated
 *"Milestone 4D (regulatory checklist execution): NOT STARTED"* while 4D-1, 4D-2
@@ -449,7 +540,7 @@ beside it elsewhere in this repository or in a task report.
 | **4D4-DEC-002** | `expected_version` semantics for the override write path | 4D-3 made optimistic concurrency mandatory on governed writes; §12 predates it and is silent. An override is a fourth governed write. | §12 (L715–754); 4D-3 `validate_expected_version()` | Project owner | **APPROVED** 2026-08-11 | — | Override writes **reuse the shared `validate_expected_version()`**. No second structural rule. |
 | **4D4-DEC-003** | Lifecycle states in which an override may be recorded | §12 does not state them. `EDITABLE_EXECUTION_STATUSES` (`draft`, `returned`) is the analogue but is not stated for overrides. | §12; `services.py` `EDITABLE_EXECUTION_STATUSES` | Project owner | **APPROVED** 2026-08-11 | — | Override permitted **only in the existing editable execution states: `draft` and `returned`** — i.e. exactly `EDITABLE_EXECUTION_STATUSES`. |
 | **4D4-DEC-004** | History reason-code vocabulary for override/deviation | `ALLOWED_HISTORY_REASON_CODES` is a closed vocabulary holding only `APPLICABILITY_REEVALUATED` and `COMPONENT_REBOUND`; neither describes an override. Adding one is a governed vocabulary change. | `governed_vocabularies.py`; M4D3-HST-005 | Eng lead + Regulatory | **OPEN** | Slice 2 | — |
-| **4D4-DEC-005** | Export payload provenance depth | §18 requires "full per-question provenance"; 4D-3 deliberately excludes `input_provenance` from the API projection. Different audiences, unresolved tension. | §17 (L887); §18; 4D-3 projection | Regulatory + Eng lead | **OPEN** | Slice 1 | — |
+| **4D4-DEC-005** | Export payload provenance depth | §18 requires "full per-question provenance"; 4D-3 deliberately excludes `input_provenance` from the API projection. Different audiences. | §17 (L887); §18; 4D-3 projection; M4D3-PRV-002 | Regulatory + Eng lead | **APPROVED** | — | **Option C — normalized, export-safe provenance projection.** Full contract in §I. The ordinary 4D-3 API projection is unchanged; provenance is assembled server-side in the permission-gated export service, allow-listed rather than column-dumped, and versioned. |
 | **4D4-DEC-006** | Canonical export serialization + checksum contract | §17 mandates a SHA-256 over the "canonical serialized export payload" but does not define canonical form (key order, decimal rendering, timestamp format). Without it the checksum is not reproducible. | §17 (L888); 4D-3 `format_decimal_plain()` | Project owner | **APPROVED** 2026-08-11 | — | Canonical form: **deterministic key ordering; `format_decimal_plain()` for decimals; UTC ISO-8601 timestamps; stable UTF-8 bytes.** |
 | **4D4-DEC-007** | Override API shape — dedicated action endpoint vs. extension of the governed response PATCH | §12 requires enforcement "at the transition boundary, not just serializer validation", which suggests an action; the repository does not decide. | §12 (L718); `_ChecklistActionViewBase` pattern | Project owner | **APPROVED** 2026-08-11 | — | **Dedicated governed action endpoint**, not the ordinary response PATCH. |
 | **4D4-DEC-008** | `approval_metadata` schema and mutability | 4D-2 records it as `null` with "shape defined in 4D-4". No source defines the shape. §V holds a **PROPOSED, non-normative** sketch only. | `MILESTONE_4D_2_DISCOVERY.md:529`; `4D_1_..._SPEC.md:353` | Regulatory + Eng lead | **PENDING APPROVAL** | Slice 2/3 | — |
@@ -460,9 +551,10 @@ beside it elsewhere in this repository or in a task report.
 on synthetic content is unblocked. Slice 2 (overrides) still requires
 `4D4-DEC-004` and `4D4-DEC-010`. Slice 1's *release* precondition —
 `4D4-DEC-009`'s closure of APP-009 — is now **met** (PR #12, `1c6bd16`); its
-payload shape still requires `4D4-DEC-005`, which remains open, and no export
-code exists yet. Production regulatory content remains blocked in full by the
-content-approval package.
+payload provenance contract is settled by `4D4-DEC-005` (APPROVED, §I.1). No
+export code exists yet, and the conditional override and `approval_metadata`
+groups remain gated on `4D4-DEC-004` and `4D4-DEC-008`. Production regulatory
+content remains blocked in full by the content-approval package.
 
 ---
 
@@ -509,8 +601,9 @@ is bound identically to an HTTP request; rejection is inert. See
 `MILESTONE_4D_4_APP_009_EVIDENCE.md`.
 
 Controlled-export release is therefore **no longer blocked by APP-009**. It
-remains unimplemented, and its payload shape still depends on `4D4-DEC-005`,
-which stays open.
+remains **unimplemented**. Its payload provenance contract is settled by
+`4D4-DEC-005` (APPROVED, §I.1); the conditional override and `approval_metadata`
+groups still wait on `4D4-DEC-004` and `4D4-DEC-008`.
 
 ### Approved engineering conventions
 
@@ -536,13 +629,15 @@ Current as of `regx-main` `1c6bd16` (PR #12 merged).
 | Engineering may start | **YES** — synthetic content only |
 | Production content may start | **NO** |
 | APP-009 prerequisite (`4D4-DEC-009`) | **SATISFIED** — closed and merged, PR #12 |
-| Controlled export **release** | **NOT BLOCKED BY APP-009.** Still **NOT IMPLEMENTED**; payload shape depends on open `DEC-005` |
+| Controlled export **specification** | **READY** — §17 decided; `DEC-005` provenance APPROVED (§I.1); `DEC-006` canonical form approved; `DEC-009` satisfied |
+| Controlled export **implementation** | **NOT STARTED** |
+| Controlled export **release** | **NOT BLOCKED BY APP-009.** Override and `approval_metadata` groups remain conditional on `DEC-004` / `DEC-008` |
 | Override implementation | **PARTIALLY READY** — `DEC-002/003/007` approved; `DEC-004`, `DEC-010` open |
 | Reviewer conclusion | **PARTIALLY READY** — service exists; serializer-coercion disposition open |
 | Production checklist content | **BLOCKED** — content-approval package, **0 of 20** production-content items approved |
 
-Only `4D4-DEC-009` changed state. `DEC-004`, `DEC-005`, `DEC-008` and `DEC-010`
-remain open and are untouched by the APP-009 merge.
+`4D4-DEC-009` was satisfied by the APP-009 merge; `4D4-DEC-005` is now APPROVED
+(§I.1). `DEC-004`, `DEC-008` and `DEC-010` remain open and are untouched.
 
 **Already decided by repository evidence — recorded here so they are not
 re-litigated as open questions:** override is permitted only on
