@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, iigChecklists } from "@/lib/api";
 import type { ChecklistResponseDTO } from "@/lib/api";
+import { toPayloadValue } from "@/app/iig-checklists/executions/[executionPublicId]/ChecklistResponses";
 
 const TENANT = "alpha";
 const EXECUTION = "exec-public-0001";
@@ -147,6 +148,92 @@ describe("responses.update - governed expected_version transport", () => {
 
     expect(updated.version).toBe(9);
     expect(updated.dataSourceTypeSnapshot).toBe("user_required");
+  });
+});
+
+describe("raw_value wire contract - real serializer, real request body", () => {
+  // These deliberately do NOT mock responses.update(). The defect this covers
+  // escaped precisely because earlier tests mocked past the wire: the helper was
+  // asserted to have been *called*, never inspected for what it actually sent.
+  // Here the real toPayloadValue() feeds the real update() and the request body
+  // is read back off the stubbed fetch.
+  //
+  // Shapes mirror backend/iig_checklist/response_validation.py exactly.
+
+  async function sentRawValue(answerType: string, text: string) {
+    const fetchMock = stubFetch(() => json(responseDTO({ version: 5 })));
+    await iigChecklists.executions.responses.update(TENANT, EXECUTION, RESPONSE, {
+      expected_version: 4,
+      raw_value: toPayloadValue(answerType, text),
+    });
+    const patchCall = fetchMock.mock.calls.find(
+      ([, init]) => (init as RequestInit | undefined)?.method === "PATCH"
+    );
+    return bodyOf(patchCall?.[1] as RequestInit | undefined).raw_value;
+  }
+
+  it("short_text sends an enveloped string", async () => {
+    expect(await sentRawValue("short_text", "abc")).toEqual({ value: "abc" });
+  });
+
+  it("long_narrative sends an enveloped string", async () => {
+    expect(await sentRawValue("long_narrative", "a longer answer")).toEqual({
+      value: "a longer answer",
+    });
+  });
+
+  it("integer sends an enveloped JSON integer, not a string", async () => {
+    const sent = await sentRawValue("integer", "12");
+    expect(sent).toEqual({ value: 12 });
+    expect(typeof (sent as { value: unknown }).value).toBe("number");
+  });
+
+  it("decimal sends an enveloped decimal string, never a JS number", async () => {
+    // A regulated figure must not round-trip through a float.
+    const sent = await sentRawValue("decimal", "12.5000000000");
+    expect(sent).toEqual({ value: "12.5000000000" });
+    expect(typeof (sent as { value: unknown }).value).toBe("string");
+  });
+
+  it("percentage sends an enveloped decimal string", async () => {
+    const sent = await sentRawValue("percentage", "99.9");
+    expect(sent).toEqual({ value: "99.9" });
+    expect(typeof (sent as { value: unknown }).value).toBe("string");
+  });
+
+  it("date sends an enveloped ISO-8601 date string", async () => {
+    expect(await sentRawValue("date", "2026-08-11")).toEqual({ value: "2026-08-11" });
+  });
+
+  it("yes_no sends an enveloped JSON boolean", async () => {
+    const yes = await sentRawValue("yes_no", "true");
+    expect(yes).toEqual({ value: true });
+    expect(typeof (yes as { value: unknown }).value).toBe("boolean");
+    expect(await sentRawValue("yes_no", "false")).toEqual({ value: false });
+  });
+
+  it("yes_no_na sends the closed string vocabulary, not a boolean", async () => {
+    expect(await sentRawValue("yes_no_na", "yes")).toEqual({ value: "yes" });
+    expect(await sentRawValue("yes_no_na", "no")).toEqual({ value: "no" });
+    expect(await sentRawValue("yes_no_na", "not_applicable")).toEqual({
+      value: "not_applicable",
+    });
+  });
+
+  it("yes_no_na 'no' is a string, never the boolean false", async () => {
+    // The old helper mapped these through booleans; the backend refuses that.
+    const sent = await sentRawValue("yes_no_na", "no");
+    expect(typeof (sent as { value: unknown }).value).toBe("string");
+    expect((sent as { value: unknown }).value).not.toBe(false);
+  });
+
+  it("an empty edit clears the answer with a bare null, not an envelope", async () => {
+    expect(await sentRawValue("short_text", "")).toBeNull();
+  });
+
+  it("an unparseable integer is forwarded verbatim for the backend to refuse", async () => {
+    // Better a clear server-side type error than a client-invented number.
+    expect(await sentRawValue("integer", "not-a-number")).toEqual({ value: "not-a-number" });
   });
 });
 

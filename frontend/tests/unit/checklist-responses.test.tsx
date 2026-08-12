@@ -230,7 +230,8 @@ describe("ChecklistResponses — governed editing and refresh", () => {
 
     await waitFor(() => expect(api.responsesUpdate).toHaveBeenCalledTimes(1));
     const payload = api.responsesUpdate.mock.calls[0]?.[3];
-    expect(payload).toMatchObject({ expected_version: 4, raw_value: "75" });
+    // raw_value is enveloped per the backend contract, not a bare scalar.
+    expect(payload).toMatchObject({ expected_version: 4, raw_value: { value: "75" } });
 
     // Option B: the authoritative collection is re-read after the write.
     await waitFor(() => expect(api.responsesList).toHaveBeenCalledTimes(2));
@@ -339,6 +340,76 @@ describe("ChecklistResponses — governed editing and refresh", () => {
       (call) => call[2] === CALC_ID
     );
     expect(calculatedWrites).toHaveLength(0);
+  });
+
+  it("offers no applicability control for a rule-governed question", async () => {
+    api.responsesList.mockResolvedValue([manual(4)]);
+    api.versionsGet.mockResolvedValue({
+      sections: [
+        {
+          ...VERSION_PAYLOAD.sections[0],
+          questions: [
+            {
+              ...VERSION_PAYLOAD.sections[0]!.questions[0]!,
+              applicability_rule_public_id: "rule-public-0001",
+            },
+          ],
+        },
+      ],
+    });
+    renderResponses();
+
+    const row = await screen.findByTestId(`response-${MANUAL_ID}`);
+    // M4D3-APP-009: applicability is server-owned, so no control is offered.
+    expect(within(row).queryByRole("checkbox")).toBeNull();
+    expect(screen.getByTestId(`applicability-governed-${MANUAL_ID}`)).toBeInTheDocument();
+    // The answer itself stays editable — APP-009 owns applicability, not the answer.
+    expect(within(row).getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("omits the server-owned applicability fields from a rule-governed save", async () => {
+    const user = userEvent.setup();
+    api.responsesList.mockResolvedValue([manual(4)]);
+    api.versionsGet.mockResolvedValue({
+      sections: [
+        {
+          ...VERSION_PAYLOAD.sections[0],
+          questions: [
+            {
+              ...VERSION_PAYLOAD.sections[0]!.questions[0]!,
+              applicability_rule_public_id: "rule-public-0001",
+            },
+          ],
+        },
+      ],
+    });
+    api.responsesUpdate.mockResolvedValue(manual(5));
+
+    renderResponses();
+    const row = await screen.findByTestId(`response-${MANUAL_ID}`);
+    await user.click(within(row).getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(api.responsesUpdate).toHaveBeenCalledTimes(1));
+    const payload = api.responsesUpdate.mock.calls[0]?.[3] as Record<string, unknown>;
+    // Their mere presence is refused by the server, so they must be absent.
+    expect(payload).not.toHaveProperty("is_not_applicable");
+    expect(payload).not.toHaveProperty("not_applicable_reason");
+    expect(payload).toHaveProperty("expected_version", 4);
+  });
+
+  it("still sends applicability fields when no rule governs the question", async () => {
+    const user = userEvent.setup();
+    api.responsesList.mockResolvedValue([manual(4)]);
+    api.responsesUpdate.mockResolvedValue(manual(5));
+
+    renderResponses();
+    const row = await screen.findByTestId(`response-${MANUAL_ID}`);
+    await user.click(within(row).getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(api.responsesUpdate).toHaveBeenCalledTimes(1));
+    const payload = api.responsesUpdate.mock.calls[0]?.[3] as Record<string, unknown>;
+    expect(payload).toHaveProperty("is_not_applicable");
+    expect(payload).toHaveProperty("not_applicable_reason");
   });
 
   it("does not offer editing once the execution leaves an editable status", async () => {

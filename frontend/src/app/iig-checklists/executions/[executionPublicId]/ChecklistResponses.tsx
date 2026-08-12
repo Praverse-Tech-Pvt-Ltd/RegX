@@ -65,42 +65,140 @@ export function isEditableResponse(
   if (!EDITABLE_EXECUTION_STATUSES.has(executionStatus)) return false;
   if (isServerControlled(response.dataSourceTypeSnapshot)) return false;
   if (question?.answer_type === REVIEWER_CONCLUSION) return false;
+  // Offer a control only where this editor can produce the exact governed
+  // payload shape. An answer type it cannot serialize — or a question whose
+  // metadata failed to load — is shown read-only rather than given a control
+  // whose every save would be refused as invalid_raw_value_shape.
+  if (!isEditableAnswerType(question?.answer_type)) return false;
   return true;
 }
 
-/** Render the stored raw_value for an input box without inventing a value. */
+/**
+ * Answer types this editor can serialize to the backend's canonical shape.
+ *
+ * `response_validation.py` gives every one of the 18 answer types an exact
+ * accepted shape, and they are not uniform. These eight are the ones a single
+ * value control can produce faithfully. The rest need a shape this editor has
+ * no control for and are therefore rendered read-only rather than offered with
+ * a control that could only ever produce a rejected payload:
+ *
+ *   quantity_with_unit                {"value": <decimal string>, "unit": <code>}
+ *   single_select                     {"option": <code>}
+ *   multi_select                      {"options": [<codes>]}     sorted, unique
+ *   fda_record_reference              {"public_id", "record_type"}
+ *   formulation_component_reference   {"public_id"}
+ *   attachment_reference              {"document_version_public_id"}
+ *
+ * calculated_value, calculated_status and approval_metadata are never
+ * client-writable at all, and reviewer_conclusion has its own endpoint.
+ */
+export const EDITABLE_ANSWER_TYPES = [
+  "short_text",
+  "long_narrative",
+  "integer",
+  "decimal",
+  "percentage",
+  "date",
+  "yes_no",
+  "yes_no_na",
+] as const;
+
+export type EditableAnswerType = (typeof EDITABLE_ANSWER_TYPES)[number];
+
+export function isEditableAnswerType(answerType: string | undefined): boolean {
+  return (EDITABLE_ANSWER_TYPES as readonly string[]).includes(answerType ?? "");
+}
+
+/** The closed vocabulary `yes_no_na` accepts — a string set, not a boolean. */
+export const YES_NO_NA_OPTIONS = ["yes", "no", "not_applicable"] as const;
+
+/**
+ * The canonical `raw_value` envelope. Every type this editor supports carries a
+ * single `value` key; the differences are in the inner JSON type.
+ */
+export interface RawValuePayload {
+  value: string | number | boolean;
+}
+
+/**
+ * Render a stored raw_value back into the edit control.
+ *
+ * Stored values are always enveloped, so the envelope is unwrapped here —
+ * showing the raw JSON would put `{"value":"abc"}` in the text box and round-trip
+ * it straight back to the server.
+ */
 function toEditableText(rawValue: unknown): string {
   if (rawValue === null || rawValue === undefined) return "";
+  if (typeof rawValue === "object" && rawValue !== null && "value" in rawValue) {
+    const inner = (rawValue as { value: unknown }).value;
+    return inner === null || inner === undefined ? "" : String(inner);
+  }
   if (typeof rawValue === "string") return rawValue;
   if (typeof rawValue === "number" || typeof rawValue === "boolean") return String(rawValue);
   return JSON.stringify(rawValue);
 }
 
 /**
- * Convert the edited text back to the shape the governed serializer expects.
- * Anything we cannot type confidently is sent through as a string and left for
- * the backend's central answer-type validation to accept or reject — the client
- * never widens what the server considers valid.
+ * Build the governed `raw_value` payload for an edited answer.
+ *
+ * The backend requires an envelope — `{"value": …}` — for every type this editor
+ * supports, with an exact inner type per `response_validation.py`:
+ *
+ *   short_text / long_narrative   non-empty string
+ *   decimal / percentage          decimal *string*, never a JS number, so no
+ *                                 precision is lost on a regulated figure
+ *   date                          "YYYY-MM-DD"
+ *   integer                       JSON integer (a bool is explicitly refused)
+ *   yes_no                        JSON **boolean**
+ *   yes_no_na                     "yes" | "no" | "not_applicable" — a string
+ *                                 vocabulary, deliberately not a boolean
+ *
+ * An empty edit clears the answer (`null`), which is what the governed service
+ * expects for "no answer"; it is not the same as declaring the response N/A.
+ *
+ * An unparseable integer is forwarded as the typed-in string rather than being
+ * coerced or silently dropped, so the backend reports the type error instead of
+ * the client inventing a number the user did not enter.
  */
-export function toPayloadValue(answerType: string | undefined, text: string): unknown {
+export function toPayloadValue(
+  answerType: string | undefined,
+  text: string
+): RawValuePayload | null {
   if (text === "") return null;
   switch (answerType) {
     case "yes_no":
+      // The control offers exactly "true"/"false", so this is total.
+      return { value: text === "true" };
     case "yes_no_na":
-      if (text === "true") return true;
-      if (text === "false") return false;
-      return text;
+      return { value: text };
     case "integer": {
-      const n = Number.parseInt(text, 10);
-      return Number.isNaN(n) ? text : n;
+      const parsed = Number.parseInt(text, 10);
+      return { value: Number.isNaN(parsed) ? text : parsed };
     }
     default:
-      return text;
+      // short_text, long_narrative, decimal, percentage and date are all
+      // carried as strings on the wire.
+      return { value: text };
   }
 }
 
 /** The reason code the backend uses for a not-comparable engine result. */
 const REASON_NOT_COMPARABLE = "NOT_COMPARABLE";
+
+/**
+ * Is this question's applicability governed by a rule (M4D3-APP-008)?
+ *
+ * When it is, `is_not_applicable` and `not_applicable_reason` are server-owned:
+ * the governed update service rejects a client-supplied value for either with
+ * 403 `applicability_server_controlled` (M4D3-APP-009). The UI therefore offers
+ * no applicability control and omits both fields from the payload — sending
+ * them would fail every save, even one that only meant to change the answer.
+ *
+ * The answer itself stays editable: APP-009 owns applicability, not the answer.
+ */
+export function isApplicabilityRuleGoverned(question: ChecklistQuestion | undefined): boolean {
+  return Boolean(question?.applicability_rule_public_id);
+}
 
 /**
  * Read-only rendering of a governed calculation outcome.
@@ -242,20 +340,24 @@ export function ChecklistResponses({
     setSaveError(null);
     setNotice(null);
     try {
+      const question = questions[response.questionPublicId];
+      const payload: Parameters<typeof iigChecklists.executions.responses.update>[3] = {
+        // Straight from the loaded response — never defaulted or synthesised.
+        expected_version: response.version,
+        raw_value: toPayloadValue(question?.answer_type, draft.text),
+      };
+      // M4D3-APP-009: omit the server-owned fields entirely for a rule-governed
+      // response. Their mere presence is refused, so including them would break
+      // an otherwise valid answer edit.
+      if (!isApplicabilityRuleGoverned(question)) {
+        payload.is_not_applicable = draft.isNotApplicable;
+        payload.not_applicable_reason = draft.notApplicableReason || null;
+      }
       await iigChecklists.executions.responses.update(
         tenantSlug,
         executionPublicId,
         response.publicId,
-        {
-          // Straight from the loaded response — never defaulted or synthesised.
-          expected_version: response.version,
-          raw_value: toPayloadValue(
-            questions[response.questionPublicId]?.answer_type,
-            draft.text
-          ),
-          is_not_applicable: draft.isNotApplicable,
-          not_applicable_reason: draft.notApplicableReason || null,
-        }
+        payload
       );
       // Option B: the PATCH body describes only the edited response, so the
       // dependent calculations the backend just cascaded are read back here.
@@ -341,43 +443,88 @@ export function ChecklistResponses({
                   <label>
                     Answer
                     <br />
-                    <input
-                      type="text"
-                      aria-label={`Answer for ${question?.code ?? response.publicId}`}
-                      value={draft.text}
-                      disabled={busy || draft.isNotApplicable}
-                      onChange={(e) => setDraft(response.publicId, { text: e.target.value })}
-                    />
+                    {question?.answer_type === "yes_no" ? (
+                      // The backend requires a JSON boolean here, so the control
+                      // offers exactly two values rather than free text.
+                      <select
+                        aria-label={`Answer for ${question?.code ?? response.publicId}`}
+                        value={draft.text}
+                        disabled={busy || draft.isNotApplicable}
+                        onChange={(e) => setDraft(response.publicId, { text: e.target.value })}
+                      >
+                        <option value="">—</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                      </select>
+                    ) : question?.answer_type === "yes_no_na" ? (
+                      // Closed string vocabulary. Note this is the *answer*
+                      // "not_applicable", which is a different concept from the
+                      // response-level is_not_applicable applicability flag.
+                      <select
+                        aria-label={`Answer for ${question?.code ?? response.publicId}`}
+                        value={draft.text}
+                        disabled={busy || draft.isNotApplicable}
+                        onChange={(e) => setDraft(response.publicId, { text: e.target.value })}
+                      >
+                        <option value="">—</option>
+                        {YES_NO_NA_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        aria-label={`Answer for ${question?.code ?? response.publicId}`}
+                        value={draft.text}
+                        disabled={busy || draft.isNotApplicable}
+                        onChange={(e) => setDraft(response.publicId, { text: e.target.value })}
+                      />
+                    )}
                   </label>
                   <br />
-                  <label>
-                    <input
-                      type="checkbox"
-                      aria-label={`Not applicable for ${question?.code ?? response.publicId}`}
-                      checked={draft.isNotApplicable}
-                      disabled={busy}
-                      onChange={(e) =>
-                        setDraft(response.publicId, { isNotApplicable: e.target.checked })
-                      }
-                    />{" "}
-                    Not applicable
-                  </label>
-                  {draft.isNotApplicable && (
+                  {isApplicabilityRuleGoverned(question) ? (
+                    <span
+                      data-testid={`applicability-governed-${response.publicId}`}
+                      style={{ color: "#4b5563" }}
+                    >
+                      Applicability is determined by a rule and is not editable here.
+                    </span>
+                  ) : (
                     <>
-                      <br />
                       <label>
-                        Reason
-                        <br />
                         <input
-                          type="text"
-                          aria-label={`Not applicable reason for ${question?.code ?? response.publicId}`}
-                          value={draft.notApplicableReason}
+                          type="checkbox"
+                          aria-label={`Not applicable for ${question?.code ?? response.publicId}`}
+                          checked={draft.isNotApplicable}
                           disabled={busy}
                           onChange={(e) =>
-                            setDraft(response.publicId, { notApplicableReason: e.target.value })
+                            setDraft(response.publicId, { isNotApplicable: e.target.checked })
                           }
-                        />
+                        />{" "}
+                        Not applicable
                       </label>
+                      {draft.isNotApplicable && (
+                        <>
+                          <br />
+                          <label>
+                            Reason
+                            <br />
+                            <input
+                              type="text"
+                              aria-label={`Not applicable reason for ${question?.code ?? response.publicId}`}
+                              value={draft.notApplicableReason}
+                              disabled={busy}
+                              onChange={(e) =>
+                                setDraft(response.publicId, {
+                                  notApplicableReason: e.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                        </>
+                      )}
                     </>
                   )}
                   <br />
