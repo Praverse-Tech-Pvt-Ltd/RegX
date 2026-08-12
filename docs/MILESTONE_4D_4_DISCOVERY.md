@@ -411,6 +411,20 @@ Scope: the block applies to the controlled-export **release** only. Export
 infrastructure may be built beforehand; it may not ship. No other 4D-4 slice is
 blocked by APP-009. See §AB.
 
+> **SATISFIED — APP-009 closed and merged (PR #12, `regx-main` `1c6bd16`).**
+> Points 1–3 above describe the exposure as it stood; they are retained as the
+> record of *why* the decision was taken, not as a current statement of
+> behaviour. A client can no longer set `is_not_applicable` or
+> `not_applicable_reason` on a rule-governed response: the governed
+> response-update service refuses it with `applicability_server_controlled` and
+> HTTP 403, with no write, no version increment, no cascade, no outcome change
+> and no success audit. Implementation evidence is in
+> `MILESTONE_4D_4_APP_009_EVIDENCE.md`, on `regx-main`.
+>
+> The `4D4-DEC-009` precondition on controlled-export **release** is therefore
+> met. **This does not make controlled exports implemented** — none of §I exists
+> yet, and the export payload still depends on the open `4D4-DEC-005`.
+
 **Inconsistency recorded, not silently reconciled:** `docs/ROADMAP.md` stated
 *"Milestone 4D (regulatory checklist execution): NOT STARTED"* while 4D-1, 4D-2
 and 4D-3 were merged to `regx-main`. Corrected in a separate commit on this
@@ -439,14 +453,16 @@ beside it elsewhere in this repository or in a task report.
 | **4D4-DEC-006** | Canonical export serialization + checksum contract | §17 mandates a SHA-256 over the "canonical serialized export payload" but does not define canonical form (key order, decimal rendering, timestamp format). Without it the checksum is not reproducible. | §17 (L888); 4D-3 `format_decimal_plain()` | Project owner | **APPROVED** 2026-08-11 | — | Canonical form: **deterministic key ordering; `format_decimal_plain()` for decimals; UTC ISO-8601 timestamps; stable UTF-8 bytes.** |
 | **4D4-DEC-007** | Override API shape — dedicated action endpoint vs. extension of the governed response PATCH | §12 requires enforcement "at the transition boundary, not just serializer validation", which suggests an action; the repository does not decide. | §12 (L718); `_ChecklistActionViewBase` pattern | Project owner | **APPROVED** 2026-08-11 | — | **Dedicated governed action endpoint**, not the ordinary response PATCH. |
 | **4D4-DEC-008** | `approval_metadata` schema and mutability | 4D-2 records it as `null` with "shape defined in 4D-4". No source defines the shape. §V holds a **PROPOSED, non-normative** sketch only. | `MILESTONE_4D_2_DISCOVERY.md:529`; `4D_1_..._SPEC.md:353` | Regulatory + Eng lead | **PENDING APPROVAL** | Slice 2/3 | — |
-| **4D4-DEC-009** | APP-009 disposition before controlled exports are released | A client can currently set `is_not_applicable` on a rule-governed response; §17 would seal applicability state into a checksummed export. | `..._EVIDENCE.md:3322`; §17 (L888) | Project owner | **APPROVED** 2026-08-11 | Export **release** only | **APP-009 must be closed before controlled exports are released.** Exporting a rule-governed applicability value that remains client-mutable is not acceptable. Does **not** block unrelated 4D-4 slices. |
+| **4D4-DEC-009** | APP-009 disposition before controlled exports are released | At the time of the decision a client could set `is_not_applicable` on a rule-governed response, and §17 would seal applicability state into a checksummed export. | `..._EVIDENCE.md:3322`; §17 (L888) | Project owner | **APPROVED** 2026-08-11 · **SATISFIED** (PR #12, `1c6bd16`) | — (precondition met) | **APP-009 must be closed before controlled exports are released.** Closed and merged; the governed service now refuses client-supplied applicability on a rule-governed response with `applicability_server_controlled` / 403. Export release is no longer blocked by APP-009 — exports remain **unimplemented**. |
 | **4D4-DEC-010** | Are `EVIDENCE_DERIVED` and `REVIEWER_CONFIRMED` responses overridable? | §12 names only `FDA_DERIVED_DEFAULT`. Read conservatively as *not* overridable, but the exclusion is inferred rather than stated. | §12 (L717, L732) | Regulatory | **OPEN** | Slice 2 | — |
 
 **Sequencing consequence.** With `4D4-DEC-001` approved, generic 4D-4 engineering
 on synthetic content is unblocked. Slice 2 (overrides) still requires
-`4D4-DEC-004` and `4D4-DEC-010`; slice 1's *release* requires `4D4-DEC-009`'s
-closure of APP-009 and, for payload shape, `4D4-DEC-005`. Production regulatory
-content remains blocked in full by the content-approval package.
+`4D4-DEC-004` and `4D4-DEC-010`. Slice 1's *release* precondition —
+`4D4-DEC-009`'s closure of APP-009 — is now **met** (PR #12, `1c6bd16`); its
+payload shape still requires `4D4-DEC-005`, which remains open, and no export
+code exists yet. Production regulatory content remains blocked in full by the
+content-approval package.
 
 ---
 
@@ -471,7 +487,7 @@ This preserves L1089's actual purpose — that implementation "must never silent
 invent real regulatory questions" — while allowing the engineering that does not
 touch regulatory content, exactly as 4D-1 through 4D-3 proceeded.
 
-### APP-009 and controlled exports — `4D4-DEC-009`
+### APP-009 and controlled exports — `4D4-DEC-009` — **SATISFIED**
 
 **Approved:** APP-009 **must be closed before controlled exports are released.**
 Controlled exports persist and checksum applicability state, so exporting a
@@ -485,6 +501,16 @@ be *released*.
 The alternatives previously listed in §Z (excluding applicability state from the
 payload; an alternative governed control) are **no longer live options**: the
 owner selected closure.
+
+**Condition met.** APP-009 was implemented, independently reviewed twice and
+merged to `regx-main` as PR #12 (`1c6bd16`). Ownership is enforced at the
+governed domain service on `question.applicability_rule`, so a direct domain call
+is bound identically to an HTTP request; rejection is inert. See
+`MILESTONE_4D_4_APP_009_EVIDENCE.md`.
+
+Controlled-export release is therefore **no longer blocked by APP-009**. It
+remains unimplemented, and its payload shape still depends on `4D4-DEC-005`,
+which stays open.
 
 ### Approved engineering conventions
 
@@ -503,14 +529,20 @@ pattern.
 
 ### Gate status
 
+Current as of `regx-main` `1c6bd16` (PR #12 merged).
+
 | Gate | Status |
 |---|---|
 | Engineering may start | **YES** — synthetic content only |
 | Production content may start | **NO** |
-| Controlled export **release** | **BLOCKED** pending APP-009 closure (`4D4-DEC-009`) |
+| APP-009 prerequisite (`4D4-DEC-009`) | **SATISFIED** — closed and merged, PR #12 |
+| Controlled export **release** | **NOT BLOCKED BY APP-009.** Still **NOT IMPLEMENTED**; payload shape depends on open `DEC-005` |
 | Override implementation | **PARTIALLY READY** — `DEC-002/003/007` approved; `DEC-004`, `DEC-010` open |
 | Reviewer conclusion | **PARTIALLY READY** — service exists; serializer-coercion disposition open |
-| Production checklist content | **BLOCKED** — content-approval package, 0 of 21 approved |
+| Production checklist content | **BLOCKED** — content-approval package, **0 of 20** production-content items approved |
+
+Only `4D4-DEC-009` changed state. `DEC-004`, `DEC-005`, `DEC-008` and `DEC-010`
+remain open and are untouched by the APP-009 merge.
 
 **Already decided by repository evidence — recorded here so they are not
 re-litigated as open questions:** override is permitted only on
