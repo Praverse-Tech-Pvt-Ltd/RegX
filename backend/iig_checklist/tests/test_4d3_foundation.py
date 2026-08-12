@@ -37,7 +37,10 @@ class TestVocabularies:
         """Counts are asserted here and nowhere else in the codebase."""
         assert len(translation.ALLOWED_REASON_CODES) == 19
         assert len(translation.ALLOWED_RESOLVER_DETAIL_CODES) == 6
-        assert len(vocab.ALLOWED_HISTORY_REASON_CODES) == 2
+        # 2 -> 3: `4D4-DEC-004` (APPROVED 2026-08-12) adds exactly one governed
+        # code, ANSWER_OVERRIDDEN. This assertion is the deliberate gate that
+        # change has to pass through, so it is updated, not relaxed.
+        assert len(vocab.ALLOWED_HISTORY_REASON_CODES) == 3
         assert len(vocab.ALLOWED_SERVICE_DETAIL_CODES) == 1
         assert len(translation.ALLOWED_INPUT_FAILURE_CODES) == 30
 
