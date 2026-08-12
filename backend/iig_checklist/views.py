@@ -9,6 +9,7 @@ a generic status PATCH.
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -1318,6 +1319,77 @@ class ChecklistResponseUpdateView(APIView):
             raise ValidationError(exc.errors) from None
 
         return Response(ChecklistResponseSerializer(result.response).data)
+
+
+class ChecklistExecutionExportView(APIView):
+    """MILESTONE_4D_DISCOVERY.md §17 -- a thin adapter over the export service.
+
+    It selects the rendering format and maps governed refusals onto the
+    structured HTTP contract. It assembles no provenance, computes no checksum
+    and holds no business rule: all of that lives in ``controlled_export``, so a
+    direct domain call is bound by exactly the same guards.
+    """
+
+    def get(self, request, public_id):
+        from .controlled_export import (
+            ExecutionNotExportable,
+            ExportPermissionDenied,
+            export_execution,
+        )
+
+        tenant = _require_tenant()
+        # Deliberately NOT named `format`: that is DRF's reserved
+        # URL_FORMAT_OVERRIDE parameter, so `?format=csv` is intercepted by
+        # content negotiation and 404s on an unknown renderer before this view
+        # ever runs. `export_format` is ours and reaches the service intact.
+        fmt = request.query_params.get("export_format", "json").lower()
+        if fmt not in {"json", "csv"}:
+            # §17 ships JSON and CSV only; PDF/Word are deferred beyond 4D.
+            return Response(
+                {
+                    "error_code": "unsupported_export_format",
+                    "detail": "export_format must be one of: json, csv.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            artifact, rendered = export_execution(
+                tenant=tenant,
+                execution_public_id=public_id,
+                actor=request.user,
+                fmt=fmt,
+            )
+        except ExportPermissionDenied:
+            return Response(
+                {
+                    "error_code": "export_permission_denied",
+                    "detail": "Exporting a checklist execution requires a dedicated permission.",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except ExecutionNotExportable:
+            return Response(
+                {
+                    "error_code": "execution_not_exportable",
+                    "detail": "Only an approved checklist execution can be exported.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        checksum = artifact["checksum"]["value"]
+        if fmt == "csv":
+            response = HttpResponse(rendered, content_type="text/csv; charset=utf-8")
+            response["Content-Disposition"] = (
+                f'attachment; filename="checklist-execution-{public_id}.csv"'
+            )
+        else:
+            response = HttpResponse(rendered, content_type="application/json; charset=utf-8")
+        # Surfaced as headers too so a client can verify the artifact it received
+        # without re-parsing it.
+        response["X-RegX-Export-Checksum"] = checksum
+        response["X-RegX-Export-Schema-Version"] = artifact["payload"]["export_schema_version"]
+        return response
 
 
 class ChecklistReviewerConclusionView(APIView):

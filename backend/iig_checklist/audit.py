@@ -41,6 +41,10 @@ class IigChecklistEvent:
     RESPONSE_CALCULATED = "iig_checklist.response.calculated"
     RESPONSE_REVIEWER_CONCLUSION_ENTERED = "checklist_response.reviewer_conclusion_entered"
     RESPONSE_REVIEWER_CONCLUSION_UPDATED = "checklist_response.reviewer_conclusion_updated"
+    # 4D-4 controlled export (MILESTONE_4D_DISCOVERY.md §17) -- emitted with a
+    # full decision-detail payload including the artifact checksum, so a later
+    # dispute can verify a previously-issued export against the audit trail.
+    EXECUTION_EXPORTED = "iig_checklist.execution.exported"
 
 
 def emit(
