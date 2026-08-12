@@ -10,6 +10,7 @@ here -- the content-approval gate is open at 0 of 20.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -139,10 +140,15 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
     return _world(tenant_a, tenant_definition, user_a)
 
 
-def _artifact(world_):
-    from django.utils import timezone
+#: generated_at participates in the hashed payload (4D4-DEC-005 "Checksum
+#: coverage"), so any test comparing two checksums must pin it. The clock is
+#: frozen only here, by passing an explicit value into the service -- the
+#: service's own UTC normalisation is untouched and still exercised.
+FIXED_GENERATED_AT = datetime(2026, 3, 4, 5, 6, 7, 890123, tzinfo=UTC)
 
-    return build_export_artifact(execution=world_["execution"], generated_at=timezone.now())
+
+def _artifact(world_, generated_at=FIXED_GENERATED_AT):
+    return build_export_artifact(execution=world_["execution"], generated_at=generated_at)
 
 
 def _url(execution):
@@ -427,22 +433,47 @@ class TestChecksum:
         assert value == value.lower()
         int(value, 16)
 
-    def test_generated_at_is_outside_the_hashed_bytes(self, world):
-        """Two exports of identical state must attest to the same bytes.
+    def test_generated_at_lives_in_the_hashed_payload_not_the_envelope(self, world):
+        """4D4-DEC-005: included artifact provenance participates in the hash.
 
-        If the timestamp were hashed, the checksum could never be re-derived
-        from the regulatory state, which is the property that makes it useful.
+        An earlier revision put generated_at in an unhashed envelope, which let
+        an issued artifact's timestamp be rewritten without breaking its
+        checksum -- defeating section 17's "verify a previously-issued export was
+        not altered after the fact".
         """
-        from datetime import timedelta
-
-        from django.utils import timezone
-
-        early = build_export_artifact(execution=world["execution"], generated_at=timezone.now())
-        later = build_export_artifact(
-            execution=world["execution"], generated_at=timezone.now() + timedelta(days=1)
+        artifact = _artifact(world)
+        assert "generated_at" in artifact["payload"]
+        assert "generated_at" not in artifact
+        assert artifact["payload"]["generated_at"] in canonical_bytes(artifact["payload"]).decode(
+            "utf-8"
         )
-        assert early["generated_at"] != later["generated_at"]
-        assert early["checksum"]["value"] == later["checksum"]["value"]
+
+    def test_a_different_generated_at_changes_the_checksum(self, world):
+        """Two export runs at different times legitimately differ."""
+        early = _artifact(world, FIXED_GENERATED_AT)
+        later = _artifact(world, FIXED_GENERATED_AT + timedelta(days=1))
+        assert early["payload"]["generated_at"] != later["payload"]["generated_at"]
+        assert early["checksum"]["value"] != later["checksum"]["value"]
+
+    def test_the_checksum_field_is_not_recursively_hashed(self, world):
+        """A hash cannot cover itself; the envelope is what stays outside."""
+        artifact = _artifact(world)
+        hashed = canonical_bytes(artifact["payload"]).decode("utf-8")
+        assert artifact["checksum"]["value"] not in hashed
+        assert "checksum" not in artifact["payload"]
+
+    def test_generated_at_is_canonical_utc_z(self, world):
+        """DEC-006 timestamp contract, now actually load-bearing on the hash."""
+        naive_looking = datetime(2026, 3, 4, 10, 6, 7, 890123, tzinfo=UTC)
+        from datetime import timezone as _tz
+
+        shifted = naive_looking.astimezone(_tz(timedelta(hours=5)))
+        # Same instant, different tzinfo -- canonical form must collapse both.
+        assert (
+            _artifact(world, naive_looking)["checksum"]["value"]
+            == (_artifact(world, shifted)["checksum"]["value"])
+        )
+        assert _artifact(world, naive_looking)["payload"]["generated_at"].endswith("Z")
 
     def test_a_governed_answer_change_changes_the_checksum(self, world):
         from iig_checklist.models import ChecklistResponse
@@ -566,3 +597,165 @@ class TestAuditAndDeferredFields:
     def test_approval_metadata_is_not_invented(self, world):
         """`4D4-DEC-008` is open -- schema 1 must not guess its shape."""
         assert "approval_metadata" not in json.dumps(_artifact(world))
+
+
+# ---------------------------------------------------------------------------
+# I. Conditional reviewer-amendment provenance -- 4D4-DEC-005
+# ---------------------------------------------------------------------------
+
+
+def _amend(world_, user, *, prior_version, new_version, reason, new_value):
+    """Append one governed reviewer-conclusion amendment row."""
+    from iig_checklist.models import ChecklistResponse, ChecklistResponseHistory
+
+    response = ChecklistResponse.objects.get(
+        execution=world_["execution"], question__code="Q-MANUAL"
+    )
+    return ChecklistResponseHistory.objects.create(
+        response=response,
+        prior_raw_value={"value": "before"},
+        new_raw_value={"value": new_value},
+        prior_is_not_applicable=False,
+        new_is_not_applicable=False,
+        prior_not_applicable_reason=None,
+        new_not_applicable_reason=None,
+        prior_entered_by=user,
+        prior_entered_at=FIXED_GENERATED_AT,
+        prior_version=prior_version,
+        new_version=new_version,
+        correction_reason=reason,
+        amended_by=user,
+        source_classification_snapshot=DataSourceClassification.USER_REQUIRED,
+    )
+
+
+def _amendments_of(artifact, code="Q-MANUAL"):
+    for response in artifact["payload"]["responses"]:
+        if response["question_code"] == code:
+            return response.get("reviewer_amendments")
+    raise AssertionError(f"no response for {code}")
+
+
+class TestReviewerAmendmentProvenance:
+    def test_absent_when_no_governed_amendment_exists(self, world):
+        """DEC-005 makes reviewer provenance conditional -- no empty placeholder."""
+        for response in _artifact(world)["payload"]["responses"]:
+            assert "reviewer_amendments" not in response
+
+    def test_reviewer_conclusion_note_is_conditional(self, world):
+        """MINOR-1: omitted rather than emitted as a meaningless null."""
+        artifact = _artifact(world)
+        assert "reviewer_conclusion_note" not in artifact["payload"]["execution"]
+
+        world["execution"].reviewer_conclusion_note = "governed conclusion"
+        world["execution"].save(update_fields=["reviewer_conclusion_note"])
+        after = _artifact(world)
+        assert after["payload"]["execution"]["reviewer_conclusion_note"] == "governed conclusion"
+        assert after["checksum"]["value"] != artifact["checksum"]["value"]
+
+    def test_included_when_a_governed_amendment_exists(self, world, user_a):
+        _amend(world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x")
+        amendments = _amendments_of(_artifact(world))
+        assert len(amendments) == 1
+        assert amendments[0]["correction_reason"] == "typo"
+        assert amendments[0]["prior_version"] == 1
+        assert amendments[0]["new_version"] == 2
+
+    def test_projection_is_allow_listed_and_carries_no_db_ids(self, world, user_a):
+        from iig_checklist.controlled_export import ALLOWED_AMENDMENT_FIELDS
+
+        amendment = _amend(
+            world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x"
+        )
+        projected = _amendments_of(_artifact(world))[0]
+        assert set(projected) <= ALLOWED_AMENDMENT_FIELDS
+        # Public identity only -- never the PK, never the actor's email.
+        assert projected["amended_by_public_id"] == str(user_a.public_id)
+        blob = json.dumps(_artifact(world), default=str)
+        assert user_a.email not in blob
+        assert f'"{amendment.pk}"' not in blob
+        assert "response_id" not in blob
+
+    def test_amendment_order_is_governed_sequence_not_alphabetical(self, world, user_a):
+        _amend(world, user_a, prior_version=2, new_version=3, reason="zzz second", new_value="b")
+        _amend(world, user_a, prior_version=1, new_version=2, reason="aaa first", new_value="a")
+        amendments = _amendments_of(_artifact(world))
+        assert [a["new_version"] for a in amendments] == [2, 3]
+        # Alphabetical ordering would have put "aaa first" first regardless;
+        # version order is what proves the sequence is governed, not sorted.
+        assert [a["correction_reason"] for a in amendments] == ["aaa first", "zzz second"]
+
+    def test_order_is_deterministic_across_exports(self, world, user_a):
+        _amend(world, user_a, prior_version=2, new_version=3, reason="second", new_value="b")
+        _amend(world, user_a, prior_version=1, new_version=2, reason="first", new_value="a")
+        assert _artifact(world)["checksum"]["value"] == _artifact(world)["checksum"]["value"]
+
+    def test_adding_an_amendment_changes_the_checksum(self, world, user_a):
+        before = _artifact(world)["checksum"]["value"]
+        _amend(world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x")
+        assert _artifact(world)["checksum"]["value"] != before
+
+    def test_changing_an_exported_amendment_field_changes_the_checksum(self, world, user_a):
+        """Tamper evidence over amendment content.
+
+        The ORM refuses both ``save()`` and ``update()`` on these rows, so the
+        only way to alter one is behind the guard's back -- which is exactly the
+        scenario section 17's checksum exists to expose. Raw SQL reproduces it.
+        """
+        from django.db import connection
+
+        amendment = _amend(
+            world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x"
+        )
+        before = _artifact(world)["checksum"]["value"]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE iig_checklist_checklistresponsehistory "
+                "SET correction_reason = %s WHERE id = %s",
+                ["tampered", amendment.pk],
+            )
+        assert _artifact(world)["checksum"]["value"] != before
+
+    def test_a_non_exported_history_field_does_not_move_the_checksum(self, world, user_a):
+        from django.db import connection
+
+        amendment = _amend(
+            world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x"
+        )
+        before = _artifact(world)["checksum"]["value"]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE iig_checklist_checklistresponsehistory SET updated_at = %s WHERE id = %s",
+                [FIXED_GENERATED_AT + timedelta(days=9), amendment.pk],
+            )
+        assert _artifact(world)["checksum"]["value"] == before
+
+    def test_db_ids_and_audit_columns_never_reach_the_hashed_bytes(self, world, user_a):
+        amendment = _amend(
+            world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x"
+        )
+        hashed = canonical_bytes(_artifact(world)["payload"]).decode("utf-8")
+        for excluded in ("created_at", "updated_at", "response_id", "amended_by_id"):
+            assert excluded not in hashed
+        assert f":{amendment.pk}," not in hashed
+
+    def test_amendments_reach_the_csv_rendering(self, world, user_a):
+        _amend(world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x")
+        rendered = render_csv(_artifact(world))
+        assert "reviewer_amendments" in rendered
+        assert "typo" in rendered
+
+    def test_ordinary_response_api_does_not_expose_amendments(
+        self, world, user_a, api_client_vp, vp_membership
+    ):
+        """DEC-005 projection boundary -- export-only, never the read model."""
+        _amend(world, user_a, prior_version=1, new_version=2, reason="typo", new_value="x")
+        url = reverse(
+            "iig_checklist:execution-response-list",
+            kwargs={"public_id": world["execution"].public_id},
+        )
+        resp = api_client_vp.get(url)
+        assert resp.status_code == 200
+        body = json.dumps(resp.json())
+        assert "reviewer_amendments" not in body
+        assert "correction_reason" not in body

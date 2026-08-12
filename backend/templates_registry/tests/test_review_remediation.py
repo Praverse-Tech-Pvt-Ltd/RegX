@@ -23,6 +23,7 @@ from django.db import connections, transaction
 from rest_framework.test import APIClient
 
 from audit.models import AuditEvent
+from common.csv_safety import CSV_FORMULA_TRIGGER_CHARS, csv_safe_cell
 from templates_registry import adapters, importer
 from templates_registry.audit_events import TemplateEvent
 from templates_registry.models import (
@@ -30,7 +31,11 @@ from templates_registry.models import (
     TemplateDuplicateCandidate,
     TemplateVersion,
 )
-from templates_registry.reconciliation import _csv_safe_cell, render_reconciliation_csv
+from templates_registry.reconciliation import (
+    _CSV_FORMULA_TRIGGER_CHARS,
+    _csv_safe_cell,
+    render_reconciliation_csv,
+)
 
 BASE = "/api/regx/v1"
 
@@ -242,7 +247,10 @@ class TestCsvFormulaInjectionNeutralization:
         ],
     )
     def test_csv_safe_cell_neutralizes_only_formula_triggers(self, raw, expected_neutralized):
-        result = _csv_safe_cell(raw)
+        # Exercises the promoted public helper directly (MILESTONE_4D_DISCOVERY.md
+        # section 17). The module-local `_csv_safe_cell` is a compatibility alias
+        # for the same object, proven by the delegation test below.
+        result = csv_safe_cell(raw)
         if expected_neutralized:
             # PLANTED VIOLATION (detected): a formula-trigger value must be
             # prefixed so spreadsheet software renders it as literal text.
@@ -252,8 +260,17 @@ class TestCsvFormulaInjectionNeutralization:
             assert result == raw
 
     def test_csv_safe_cell_handles_none_and_empty(self):
-        assert _csv_safe_cell(None) == ""
-        assert _csv_safe_cell("") == ""
+        assert csv_safe_cell(None) == ""
+        assert csv_safe_cell("") == ""
+
+    def test_the_private_alias_delegates_to_the_promoted_public_helper(self):
+        """One implementation platform-wide, not two that agree today.
+
+        Identity -- not merely equal behaviour -- is what proves no duplicate
+        helper has reappeared in `templates_registry`.
+        """
+        assert _csv_safe_cell is csv_safe_cell
+        assert _CSV_FORMULA_TRIGGER_CHARS is CSV_FORMULA_TRIGGER_CHARS
 
     def test_render_reconciliation_csv_neutralizes_every_column(self):
         report = {
