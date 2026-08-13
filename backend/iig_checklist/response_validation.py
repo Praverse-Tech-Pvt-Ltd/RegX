@@ -130,17 +130,21 @@ def _validate_yes_no_na(value):
 
 
 def _question_option_codes(question):
-    """Returns the set of valid option codes for the question, or None if
-    the question defines no closed option list (structural validation
-    only in that case -- there is no dedicated QuestionOption model in
-    this codebase; option codes are authored into validation_rule)."""
+    """Returns the set of valid option *machine values*, or None if the question
+    declares no closed option list.
+
+    `5A-DEC-002` moved the vocabulary from a bare code list to governed
+    value/label objects, so the shape is read through the single shared parser
+    in `question_options` rather than unpacked here. Answer validation stays
+    deliberately label-blind: a response is checked against the stable value,
+    never the wording, so re-labelling an option can never invalidate an answer
+    already recorded against it.
+    """
     if question is None:
         return None
-    rule = question.validation_rule or {}
-    options = rule.get("options")
-    if not isinstance(options, list):
-        return None
-    return set(options)
+    from .question_options import option_values
+
+    return option_values(question.validation_rule or {})
 
 
 def _validate_single_select(value, *, question):

@@ -47,6 +47,24 @@ CLONABLE_SOURCE_VERSION_STATUSES = frozenset(
 )
 
 
+class Jurisdiction(models.TextChoices):
+    """`5A-DEC-005` -- explicit, structured, governed regulatory jurisdiction.
+
+    Deliberately a controlled vocabulary rather than free text: a checklist
+    version is approved against a defined regulatory basis and source set, and
+    "which regulator" is the first thing a reviewer or an auditor must be able
+    to read without parsing prose. Hiding it inside ``regulatory_basis`` would
+    make it unqueryable, unvalidatable and invisible to the controlled export.
+
+    **Exactly one member.** 5A-DEC-005 authorises `US_FDA` and nothing else, and
+    no other jurisdiction exists in any authoritative repository requirement.
+    Adding a member is a governed content decision with a named regulatory
+    approver -- never an engineering convenience.
+    """
+
+    US_FDA = "US_FDA", "United States FDA"
+
+
 class DataSourceClassification(models.TextChoices):
     FDA_DERIVED_DEFAULT = "fda_derived_default", "FDA-derived default"
     USER_REQUIRED = "user_required", "User required"

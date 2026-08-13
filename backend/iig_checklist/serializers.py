@@ -71,6 +71,9 @@ class ChecklistVersionSerializer(serializers.ModelSerializer):
             "effective_date",
             "expiry_date",
             "regulatory_basis",
+            # `5A-DEC-005` -- writable while the version is a draft, then frozen by
+            # ChecklistVersion.clean() like the regulatory basis it qualifies.
+            "jurisdiction",
             "change_summary",
             "cloned_from_version_public_id",
         ]
@@ -129,6 +132,8 @@ class ChecklistSectionSerializer(serializers.ModelSerializer):
 
 
 class ChecklistQuestionSerializer(serializers.ModelSerializer):
+    #: `5A-DEC-002` -- resolved governed option vocabulary (value + label).
+    options = serializers.SerializerMethodField()
     applicability_rule_public_id = serializers.UUIDField(
         source="applicability_rule.public_id", read_only=True, allow_null=True
     )
@@ -155,11 +160,33 @@ class ChecklistQuestionSerializer(serializers.ModelSerializer):
             "regulatory_reference",
             "default_value_binding",
             "validation_rule",
+            "options",
         ]
-        read_only_fields = ["public_id"]
+        read_only_fields = ["public_id", "options"]
 
     def validate_code(self, value):
         return _normalize_code_field(value)
+
+    def get_options(self, obj):
+        """`5A-DEC-002` -- the resolved value/label vocabulary, server-derived.
+
+        Exposed as its own field so a client never has to reach into
+        `validation_rule` and never has to guess a label from a code: deriving
+        labels in the frontend is exactly what 5A-DEC-002 forbids. Read-only,
+        because the authored source of truth remains `validation_rule` and two
+        writable representations of one vocabulary could disagree.
+
+        Omitted (`None`) for a question with no closed vocabulary, so "no
+        options" stays distinguishable from "an empty option list".
+        """
+        from .question_options import parse_options
+
+        parsed = parse_options(obj.validation_rule or {})
+        if parsed is None:
+            return None
+        return [
+            {"value": option.value, "label": option.display_label} for option in parsed
+        ]
 
 
 class VersionActionSerializer(serializers.Serializer):
@@ -333,6 +360,8 @@ class ChecklistResponseSerializer(serializers.ModelSerializer):
     entered_by_email = serializers.SerializerMethodField()
     confirmed_by_email = serializers.SerializerMethodField()
     calculation = serializers.SerializerMethodField()
+    #: M4D3-PST-009 / `5A-DEC-004` -- derived from persisted state only.
+    applicability_outcome = serializers.SerializerMethodField()
 
     class Meta:
         model = ChecklistResponse
@@ -349,10 +378,25 @@ class ChecklistResponseSerializer(serializers.ModelSerializer):
             "confirmed_at",
             "override_reason",
             "system_derived_value",
+            #: `5A-DEC-001` -- read-only governed FDA-derived provenance.
+            "source_provenance",
             "version",
             "calculation",
+            "applicability_outcome",
         ]
         read_only_fields = fields
+
+    def get_applicability_outcome(self, obj):
+        """M4D3-PST-009 -- `applicable` / `not_applicable` / `review_required` /
+        `no_rule`, derived from what is stored and nothing else.
+
+        Never recomputed at read time (PST-008), so a submitted or approved
+        execution keeps reporting the applicability it was actually assessed
+        against even if the product or FDA data behind it later changes.
+        """
+        from .applicability_runtime import derive_applicability_outcome
+
+        return derive_applicability_outcome(obj)
 
     def get_entered_by_email(self, obj):
         return getattr(obj.entered_by, "email", None)

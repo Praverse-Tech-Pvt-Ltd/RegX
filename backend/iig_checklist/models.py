@@ -34,6 +34,7 @@ from .enums import (
     DataSourceClassification,
     EvidenceRequirement,
     ExecutionStatus,
+    Jurisdiction,
 )
 from .execution_constants import (
     MAX_NOT_APPLICABLE_REASON_CHARS,
@@ -108,6 +109,25 @@ class ChecklistVersion(PublicIDModel, TimeStampedModel):
     effective_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)
     regulatory_basis = models.CharField(max_length=500, blank=True)
+    #: `5A-DEC-005` -- structured, governed jurisdiction, version-scoped.
+    #:
+    #: Owned by the *version* rather than the definition because a version is
+    #: what is approved against a defined regulatory basis and source set;
+    #: `ChecklistDefinition` carries no lifecycle at all, so it cannot express
+    #: "approved under this regulator as of this version". It sits beside
+    #: `regulatory_basis` for exactly that reason.
+    #:
+    #: Blank is permitted and means **not stated** -- never "assume US_FDA".
+    #: Pre-5A synthetic content predates the field and must not be retro-labelled
+    #: with a regulator no one approved it under; the migration therefore
+    #: backfills nothing. Production content is required to state it by the
+    #: content package, not by a model default that would silently invent one.
+    jurisdiction = models.CharField(
+        max_length=20,
+        choices=Jurisdiction.choices,
+        blank=True,
+        default="",
+    )
     change_summary = models.TextField(blank=True)
     # Audit-trail readability only -- deliberately NOT a ForeignKey, so
     # retiring/deleting the source version years later can never cascade
@@ -198,6 +218,11 @@ class ChecklistVersion(PublicIDModel, TimeStampedModel):
                     "effective_date",
                     "expiry_date",
                     "regulatory_basis",
+                    # `5A-DEC-005` -- jurisdiction is lifecycle-governed exactly like
+                    # the regulatory basis it qualifies: fixed once the version
+                    # leaves draft/returned, so an approved version can never
+                    # silently change which regulator it was approved under.
+                    "jurisdiction",
                     "change_summary",
                     "cloned_from_version_public_id",
                 ]
@@ -397,6 +422,36 @@ class ChecklistQuestion(PublicIDModel, TimeStampedModel):
             raise ValidationError(
                 "REVIEWER_CONFIRMED questions must have reviewer_confirmation_required=True."
             )
+        # `5A-DEC-001` -- an FDA-derived binding must name an approved resolver.
+        # Checked here, at authoring time, so an unknown identifier is refused
+        # while the version is still a draft rather than silently producing an
+        # unresolvable answer on every execution built from it. A binding on a
+        # question that is not FDA-derived is equally refused: nothing would
+        # ever read it, so it could only mislead a reviewer of the content.
+        from .answer_sources import is_known_resolver
+
+        binding = (self.prefill_source or "").strip()
+        if binding:
+            if self.data_source_classification != DataSourceClassification.FDA_DERIVED_DEFAULT:
+                raise ValidationError(
+                    "prefill_source may only be set when data_source_classification "
+                    "is FDA_DERIVED_DEFAULT."
+                )
+            if not is_known_resolver(binding):
+                raise ValidationError(
+                    f"prefill_source {binding!r} is not an approved answer-source "
+                    "resolver identifier."
+                )
+
+        # `5A-DEC-002` -- the authored option vocabulary is content, so it is
+        # validated where content is authored. Doing it at answer time instead
+        # would report a content defect as if the reviewer's answer were wrong.
+        from .question_options import OptionConfigurationError, validate_options
+
+        try:
+            validate_options(self.validation_rule)
+        except OptionConfigurationError as exc:
+            raise ValidationError(f"{exc.error_code}: {exc}") from exc
         if (
             self.applicability_rule_id
             and self.applicability_rule.checklist_version_id != self.section.checklist_version_id
@@ -630,6 +685,18 @@ class ChecklistResponse(PublicIDModel, TimeStampedModel):
     confirmed_at = models.DateTimeField(null=True, blank=True)
     override_reason = models.TextField(blank=True)
     system_derived_value = models.JSONField(null=True, blank=True)
+    #: `5A-DEC-001` -- governed provenance for an FDA-derived answer.
+    #:
+    #: Written only by the governed population pass, never by a client. Records
+    #: which approved resolver ran, which governed source release it read (by
+    #: UUID and source checksum) and which field of it -- or, when nothing could
+    #: be resolved, the explicit reason there is no value. That distinction is
+    #: the point: an empty FDA-derived answer must be readable as "the source
+    #: had nothing" rather than being indistinguishable from "never populated".
+    #:
+    #: Null for every response that is not FDA-derived, so the column says
+    #: nothing about answers it does not govern.
+    source_provenance = models.JSONField(null=True, blank=True)
     version = models.PositiveIntegerField(default=1)
 
     class Meta:

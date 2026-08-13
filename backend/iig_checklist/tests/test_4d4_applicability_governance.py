@@ -269,6 +269,14 @@ class TestRejectionIsInert:
         assert world["governed"].version == before
 
     def test_no_field_is_written(self, world, api_client_doer):
+        # Asserted as "unchanged by the PATCH", not "empty". Since `5A-DEC-004`
+        # a governed writer exists, so a rule-governed response legitimately
+        # carries server-owned applicability state before any client request.
+        # Comparing against the pre-PATCH values is what actually expresses
+        # APP-009 inertness; comparing against "" only worked while nothing in
+        # the system had ever written the field.
+        before_flag = world["governed"].is_not_applicable
+        before_reason = world["governed"].not_applicable_reason
         _patch(
             api_client_doer,
             world,
@@ -280,8 +288,10 @@ class TestRejectionIsInert:
             },
         )
         world["governed"].refresh_from_db()
-        assert world["governed"].is_not_applicable is False
-        assert (world["governed"].not_applicable_reason or "") == ""
+        assert world["governed"].is_not_applicable is before_flag
+        assert world["governed"].not_applicable_reason == before_reason
+        # The specific thing the client tried to write is absent either way.
+        assert (world["governed"].not_applicable_reason or "") != "client says so"
 
     def test_no_success_audit_is_emitted(self, world, api_client_doer):
         from audit.models import AuditEvent

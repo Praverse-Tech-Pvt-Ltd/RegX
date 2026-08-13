@@ -486,7 +486,16 @@ class ChecklistVersionDetailView(APIView):
                         "detail": f"Version is {version.status!r}, no longer editable.",
                     }
                 )
-            for field in ("effective_date", "expiry_date", "regulatory_basis", "change_summary"):
+            # `5A-DEC-005` -- jurisdiction is editable here for the same reason
+            # regulatory_basis is: both describe what the draft will be approved
+            # against, and both freeze together when it leaves draft/returned.
+            for field in (
+                "effective_date",
+                "expiry_date",
+                "regulatory_basis",
+                "jurisdiction",
+                "change_summary",
+            ):
                 if field in request.data:
                     setattr(version, field, request.data[field])
             try:

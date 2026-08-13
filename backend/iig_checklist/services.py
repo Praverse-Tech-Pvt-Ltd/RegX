@@ -337,6 +337,37 @@ def _questions_for_version(checklist_version):
     ).select_related("section")
 
 
+def _resolve_fda_derived_default(question):
+    """Resolve one FDA-derived question's default through the governed registry.
+
+    Returns ``(raw_value, provenance)``. Both are ``None`` for a question that
+    declares no binding, so nothing changes for content that does not use the
+    mechanism.
+
+    **The governed source is not selected here.** Which IID precedent record
+    answers a given question depends on ingredient/route matching that is scoped
+    to a formulation *component*, and no approved specification says which
+    component governs an execution-level default. Choosing one would be
+    engineering inventing a regulatory mapping, so the resolver is invoked with
+    no source and returns an explicit ``source_unavailable`` outcome, which is
+    recorded as provenance. That is the honest state: the binding is real,
+    validated and audited, and the selection rule is a registered governance
+    question (5A-P1 OQ-8). A resolved-looking empty answer would be worse than
+    a visibly unresolved one.
+    """
+    from .answer_sources import resolve
+
+    binding = (question.prefill_source or "").strip()
+    if not binding:
+        return None, None
+    if question.data_source_classification != DataSourceClassification.FDA_DERIVED_DEFAULT:
+        return None, None
+
+    outcome, resolver_version = resolve(binding, None)
+    provenance = outcome.provenance(binding, resolver_version)
+    return (outcome.value if outcome.resolved else None), provenance
+
+
 def create_execution(
     *,
     tenant,
@@ -431,13 +462,21 @@ def create_execution(
             raise ExecutionAlreadyActive() from exc
 
         for q in questions:
+            # `5A-DEC-001` -- governed FDA-derived population, before any
+            # calculation runs (M4D3-POP-002). A question with no approved
+            # binding resolves to nothing and records nothing, exactly as
+            # before; a bound one records either a value with its source
+            # provenance or an explicit reason there is none. There is no third
+            # outcome: a fabricated default is never written.
+            fda_value, fda_provenance = _resolve_fda_derived_default(q)
             response = _create_validated(
                 ChecklistResponse,
                 execution=execution,
                 question=q,
                 data_source_type_snapshot=q.data_source_classification,
-                raw_value=None,
+                raw_value=fda_value,
                 is_not_applicable=False,
+                source_provenance=fda_provenance,
             )
             if q.data_source_classification == DataSourceClassification.SYSTEM_CALCULATED:
                 # The placeholder records the *calculation function name*, which
@@ -458,6 +497,15 @@ def create_execution(
                     status=CalculationStatus.DATA_REQUIRED,
                     calculation_name=entry.calculation_name,
                 )
+
+        # `5A-DEC-004` -- evaluate governed applicability once the responses
+        # exist, inside the same transaction, so an execution is never visible
+        # in a state where a rule-governed question has not been assessed.
+        # Rules are version-scoped and the context is assembled once, so every
+        # question in this execution is judged against identical product state.
+        from .applicability_runtime import evaluate_execution_applicability
+
+        evaluate_execution_applicability(execution=execution, actor=actor)
 
     # Step 6: post-commit audit.
     def _audit():

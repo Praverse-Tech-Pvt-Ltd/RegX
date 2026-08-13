@@ -257,6 +257,12 @@ class TestSchemaAndIdentifiers:
                 "data_source_type_snapshot",
                 "system_derived_value",
                 "calculation",
+                # `5A-DEC-004` -- the governed applicability decision is part of
+                # the exported shape now that rules are actually evaluated.
+                # Unconditional: every response states the applicability it was
+                # assessed under, including `no_rule`, so the artifact never
+                # leaves a reader guessing whether a rule existed.
+                "applicability_outcome",
             }
 
     def test_no_model_repr_leaks(self, world):
