@@ -77,6 +77,8 @@ export interface ChecklistResponseDTO {
   override_reason: string;
   system_derived_value: unknown | null;
   version: number;
+  /** `5A-DEC-004` — server-derived governed applicability decision. */
+  applicability_outcome?: string;
   /** Read-only projection of the governed CalculationOutcome; null when none. */
   calculation?: CalculationOutcomeSummaryDTO | null;
 }
@@ -135,6 +137,12 @@ export interface ChecklistResponse {
   rawValue: unknown | null;
   isNotApplicable: boolean;
   notApplicableReason: string | null;
+  /**
+   * `5A-DEC-004` — the governed applicability decision, derived server-side
+   * from persisted state (M4D3-PST-009). Never recomputed by the client: a
+   * historical execution must keep reporting what it was assessed against.
+   */
+  applicabilityOutcome: string;
   enteredByEmail: string | null;
   enteredAt: string | null;
   confirmedByEmail: string | null;
@@ -210,6 +218,9 @@ export function toChecklistResponse(dto: ChecklistResponseDTO): ChecklistRespons
     rawValue: dto.raw_value,
     isNotApplicable: dto.is_not_applicable,
     notApplicableReason: dto.not_applicable_reason,
+    // Defaults to `no_rule` only for a payload predating the field; the server
+    // always sends it, so this never invents an applicability claim.
+    applicabilityOutcome: dto.applicability_outcome ?? "no_rule",
     enteredByEmail: dto.entered_by_email,
     enteredAt: dto.entered_at,
     confirmedByEmail: dto.confirmed_by_email,

@@ -1315,6 +1315,21 @@ export interface ChecklistQuestion {
    * existing question representation — declared here, not newly exposed.
    */
   applicability_rule_public_id?: string | null;
+  /**
+   * `5A-DEC-002` — the governed select vocabulary, resolved server-side.
+   *
+   * `null` when the question declares no closed option list. The label is
+   * approved content: it is displayed as given and is never derived from the
+   * value here, because prettifying a code in the client would put unapproved
+   * wording in front of a reviewer.
+   */
+  options?: ChecklistQuestionOption[] | null;
+}
+
+/** One governed select option: a stable machine value and its approved label. */
+export interface ChecklistQuestionOption {
+  value: string;
+  label: string;
 }
 
 // 4D-2 Execution types — re-exported from the centralised mapper module.

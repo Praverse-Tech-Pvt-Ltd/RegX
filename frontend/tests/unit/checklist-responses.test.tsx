@@ -55,6 +55,8 @@ function response(overrides: Partial<ChecklistResponse> & { publicId: string }):
     rawValue: null,
     isNotApplicable: false,
     notApplicableReason: null,
+    // `5A-DEC-004` — always present at runtime; the mapper defaults it.
+    applicabilityOutcome: "no_rule",
     enteredByEmail: null,
     enteredAt: null,
     confirmedByEmail: null,
