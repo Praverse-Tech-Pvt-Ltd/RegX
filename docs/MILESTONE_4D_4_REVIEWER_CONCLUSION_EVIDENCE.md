@@ -288,26 +288,85 @@ pinned in two languages, so a one-sided regression cannot pass.
 
 | Gate | Result |
 |---|---|
-| Full backend suite | *see §10.1* |
-| Coverage | *see §10.1* |
-| Frontend unit | *see §10.2* |
-| Type-check (`tsc --noEmit`) | *see §10.2* |
-| Lint (`next lint`) | *see §10.2* |
-| Playwright / E2E | *see §10.3* |
-| `manage.py check` | *see §10.4* |
-| `makemigrations --check --dry-run` | *see §10.4* |
-| `migrate --check` | *see §10.4* |
-| `ruff check .` / `ruff format --check .` | *see §10.4* |
-| `lint-imports` | *see §10.4* |
+| Full backend suite | **2018 passed, 0 failed** (901.63s) |
+| Backend coverage | **94.87%** (23121 statements, 1185 missed) |
+| Frontend unit | **238 passed, 0 failed** across 12 files |
+| Type-check (`tsc --noEmit`) | **PASS** — no errors |
+| Lint (`next lint`) | **PASS** — no warnings or errors |
+| Playwright / E2E | **91 passed, 0 failed** |
+| `manage.py check` | **PASS** — no issues (0 silenced) |
+| `makemigrations --check --dry-run` | **PASS** — no changes detected |
+| `migrate --check` | **PASS** |
+| `ruff check .` | **PASS** — all checks passed |
+| `ruff format --check .` | **PASS** — 279 files formatted |
+| `lint-imports` | **PASS** — 7 contracts kept, 0 broken |
 
-**Process discipline.** No two pytest processes ran concurrently — the test
-PostgreSQL database is shared, and a previous session produced invalid results
-by violating this. No backend source was edited while backend coverage was being
-measured. Every suite was run serially.
+Prior trustworthy baseline was 1976 passed at 94.82%. This slice adds tests and
+no failures; coverage moves to 94.87%.
+
+**Models unchanged. Migrations: none.** Confirmed by
+`makemigrations --check --dry-run` reporting no changes.
+
+### 10.1 E2E disposition
+
+**PASS — 91 of 91, no failures, no new regressions.**
+
+`fda-iid.spec.ts` has a documented history of parallel-execution instability and
+is the known baseline flake. It did **not** fail in this run, so there is nothing
+to attribute to either the baseline or this branch. No unrelated FDA-IID code was
+modified — making E2E green by touching it was explicitly out of bounds, and was
+not necessary.
+
+### 10.2 Process discipline
+
+No two pytest processes ran concurrently — the test PostgreSQL database is
+shared, and a previous session produced invalid results by violating this. Every
+backend suite ran serially.
+
+One deviation is recorded rather than hidden: `ruff format` reformatted a new
+backend test file while a full-coverage run was in flight, which is exactly the
+"no backend edits during coverage measurement" rule. **That run was discarded**
+and the full suite was re-run from a clean, committed tree with no concurrent
+pytest and no edits during the run. The 2018/94.87% figures above are from that
+clean re-run.
 
 ---
 
-## 11. Remaining deferred items
+## 11. Milestone 4D closure reassessment
+
+`MILESTONE_4D_CLOSEOUT_STATUS.md` §5 (on the preserved closeout branch
+`regx/chore/milestone-4d-closeout`, `ebc09da`) lists four remaining engineering
+items. Re-read against the repository after this slice:
+
+| # | Item as recorded | Classification now |
+|---|---|---|
+| 1 | Reviewer-conclusion **frontend surface** — "the governed service, its dedicated endpoint and its export projection all exist; the UI does not… no client calls the per-response reviewer-conclusion endpoint" | **IMPLEMENTED** — typed client, UI, 40 frontend tests; the per-response endpoint now has a real caller |
+| 2 | Reviewer-conclusion **minimum-length enforcement** — "confirm min-length enforcement matches §13" | **IMPLEMENTED / RESOLVED** — confirmed: §13 specifies **no numeric minimum**. Meaningful non-empty is enforced and documented (§H.1); no threshold invented |
+| 3 | `ReviewerConclusionSerializer.expected_version` **coercion — disposition OPEN**, "a governance decision, not a free fix" | **IMPLEMENTED** — registered and approved as `4D4-DEC-013`, then implemented. Three governed write paths, now one contract |
+| 4 | **Override clearing** — deferred by §AC.4 | **APPROVED-DEFERRED** — unchanged; no clear path, no `ANSWER_OVERRIDE_CLEARED` code, no route, and no clear action offered for reviewer conclusions either |
+
+Additional items outside that list:
+
+| Item | Classification |
+|---|---|
+| `ControlledExportError` | **MINOR TECHNICAL DEBT — DEFERRED** |
+| Production regulatory content | **PRODUCTION-CONTENT-GATED — 0 of 20** |
+| `fda-iid.spec.ts` parallel instability | known baseline test debt; did not reproduce this run |
+
+**Critical: 0. Major: 0. Blocking: none.**
+
+Items 1–3 were the required engineering work and are complete. Item 4 is
+approved-deferred by an existing decision, not an omission. On that basis:
+
+> **Engineering Milestone 4D: READY FOR CLOSEOUT.**
+
+This is deliberately **not** marked COMPLETE here. Closure is recorded on the
+preserved closeout branch `regx/chore/milestone-4d-closeout` (`ebc09da`), which
+carries the roadmap correction and `MILESTONE_4D_CLOSEOUT_STATUS.md` and is kept
+separate from this feature branch. Production regulatory content remains a
+separate gate at 0 of 20 and is **not** satisfied by any result in this document.
+
+## 12. Remaining deferred items
 
 | Item | Classification |
 |---|---|
