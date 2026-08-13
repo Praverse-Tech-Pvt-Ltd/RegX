@@ -87,6 +87,7 @@ from .services import (
     MissingReturnReason,
     ReviewerConclusionCorrectionReasonRequired,
     ReviewerConclusionEmpty,
+    ReviewerConclusionInvalidExpectedVersion,
     ReviewerConclusionInvalidPayload,
     ReviewerConclusionInvalidState,
     ReviewerConclusionPayloadTooLarge,
@@ -1413,17 +1414,29 @@ class ChecklistCapabilitiesView(APIView):
     """
 
     def get(self, request):
-        from .permissions import PERM_OVERRIDE_EXECUTION, has_iig_checklist_permission
+        from .permissions import (
+            PERM_OVERRIDE_EXECUTION,
+            PERM_REVIEW_EXECUTION,
+            has_iig_checklist_permission,
+        )
 
         # Fail-closed through the established convention: no tenant context is a
         # refusal, not an empty-but-successful answer.
         tenant = _require_tenant()
+        # Each flag is derived independently from the same authoritative
+        # predicate the corresponding governed service enforces with, so a
+        # capability can never disagree with the service that owns it. They are
+        # deliberately not folded into one "can review" notion: override and
+        # reviewer conclusion are separate governed concepts with separate
+        # permissions (`4D4-DEC-011`, and `PERM_REVIEW_EXECUTION` from 4D-2).
         return Response(
             {
-                # Derived from the same authoritative predicate the override
-                # service enforces with, so the two can never disagree.
                 "can_override_response": has_iig_checklist_permission(
                     request.user, tenant, PERM_OVERRIDE_EXECUTION
+                ),
+                # `4D4-DEC-012` approved extension (2026-08-12).
+                "can_enter_reviewer_conclusion": has_iig_checklist_permission(
+                    request.user, tenant, PERM_REVIEW_EXECUTION
                 ),
             }
         )
@@ -1594,6 +1607,16 @@ class ChecklistReviewerConclusionView(APIView):
                 {
                     "error_code": "reviewer_conclusion_payload_too_large",
                     "detail": "Payload exceeds byte limit.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except ReviewerConclusionInvalidExpectedVersion:
+            # `4D4-DEC-013` -- malformed, not stale. 400 with the same governed
+            # code the other two write paths use, so a client sees one contract.
+            return Response(
+                {
+                    "error_code": "invalid_expected_version",
+                    "detail": "expected_version must be a positive integer.",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

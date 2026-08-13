@@ -590,7 +590,17 @@ class ChecklistResponseOverrideSerializer(serializers.Serializer):
 
 class ReviewerConclusionSerializer(serializers.Serializer):
     raw_value = serializers.JSONField()
-    expected_version = serializers.IntegerField(min_value=1)
+    #: `4D4-DEC-013` (APPROVED 2026-08-12) closes the coercion divergence
+    #: `MILESTONE_4D_4_DISCOVERY.md` §H recorded as OPEN.
+    #:
+    #: This was `IntegerField(min_value=1)`, which coerces `1.0`, `"1"` and
+    #: `"1.0"` into the integer 1 -- so the transport layer applied a *more
+    #: permissive* structural rule than the domain, and reviewer conclusion ran a
+    #: third concurrency contract while the response-update and override paths
+    #: shared one. Now a passthrough: presence is checked here, structural
+    #: validity is decided by the governed `validate_expected_version()` in the
+    #: service, exactly as on the other two governed write paths.
+    expected_version = serializers.JSONField(required=False, allow_null=True)
     correction_reason = serializers.CharField(
         allow_blank=True,
         required=False,
@@ -603,6 +613,17 @@ class ReviewerConclusionSerializer(serializers.Serializer):
         if unknown:
             raise serializers.ValidationError(
                 {"error_code": "unknown_field", "detail": f"Unknown fields: {unknown}"}
+            )
+        # Presence only -- `4D4-DEC-013`. A key that is present but structurally
+        # invalid (`null`, `1.0`, `"1"`, `0`) passes here untouched and is refused
+        # by the governed validator in the service, so one structural rule exists
+        # rather than two.
+        if "expected_version" not in attrs:
+            raise serializers.ValidationError(
+                {
+                    "error_code": "expected_version_required",
+                    "detail": "expected_version is required on a governed reviewer conclusion.",
+                }
             )
         raw_value = attrs.get("raw_value")
         if not isinstance(raw_value, dict):

@@ -142,3 +142,93 @@ def test_unsupported_types_would_reject_a_plain_value_envelope(answer_type, payl
 def test_server_owned_types_reject_any_client_raw_value(answer_type):
     with pytest.raises(InvalidRawValueShape):
         validate_raw_value_shape(answer_type, {"value": "anything"})
+
+
+# ---------------------------------------------------------------------------
+# The per-response reviewer-conclusion endpoint.
+#
+# A `reviewer_conclusion` answer never travels the ordinary PATCH -- the check
+# above records that refusal -- so its wire contract is owned by
+# `ReviewerConclusionSerializer`, not `validate_raw_value_shape()`. These pin the
+# payload the frontend client emits
+# (`iigChecklists.executions.responses.reviewerConclusion`) against that real
+# serializer, the same cross-language guarantee the block above gives the editor.
+#
+# Database-free: the serializer decides shape before any model is touched.
+# ---------------------------------------------------------------------------
+
+
+def _conclusion_errors(payload):
+    from iig_checklist.serializers import ReviewerConclusionSerializer
+
+    serializer = ReviewerConclusionSerializer(data=payload)
+    return {} if serializer.is_valid() else serializer.errors
+
+
+def test_frontend_first_entry_payload_is_accepted():
+    # Exactly what the client sends on first entry: no correction_reason, and
+    # expected_version as a JSON integer taken from the loaded response.
+    assert (
+        _conclusion_errors({"raw_value": {"value": "Reviewed; acceptable."}, "expected_version": 3})
+        == {}
+    )
+
+
+def test_frontend_amendment_payload_is_accepted():
+    assert (
+        _conclusion_errors(
+            {
+                "raw_value": {"value": "Revised conclusion."},
+                "expected_version": 7,
+                "correction_reason": "Cited the wrong section.",
+            }
+        )
+        == {}
+    )
+
+
+def test_a_meaningful_one_character_conclusion_is_accepted():
+    # Section 13 specifies no numeric minimum, so none exists. This is the guard
+    # against a 3- or 10-character rule being invented later on either side.
+    assert _conclusion_errors({"raw_value": {"value": "Y"}, "expected_version": 1}) == {}
+
+
+@pytest.mark.parametrize("text", ["", "   ", "\t\n "])
+def test_empty_and_whitespace_only_conclusions_are_refused(text):
+    # Meaningful non-empty is the enforced requirement on both sides.
+    errors = _conclusion_errors({"raw_value": {"value": text}, "expected_version": 1})
+    assert errors, "whitespace-only must not be accepted as a conclusion"
+
+
+def test_the_existing_maximum_is_still_enforced():
+    from iig_checklist.execution_constants import MAX_REVIEWER_CONCLUSION_CHARS
+
+    # The frontend control caps at exactly this number; the boundary is valid.
+    at_limit = "x" * MAX_REVIEWER_CONCLUSION_CHARS
+    assert _conclusion_errors({"raw_value": {"value": at_limit}, "expected_version": 1}) == {}
+    over = "x" * (MAX_REVIEWER_CONCLUSION_CHARS + 1)
+    assert _conclusion_errors({"raw_value": {"value": over}, "expected_version": 1})
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "entered_by",
+        "entered_at",
+        "confirmed_by",
+        "confirmed_at",
+        "reviewer",
+        "version",
+        "history",
+        "data_source_type_snapshot",
+        "override_reason",
+    ],
+)
+def test_server_controlled_fields_are_refused_if_a_client_ever_sends_one(field):
+    # The frontend sends none of these; this is what makes that a contract
+    # rather than a convention. All of it is derived from the authenticated
+    # actor server-side.
+    errors = _conclusion_errors(
+        {"raw_value": {"value": "ok"}, "expected_version": 1, field: "anything"}
+    )
+    assert errors, f"{field} must be refused as an unknown field"
