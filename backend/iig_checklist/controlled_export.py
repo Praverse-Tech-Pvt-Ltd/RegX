@@ -56,8 +56,8 @@ from decimal import Decimal
 
 from common.csv_safety import csv_safe_cell
 
-from .calculation_translation import format_decimal_plain
 from .applicability_runtime import derive_applicability_outcome
+from .calculation_translation import format_decimal_plain
 from .enums import AnswerType
 from .governed_vocabularies import HISTORY_REASON_ANSWER_OVERRIDDEN
 

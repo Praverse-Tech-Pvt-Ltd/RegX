@@ -303,9 +303,7 @@ def _validate_registry() -> None:
         if not identifier or not isinstance(identifier, str):
             raise RuntimeError(f"Invalid resolver identifier: {identifier!r}")
         if entry.source_kind not in ALLOWED_SOURCE_KINDS:
-            raise RuntimeError(
-                f"{identifier}: unknown source_kind {entry.source_kind!r}"
-            )
+            raise RuntimeError(f"{identifier}: unknown source_kind {entry.source_kind!r}")
         if not callable(entry.function):
             raise RuntimeError(f"{identifier}: resolver is not callable")
 

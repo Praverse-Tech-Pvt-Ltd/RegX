@@ -524,19 +524,47 @@ milestone** and a prerequisite to any Part 11 claim — it is not satisfiable by
 Any prerequisite engine work identified by OQ-1/OQ-3 must complete **before**
 step 1 for the affected questions.
 
-## 9. Open questions requiring an owner decision
+## 9. Open questions — resolved by owner decision, and what remains
 
-None is engineering's to settle.
+**OQ-1 through OQ-7 were answered by the project owner as `5A-DEC-001` through
+`5A-DEC-007` (§12), and Milestone 5A-P1 implemented the engineering
+consequences.** The table records the disposition of each; §12 carries the
+decisions and `MILESTONE_5A_P1_ENGINEERING_EVIDENCE.md` the implementation
+evidence.
+
+| ID | Original question | Disposition |
+|---|---|---|
+| **OQ-1** | FDA-derived defaults declared but never populated | **CLOSED — `5A-DEC-001`.** Bindings may not be approved against an inert mechanism. The governed resolver layer is implemented: allow-list, provenance, explicit failure, no fabrication. |
+| **OQ-2** | Select options had codes but no label field | **CLOSED — `5A-DEC-002`.** Explicit value/label semantics; raw codes are never displayed and labels are never derived client-side. |
+| **OQ-3** | No per-question export exclusion | **CLOSED — `5A-DEC-003`.** Full governed inclusion for the first production release; no exclusion feature required for 5A. Regulatory may request exclusions through a later governed change. |
+| **OQ-4** | Applicability rules stored but never evaluated | **CLOSED — `5A-DEC-004`.** The deterministic runtime evaluator is implemented, fail-closed, with the APP-009 boundary preserved. |
+| **OQ-5** | Jurisdiction had no model field | **CLOSED — `5A-DEC-005`.** Structured governed metadata on `ChecklistVersion`, vocabulary `US_FDA`, inside the checksum-covered export. |
+| **OQ-6** | Platform-master or tenant-scoped production templates | **CLOSED — `5A-DEC-006`.** Official templates are platform-master governed content; tenants consume approved/active versions and never hold duplicated copies. |
+| **OQ-7** | May one person author and approve the package | **CLOSED — `5A-DEC-007`.** Author must not be the final regulatory reviewer/approver. A package requirement, not a new workflow engine. |
+
+### 9.1 New open question raised by 5A-P1
+
+One question surfaced during implementation and is **deliberately not answered
+by engineering**, because answering it would decide which regulated source
+answers a question:
 
 | ID | Question | Why it cannot be decided by engineering | Owner |
 |---|---|---|---|
-| **OQ-1** | FDA-derived defaults are declared but never populated (§3.6). Approve bindings now and build the resolver layer as a load prerequisite; classify those questions differently; or defer them? | Changes who supplies a regulated answer and how it is evidenced | Regulatory + Eng lead |
-| **OQ-2** | Select options have codes but **no label field** (§3.9). Display raw codes to reviewers; encode labels in question text; or add a labelling mechanism (new engineering scope)? | What a reviewer sees when choosing an answer is regulatory-facing | Regulatory + Eng lead |
-| **OQ-3** | No per-question export inclusion/exclusion exists (§3.10). Accept that every question is exported inside the checksum, or fund an exclusion mechanism? | Export content is a regulatory artifact decision | Regulatory |
-| **OQ-4** | Applicability rules are stored and validated but not evaluated (§3.5). Approve rules now as documented intent, or defer applicability entirely until the evaluator exists? | Determines whether a "not applicable" outcome is system- or human-determined | Regulatory + Eng lead |
-| **OQ-5** | Jurisdiction has **no model field** (item 3). Record it in `regulatory_basis`, in the definition `description`, or add a field? | Where a regulatory attribute is recorded affects export and review | Regulatory + Eng lead |
-| **OQ-6** | Will production templates be `platform_master` (superuser authoring, shared) or `tenant`-scoped (per-client)? | Determines who may load content and who may vary it | Project owner + Regulatory |
-| **OQ-7** | Is the same person permitted to author and review the package (§6.2)? | A single-person package must be labelled as such, not implied to be two-person reviewed | Project owner |
+| **OQ-8** | Which `AssessmentSnapshot` governs execution-level `iid.*` values? A snapshot is scoped to one formulation **component**, while applicability and FDA-derived defaults are properties of the **execution**. No approved specification says which component's snapshot governs, or whether one must be created during a population pass. | Choosing a component decides which precedent record answers a regulated question — a regulatory mapping, not a mechanism | Regulatory + Eng lead |
+
+**Behaviour until OQ-8 is answered — conservative, and never silent:**
+
+- an applicability rule reading any `iid.*` field evaluates to
+  **`review_required`** with reason code `APPLICABILITY_SOURCE_UNRESOLVED`,
+  rather than quietly taking its false branch. "We could not find out" is not
+  the same answer as "no";
+- an FDA-derived binding resolves to an explicit **`source_unavailable`**
+  provenance record with no value. The binding is real, validated and audited;
+  the governed selection rule is what is missing, and no default is fabricated
+  to paper over it.
+
+Both states are visible in the API and in the controlled export, so a reviewer
+sees an unresolved source rather than an answer that looks settled.
 
 ## 10. Production-readiness boundary
 
@@ -573,3 +601,28 @@ Rather than duplicate it, 5A **keeps it as the origin of the gate** — it holds
 
 The 4D-4 document gains a forward pointer and nothing else. The item table is
 **not** duplicated: the 5A register is the working copy.
+
+---
+
+## 12. Approved owner decisions — `5A-DEC-001` … `5A-DEC-007`
+
+Recorded as **approved project-owner decisions**. Each closes an open question
+from §9 and each has an engineering consequence delivered in Milestone 5A-P1.
+None approves any production regulatory content: the gate remains at
+**0 of 20**.
+
+| ID | Decision | Status | Engineering consequence |
+|---|---|---|---|
+| **5A-DEC-001** | Production `FDA_DERIVED_DEFAULT` bindings **shall not** be approved against an inert binding. The governed runtime resolver must exist first: deterministic, source identity and version preserved, reproducible after approval, tenant-isolated, explicit failure when a source cannot be resolved, no silent fallback or fabrication. | **APPROVED** | `answer_sources.py` allow-list registry; `ChecklistResponse.source_provenance`; governed population at execution creation; authoring-time binding validation. |
+| **5A-DEC-002** | Production select options **shall** use explicit machine value plus human-readable label. Raw codes must not be displayed as labels, labels must not be encoded into question prose, and labels must not be derived heuristically in the frontend. | **APPROVED** | `question_options.py` governed schema and validation; server-resolved `options` field; client renders the label. |
+| **5A-DEC-003** | First production release uses **full governed question inclusion** in controlled exports. No per-question export-exclusion feature is required for 5A. | **APPROVED** | No exclusion mechanism built, deliberately. Regressions pin that governed questions, applicability state, FDA provenance, jurisdiction and select interpretation all stay checksum-covered. |
+| **5A-DEC-004** | Persisting an applicability rule without evaluating it is **not sufficient** for production. Deterministic runtime evaluation must exist before content depending on applicability may be approved or activated, reusing the APP-009 ownership boundary. | **APPROVED** | Pure evaluator in `applicability.py`; governed writer `applicability_runtime.py`; derived `applicability_outcome`; fail-closed on unresolved sources and malformed rules. |
+| **5A-DEC-005** | Jurisdiction **shall** be explicit structured governed metadata, not hidden inside free-text `regulatory_basis`. Version-governed. Controlled vocabulary initially sufficient for `US_FDA`; no invented additions. | **APPROVED** | `Jurisdiction` enum with one member; `ChecklistVersion.jurisdiction`; lifecycle-frozen; checksum-covered; migration backfills nothing. |
+| **5A-DEC-006** | Official REGX production regulatory checklist templates are **platform-master** governed content. Tenants consume approved/active versions; official content is never duplicated per tenant. Tenant execution data stays tenant-isolated. | **APPROVED** | **Verified, no code needed.** `can_author_platform_master()` and `can_mutate_definition_scope()` already enforce it and visibility never implies mutation authority; 49 existing tests, extended by 5A-P1 regressions. |
+| **5A-DEC-007** | Production regulatory-content **author must not be** the person performing final regulatory review/approval. Item-20 sign-off is by the designated qualified regulatory authority. Engineering compatibility review is **not** regulatory approval. **No 21 CFR Part 11 electronic-signature compliance is claimed.** | **APPROVED** | Recorded as a package requirement with separate Author and Regulatory Approver fields and a validation checklist — deliberately **not** a second workflow engine for a Markdown file. The application's own self-approval bar is a different control, verified separately. |
+
+### 12.1 What these decisions do not do
+
+They do not author regulatory content, do not select templates, do not interpret
+guidance, and do not move the approval count. Milestone 5A remains **BLOCKED ON
+REGULATORY APPROVAL** at **0 of 20**.

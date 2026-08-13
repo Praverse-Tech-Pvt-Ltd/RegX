@@ -4,10 +4,38 @@ Tracks milestone status on the `regx-main` line. This branch is a clean-room imp
 
 ## Milestone 5A — Production Regulatory Checklist Content Readiness
 
-**Status: IN DISCOVERY — BLOCKED ON REGULATORY APPROVAL**
+**Status: ENGINEERING PREREQUISITES COMPLETE (5A-P1) — BLOCKED ON REGULATORY APPROVAL**
 **Production regulatory checklist content: 0 of 20 approved — gate OPEN.**
 
-5A converts the production-content gate from an unspecific "0/20" into a
+### 5A-P1 — Content engine prerequisites: COMPLETE
+
+Discovery found three capability limits that made it unsafe to ask a regulatory
+authority to approve content. 5A-P1 closed them, under approved project-owner
+decisions `5A-DEC-001` through `5A-DEC-007`:
+
+- **FDA-derived resolvers** now exist as a governed allow-list with source
+  provenance, explicit failure statuses and no fabricated defaults;
+- **applicability rules are evaluated at runtime**, deterministically and
+  fail-closed, with the APP-009 ownership boundary preserved;
+- **select options carry approved labels**, so a reviewer never sees a raw code
+  and no label is derived in the client;
+- **jurisdiction** is structured governed metadata on `ChecklistVersion`, inside
+  the checksum-covered export;
+- **platform-master ownership** was verified rather than rebuilt — the existing
+  controls already enforce `5A-DEC-006`;
+- **no per-question export exclusion** was built: `5A-DEC-003` chose full
+  governed inclusion for the first production release.
+
+**Engineering prerequisites are not regulatory approvals.** The count stays at
+0 of 20 and moves only when a named regulatory authority signs. One new open
+question (**OQ-8**, which `AssessmentSnapshot` governs execution-level `iid.*`
+values) is deliberately left to the owner; until it is answered, affected rules
+evaluate to `review_required` and affected bindings record `source_unavailable`
+rather than guessing.
+
+See [MILESTONE_5A_P1_ENGINEERING_EVIDENCE.md](MILESTONE_5A_P1_ENGINEERING_EVIDENCE.md).
+
+5A discovery converted the production-content gate from an unspecific "0/20" into a
 controlled approval package a qualified RA/QA authority can review and sign. It
 defines the content schema, per-item ownership, evidence requirements,
 engine traceability, the approval workflow, sign-off criteria and the engineering

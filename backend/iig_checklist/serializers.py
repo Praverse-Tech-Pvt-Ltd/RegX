@@ -184,9 +184,7 @@ class ChecklistQuestionSerializer(serializers.ModelSerializer):
         parsed = parse_options(obj.validation_rule or {})
         if parsed is None:
             return None
-        return [
-            {"value": option.value, "label": option.display_label} for option in parsed
-        ]
+        return [{"value": option.value, "label": option.display_label} for option in parsed]
 
 
 class VersionActionSerializer(serializers.Serializer):

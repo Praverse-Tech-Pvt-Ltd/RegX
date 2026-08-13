@@ -7,6 +7,33 @@
 > [MILESTONE_5A_REGULATORY_CONTENT_PACKAGE_TEMPLATE.md](MILESTONE_5A_REGULATORY_CONTENT_PACKAGE_TEMPLATE.md)
 > **Engine facts verified against** `regx-main` `8305180` **code, not only docs.**
 
+> ### ▶ Milestone 5A-P1 closed the three capability limits
+>
+> Items 11, 12 and 18 were marked **capability-limited**: they asked the
+> authority to approve content against mechanisms that did not exist. 5A-P1
+> built them, so the disclosures below are **resolved**.
+>
+> - **Item 11** — applicability rules are now actually evaluated (`5A-DEC-004`).
+> - **Item 12** — FDA-derived bindings now resolve through a governed allow-list
+>   with provenance and explicit failure (`5A-DEC-001`).
+> - **Item 18** — no exclusion mechanism is needed: `5A-DEC-003` decided full
+>   governed inclusion for the first production release.
+>
+> Two further decisions bear on this register: `5A-DEC-005` gives jurisdiction
+> (item 3) a structured governed home, and `5A-DEC-006` settles item 1's scope
+> question — official templates are platform-master content.
+>
+> **One new constraint applies to items 11 and 12** and must be read before
+> approving either: `MILESTONE_5A_DISCOVERY.md` **OQ-8**. Which
+> `AssessmentSnapshot` governs execution-level `iid.*` values is not settled by
+> any approved specification, so a rule reading `iid.*` currently evaluates to
+> `review_required`, and an FDA-derived binding records `source_unavailable`.
+> Both are visible and neither fabricates a value — but content depending on
+> `iid.*` should not be approved as *automatic* until OQ-8 is answered.
+>
+> **The approval count is unchanged: 0 of 20.** Engineering prerequisites are
+> not regulatory approvals.
+
 ## 1. Reading this register
 
 Four ownership classes:
@@ -47,6 +74,10 @@ Candidates named at `MILESTONE_4D_DISCOVERY.md:1089` — oral solid, oral liquid
 parenteral, topical, "potentially others" — are **candidates only**. Engineering
 has selected nothing.
 
+`5A-DEC-006` settles the *scope type* but not the *set*: whatever templates are
+included are **platform-master** governed content that tenants consume, never
+duplicated per tenant. Which templates ship remains entirely regulatory.
+
 ### Item 2 — Checklist title per definition
 
 | | |
@@ -70,10 +101,10 @@ has selected nothing.
 | **Owner** | Regulatory (unchanged) |
 | **Evidence required** | Statement of jurisdiction and its basis |
 | **Citation required?** | **Yes** |
-| **Engineering dependency** | ⚠ **No model field exists** for jurisdiction |
+| **Engineering dependency** | ✅ `ChecklistVersion.jurisdiction`, controlled vocabulary, lifecycle-frozen, checksum-covered (`5A-DEC-005`). Vocabulary is `US_FDA` only; another jurisdiction requires a governed decision, not a code change |
 | **Validation rule** | Stated explicitly per definition; never inferred |
-| **Completion criterion** | Jurisdiction stated **and** its storage location decided (OQ-5) |
-| **Downstream** | Undecided — `regulatory_basis`, `description`, or a new field |
+| **Completion criterion** | Jurisdiction stated per definition (storage settled by `5A-DEC-005`) |
+| **Downstream** | `ChecklistVersion.jurisdiction` |
 | **Interpretation risk** | **HIGH** — the wrong jurisdiction invalidates every question under it |
 | **Status** | **PENDING** |
 
@@ -213,13 +244,20 @@ for a rejected one without regulatory re-confirmation.
 | **Completion criterion** | Intent stated, encodable within the six fields, **and OQ-4 resolved** |
 | **Downstream** | `ApplicabilityRule`, `ChecklistSection.applicability_rule`, `ChecklistQuestion.applicability_rule` |
 | **Interpretation risk** | **HIGH** — applicability decides whether a question must be answered at all |
-| **Status** | **PENDING — capability-limited** |
+| **Status** | **PENDING** — capability limit resolved by `5A-DEC-004` |
 
-⚠ **Disclosure required before approval.** There is **no runtime applicability
+✅ **Resolved by 5A-P1.** A deterministic runtime evaluator now exists, and an
+approved rule is evaluated and persisted at execution creation. Superseded
+disclosure, retained for history: there was **no runtime applicability
 evaluator**; `applicability.py` validates and canonicalizes only, and
 `MILESTONE_4D_4_APP_009_EVIDENCE.md` §6 states that nothing in production writes
 `is_not_applicable` from a rule. An approved rule will be stored, validated and
-exported but **not automatically applied**. See **OQ-4**.
+exported but **not automatically applied**. That is no longer true.
+
+⚠ **Still read OQ-8 before approving a rule that reads `iid.*`:** those three
+fields evaluate to `review_required` today, because which component snapshot
+governs an execution-level rule is not specified. Rules over `product.*`
+evaluate fully.
 
 An intent that cannot be expressed with the six available fields is a **blocking
 finding returned to Regulatory** — never approximated by engineering.
@@ -232,14 +270,14 @@ finding returned to Regulatory** — never approximated by engineering.
 | **Owner** | Regulatory + Engineering (unchanged) |
 | **Evidence required** | Which FDA field feeds which question, and why that field is the correct source |
 | **Citation required?** | **Yes** |
-| **Engineering dependency** | ⚠ **No resolver layer exists** |
-| **Validation rule** | Classification is valid and the answer-type pair is allowed; **the binding itself cannot be validated — nothing consumes it** |
-| **Completion criterion** | Binding stated, **and OQ-1 resolved** |
-| **Downstream** | `ChecklistQuestion.prefill_source` / `default_value_binding` — **both inert** |
+| **Engineering dependency** | ✅ Governed allow-list resolver layer (`5A-DEC-001`): `answer_sources.py`, provenance on the response, explicit failure statuses |
+| **Validation rule** | Classification and answer-type pair allowed; **the binding identifier is validated against the approved registry at authoring time** and refused again at resolution |
+| **Completion criterion** | Binding stated and naming an approved resolver identifier |
+| **Downstream** | `ChecklistQuestion.prefill_source` (governed resolver identifier); `ChecklistResponse.source_provenance`. `default_value_binding` remains reserved and unused |
 | **Interpretation risk** | **HIGH** — a wrong source field puts a wrong regulated value in front of a reviewer |
-| **Status** | **PENDING — capability-limited** |
+| **Status** | **PENDING** — capability limit resolved by `5A-DEC-001` |
 
-⚠ **Disclosure required before approval.** `answer_sources.py`
+✅ **Resolved by 5A-P1.** Superseded disclosure, retained for history: `answer_sources.py`
 (`MILESTONE_4D_3_IMPLEMENTATION_SPEC.md` M4D3-SVC-007, M4D3-POP-001/002) **does
 not exist**; it was held out of scope by instruction and disclosed at
 `MILESTONE_4D_3_IMPLEMENTATION_EVIDENCE.md:3121-3124` and :3149.
@@ -250,8 +288,13 @@ against nothing and read by no engine code**.
 
 In the current engine an `FDA_DERIVED_DEFAULT` question **starts empty**, is not
 client-writable (`services.py:940`), and can only be filled through a governed
-override by a Reviewer or VP. The authority must be told this before approving
-any such binding. See **OQ-1**.
+override by a Reviewer or VP. That is no longer true: a bound question now
+resolves through the governed registry and records provenance either way.
+
+⚠ **Still read OQ-8 before approving a binding:** no governed rule yet selects
+*which* IID precedent record answers a given question, so a binding resolves to
+an explicit `source_unavailable` record rather than a value. Nothing is
+fabricated, and the failure is visible in the API and the export.
 
 ### Item 13 — `SYSTEM_CALCULATED` bindings
 
@@ -355,11 +398,11 @@ rather than at load time. The regulatory *expectation* remains regulatory-owned.
 | **Evidence required** | Any exclusion requirement and its rationale |
 | **Citation required?** | Where guidance-derived |
 | **Engineering dependency** | ⚠ **No inclusion/exclusion mechanism exists.** Export covers **every** response of an approved execution (`controlled_export.py:453`), inside the SHA-256 checksum; only `approved` executions are exportable (`controlled_export.py:96`) |
-| **Validation rule** | An exclusion request is a **blocking finding** — it requires new engineering scope |
-| **Completion criterion** | Either "no exclusions required" is confirmed, or **OQ-3** is resolved with funded scope |
+| **Validation rule** | `5A-DEC-003` decided full governed inclusion for the first production release. An exclusion request is deferred to a later governed change, not a 5A blocker |
+| **Completion criterion** | Confirm that full governed inclusion is acceptable (`5A-DEC-003`) |
 | **Downstream** | `controlled_export` payload and checksum |
 | **Interpretation risk** | MEDIUM |
-| **Status** | **PENDING — capability-limited** |
+| **Status** | **PENDING** — settled by `5A-DEC-003`; confirmation only |
 
 ⚠ **Reclassification justified.** The 4D-4 table asks "Any exclusions?" of
 Regulatory alone. Because no mechanism exists, an unqualified regulatory
@@ -404,7 +447,8 @@ recording it as engineering-derived-with-confirmation reflects the code.
 
 | Required element | Present? |
 |---|---|
-| Approver full name (individual, not a role) | ☐ |
+| Author full name and role (individual) | ☐ |
+| **Regulatory approver full name and role — must differ from the author (`5A-DEC-007`)** | ☐ |
 | Organizational role | ☐ |
 | Authority statement (IIG guidance interpretation authority) | ☐ |
 | Approval date | ☐ |
@@ -414,6 +458,8 @@ recording it as engineering-derived-with-confirmation reflects the code.
 | Source-reference inventory | ☐ |
 | Confirmation that questions, applicability and reviewer expectations were reviewed | ☐ |
 | Confirmation that engineering authored no regulatory meaning | ☐ |
+| Confirmation that the author and the regulatory approver are different people (`5A-DEC-007`) | ☐ |
+| Confirmation that engineering compatibility review was **not** treated as regulatory approval | ☐ |
 | Signature evidence per `MILESTONE_5A_DISCOVERY.md` §7.3 | ☐ |
 
 **Signature mechanism — required label.** No 21 CFR Part 11 validated electronic
@@ -432,13 +478,18 @@ claimed."*
 | FORMAL SIGN-OFF | 20 | 1 |
 | **Total** | | **20** |
 
-**Capability-limited items — approve only with the disclosure attached:**
+**Capability limits — all three resolved by Milestone 5A-P1:**
 
-| Item | Limitation | Open question |
+| Item | Former limitation | Now |
 |---|---|---|
-| 11 | Applicability rules validated and stored, never evaluated at runtime | OQ-4 |
-| 12 | FDA-derived bindings inert; no resolver layer; responses start empty | OQ-1 |
-| 18 | No per-question export exclusion; all responses are exported | OQ-3 |
+| 11 | Rules validated and stored, never evaluated | **Evaluated at runtime** (`5A-DEC-004`), fail-closed. `iid.*` rules await OQ-8. |
+| 12 | Bindings inert; no resolver layer | **Governed allow-list resolver** with provenance and explicit failure (`5A-DEC-001`). Source selection awaits OQ-8. |
+| 18 | No per-question export exclusion | **Not required** — `5A-DEC-003` chose full governed inclusion. |
+
+**One live constraint remains:** OQ-8 (which `AssessmentSnapshot` governs
+execution-level `iid.*`). Content that depends on `iid.*` applicability or on a
+resolved FDA-derived value should not be approved as *automatic* until it is
+answered. Everything over `product.*` is fully functional.
 
 **High interpretation risk:** items 1, 3, 4, 5, 7, 9, 10, 11, 12, 13, 15, 16, 20.
 

@@ -37,9 +37,7 @@ from .field_registry import FIELD_REGISTRY_VERSION
 from .governed_vocabularies import RESERVED_REASON_PREFIX
 
 #: PST-007 -- the only statuses in which applicability may be (re)computed.
-RECOMPUTABLE_EXECUTION_STATUSES = frozenset(
-    {ExecutionStatus.DRAFT, ExecutionStatus.RETURNED}
-)
+RECOMPUTABLE_EXECUTION_STATUSES = frozenset({ExecutionStatus.DRAFT, ExecutionStatus.RETURNED})
 
 #: The six field names of registry version 1, split by the source that owns
 #: them. Kept as data rather than inline lookups so that "which source feeds
@@ -262,15 +260,14 @@ def evaluate_execution_applicability(*, execution, actor=None) -> dict:
         if outcome == ApplicabilityOutcome.NOT_APPLICABLE:
             new_flag, new_reason = True, rule.reason_code
         elif outcome == ApplicabilityOutcome.REVIEW_REQUIRED:
-            new_flag, new_reason = False, review_required_marker(
-                _review_reason_code(rule, context)
-            )
+            new_flag, new_reason = False, review_required_marker(_review_reason_code(rule, context))
         else:
             new_flag, new_reason = False, None
 
-        if response.is_not_applicable == new_flag and (
-            response.not_applicable_reason or None
-        ) == new_reason:
+        if (
+            response.is_not_applicable == new_flag
+            and (response.not_applicable_reason or None) == new_reason
+        ):
             continue
 
         response.is_not_applicable = new_flag

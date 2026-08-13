@@ -223,7 +223,9 @@ class TestJurisdictionReachesTheExport:
         execution.save(update_fields=["status"])
         return execution
 
-    def test_jurisdiction_is_in_the_hashed_payload(self, db, tenant_a, tenant_definition, user_a, doer_membership):
+    def test_jurisdiction_is_in_the_hashed_payload(
+        self, db, tenant_a, tenant_definition, user_a, doer_membership
+    ):
         from iig_checklist.controlled_export import build_export_artifact
 
         execution = self._approved_execution(
@@ -480,9 +482,21 @@ class TestEvaluatorSemantics:
     @pytest.mark.parametrize(
         ("condition", "context", "expected"),
         [
-            ({"field": "product.route", "op": "eq", "value": "oral"}, {"product.route": "oral"}, True),
-            ({"field": "product.route", "op": "eq", "value": "oral"}, {"product.route": "iv"}, False),
-            ({"field": "product.route", "op": "neq", "value": "oral"}, {"product.route": "iv"}, True),
+            (
+                {"field": "product.route", "op": "eq", "value": "oral"},
+                {"product.route": "oral"},
+                True,
+            ),
+            (
+                {"field": "product.route", "op": "eq", "value": "oral"},
+                {"product.route": "iv"},
+                False,
+            ),
+            (
+                {"field": "product.route", "op": "neq", "value": "oral"},
+                {"product.route": "iv"},
+                True,
+            ),
             (
                 {"field": "product.route", "op": "in", "value": ["oral", "iv"]},
                 {"product.route": "iv"},
@@ -507,7 +521,9 @@ class TestEvaluatorSemantics:
         # M4D3-APP-005 -- absent is absent, not an error and not a match.
         from iig_checklist.applicability import evaluate_condition
 
-        assert evaluate_condition({"field": "product.route", "op": "eq", "value": "oral"}, {}) is False
+        assert (
+            evaluate_condition({"field": "product.route", "op": "eq", "value": "oral"}, {}) is False
+        )
 
     def test_explicit_null_is_treated_as_absent(self):
         from iig_checklist.applicability import evaluate_condition
@@ -736,13 +752,13 @@ class TestApplicabilityIsActuallyEvaluated:
         # Reachable only if validation was bypassed -- but reachable. One bad
         # rule must not make the whole execution uncreatable, and must not be
         # silently treated as applicable either.
-        _, response = self._world(
-            tenant_a, tenant_definition, user_a, {"op": "always_true"}
-        )
+        _, response = self._world(tenant_a, tenant_definition, user_a, {"op": "always_true"})
         assert response.is_not_applicable is False
         assert response.not_applicable_reason == "REVIEW_REQUIRED:APPLICABILITY_RULE_MALFORMED"
 
-    def test_an_ungoverned_question_is_untouched(self, db, tenant_a, tenant_definition, user_a, doer_membership):
+    def test_an_ungoverned_question_is_untouched(
+        self, db, tenant_a, tenant_definition, user_a, doer_membership
+    ):
         # M4D3-APP-012 -- the pass only ever writes rule-governed responses.
         version = _version(tenant_definition, user_a, status="draft")
         section = _section(version)
@@ -1037,7 +1053,9 @@ class TestPopulationAtExecutionCreation:
         projected = artifact["payload"]["responses"][0]
         assert projected["source_provenance"]["status"] == "source_unavailable"
 
-    def test_a_client_cannot_write_provenance(self, db, tenant_a, tenant_definition, user_a, doer_membership):
+    def test_a_client_cannot_write_provenance(
+        self, db, tenant_a, tenant_definition, user_a, doer_membership
+    ):
         from iig_checklist.serializers import ChecklistResponseSerializer
 
         # Read-only on the serializer the client sees: provenance is evidence

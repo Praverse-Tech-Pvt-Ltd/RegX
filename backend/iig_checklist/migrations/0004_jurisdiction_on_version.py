@@ -13,15 +13,16 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('iig_checklist', '0003_alter_calculationoutcome_input_provenance_and_more'),
+        ("iig_checklist", "0003_alter_calculationoutcome_input_provenance_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='checklistversion',
-            name='jurisdiction',
-            field=models.CharField(blank=True, choices=[('US_FDA', 'United States FDA')], default='', max_length=20),
+            model_name="checklistversion",
+            name="jurisdiction",
+            field=models.CharField(
+                blank=True, choices=[("US_FDA", "United States FDA")], default="", max_length=20
+            ),
         ),
     ]

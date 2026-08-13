@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('iig_checklist', '0004_jurisdiction_on_version'),
+        ("iig_checklist", "0004_jurisdiction_on_version"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='checklistresponse',
-            name='source_provenance',
+            model_name="checklistresponse",
+            name="source_provenance",
             field=models.JSONField(blank=True, null=True),
         ),
     ]
