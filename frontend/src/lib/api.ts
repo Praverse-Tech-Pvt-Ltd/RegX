@@ -1329,7 +1329,28 @@ export type {
   CalculationStatus,
 } from "./api/execution-mappers";
 
+/**
+ * `4D4-DEC-012` — tenant-scoped capability flags for the current caller.
+ *
+ * Named capabilities only: never raw permission codenames, roles or any other
+ * authorization internals. The client learns what it may do, not how
+ * permissions are modelled.
+ */
+export interface ChecklistCapabilities {
+  can_override_response: boolean;
+}
+
 export const iigChecklists = {
+  /**
+   * Advisory UI metadata **only**. The backend remains authoritative — a client
+   * that ignores these flags still receives the same governed refusal, so this
+   * must never be treated as a security boundary.
+   */
+  capabilities: (tenantSlug: string) =>
+    apiRequest<ChecklistCapabilities>("/api/regx/v1/iig-checklists/capabilities/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
   definitions: {
     list: (tenantSlug: string, params?: { page?: number }) => {
       const qs = new URLSearchParams();
