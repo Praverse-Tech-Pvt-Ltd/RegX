@@ -463,7 +463,11 @@ class TestCapabilitySurface:
         self, db, api_client_reviewer, reviewer_membership
     ):
         resp = api_client_reviewer.get(_capabilities_url())
-        assert set(resp.data) == {"can_override_response"}
+        # `4D4-DEC-012` approved extension (2026-08-12): exactly one additional
+        # flag, `can_enter_reviewer_conclusion`. This assertion is the gate that
+        # extension had to pass through, so it is updated to the newly approved
+        # shape rather than relaxed -- an unapproved third key still fails here.
+        assert set(resp.data) == {"can_override_response", "can_enter_reviewer_conclusion"}
         blob = json.dumps(resp.data)
         # No raw codenames, no role internals, no database identifiers.
         assert "iig_checklist." not in blob
