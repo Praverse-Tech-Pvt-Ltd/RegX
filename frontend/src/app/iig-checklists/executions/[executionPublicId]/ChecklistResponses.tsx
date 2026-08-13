@@ -44,6 +44,48 @@ const SERVER_CONTROLLED_CLASSIFICATIONS = new Set([
 /** Reviewer conclusions have their own governed endpoint, not this PATCH. */
 const REVIEWER_CONCLUSION = "reviewer_conclusion";
 
+/**
+ * Mirrors the backend gate in `enter_reviewer_conclusion()`: the service refuses
+ * any other status with 409 `reviewer_conclusion_invalid_state`. A conclusion is
+ * a review act, so it exists only while the execution is under review — never in
+ * `draft`/`returned` (where it has not been submitted yet) and never after
+ * `approved` (where the record is closed).
+ */
+const REVIEWER_CONCLUSION_STATUSES = new Set(["submitted_for_review"]);
+
+/**
+ * Matches the backend `MAX_REVIEWER_CONCLUSION_CHARS`, which bounds both the
+ * execution-level note and this per-response raw_value.
+ */
+export const MAX_REVIEWER_CONCLUSION_CHARS = 4_000;
+
+/**
+ * Client-side echo of the governed text rules for a reviewer conclusion.
+ *
+ * §13 states the conclusion is free text, required, with a minimum length
+ * enforced — but specifies **no numeric minimum**. None is invented here: the
+ * requirement implemented is *meaningful non-empty*, exactly as the backend
+ * enforces it (missing / empty / whitespace-only refused via `.strip()`). A
+ * single meaningful character is a valid conclusion and must not be refused.
+ *
+ * The maximum is the pre-existing governed one, unchanged.
+ *
+ * This never replaces the server's decision — it only avoids a request that is
+ * already known to be refused, and reports the same reason the server would.
+ */
+export function reviewerConclusionError(text: string): string | null {
+  if (!text.trim()) return "A reviewer conclusion is required.";
+  if (text.length > MAX_REVIEWER_CONCLUSION_CHARS) {
+    return `A reviewer conclusion may not exceed ${MAX_REVIEWER_CONCLUSION_CHARS} characters.`;
+  }
+  return null;
+}
+
+/** An existing conclusion is amended, not entered; the backend then requires a reason. */
+export function isReviewerConclusionAmendment(response: ChecklistResponse): boolean {
+  return response.rawValue !== null && response.rawValue !== undefined;
+}
+
 const PROVENANCE_BY_CLASSIFICATION: Record<string, Provenance> = {
   fda_derived_default: "FDA_SOURCE",
   system_calculated: "CALCULATED",
@@ -297,6 +339,17 @@ export function ChecklistResponses({
   const [overrideDrafts, setOverrideDrafts] = useState<
     Record<string, { value: string; reason: string }>
   >({});
+  /**
+   * `4D4-DEC-012` extension. Same fail-closed default as the override flag: the
+   * action stays hidden until the server confirms it, so a failed capability
+   * fetch cannot reveal a reviewer action to a Doer. Presentation only —
+   * `PERM_REVIEW_EXECUTION` is enforced by the service regardless.
+   */
+  const [canEnterReviewerConclusion, setCanEnterReviewerConclusion] = useState(false);
+  const [conclusionSavingId, setConclusionSavingId] = useState<string | null>(null);
+  const [conclusionDrafts, setConclusionDrafts] = useState<
+    Record<string, { text: string; correctionReason: string }>
+  >({});
 
   /**
    * Refetch the authoritative response collection and rebuild every draft from
@@ -315,11 +368,15 @@ export function ChecklistResponses({
     iigChecklists
       .capabilities(tenantSlug)
       .then((caps) => {
-        if (!cancelled) setCanOverride(caps.can_override_response);
+        if (cancelled) return;
+        setCanOverride(caps.can_override_response);
+        setCanEnterReviewerConclusion(caps.can_enter_reviewer_conclusion);
       })
       // Fail closed: a capability the server did not confirm stays hidden.
       .catch(() => {
-        if (!cancelled) setCanOverride(false);
+        if (cancelled) return;
+        setCanOverride(false);
+        setCanEnterReviewerConclusion(false);
       });
     return () => {
       cancelled = true;
@@ -468,6 +525,107 @@ export function ChecklistResponses({
     }
   }
 
+  /**
+   * All three governed conditions, mirroring `enter_reviewer_conclusion()`:
+   * the capability (`PERM_REVIEW_EXECUTION`, never a hardcoded role name), the
+   * answer type, and the lifecycle status. The server enforces each of them
+   * independently; this only decides whether to offer the action.
+   */
+  function canOfferReviewerConclusion(question: ChecklistQuestion | undefined): boolean {
+    return (
+      canEnterReviewerConclusion &&
+      question?.answer_type === REVIEWER_CONCLUSION &&
+      REVIEWER_CONCLUSION_STATUSES.has(executionStatus)
+    );
+  }
+
+  async function submitReviewerConclusion(response: ChecklistResponse) {
+    // One governed write in flight at a time, across all three write paths.
+    if (conclusionSavingId !== null || savingId !== null || overridingId !== null) return;
+    const draft = conclusionDrafts[response.publicId] ?? { text: "", correctionReason: "" };
+
+    const textError = reviewerConclusionError(draft.text);
+    if (textError) {
+      setSaveError(textError);
+      return;
+    }
+    const amending = isReviewerConclusionAmendment(response);
+    if (amending && !draft.correctionReason.trim()) {
+      setSaveError("A correction reason is required when amending a reviewer conclusion.");
+      return;
+    }
+
+    setConclusionSavingId(response.publicId);
+    setSaveError(null);
+    setNotice(null);
+    try {
+      // Exactly the fields the endpoint accepts. The text is sent as typed —
+      // trimming it here would silently alter a regulated record; the backend
+      // strips only to decide emptiness. `correction_reason` is omitted
+      // entirely on first entry, where the service does not want it.
+      const payload: Parameters<
+        typeof iigChecklists.executions.responses.reviewerConclusion
+      >[3] = {
+        raw_value: { value: draft.text },
+        // Straight from the loaded response, already a JSON integer —
+        // `4D4-DEC-013` refuses "1", 1.0 and "1.0" rather than coercing them.
+        expected_version: response.version,
+      };
+      if (amending) payload.correction_reason = draft.correctionReason;
+
+      await iigChecklists.executions.responses.reviewerConclusion(
+        tenantSlug,
+        executionPublicId,
+        response.publicId,
+        payload
+      );
+      // The server owns the new version, provenance and history. Read the
+      // authoritative collection back rather than patching local state, so the
+      // next amendment sends the server's version and not a guessed one.
+      await refresh();
+      setConclusionDrafts((prev) => ({
+        ...prev,
+        [response.publicId]: { text: "", correctionReason: "" },
+      }));
+      setNotice("Reviewer conclusion recorded.");
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 409) {
+        // Either a stale version or an execution that left review. Both mean
+        // our picture is out of date, so reload before saying anything, and
+        // report the server's own governed reason rather than guessing which.
+        await refresh().catch(() => undefined);
+        setSaveError(
+          err.message ||
+            "This response changed since you loaded it. The current values have been refreshed — review them and try again."
+        );
+      } else if (err instanceof ApiError && err.status === 403) {
+        setSaveError("You do not have permission to enter a reviewer conclusion.");
+      } else if (err instanceof ApiError) {
+        // Governed 400s (`reviewer_conclusion_empty`, `invalid_expected_version`,
+        // `reviewer_conclusion_too_long`, …) surface the server's detail.
+        setSaveError(err.message || "Reviewer conclusion failed.");
+      } else {
+        setSaveError("Reviewer conclusion failed.");
+      }
+    } finally {
+      setConclusionSavingId(null);
+    }
+  }
+
+  function setConclusionDraft(
+    publicId: string,
+    patch: Partial<{ text: string; correctionReason: string }>
+  ) {
+    setConclusionDrafts((prev) => ({
+      ...prev,
+      [publicId]: {
+        text: prev[publicId]?.text ?? "",
+        correctionReason: prev[publicId]?.correctionReason ?? "",
+        ...patch,
+      },
+    }));
+  }
+
   function setDraft(publicId: string, patch: Partial<Draft>) {
     setDrafts((prev) => {
       const current = prev[publicId];
@@ -513,7 +671,83 @@ export function ChecklistResponses({
                 {provenance && <ProvenanceLabel kind={provenance} />}
               </div>
 
-              {isServerControlled(classification) ? (
+              {/* A reviewer_conclusion answer is governed by its own endpoint,
+                  so the answer type decides the branch before classification
+                  does: neither the ordinary editor nor the override form can
+                  produce a payload this response would accept. */}
+              {question?.answer_type === REVIEWER_CONCLUSION ? (
+                <div data-testid={`reviewer-conclusion-${response.publicId}`}>
+                  {/* The current conclusion is always shown, to every reader —
+                      visibility is not gated on the capability to write one. */}
+                  <p
+                    data-testid={`reviewer-conclusion-current-${response.publicId}`}
+                    style={{ margin: "0.25rem 0" }}
+                  >
+                    {toEditableText(response.rawValue) || "No reviewer conclusion recorded."}
+                  </p>
+                  {response.enteredByEmail && (
+                    <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+                      Recorded by {response.enteredByEmail}
+                    </p>
+                  )}
+                  {canOfferReviewerConclusion(question) && (
+                    <div data-testid={`reviewer-conclusion-form-${response.publicId}`}>
+                      <label>
+                        {isReviewerConclusionAmendment(response)
+                          ? "Amend reviewer conclusion"
+                          : "Reviewer conclusion"}
+                        <br />
+                        <textarea
+                          aria-label={`Reviewer conclusion for ${question?.code ?? response.publicId}`}
+                          // The governed maximum, mirrored so the control cannot
+                          // build a payload the server would refuse. There is no
+                          // minLength: §13 specifies no numeric minimum.
+                          maxLength={MAX_REVIEWER_CONCLUSION_CHARS}
+                          value={conclusionDrafts[response.publicId]?.text ?? ""}
+                          disabled={conclusionSavingId === response.publicId}
+                          onChange={(e) =>
+                            setConclusionDraft(response.publicId, { text: e.target.value })
+                          }
+                        />
+                      </label>
+                      {/* Only an amendment needs one — the service requires a
+                          correction reason exactly when a conclusion already
+                          exists, and rejects the write without it. */}
+                      {isReviewerConclusionAmendment(response) && (
+                        <label>
+                          Correction reason (required)
+                          <br />
+                          <input
+                            type="text"
+                            required
+                            aria-label={`Correction reason for ${question?.code ?? response.publicId}`}
+                            value={conclusionDrafts[response.publicId]?.correctionReason ?? ""}
+                            disabled={conclusionSavingId === response.publicId}
+                            onChange={(e) =>
+                              setConclusionDraft(response.publicId, {
+                                correctionReason: e.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      )}
+                      <br />
+                      <button
+                        type="button"
+                        data-testid={`reviewer-conclusion-submit-${response.publicId}`}
+                        disabled={conclusionSavingId === response.publicId}
+                        onClick={() => void submitReviewerConclusion(response)}
+                      >
+                        {conclusionSavingId === response.publicId
+                          ? "Saving…"
+                          : isReviewerConclusionAmendment(response)
+                            ? "Amend Reviewer Conclusion"
+                            : "Enter Reviewer Conclusion"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : isServerControlled(classification) ? (
                 <div data-testid={`readonly-${response.publicId}`}>
                   {classification === "system_calculated" ? (
                     <CalculationResult calculation={response.calculation} />

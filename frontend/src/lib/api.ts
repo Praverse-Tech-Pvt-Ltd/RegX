@@ -1338,6 +1338,12 @@ export type {
  */
 export interface ChecklistCapabilities {
   can_override_response: boolean;
+  /**
+   * `4D4-DEC-012` extension — derived server-side from `PERM_REVIEW_EXECUTION`,
+   * the same predicate `enter_reviewer_conclusion()` enforces with, so the flag
+   * can never disagree with the service that owns it. Advisory only.
+   */
+  can_enter_reviewer_conclusion: boolean;
 }
 
 export const iigChecklists = {
@@ -1654,6 +1660,56 @@ export const iigChecklists = {
       ) =>
         apiRequest<ChecklistResponseDTO>(
           `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/${responsePublicId}/override/`,
+          { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+        ).then(toChecklistResponse),
+
+      /**
+       * The dedicated governed **per-response** reviewer-conclusion action.
+       *
+       * Deliberately not `executions.approve()`. Those are two different
+       * concepts: `approve()` carries the execution-level
+       * `reviewer_conclusion_note` that closes the whole review, whereas this
+       * writes the governed answer of one `REVIEWER_CONCLUSION` response.
+       * Reaching for `approve()` here would both skip the per-response audit
+       * and history trail and end the review as a side effect of answering a
+       * question.
+       *
+       * Nor is it the ordinary response PATCH: `response_validation.py` refuses
+       * a `reviewer_conclusion` raw_value on that path outright.
+       *
+       * The accepted client fields are exactly these three — the serializer
+       * rejects anything else with `unknown_field`, so reviewer identity,
+       * timestamps, `confirmed_by` / `confirmed_at`, history and
+       * `data_source_type_snapshot` are never sent. All of that provenance is
+       * server-derived from the authenticated actor.
+       *
+       * `expected_version` must be the loaded response's `version` as a JSON
+       * **integer** (`4D4-DEC-013`): the backend applies the shared strict
+       * validator, so `"1"`, `1.0` and `"1.0"` are refused with a governed 400
+       * `invalid_expected_version` rather than silently coerced to 1.
+       *
+       * `correction_reason` is required by the service only when amending an
+       * existing conclusion, so it is optional here and omitted on first entry.
+       *
+       * Governed refusals a caller must handle: 400
+       * `invalid_expected_version` / `reviewer_conclusion_empty` /
+       * `reviewer_conclusion_too_long` /
+       * `reviewer_conclusion_correction_reason_required`, 403, and 409
+       * `reviewer_conclusion_stale_version` / `reviewer_conclusion_invalid_state`
+       * — a 409 means refetch authoritative state, never retry blindly.
+       */
+      reviewerConclusion: (
+        tenantSlug: string,
+        executionPublicId: string,
+        responsePublicId: string,
+        data: {
+          raw_value: { value: string };
+          expected_version: number;
+          correction_reason?: string;
+        }
+      ) =>
+        apiRequest<ChecklistResponseDTO>(
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/${responsePublicId}/reviewer-conclusion/`,
           { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
         ).then(toChecklistResponse),
     },
