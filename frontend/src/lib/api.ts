@@ -1582,6 +1582,14 @@ export const iigChecklists = {
        * A ``409`` with ``stale_version`` means the row moved underneath us; the
        * caller must refetch authoritative state rather than retry blindly.
        */
+      /**
+       * `override_reason` is deliberately absent from this payload. It was
+       * accepted and silently discarded before Milestone 4D-4 — the ordinary
+       * update path never wrote it. `4D4-DEC-007` gives overrides their own
+       * governed action, and the backend now rejects the field here with
+       * `unknown_field`, so sending it would fail the request outright rather
+       * than be ignored. Use the override action instead.
+       */
       update: (
         tenantSlug: string,
         executionPublicId: string,
@@ -1591,12 +1599,41 @@ export const iigChecklists = {
           raw_value?: unknown;
           is_not_applicable?: boolean;
           not_applicable_reason?: string | null;
-          override_reason?: string;
         }
       ) =>
         apiRequest<ChecklistResponseDTO>(
           `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/${responsePublicId}/`,
           { method: "PATCH", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+        ).then(toChecklistResponse),
+
+      /**
+       * `4D4-DEC-007` — the dedicated governed override action.
+       *
+       * Separate from `update` by design: §12 requires enforcement at the
+       * transition boundary, and `system_derived_value` / `override_reason`
+       * stay off the ordinary PATCH entirely (§AC.5).
+       *
+       * Only an `FDA_DERIVED_DEFAULT` response may be overridden, only while
+       * the execution is editable, and only by a caller holding
+       * `iig_checklist.override_execution` (Reviewer or VP). All three are
+       * enforced server-side — this client cannot make them true.
+       *
+       * `expected_version` is mandatory and must be the loaded response's
+       * `version`. There is no clear-override operation: §AC.4 defers it.
+       */
+      override: (
+        tenantSlug: string,
+        executionPublicId: string,
+        responsePublicId: string,
+        data: {
+          expected_version: number;
+          raw_value: unknown;
+          override_reason: string;
+        }
+      ) =>
+        apiRequest<ChecklistResponseDTO>(
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/responses/${responsePublicId}/override/`,
+          { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
         ).then(toChecklistResponse),
     },
   },

@@ -31,6 +31,14 @@ PERM_VIEW_EXECUTION = "iig_checklist.view_execution"
 #: `fda_data.export_reconciliation` pattern. Holding view_execution must never by
 #: itself confer authority to emit a checksummed regulatory artifact.
 PERM_EXPORT_CHECKLIST = "iig_checklist.export_checklist"
+#: MILESTONE_4D_4_DISCOVERY.md §AC.3 (``4D4-DEC-011``) -- override authority is a
+#: dedicated permission. §12 sets the floor ("at minimum `iig_checklist.review`",
+#: never a Doer) but names a *definition-governance* permission for what is an
+#: *execution* write, and the two candidate readings disagree: ``PERM_REVIEW``
+#: resolves to Reviewer+VP, ``PERM_REVIEW_EXECUTION`` to Reviewer only. Rather
+#: than overload either, override gets its own codename. Ordinary edit, view or
+#: review authority must never implicitly confer it.
+PERM_OVERRIDE_EXECUTION = "iig_checklist.override_execution"
 
 # Deliberately NOT granted to any built-in role below. Platform-master
 # checklist definitions are globally visible to every tenant, so
@@ -64,6 +72,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         # 4D-2
         PERM_REVIEW_EXECUTION,
         PERM_VIEW_EXECUTION,
+        # 4D-4 §AC.3 (`4D4-DEC-011`).
+        PERM_OVERRIDE_EXECUTION,
     ],
     Role.BuiltIn.VP: [
         PERM_VIEW_DEFINITION,
@@ -82,6 +92,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         # Doer and Reviewer both hold PERM_VIEW_EXECUTION and still cannot
         # export, which is exactly the "not implicit from view" requirement.
         PERM_EXPORT_CHECKLIST,
+        # 4D-4 §AC.3 (`4D4-DEC-011`). Reviewer and VP only; never Doer.
+        PERM_OVERRIDE_EXECUTION,
     ],
     Role.BuiltIn.TENANT_ADMIN: [
         PERM_VIEW_DEFINITION,

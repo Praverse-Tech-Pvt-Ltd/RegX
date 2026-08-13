@@ -1392,6 +1392,110 @@ class ChecklistExecutionExportView(APIView):
         return response
 
 
+class ChecklistResponseOverrideView(APIView):
+    """`4D4-DEC-007` -- the dedicated governed override action.
+
+    Deliberately not the ordinary response PATCH: §12 requires enforcement "at
+    the transition boundary, not just serializer validation", and §AC.5 keeps
+    ``system_derived_value`` and ``override_reason`` off the ordinary update
+    path entirely.
+
+    A thin adapter. No class-level permission check -- the service performs the
+    tenant-scoped lookup first, so a cross-tenant id returns 404 before any
+    permission gate fires, and it enforces ``PERM_OVERRIDE_EXECUTION`` for
+    in-tenant callers. Every rule lives in the service, so a direct domain call
+    is bound by exactly the same guards.
+    """
+
+    def post(self, request, public_id, response_public_id):
+        from .overrides import (
+            OverrideClearNotSupported,
+            OverrideInvalidExpectedVersion,
+            OverrideInvalidPayload,
+            OverrideInvalidState,
+            OverrideNotOverridable,
+            OverridePermissionDenied,
+            OverrideReasonRequired,
+            OverrideStaleVersion,
+            override_checklist_response,
+        )
+
+        tenant = _require_tenant()
+        try:
+            result = override_checklist_response(
+                tenant=tenant,
+                execution_public_id=public_id,
+                response_public_id=response_public_id,
+                actor=request.user,
+                payload=request.data,
+            )
+        except OverridePermissionDenied:
+            return Response(
+                {
+                    "error_code": "override_permission_denied",
+                    "detail": "Overriding a governed response requires a dedicated permission.",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        except OverrideNotOverridable:
+            return Response(
+                {
+                    "error_code": "response_not_overridable",
+                    "detail": "Only an FDA-derived default response may be overridden.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        except OverrideInvalidState:
+            return Response(
+                {
+                    "error_code": "override_invalid_state",
+                    "detail": "Overrides are permitted only while the execution is editable.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        except OverrideClearNotSupported:
+            return Response(
+                {
+                    "error_code": "override_clear_not_supported",
+                    "detail": "Clearing an override is not a supported governed transition.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except OverrideReasonRequired:
+            return Response(
+                {
+                    "error_code": "override_reason_required",
+                    "detail": "override_reason is required and may not be blank.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except OverrideInvalidExpectedVersion:
+            return Response(
+                {
+                    "error_code": "invalid_expected_version",
+                    "detail": "expected_version must be a positive integer.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except OverrideStaleVersion:
+            return Response(
+                {
+                    "error_code": "stale_expected_version",
+                    "detail": "The response was modified by someone else; re-read and retry.",
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        except OverrideInvalidPayload as exc:
+            # `exc.errors` is the serializer's own governed error structure, not
+            # exception text -- no internal detail leaks through this path.
+            return Response(exc.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            ChecklistResponseSerializer(result.response).data,
+            status=status.HTTP_200_OK,
+        )
+
+
 class ChecklistReviewerConclusionView(APIView):
     # No class-level permission check — enter_reviewer_conclusion() uses
     # visible_to(tenant) first, so cross-tenant IDs return 404 before any

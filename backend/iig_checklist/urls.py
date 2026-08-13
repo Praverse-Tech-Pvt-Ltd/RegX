@@ -158,4 +158,11 @@ urlpatterns = [
         views.ChecklistReviewerConclusionView.as_view(),
         name="execution-reviewer-conclusion",
     ),
+    # 4D-4 `4D4-DEC-007` -- dedicated governed override action, deliberately not
+    # an extension of the ordinary response PATCH.
+    path(
+        "iig-checklists/executions/<uuid:public_id>/responses/<uuid:response_public_id>/override/",
+        views.ChecklistResponseOverrideView.as_view(),
+        name="execution-response-override",
+    ),
 ]
