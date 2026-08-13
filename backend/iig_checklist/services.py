@@ -263,6 +263,16 @@ class ReviewerConclusionRequired(Exception):
     pass
 
 
+class ReviewerConclusionInvalidExpectedVersion(Exception):
+    """`4D4-DEC-013` -- expected_version is structurally invalid.
+
+    Distinct from ``ReviewerConclusionStaleVersion``: this is a malformed value
+    (``1.0``, ``"1"``, ``0``, ``null``), not a correctly-shaped value that lost a
+    race. Separate codes so a client can tell "fix your request" from "re-read
+    and retry".
+    """
+
+
 class SelfApprovalForbidden(Exception):
     pass
 
@@ -678,6 +688,18 @@ def enter_reviewer_conclusion(
 
     if response.question.answer_type != AnswerType.REVIEWER_CONCLUSION:
         raise ReviewerConclusionWrongAnswerType()
+
+    # `4D4-DEC-013` -- the same governed structural validator the response-update
+    # and override paths use, applied to the value the client actually submitted.
+    # The serializer is a passthrough, so `1.0`, `"1"` and `"1.0"` arrive intact
+    # and are refused here rather than silently becoming version 1. One
+    # structural rule, three governed entry points.
+    from .calculation_execution import InvalidExpectedVersion, validate_expected_version
+
+    try:
+        expected_version = validate_expected_version(expected_version)
+    except InvalidExpectedVersion as exc:
+        raise ReviewerConclusionInvalidExpectedVersion() from exc
 
     # Validate raw_value structure.
     if not isinstance(raw_value, dict):
