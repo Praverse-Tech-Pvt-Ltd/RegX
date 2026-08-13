@@ -110,7 +110,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.responsesList.mockResolvedValue([FDA_RESPONSE]);
   api.versionsGet.mockResolvedValue(versionWith("fda_derived_default"));
-  api.capabilities.mockResolvedValue({ can_override_response: true });
+  api.capabilities.mockResolvedValue({
+    can_override_response: true,
+    can_enter_reviewer_conclusion: false,
+  });
   api.responsesOverride.mockResolvedValue(FDA_RESPONSE);
 });
 
@@ -121,7 +124,10 @@ describe("override UI visibility", () => {
   });
 
   it("hides the override form when the capability is false", async () => {
-    api.capabilities.mockResolvedValue({ can_override_response: false });
+    api.capabilities.mockResolvedValue({
+      can_override_response: false,
+      can_enter_reviewer_conclusion: false,
+    });
     renderResponses();
     await screen.findByTestId("checklist-responses");
     await waitFor(() =>
