@@ -1392,6 +1392,43 @@ class ChecklistExecutionExportView(APIView):
         return response
 
 
+class ChecklistCapabilitiesView(APIView):
+    """`4D4-DEC-012` -- the minimal tenant-scoped capability surface.
+
+    Advisory UI metadata **only**. The governed services remain authoritative:
+    this endpoint cannot grant anything, and a client that ignores it still hits
+    the same server-side refusal.
+
+    Deliberately **not** `authorization.effective_permissions_view`, for two
+    independent reasons. That endpoint reads the database ``Permission`` table,
+    whereas ``iig_checklist`` authority lives in the governed ``ROLE_PERMISSIONS``
+    mapping, so the override permission would never appear there. More seriously,
+    it aggregates across *all* of a user's tenant memberships with no tenant
+    scoping -- using it for a tenant-scoped decision would blur authority between
+    tenants.
+
+    The response carries **named capability flags**, never raw permission
+    codenames, role identifiers or any other authorization internals: the client
+    learns what it may do, not how permissions are modelled.
+    """
+
+    def get(self, request):
+        from .permissions import PERM_OVERRIDE_EXECUTION, has_iig_checklist_permission
+
+        # Fail-closed through the established convention: no tenant context is a
+        # refusal, not an empty-but-successful answer.
+        tenant = _require_tenant()
+        return Response(
+            {
+                # Derived from the same authoritative predicate the override
+                # service enforces with, so the two can never disagree.
+                "can_override_response": has_iig_checklist_permission(
+                    request.user, tenant, PERM_OVERRIDE_EXECUTION
+                ),
+            }
+        )
+
+
 class ChecklistResponseOverrideView(APIView):
     """`4D4-DEC-007` -- the dedicated governed override action.
 
