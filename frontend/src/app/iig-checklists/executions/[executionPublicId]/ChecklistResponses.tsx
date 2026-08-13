@@ -287,6 +287,16 @@ export function ChecklistResponses({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  /**
+   * `4D4-DEC-012`. Defaults to `false` so the action stays hidden until the
+   * server has actually said yes — a failed capability fetch must not reveal it.
+   * This is presentation only; `4D4-DEC-011` is enforced server-side regardless.
+   */
+  const [canOverride, setCanOverride] = useState(false);
+  const [overridingId, setOverridingId] = useState<string | null>(null);
+  const [overrideDrafts, setOverrideDrafts] = useState<
+    Record<string, { value: string; reason: string }>
+  >({});
 
   /**
    * Refetch the authoritative response collection and rebuild every draft from
@@ -299,6 +309,22 @@ export function ChecklistResponses({
     setDrafts(Object.fromEntries(fresh.map((r) => [r.publicId, draftFrom(r)])));
     return fresh;
   }, [tenantSlug, executionPublicId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    iigChecklists
+      .capabilities(tenantSlug)
+      .then((caps) => {
+        if (!cancelled) setCanOverride(caps.can_override_response);
+      })
+      // Fail closed: a capability the server did not confirm stays hidden.
+      .catch(() => {
+        if (!cancelled) setCanOverride(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSlug]);
 
   useEffect(() => {
     let cancelled = false;
@@ -383,6 +409,65 @@ export function ChecklistResponses({
     }
   }
 
+  /**
+   * `4D4-DEC-010` / `4D4-DEC-011` / `4D4-DEC-003` — all three conditions must
+   * hold before the action is even offered. This mirrors the server's rules; it
+   * does not replace them.
+   */
+  function canOfferOverride(response: ChecklistResponse): boolean {
+    return (
+      canOverride &&
+      response.dataSourceTypeSnapshot === "fda_derived_default" &&
+      EDITABLE_EXECUTION_STATUSES.has(executionStatus)
+    );
+  }
+
+  async function submitOverride(response: ChecklistResponse) {
+    if (overridingId !== null || savingId !== null) return;
+    const draft = overrideDrafts[response.publicId] ?? { value: "", reason: "" };
+    if (!draft.reason.trim()) {
+      setSaveError("An override reason is required.");
+      return;
+    }
+
+    setOverridingId(response.publicId);
+    setSaveError(null);
+    setNotice(null);
+    try {
+      const question = questions[response.questionPublicId];
+      await iigChecklists.executions.responses.override(
+        tenantSlug,
+        executionPublicId,
+        response.publicId,
+        {
+          expected_version: response.version,
+          raw_value: toPayloadValue(question?.answer_type, draft.value),
+          override_reason: draft.reason,
+        }
+      );
+      // Authoritative refetch — the server may have cascaded dependent
+      // calculations, and none of that is reconstructed client-side.
+      await refresh();
+      setOverrideDrafts((prev) => ({ ...prev, [response.publicId]: { value: "", reason: "" } }));
+      setNotice("Override recorded. Calculated values refreshed.");
+    } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 409) {
+        await refresh().catch(() => undefined);
+        setSaveError(
+          "This response changed since you loaded it. The current values have been refreshed — review them and try again."
+        );
+      } else if (err instanceof ApiError && err.status === 403) {
+        setSaveError("You do not have permission to override this response.");
+      } else if (err instanceof ApiError) {
+        setSaveError(err.message || "Override failed.");
+      } else {
+        setSaveError("Override failed.");
+      }
+    } finally {
+      setOverridingId(null);
+    }
+  }
+
   function setDraft(publicId: string, patch: Partial<Draft>) {
     setDrafts((prev) => {
       const current = prev[publicId];
@@ -433,9 +518,76 @@ export function ChecklistResponses({
                   {classification === "system_calculated" ? (
                     <CalculationResult calculation={response.calculation} />
                   ) : (
-                    <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
-                      FDA-derived default. Server-owned and not editable here.
-                    </p>
+                    <>
+                      <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+                        FDA-derived default. Server-owned and not editable here.
+                      </p>
+                      {response.overrideReason && (
+                        <p
+                          data-testid={`override-recorded-${response.publicId}`}
+                          style={{ margin: "0.25rem 0", color: "#92400e" }}
+                        >
+                          Overridden. Reason: {response.overrideReason}
+                        </p>
+                      )}
+                      {/* `4D4-DEC-010` gates this to FDA-derived defaults only, so
+                          no other classification can reach it. There is
+                          deliberately no clear-override control (§AC.4). */}
+                      {canOfferOverride(response) && (
+                        <div data-testid={`override-form-${response.publicId}`}>
+                          <label>
+                            Override value
+                            <br />
+                            <input
+                              type="text"
+                              aria-label={`Override value for ${question?.code ?? response.publicId}`}
+                              value={overrideDrafts[response.publicId]?.value ?? ""}
+                              disabled={overridingId === response.publicId}
+                              onChange={(e) =>
+                                setOverrideDrafts((prev) => ({
+                                  ...prev,
+                                  [response.publicId]: {
+                                    value: e.target.value,
+                                    reason: prev[response.publicId]?.reason ?? "",
+                                  },
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            Override reason (required)
+                            <br />
+                            <input
+                              type="text"
+                              required
+                              aria-label={`Override reason for ${question?.code ?? response.publicId}`}
+                              value={overrideDrafts[response.publicId]?.reason ?? ""}
+                              disabled={overridingId === response.publicId}
+                              onChange={(e) =>
+                                setOverrideDrafts((prev) => ({
+                                  ...prev,
+                                  [response.publicId]: {
+                                    value: prev[response.publicId]?.value ?? "",
+                                    reason: e.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            data-testid={`override-submit-${response.publicId}`}
+                            disabled={
+                              overridingId === response.publicId ||
+                              !(overrideDrafts[response.publicId]?.reason ?? "").trim()
+                            }
+                            onClick={() => void submitOverride(response)}
+                          >
+                            {overridingId === response.publicId ? "Overriding…" : "Override"}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ) : editable && draft ? (
