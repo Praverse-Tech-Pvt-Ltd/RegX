@@ -5,6 +5,25 @@
 > **Blocks:** Milestone 4D-4 production-content implementation.
 > **Companion:** `MILESTONE_4D_4_DISCOVERY.md`
 
+> ### ▶ Superseded operationally by Milestone 5A
+>
+> This document remains the **origin of the gate**: it records `4D4-DEC-001`,
+> the synthetic-vs-production boundary, and the original enumeration of the 20
+> items. It is not superseded as history and its gate state is unchanged —
+> **still 0 of 20 approved**.
+>
+> The **working** approval package is now Milestone 5A, which adds what this
+> document deliberately did not attempt: per-item ownership classes, evidence
+> requirements, engine traceability verified against merged code, an approval
+> workflow, sign-off criteria, and the handoff definition.
+>
+> - [MILESTONE_5A_DISCOVERY.md](MILESTONE_5A_DISCOVERY.md) — operating model, engine constraints, workflow, closure
+> - [MILESTONE_5A_REGULATORY_CONTENT_PACKAGE_TEMPLATE.md](MILESTONE_5A_REGULATORY_CONTENT_PACKAGE_TEMPLATE.md) — the schema the authority fills in
+> - [MILESTONE_5A_APPROVAL_REGISTER.md](MILESTONE_5A_APPROVAL_REGISTER.md) — **the live 20-item register**
+>
+> **Use the 5A register for tracking.** The §4 table below is retained as the
+> original statement of the items; it is not maintained in parallel.
+
 ## 1. Why this gate exists
 
 `MILESTONE_4D_DISCOVERY.md:1089` (Open Question 4, *RESOLVED BY CONTROLLED
@@ -71,6 +90,12 @@ remains fully blocked, 0 of 20 approved.**
 
 All items PENDING. Evidence column cites the repository constraint the approved
 content must satisfy; it is not a proposed answer.
+
+**Original statement of the items — retained as history.** Ownership classes,
+evidence requirements, validation rules and completion criteria now live in
+[MILESTONE_5A_APPROVAL_REGISTER.md](MILESTONE_5A_APPROVAL_REGISTER.md), which is
+the register to update. Three owner labels are refined there (items 17, 18, 19),
+each with its reason recorded; the rest are carried forward unchanged.
 
 | # | Item | Decision | Owner | Status | Evidence / constraint | Approver | Date | Comments |
 |---|---|---|---|---|---|---|---|---|
