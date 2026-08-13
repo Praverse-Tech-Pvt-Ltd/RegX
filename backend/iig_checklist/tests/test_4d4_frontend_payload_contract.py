@@ -168,18 +168,23 @@ def _conclusion_errors(payload):
 def test_frontend_first_entry_payload_is_accepted():
     # Exactly what the client sends on first entry: no correction_reason, and
     # expected_version as a JSON integer taken from the loaded response.
-    assert _conclusion_errors({"raw_value": {"value": "Reviewed; acceptable."},
-                               "expected_version": 3}) == {}
+    assert (
+        _conclusion_errors({"raw_value": {"value": "Reviewed; acceptable."}, "expected_version": 3})
+        == {}
+    )
 
 
 def test_frontend_amendment_payload_is_accepted():
-    assert _conclusion_errors(
-        {
-            "raw_value": {"value": "Revised conclusion."},
-            "expected_version": 7,
-            "correction_reason": "Cited the wrong section.",
-        }
-    ) == {}
+    assert (
+        _conclusion_errors(
+            {
+                "raw_value": {"value": "Revised conclusion."},
+                "expected_version": 7,
+                "correction_reason": "Cited the wrong section.",
+            }
+        )
+        == {}
+    )
 
 
 def test_a_meaningful_one_character_conclusion_is_accepted():

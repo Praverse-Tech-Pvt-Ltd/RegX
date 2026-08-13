@@ -169,10 +169,43 @@ surface for entering and displaying conclusions; inclusion in export (§I).
 `IntegerField(min_value=1)` and "retains the same coercion divergence". No 4D-4
 source requires closing it.
 
-**Disposition: OPEN** — not *required* by 4D-4's authoritative scope, but 4D-4 is
-the milestone that touches reviewer conclusion, making it the natural place to
-close a known divergence from the governed
-`validate_expected_version()` contract. Recommend closing; requires approval.
+**Disposition: CLOSED** — registered and approved as **`4D4-DEC-013`**, and
+implemented. The serializer is now a presence-only passthrough and the service
+applies the shared `validate_expected_version()`, so `"1"`, `1.0` and `"1.0"`
+are refused with a governed 400 `invalid_expected_version` instead of silently
+becoming version 1. One structural rule now governs all three write paths.
+
+### H.1 §13 minimum length — what the source does and does not say
+
+§13 requires the conclusion to be **free text, required, with a minimum length
+enforced**. It states **NO NUMERIC MINIMUM.**
+
+This is a deliberate finding, recorded so it is not re-litigated: no source in
+the repository specifies 3, 5, 10 or any other character count for a reviewer
+conclusion, and **none is invented**. Inventing one would be a regulatory rule
+authored by engineering.
+
+**The enforced requirement is therefore *meaningful non-empty*:**
+
+| Input | Disposition |
+|---|---|
+| Missing `raw_value` / missing `value` | **Refused** — `reviewer_conclusion_invalid_payload` |
+| Empty string | **Refused** — `reviewer_conclusion_empty` |
+| Whitespace-only (`"   "`, `"\t\n"`) | **Refused** — `reviewer_conclusion_empty` |
+| One meaningful character (`"Y"`) | **Accepted** — no numeric minimum exists to refuse it |
+| Up to `MAX_REVIEWER_CONCLUSION_CHARS` (4000) | **Accepted** |
+| Beyond 4000 | **Refused** — `reviewer_conclusion_too_long` (pre-existing maximum, unchanged) |
+
+This reading satisfies §13's "minimum length enforced" — a whitespace-only
+string is not a conclusion — without authoring a threshold §13 withholds. It is
+pinned by test on both sides of the wire, so neither side can drift into an
+invented minimum: `test_4d4_reviewer_conclusion_completion.py`
+(`TestConclusionTextRequirements`), `test_4d4_frontend_payload_contract.py`
+(`test_a_meaningful_one_character_conclusion_is_accepted`), and
+`frontend/tests/unit/reviewer-conclusion-ui.test.tsx`.
+
+**If a numeric minimum is ever required, it is a new governed decision** with a
+named regulatory approver — not a code change.
 
 ## I. Controlled exports
 
@@ -553,6 +586,7 @@ beside it elsewhere in this repository or in a task report.
 | **4D4-DEC-010** | Are `EVIDENCE_DERIVED` and `REVIEWER_CONFIRMED` responses overridable? | §12 names only `FDA_DERIVED_DEFAULT`. Read conservatively as *not* overridable, but the exclusion is inferred rather than stated. | §12 (L717, L732) | Regulatory | **APPROVED** 2026-08-12 | — | **Neither is overridable.** Overridability by classification: `FDA_DERIVED_DEFAULT` **overridable**; `SYSTEM_CALCULATED`, `EVIDENCE_DERIVED`, `REVIEWER_CONFIRMED` **not overridable**; `USER_REQUIRED` is **not an override case** at all (ordinarily editable). Each non-overridable classification has its own governed correction path. Full contract in §AC. |
 | **4D4-DEC-011** | Which permission authorizes an override write? | §12 sets the authority floor ("at minimum `iig_checklist.review`", never a Doer) but names a definition-governance permission for what is an execution write. `PERM_REVIEW` resolves to Reviewer+VP while the execution-scoped `PERM_REVIEW_EXECUTION` resolves to Reviewer only — the two readings disagree on whether a VP may override. | §12 (L741–754); `permissions.py` `ROLE_PERMISSIONS` | Eng lead + Regulatory | **APPROVED** 2026-08-12 | — | **A dedicated permission, `PERM_OVERRIDE_EXECUTION` / `iig_checklist.override_execution`.** Neither `PERM_REVIEW` nor `PERM_REVIEW_EXECUTION` is overloaded. Granted to **Reviewer and VP**; **never** to Doer. Ordinary edit/view/review authority must never implicitly confer override authority. Full contract in §AC. |
 | **4D4-DEC-012** | How does the frontend learn whether the caller may override? | `4D4-DEC-011` requires the override action to be shown only to a holder of `iig_checklist.override_execution`, but the frontend has no permission surface at all. `authorization.effective_permissions_view` cannot serve it: it reads the database `Permission` table, whereas `iig_checklist` authority lives in the governed `ROLE_PERMISSIONS` mapping, and it aggregates across **all** of a user's tenant memberships with no tenant scoping. | `authorization/views.py`; `iig_checklist/permissions.py` | Eng lead + Regulatory | **APPROVED** 2026-08-12 | — | **A minimal tenant-scoped capability surface: `GET /api/regx/v1/iig-checklists/capabilities/`**, returning named boolean flags (v1: `can_override_response`) derived from `has_iig_checklist_permission()`. Never raw codenames, role identifiers or other authorization internals. Advisory UI metadata only — the governed services stay authoritative. `effective_permissions_view` is **not** reused and **not** modified. Full contract in §AD. |
+| **4D4-DEC-013** | Does the reviewer-conclusion write path keep its coercive `IntegerField` `expected_version`, or adopt the shared governed validator? | 4D-3 evidence (`MILESTONE_4D_3_IMPLEMENTATION_EVIDENCE.md:3342`) records the serializer keeping `IntegerField(min_value=1)` and "retains the same coercion divergence". DRF coerces `"1"` and `1.0` to `1`, so a malformed version silently became a valid one on this path while the response-update and override paths refused it — two structural rules for one concept. | `iig_checklist/serializers.py` `ReviewerConclusionSerializer`; `calculation_execution.validate_expected_version()`; `4D4-DEC-002` | Eng lead + Regulatory | **APPROVED** 2026-08-13 | — | **Adopt the shared `validate_expected_version()`.** The serializer field becomes a presence-only passthrough (`JSONField`); structural validity is decided once, in the service, by the same validator the other two governed write paths use. `"1"`, `1.0`, `"1.0"`, booleans, null, zero and negatives are refused with the governed 400 `invalid_expected_version` — **malformed, not stale**, so it is never confused with a 409 concurrency conflict. Extends `4D4-DEC-002` from overrides to all three governed write paths. No model change, no migration. |
 
 **Sequencing consequence.** With `4D4-DEC-001` approved, generic 4D-4 engineering
 on synthetic content is unblocked. Slice 1 (controlled exports) is **CLOSED** —
@@ -637,6 +671,7 @@ governed `raw_value` projection.
 | `4D4-DEC-011` | Override authority is a dedicated `PERM_OVERRIDE_EXECUTION`; no existing permission is overloaded. |
 | `4D4-DEC-008` | `approval_metadata` is a server-derived, write-once projection of existing governed approval state; no new field, no migration. |
 | `4D4-DEC-012` | UI authority is read from a dedicated tenant-scoped capability surface of named flags; `effective_permissions_view` is neither reused nor modified. |
+| `4D4-DEC-013` | Reviewer-conclusion writes use the shared `validate_expected_version()`; a malformed `expected_version` is a governed 400, never a coerced version and never a 409. |
 
 None contradicts repository evidence: `4D4-DEC-002` extends 4D-3's single-validator
 principle; `4D4-DEC-003` matches the existing constant; `4D4-DEC-006` reuses
@@ -662,7 +697,7 @@ Current as of `regx-main` `4265ce8` (PR #16 merged).
 | **Override implementation** | **MERGED (PR #16)** |
 | **`approval_metadata` (`DEC-008`)** | **APPROVED** (§AD) — implementation in the current slice |
 | **Capability surface (`DEC-012`)** | **APPROVED** (§AD) — implementation in the current slice |
-| Reviewer conclusion | **PARTIALLY READY** — service exists; serializer-coercion disposition open |
+| Reviewer conclusion | **IMPLEMENTED** — backend and frontend complete; `4D4-DEC-013` approved and closed; §13 minimum-length reading recorded in §H.1 |
 | Production checklist content | **BLOCKED** — content-approval package, **0 of 20** production-content items approved |
 | Milestone 4D-4 overall | **NOT COMPLETE** |
 
@@ -898,6 +933,35 @@ Approved surface:
 GET /api/regx/v1/iig-checklists/capabilities/
 → { "can_override_response": true | false }
 ```
+
+**Extension, approved 2026-08-13 under the same decision.** The
+reviewer-conclusion frontend needs the same thing the override frontend needed,
+for the same reason, and the decision anticipated it: "extensible, but each new
+flag is a governed decision". The approved surface is now exactly:
+
+```
+GET /api/regx/v1/iig-checklists/capabilities/
+→ {
+    "can_override_response":         true | false,   // PERM_OVERRIDE_EXECUTION
+    "can_enter_reviewer_conclusion": true | false    // PERM_REVIEW_EXECUTION
+  }
+```
+
+- `can_enter_reviewer_conclusion` is derived from **`PERM_REVIEW_EXECUTION`** —
+  the same predicate `enter_reviewer_conclusion()` enforces with, so the flag
+  cannot disagree with the service that owns it.
+- The two flags are **deliberately independent**, not folded into one "can
+  review" notion: override and reviewer conclusion are separate governed
+  concepts with separate permissions (`4D4-DEC-011` vs. the 4D-2
+  `PERM_REVIEW_EXECUTION`). A VP holds override authority but is not thereby a
+  reviewer of record.
+- **This key set is exact.** The contract test asserts equality, not a subset,
+  so an unapproved third key fails — a new flag cannot be added without a
+  governed decision recorded here.
+
+Reviewer-conclusion capability matrix: Reviewer `true`; Doer `false`; VP and
+Tenant Admin follow `ROLE_PERMISSIONS` for `PERM_REVIEW_EXECUTION` and are
+asserted against it rather than hardcoded.
 
 - **Tenant-scoped** through the existing required-tenant mechanism; fail-closed
   when absent.
