@@ -7,7 +7,12 @@ Tracks milestone status on the `regx-main` line. This branch is a clean-room imp
 **Milestone 4A–4C technical foundation: COMPLETE**
 **Production FDA data ingestion: NOT STARTED**
 **Production client formulation use: NOT STARTED**
-**Milestone 4D (regulatory checklist execution): IN PROGRESS** — 4D-1 COMPLETE, 4D-2 COMPLETE, 4D-3 COMPLETE; 4D-4 IN PROGRESS (APP-009 prerequisite COMPLETE; overrides, reviewer conclusion and controlled exports not started; production regulatory content BLOCKED pending approval)
+**Engineering Milestone 4D (regulatory checklist execution): COMPLETE** — 4D-1, 4D-2, 4D-3 and 4D-4 are complete on `regx-main` through PR #18 (merge SHA `6ed2a4efd9aef71d500776750fc73c100de55586`).
+**Production regulatory checklist content: 0 of 20 approved — separate human regulatory-authorship gate, still OPEN.**
+
+4D-4 delivered APP-009 applicability ownership (PR #12), controlled exports with canonical checksum and normalized provenance (PR #15), governed overrides/deviations (PR #16), governed `approval_metadata`, tenant-scoped capabilities and override UI (PR #17), and strict reviewer-conclusion concurrency plus the dedicated per-response reviewer-conclusion frontend workflow (PR #18). Override clearing remains APPROVED-DEFERRED; the known `ControlledExportError` mapping issue remains MINOR-DEFERRED. Neither is a Critical/Major blocker to the defined engineering milestone.
+
+See [MILESTONE_4D_CLOSEOUT_STATUS.md](MILESTONE_4D_CLOSEOUT_STATUS.md), [MILESTONE_4D_4_DISCOVERY.md](MILESTONE_4D_4_DISCOVERY.md), [MILESTONE_4D_4_REVIEWER_CONCLUSION_EVIDENCE.md](MILESTONE_4D_4_REVIEWER_CONCLUSION_EVIDENCE.md), and [MILESTONE_4D_4_CONTENT_APPROVAL.md](MILESTONE_4D_4_CONTENT_APPROVAL.md) for the engineering closeout, decision register/evidence, and the still-open production-content gate.
 
 Three apps: `fda_data` (platform-level FDA source-data governance), `formulations` (tenant-scoped product/formulation records), and `iid_assessment` (IID precedent matching, unit conversion, calculation, and decision engine). See [FDA_DATA_GOVERNANCE.md](FDA_DATA_GOVERNANCE.md), [FDA_IID_INGESTION.md](FDA_IID_INGESTION.md), [FDA_TERMINOLOGY_MAPPING.md](FDA_TERMINOLOGY_MAPPING.md), [FORMULATION_DATA_MODEL.md](FORMULATION_DATA_MODEL.md), [IID_MATCHING_ENGINE.md](IID_MATCHING_ENGINE.md), [IID_CALCULATION_RULES.md](IID_CALCULATION_RULES.md), and [IID_DECISION_STATUSES.md](IID_DECISION_STATUSES.md) for architecture.
 
@@ -52,7 +57,7 @@ Three apps: `fda_data` (platform-level FDA source-data governance), `formulation
 
 1. Only synthetic, non-confidential fixtures are included — no real FDA source file (Orange Book, IID) has been imported.
 2. No real client formulation/product data is included; all formulation fixtures are synthetic.
-3. Milestone 4D (final regulatory checklist execution and approval workflow) is partially implemented: 4D-1 (definition governance), 4D-2 (execution/response/outcome foundation) and 4D-3 (draft-answer generation, FDA-derived population, system-calculated computation and cascade recalculation) are complete on `regx-main`. 4D-4 (overrides/deviations, reviewer conclusion, controlled exports, production checklist content) is in progress. Discovery and the decision register are recorded in [MILESTONE_4D_4_DISCOVERY.md](MILESTONE_4D_4_DISCOVERY.md), and the regulatory-content approval gate in [MILESTONE_4D_4_CONTENT_APPROVAL.md](MILESTONE_4D_4_CONTENT_APPROVAL.md) remains open at 0 of 20 items. The M4D3-APP-009 applicability-ownership prerequisite is complete and merged (PR #12), with evidence in [MILESTONE_4D_4_APP_009_EVIDENCE.md](MILESTONE_4D_4_APP_009_EVIDENCE.md); the same slice corrected the frontend response `raw_value` wire contract. Overrides/deviations, reviewer-conclusion completion and controlled exports are not started, and no production regulatory checklist content exists. The controlled-export provenance contract is approved (`4D4-DEC-005`), so the export slice is specified but not implemented. Three governance decisions remain open (`4D4-DEC-004`, `-008`, `-010`).
+3. Engineering Milestone 4D is complete through PR #18, including APP-009 applicability ownership, controlled exports/provenance, governed overrides, approval metadata, tenant-scoped capabilities, and the per-response reviewer-conclusion workflow. The production regulatory-content gate remains open at 0 of 20 approved items and is tracked separately in [MILESTONE_4D_4_CONTENT_APPROVAL.md](MILESTONE_4D_4_CONTENT_APPROVAL.md). Override clearing is APPROVED-DEFERRED and `ControlledExportError` remains MINOR-DEFERRED; see [MILESTONE_4D_CLOSEOUT_STATUS.md](MILESTONE_4D_CLOSEOUT_STATUS.md).
 4. Only one production substance-mapping creation path exists (the manual proposal API); an import-generated candidate path is a natural follow-on, not a blocking gap.
 5. No 21 CFR Part 11 compliance is claimed by this milestone.
 6. Human regulatory review remains mandatory at every mapping and assessment decision point — an IID precedent match is a comparison reference only, never an automatic safety or regulatory-approval determination.
@@ -166,19 +171,6 @@ Branch and tenancy/identity/authorization/audit foundation preceding the documen
 
 ## Next
 
-Milestone 4A–4C (FDA data governance, formulation foundation, IID matching/
-calculation/decision engine) is technically complete on `regx-main` as of
-the merge and release tag recorded above. **Milestone 4D (final regulatory
-checklist-execution engine) is in progress: 4D-1, 4D-2 and 4D-3 are complete on
-`regx-main`; 4D-4 is planned but not started, pending the open governance and
-regulatory-content gates recorded in
-[MILESTONE_4D_4_DISCOVERY.md](MILESTONE_4D_4_DISCOVERY.md).** Production
-FDA data ingestion (importing, reviewing, approving, and activating a real
-Orange Book/IID source release) and production client formulation use are
-both not started and require, respectively, a confirmed real source file
-and real client formulation records entered by the client's own users
-through the tenant-scoped UI. Production regulatory-template migration
-(Milestone 3) likewise remains not started pending a client-approved
-source package plus confirmed ownership/licensing. No IIG checklist-
-execution engine, ANDA/DMF scoring, regulatory AI, report generation, or
-Word integration work has begun.
+Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx-main`. Production FDA data ingestion, production client formulation use, production regulatory-template migration, and the Milestone 4D production regulatory checklist-content gate remain open and require real source/client content plus the corresponding human review and approval processes.
+
+No authoritative Milestone 5 scope is currently defined in this repository. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration have not yet been scoped as an engineering milestone. A new discovery/scoping decision is required before implementation begins.
