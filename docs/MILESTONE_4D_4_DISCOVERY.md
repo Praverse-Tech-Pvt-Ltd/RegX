@@ -530,8 +530,9 @@ The authoritative list of what must be decided before 4D-4 engineering.
 Six decisions were **approved by the project owner on 2026-08-11**. `4D4-DEC-005`
 was approved subsequently (PR #14); `4D4-DEC-004`, `4D4-DEC-010` and the newly
 registered `4D4-DEC-011` were **approved by the project Regulatory + Engineering
-authority on 2026-08-12** (§AC). **`4D4-DEC-008` is now the only decision not yet
-approved**, and remains `PENDING APPROVAL`.
+authority on 2026-08-12** (§AC), and `4D4-DEC-008` together with the newly
+registered `4D4-DEC-012` were approved by the same authority on **2026-08-12**
+(§AD). **Every registered decision is now APPROVED**; none remains open.
 Status is `APPROVED`, `OPEN` (no repository evidence decides it) or
 `PENDING APPROVAL` (a specific human authority must sign off).
 
@@ -547,10 +548,11 @@ beside it elsewhere in this repository or in a task report.
 | **4D4-DEC-005** | Export payload provenance depth | §18 requires "full per-question provenance"; 4D-3 deliberately excludes `input_provenance` from the API projection. Different audiences. | §17 (L887); §18; 4D-3 projection; M4D3-PRV-002 | Regulatory + Eng lead | **APPROVED** | — | **Option C — normalized, export-safe provenance projection.** Full contract in §I. The ordinary 4D-3 API projection is unchanged; provenance is assembled server-side in the permission-gated export service, allow-listed rather than column-dumped, and versioned. |
 | **4D4-DEC-006** | Canonical export serialization + checksum contract | §17 mandates a SHA-256 over the "canonical serialized export payload" but does not define canonical form (key order, decimal rendering, timestamp format). Without it the checksum is not reproducible. | §17 (L888); 4D-3 `format_decimal_plain()` | Project owner | **APPROVED** 2026-08-11 | — | Canonical form: **deterministic key ordering; `format_decimal_plain()` for decimals; UTC ISO-8601 timestamps; stable UTF-8 bytes.** |
 | **4D4-DEC-007** | Override API shape — dedicated action endpoint vs. extension of the governed response PATCH | §12 requires enforcement "at the transition boundary, not just serializer validation", which suggests an action; the repository does not decide. | §12 (L718); `_ChecklistActionViewBase` pattern | Project owner | **APPROVED** 2026-08-11 | — | **Dedicated governed action endpoint**, not the ordinary response PATCH. |
-| **4D4-DEC-008** | `approval_metadata` schema and mutability | 4D-2 records it as `null` with "shape defined in 4D-4". No source defines the shape. §V holds a **PROPOSED, non-normative** sketch only. | `MILESTONE_4D_2_DISCOVERY.md:529`; `4D_1_..._SPEC.md:353` | Regulatory + Eng lead | **PENDING APPROVAL** | Slice 2/3 | — |
+| **4D4-DEC-008** | `approval_metadata` schema and mutability | 4D-2 records it as `null` with "shape defined in 4D-4". No source defines the shape. §V holds a **PROPOSED, non-normative** sketch only. | `MILESTONE_4D_2_DISCOVERY.md:529`; `4D_1_..._SPEC.md:353`; `ChecklistExecution.approved_by/approved_at` | Regulatory + Eng lead | **APPROVED** 2026-08-12 | — | **A server-derived, write-once projection of governed approval state** — not a second approval system. Exact key set: `approval_decision`, `approved_by_public_id`, `approved_at`, `execution_public_id`, `checklist_version_public_id`, `checklist_version_number`, and conditionally `reviewer_conclusion_response_public_id`. No actor email or display name, no database keys, no free-form extension, **no approval comment** (`reviewer_conclusion_note` remains the governed narrative). Written inside the approve transition's own atomic block. **No new field, no migration.** Full contract in §AD. |
 | **4D4-DEC-009** | APP-009 disposition before controlled exports are released | At the time of the decision a client could set `is_not_applicable` on a rule-governed response, and §17 would seal applicability state into a checksummed export. | `..._EVIDENCE.md:3322`; §17 (L888) | Project owner | **APPROVED** 2026-08-11 · **SATISFIED** (PR #12, `1c6bd16`) | — (precondition met) | **APP-009 must be closed before controlled exports are released.** Closed and merged; the governed service now refuses client-supplied applicability on a rule-governed response with `applicability_server_controlled` / 403. Export release is no longer blocked by APP-009 — exports remain **unimplemented**. |
 | **4D4-DEC-010** | Are `EVIDENCE_DERIVED` and `REVIEWER_CONFIRMED` responses overridable? | §12 names only `FDA_DERIVED_DEFAULT`. Read conservatively as *not* overridable, but the exclusion is inferred rather than stated. | §12 (L717, L732) | Regulatory | **APPROVED** 2026-08-12 | — | **Neither is overridable.** Overridability by classification: `FDA_DERIVED_DEFAULT` **overridable**; `SYSTEM_CALCULATED`, `EVIDENCE_DERIVED`, `REVIEWER_CONFIRMED` **not overridable**; `USER_REQUIRED` is **not an override case** at all (ordinarily editable). Each non-overridable classification has its own governed correction path. Full contract in §AC. |
 | **4D4-DEC-011** | Which permission authorizes an override write? | §12 sets the authority floor ("at minimum `iig_checklist.review`", never a Doer) but names a definition-governance permission for what is an execution write. `PERM_REVIEW` resolves to Reviewer+VP while the execution-scoped `PERM_REVIEW_EXECUTION` resolves to Reviewer only — the two readings disagree on whether a VP may override. | §12 (L741–754); `permissions.py` `ROLE_PERMISSIONS` | Eng lead + Regulatory | **APPROVED** 2026-08-12 | — | **A dedicated permission, `PERM_OVERRIDE_EXECUTION` / `iig_checklist.override_execution`.** Neither `PERM_REVIEW` nor `PERM_REVIEW_EXECUTION` is overloaded. Granted to **Reviewer and VP**; **never** to Doer. Ordinary edit/view/review authority must never implicitly confer override authority. Full contract in §AC. |
+| **4D4-DEC-012** | How does the frontend learn whether the caller may override? | `4D4-DEC-011` requires the override action to be shown only to a holder of `iig_checklist.override_execution`, but the frontend has no permission surface at all. `authorization.effective_permissions_view` cannot serve it: it reads the database `Permission` table, whereas `iig_checklist` authority lives in the governed `ROLE_PERMISSIONS` mapping, and it aggregates across **all** of a user's tenant memberships with no tenant scoping. | `authorization/views.py`; `iig_checklist/permissions.py` | Eng lead + Regulatory | **APPROVED** 2026-08-12 | — | **A minimal tenant-scoped capability surface: `GET /api/regx/v1/iig-checklists/capabilities/`**, returning named boolean flags (v1: `can_override_response`) derived from `has_iig_checklist_permission()`. Never raw codenames, role identifiers or other authorization internals. Advisory UI metadata only — the governed services stay authoritative. `effective_permissions_view` is **not** reused and **not** modified. Full contract in §AD. |
 
 **Sequencing consequence.** With `4D4-DEC-001` approved, generic 4D-4 engineering
 on synthetic content is unblocked. Slice 1 (controlled exports) is **CLOSED** —
@@ -558,17 +560,18 @@ merged as PR #15 (`52a6e46`); its release precondition `4D4-DEC-009` was met by
 PR #12 (`1c6bd16`) and its payload provenance contract is settled by
 `4D4-DEC-005` (§I.1).
 
-Slice 2 (overrides) is **specification-ready**: `4D4-DEC-004`, `4D4-DEC-010` and
-`4D4-DEC-011` are approved (§AC), joining the already-approved `4D4-DEC-002`,
-`4D4-DEC-003` and `4D4-DEC-007`. **No override implementation exists yet.**
+Slice 2 (overrides) is **CLOSED** — merged as PR #16 (`4265ce8`), implementing
+`4D4-DEC-004`, `4D4-DEC-010` and `4D4-DEC-011` (§AC) alongside the
+already-approved `4D4-DEC-002`, `4D4-DEC-003` and `4D4-DEC-007`.
 
-The export's conditional **`approval_metadata`** group remains gated on
-`4D4-DEC-008`, which remains PENDING APPROVAL. The export's conditional
-**override** group
-is no longer gated on a decision — its contract is fixed in §AC.5 — but the
-controlled-export implementation is deliberately **not** modified until override
-persistence exists to project. Production regulatory content remains blocked in
-full by the content-approval package.
+Slice 3 (approval metadata and capabilities) implements `4D4-DEC-008` and
+`4D4-DEC-012` (§AD). Both conditional export groups are now settled: the
+**override** group by §AC.5, and the **`approval_metadata`** group by §AD, which
+carries it through the existing governed `raw_value` projection rather than
+adding a duplicate provenance group.
+
+Production regulatory content remains blocked in full by the content-approval
+package.
 
 ---
 
@@ -617,9 +620,10 @@ is bound identically to an HTTP request; rejection is inert. See
 Controlled-export release is therefore **no longer blocked by APP-009**. It was
 **implemented and merged as PR #15** (`52a6e46`) for the non-conditional
 provenance groups. Its payload provenance contract is settled by `4D4-DEC-005`
-(APPROVED, §I.1); the conditional override group's contract is now fixed by
-`4D4-DEC-004` / `4D4-DEC-010` (§AC) but **is not yet exported**, and the
-conditional `approval_metadata` group still waits on `4D4-DEC-008`.
+(APPROVED, §I.1); the conditional override group is fixed by `4D4-DEC-004` /
+`4D4-DEC-010` (§AC) and exported since PR #16; the conditional
+`approval_metadata` group is fixed by `4D4-DEC-008` (§AD) and rides the existing
+governed `raw_value` projection.
 
 ### Approved engineering conventions
 
@@ -631,6 +635,8 @@ conditional `approval_metadata` group still waits on `4D4-DEC-008`.
 | `4D4-DEC-007` | Override uses a dedicated governed action endpoint, not the ordinary response PATCH. |
 | `4D4-DEC-004` | One governed history reason code, `ANSWER_OVERRIDDEN`, covering both apply and update. |
 | `4D4-DEC-011` | Override authority is a dedicated `PERM_OVERRIDE_EXECUTION`; no existing permission is overloaded. |
+| `4D4-DEC-008` | `approval_metadata` is a server-derived, write-once projection of existing governed approval state; no new field, no migration. |
+| `4D4-DEC-012` | UI authority is read from a dedicated tenant-scoped capability surface of named flags; `effective_permissions_view` is neither reused nor modified. |
 
 None contradicts repository evidence: `4D4-DEC-002` extends 4D-3's single-validator
 principle; `4D4-DEC-003` matches the existing constant; `4D4-DEC-006` reuses
@@ -643,7 +649,7 @@ not describe"; `4D4-DEC-011` preserves §12's authority floor while resolving th
 
 ### Gate status
 
-Current as of `regx-main` `52a6e46` (PR #15 merged).
+Current as of `regx-main` `4265ce8` (PR #16 merged).
 
 | Gate | Status |
 |---|---|
@@ -651,18 +657,20 @@ Current as of `regx-main` `52a6e46` (PR #15 merged).
 | Production content may start | **NO** |
 | APP-009 prerequisite (`4D4-DEC-009`) | **SATISFIED** — closed and merged, PR #12 |
 | Controlled export **specification** | **READY** — §17 decided; `DEC-005` provenance APPROVED (§I.1); `DEC-006` canonical form approved; `DEC-009` satisfied |
-| Controlled export **implementation** | **MERGED (PR #15)** — non-conditional provenance groups only; override and `approval_metadata` groups not yet exported |
-| **Override governance specification** | **READY** — `DEC-002/003/004/007/010/011` all approved (§AC) |
-| **Override implementation** | **NOT STARTED** |
-| `approval_metadata` (`DEC-008`) | **PENDING APPROVAL** — shape undefined; not resolved here |
+| Controlled export **implementation** | **MERGED (PR #15)**, override provenance added in **PR #16** |
+| **Override governance specification** | **READY** — `DEC-002/003/004/007/010/011` approved (§AC) |
+| **Override implementation** | **MERGED (PR #16)** |
+| **`approval_metadata` (`DEC-008`)** | **APPROVED** (§AD) — implementation in the current slice |
+| **Capability surface (`DEC-012`)** | **APPROVED** (§AD) — implementation in the current slice |
 | Reviewer conclusion | **PARTIALLY READY** — service exists; serializer-coercion disposition open |
 | Production checklist content | **BLOCKED** — content-approval package, **0 of 20** production-content items approved |
 | Milestone 4D-4 overall | **NOT COMPLETE** |
 
-`4D4-DEC-009` was satisfied by the APP-009 merge; `4D4-DEC-005` is APPROVED
-(§I.1); `4D4-DEC-004`, `4D4-DEC-010` and `4D4-DEC-011` are APPROVED (§AC).
-**`4D4-DEC-008` is the only decision not yet approved** (PENDING APPROVAL), and
-is untouched by this change.
+Every registered decision is now APPROVED: `4D4-DEC-009` satisfied by the APP-009
+merge; `4D4-DEC-005` (§I.1); `4D4-DEC-004`, `-010`, `-011` (§AC); `4D4-DEC-008`
+and `4D4-DEC-012` (§AD). **Milestone 4D-4 nonetheless remains incomplete** — the
+production content gate stands at 0 of 20, and that is regulatory authorship, not
+an engineering decision.
 
 **Already decided by repository evidence — recorded here so they are not
 re-litigated as open questions:** override is permitted only on
@@ -801,6 +809,112 @@ discipline already applied to input and reviewer-amendment provenance.
 
 ### AC.6 What this section does not decide
 
-`4D4-DEC-008` (`approval_metadata` schema and mutability) remains **PENDING
-APPROVAL** and is untouched. Production regulatory content remains at **0 of 20** approved.
-**Milestone 4D-4 is not complete.**
+`4D4-DEC-008` (`approval_metadata` schema and mutability) was outside this
+section's scope; it is resolved separately in **§AD**. Production regulatory
+content remains at **0 of 20** approved. **Milestone 4D-4 is not complete.**
+
+---
+
+## AD. Approved approval metadata and capability surface (2026-08-12)
+
+Approved by the project **Regulatory + Engineering authority** on **2026-08-12**,
+resolving `4D4-DEC-008` and the newly registered `4D4-DEC-012`.
+
+### AD.1 `approval_metadata` — `4D4-DEC-008`
+
+`approval_metadata` is an **`AnswerType`**, not an execution column: a
+per-question response whose payload lives in `ChecklistResponse.raw_value`. Its
+compatibility floor is `REVIEWER_CONFIRMED` only, and it sits in
+`response_validation._CLIENT_REJECTED_TYPES`, so a client may never supply it.
+
+**It is a projection, not a second approval system.** Execution-level approval
+provenance already exists — `ChecklistExecution.approved_by` and `approved_at`,
+written at the approve transition. This decision projects that governed state
+into the answer; it does not duplicate or replace it. **No new field is approved,
+so no migration is implied.**
+
+Exact approved key set:
+
+```json
+{
+  "approval_decision": "approved",
+  "approved_by_public_id": "<uuid>",
+  "approved_at": "<ISO-8601 UTC, Z-suffixed>",
+  "execution_public_id": "<uuid>",
+  "checklist_version_public_id": "<uuid>",
+  "checklist_version_number": 1,
+  "reviewer_conclusion_response_public_id": "<uuid>"
+}
+```
+
+- `reviewer_conclusion_response_public_id` is **conditional** — present only
+  where a governed reviewer-conclusion response actually carries a value. An
+  unanswered conclusion question is not a linkage and is omitted, not nulled.
+- `approved_at` uses the `4D4-DEC-006` UTC/`Z` rendering, so an approval
+  timestamp reads identically wherever it surfaces.
+- **Excluded outright:** actor email or display name, database primary keys,
+  free-form extension fields, and **any approval comment or reason**.
+  `reviewer_conclusion_note` remains the governed narrative mechanism, and §12
+  gives exactly one approval point — an approver with reservations `return`s the
+  execution rather than annotating an approval.
+
+**Generation.** Server-only, inside the approve transition's own
+`transaction.atomic()` block, so the metadata and the approved status commit
+together or not at all. **Immutability** follows from the lifecycle rather than a
+second guard: approval leaves `EDITABLE_EXECUTION_STATUSES`, so no governed path
+can rewrite the response afterwards.
+
+**The question is not mandatory.** An execution whose checklist defines no
+`approval_metadata` question approves exactly as before. No normative source
+requires one, so none is invented.
+
+**Completeness-gate consequence.** `_check_execution_completeness` exempts
+`APPROVAL_METADATA`. A *required* approval_metadata question would otherwise be
+unsatisfiable by construction — it is generated *by* the transition the gate
+guards, and its `REVIEWER_CONFIRMED` floor would additionally demand a
+confirmation no client may supply. This mirrors the existing
+`REVIEWER_CONCLUSION` exemption.
+
+**Controlled export.** The payload rides the **existing** governed `raw_value`
+projection, which is already inside the canonical hashed payload. No duplicate
+approval-provenance group is added, and checksum semantics are unchanged.
+
+### AD.2 Capability surface — `4D4-DEC-012`
+
+`4D4-DEC-011` requires the override action to be shown only to a holder of
+`iig_checklist.override_execution`, but the frontend had **no permission surface
+at all**.
+
+`authorization.effective_permissions_view` cannot serve it, for two independent
+reasons: it reads the database `Permission` table, whereas `iig_checklist`
+authority lives in the governed `ROLE_PERMISSIONS` mapping — so the override
+permission would never appear — and it aggregates across **all** of a user's
+tenant memberships with no tenant scoping, which would blur authority between
+tenants. It is **neither reused nor modified**.
+
+Approved surface:
+
+```
+GET /api/regx/v1/iig-checklists/capabilities/
+→ { "can_override_response": true | false }
+```
+
+- **Tenant-scoped** through the existing required-tenant mechanism; fail-closed
+  when absent.
+- Derived from **`has_iig_checklist_permission()`** — the same predicate the
+  override service enforces with, so the two can never disagree.
+- **Named capability flags only.** Never raw permission codenames, role
+  identifiers, other tenants' permissions, or any other authorization internals.
+- **Advisory UI metadata only.** The governed services remain authoritative; a
+  client ignoring the flag receives the same refusal.
+- Extensible, but each new flag is a governed decision — this is not a general
+  authorization dump.
+
+Expected matrix: Reviewer `true`, VP `true`, Doer `false`, Tenant Admin `false`
+unless `ROLE_PERMISSIONS` explicitly grants the permission.
+
+### AD.3 What this section does not decide
+
+Production regulatory content remains at **0 of 20** approved — regulatory
+authorship, not an engineering decision. Override **clearing** remains deferred
+by §AC.4. **Milestone 4D-4 is not complete.**

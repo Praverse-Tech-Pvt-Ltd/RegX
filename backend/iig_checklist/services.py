@@ -557,18 +557,34 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         locked.full_clean()
         locked.save()
 
+        # `4D4-DEC-008` -- the governed approval_metadata projection is written
+        # inside this same atomic block, so the metadata and the approved status
+        # commit together or not at all. Zero written is normal: an execution
+        # whose checklist defines no approval_metadata question approves exactly
+        # as before.
+        approval_metadata_written = 0
+        if action == "approve":
+            from .approval_metadata import populate_approval_metadata
+
+            approval_metadata_written = populate_approval_metadata(
+                execution=locked, actor=actor, approved_at=now
+            )
+
     def _audit():
+        payload = {
+            "action": action,
+            "before_status": execution.status,
+            "after_status": new_status,
+        }
+        if action == "approve":
+            payload["approval_metadata_written"] = approval_metadata_written
         emit(
             event_type=action_event_map[action],
             resource_id=str(locked.public_id),
             actor_id=getattr(actor, "id", None),
             actor_email=getattr(actor, "email", ""),
             tenant_id=getattr(tenant, "id", None),
-            payload={
-                "action": action,
-                "before_status": execution.status,
-                "after_status": new_status,
-            },
+            payload=payload,
         )
 
     db_transaction.on_commit(_audit)
@@ -583,6 +599,14 @@ def _check_execution_completeness(execution, *, for_approve=False):
     for response in responses:
         q = response.question
         if not q.required:
+            continue
+        # `4D4-DEC-008` -- approval_metadata is generated *by* the approve
+        # transition this gate guards, so a required approval_metadata question
+        # could never be satisfied beforehand: the gate would be unsatisfiable by
+        # construction, and its REVIEWER_CONFIRMED floor would additionally
+        # demand a confirmation that no client may supply. Exempted for the same
+        # reason REVIEWER_CONCLUSION is exempted before approval.
+        if q.answer_type == AnswerType.APPROVAL_METADATA:
             continue
         if q.answer_type == AnswerType.REVIEWER_CONCLUSION and not for_approve:
             continue
