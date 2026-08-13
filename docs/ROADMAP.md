@@ -2,6 +2,41 @@
 
 Tracks milestone status on the `regx-main` line. This branch is a clean-room implementation and shares no code with the legacy booking demo on `main` — see [LEGACY_BOUNDARY.md](LEGACY_BOUNDARY.md).
 
+## Milestone 5A — Production Regulatory Checklist Content Readiness
+
+**Status: IN DISCOVERY — BLOCKED ON REGULATORY APPROVAL**
+**Production regulatory checklist content: 0 of 20 approved — gate OPEN.**
+
+5A converts the production-content gate from an unspecific "0/20" into a
+controlled approval package a qualified RA/QA authority can review and sign. It
+defines the content schema, per-item ownership, evidence requirements,
+engine traceability, the approval workflow, sign-off criteria and the engineering
+handoff. It contains **no production regulatory content** — no question text, no
+template selection, no guidance interpretation, and no approval or signature.
+
+5A is **COMPLETE only when all 20 items are resolved and item 20 carries a valid
+formal sign-off** by the identified regulatory authority. Until then it is
+BLOCKED ON REGULATORY APPROVAL, and engineering implementation of approved
+content does not begin.
+
+Discovery surfaced three capability limits that constrain what can meaningfully
+be approved today, each traced to merged code and each raised as an open
+question rather than resolved by engineering: applicability rules are validated
+and stored but never evaluated at runtime; FDA-derived default bindings are
+inert because the resolver layer was deliberately held out of 4D-3 scope; and
+there is no per-question export inclusion/exclusion mechanism.
+
+5A is **not** FDA data ingestion, client formulation onboarding, template
+migration, production infrastructure, 21 CFR Part 11 validation, or go-live
+approval. No Part 11 compliance is claimed, and no Part 11 validated electronic
+signature system exists in this repository.
+
+See [MILESTONE_5A_DISCOVERY.md](MILESTONE_5A_DISCOVERY.md),
+[MILESTONE_5A_REGULATORY_CONTENT_PACKAGE_TEMPLATE.md](MILESTONE_5A_REGULATORY_CONTENT_PACKAGE_TEMPLATE.md),
+and [MILESTONE_5A_APPROVAL_REGISTER.md](MILESTONE_5A_APPROVAL_REGISTER.md).
+
+---
+
 ## Milestone 4A–4C — FDA Data Governance, Formulation Foundation, and IID Assessment
 
 **Milestone 4A–4C technical foundation: COMPLETE**
@@ -171,6 +206,8 @@ Branch and tenancy/identity/authorization/audit foundation preceding the documen
 
 ## Next
 
-Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx-main`. Production FDA data ingestion, production client formulation use, production regulatory-template migration, and the Milestone 4D production regulatory checklist-content gate remain open and require real source/client content plus the corresponding human review and approval processes.
+Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx-main`. Production FDA data ingestion, production client formulation use, and production regulatory-template migration remain open and require real source/client content plus the corresponding human review and approval processes.
 
-No authoritative Milestone 5 scope is currently defined in this repository. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration have not yet been scoped as an engineering milestone. A new discovery/scoping decision is required before implementation begins.
+**Milestone 5A is in discovery** and is the defined successor: it makes the production regulatory checklist-content gate signable. It is blocked on human regulatory approval, not on engineering. The next action is a regulatory one — the template-scope decision (register item 1).
+
+Milestones 5B–5D are **not scoped**. 5A deliberately records no detailed requirements for them; each needs its own discovery. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration remain unscoped as engineering milestones.
