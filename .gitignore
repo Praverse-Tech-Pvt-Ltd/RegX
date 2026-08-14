@@ -98,3 +98,23 @@ Thumbs.db
 
 # Docker volumes
 .docker/
+
+# ---------------------------------------------------------------------------
+# Company runtime assets — present on disk, deliberately not versioned.
+# Rationale and restore instructions: docs/COMPANY_RUNTIME_ASSETS.md
+# Restore with: scripts/sync_company_runtime_assets.sh
+# ---------------------------------------------------------------------------
+
+# Runtime media (196 MB): FDA-483 observation images reached through
+# AIDatabase ImageField rows. Mutable, user-generated, per-deployment state;
+# bind-mounted into the containers by compose.yaml.
+/company_site/media/
+
+# Dead marketing videos (82 MB): the only reference anywhere in the codebase
+# is a commented-out line in templates/RATools/RAToolsBase.html:1638.
+/company_site/static/videos/
+
+# Data-import spreadsheets (14 MB): inputs to one-off management commands
+# whose results already live in db.sqlite3. Never read while serving a
+# request, and client-named, so better kept out of a shared repository.
+/company_site/AIDatabase/management/commands/*.xlsx
