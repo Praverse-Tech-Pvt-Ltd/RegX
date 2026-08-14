@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "company_site/**"
       - "compose.yaml"
       - "infra/**"
       - ".github/workflows/docker-integration.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "backend/**"
       - "frontend/**"
+      - "company_site/**"
       - "compose.yaml"
       - "infra/**"
 
@@ -28,6 +30,10 @@ jobs:
       DJANGO_SECRET_KEY: ci-docker-verify-secret-key-not-for-production
       POSTGRES_PASSWORD: ci-docker-verify-password
       MFA_ENCRYPTION_KEY: cVLYzYQ6Zt7wq1V3nq9xQx3v2ZbXK6y8f1s7v3o9m4k=
+      # The company_site service added by the site integration guards its own
+      # SECRET_KEY the same way the backend does, so compose interpolation
+      # fails at `build` time without it.
+      COMPANY_SECRET_KEY: ci-docker-verify-company-secret-not-for-production
 
     steps:
       - uses: actions/checkout@v4
@@ -757,6 +763,72 @@ jobs:
       - name: Verify production CSP header is present
         run: |
           curl -sD - -o /dev/null http://localhost:3000/signin | grep -i "content-security-policy" || { echo "CSP header missing"; exit 1; }
+
+      # --- Company-site integration -------------------------------------
+      # Everything above talks to the backend and frontend on their own
+      # ports. These steps verify the thing the integration actually
+      # delivers: one nginx origin serving the company website and the REGX
+      # modules together.
+
+      - name: Wait for company_site and nginx to be healthy
+        run: |
+          for svc in company_site nginx; do
+            status=starting
+            # The company app builds pandas frames over the FDA-483 dataset on
+            # first request, so it is markedly slower to report healthy than
+            # the REGX services.
+            for i in $(seq 1 60); do
+              status=$(docker inspect --format='{{.State.Health.Status}}' "regx-ci-${svc}-1" 2>/dev/null || echo "starting")
+              [ "$status" = "healthy" ] && break
+              sleep 5
+            done
+            echo "$svc: $status"
+            [ "$status" = "healthy" ] || { echo "$svc did not become healthy"; docker compose -p regx-ci logs "$svc"; exit 1; }
+          done
+
+      - name: Verify the company website renders through the integrated origin
+        run: |
+          check() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 180 "http://localhost:8080$1")
+            echo "$1: $code"
+            [ "$code" = "200" ] || { echo "$1 returned $code"; exit 1; }
+          }
+          check /
+          check /ratools/
+          check /termsofuse/
+          check /adminmaster/login/
+
+      - name: Verify REGX modules and API answer on the same origin
+        run: |
+          check() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "http://localhost:8080$1")
+            echo "$1: $code"
+            [ "$code" = "200" ] || { echo "$1 returned $code"; exit 1; }
+          }
+          check /documents
+          check /iig-checklists
+          check /migration-batches
+          check /iid-assessments/preview
+          check /api/regx/v1/health/
+          check /healthz
+
+      - name: Verify both static trees are served and do not collide
+        run: |
+          check() {
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 "http://localhost:8080$1")
+            echo "$1: $code"
+            [ "$code" = "200" ] || { echo "$1 returned $code"; exit 1; }
+          }
+          # Company assets under /static/, REGX shell assets under /regx-shell/.
+          check /static/assets/css/style.css
+          check /regx-shell/regx/regx-shell.css
+          check /regx-shell/css/style.css
+
+      - name: Verify the REGX API still refuses anonymous callers through nginx
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 http://localhost:8080/api/regx/v1/tenants/)
+          echo "tenants (unauthenticated): $code"
+          [ "$code" = "401" ] || [ "$code" = "403" ] || { echo "expected 401/403, got $code"; exit 1; }
 
       - name: Print service logs on failure
         if: failure()
