@@ -58,8 +58,11 @@ const REGX_MODULES: Item[] = [
     icon: "mdi mdi-flask-empty-outline",
   },
   {
+    // There is no /iid-assessments index route — the module exposes a preview
+    // screen and per-assessment detail pages only, so linking the bare path
+    // would be a 404 in the sidebar. Caught by the shell E2E asset check.
     id: "iid-assessments",
-    href: "/iid-assessments",
+    href: "/iid-assessments/preview",
     label: "IID Assessments",
     icon: "mdi mdi-clipboard-text-outline",
   },
@@ -197,6 +200,11 @@ const LEGACY_TOOLS: Item[] = [
 ];
 
 function isActive(pathname: string, href: string): boolean {
+  if (href === "/iid-assessments/preview") {
+    // The entry points at the preview screen, but it represents the whole
+    // module — so an assessment detail page must light it up too.
+    return pathname.startsWith("/iid-assessments");
+  }
   if (href === "/iig-checklists") {
     // The definitions list owns /iig-checklists itself and its [publicId]
     // and /new children, but not the sibling /versions and /executions
