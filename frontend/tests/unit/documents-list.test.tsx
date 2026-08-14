@@ -36,7 +36,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import DocumentsPage from "@/app/documents/page";
+import DocumentsPage from "@/app/(regx)/documents/page";
 
 beforeEach(() => {
   nav.push.mockReset();

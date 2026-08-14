@@ -43,7 +43,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import TemplatesPage from "@/app/templates/page";
+import TemplatesPage from "@/app/(regx)/templates/page";
 
 beforeEach(() => {
   nav.push.mockReset();

@@ -84,10 +84,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import DefinitionsPage from "@/app/iig-checklists/page";
-import NewDefinitionPage from "@/app/iig-checklists/new/page";
-import DefinitionDetailPage from "@/app/iig-checklists/[publicId]/page";
-import VersionDetailPage from "@/app/iig-checklists/versions/[versionPublicId]/page";
+import DefinitionsPage from "@/app/(regx)/iig-checklists/page";
+import NewDefinitionPage from "@/app/(regx)/iig-checklists/new/page";
+import DefinitionDetailPage from "@/app/(regx)/iig-checklists/[publicId]/page";
+import VersionDetailPage from "@/app/(regx)/iig-checklists/versions/[versionPublicId]/page";
 
 beforeEach(() => {
   nav.push.mockReset();

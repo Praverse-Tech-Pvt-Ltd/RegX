@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, iigChecklists } from "@/lib/api";
 import type { ChecklistResponseDTO } from "@/lib/api";
-import { toPayloadValue } from "@/app/iig-checklists/executions/[executionPublicId]/ChecklistResponses";
+import { toPayloadValue } from "@/app/(regx)/iig-checklists/executions/[executionPublicId]/ChecklistResponses";
 
 const TENANT = "alpha";
 const EXECUTION = "exec-public-0001";
