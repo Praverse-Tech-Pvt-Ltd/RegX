@@ -36,19 +36,19 @@ const NAV_LINKS = [
   {
     href: "/aidatabase/auditiq/",
     label: "Audit IQ",
-    icon: "/company/assets-icretegy-483.png",
+    icon: "/regx-shell/assets-icretegy-483.png",
     matches: ["/aidatabase/"],
   },
   {
     href: "/ratools/modulehome/",
     label: "ANDA CTD SmartTemplate",
-    icon: "/company/assets-anda-ctd.svg",
+    icon: "/regx-shell/assets-anda-ctd.svg",
     matches: ["/ratools/modulehome/"],
   },
   {
     href: "/ratools/",
     label: "RegX",
-    icon: "/company/assets-icretegy-tools.png",
+    icon: "/regx-shell/assets-icretegy-tools.png",
     matches: [],
   },
 ];
@@ -82,7 +82,7 @@ export default function CompanyNavbar() {
       <div className="container-fluid px-4">
         <a className="navbar-brand" href="/">
           <img
-            src="/company/itechnical-logo.png"
+            src="/regx-shell/itechnical-logo.png"
             alt="logo"
             className="navbar-logo"
             style={{ width: "145px", maxWidth: "100%", height: "auto" }}

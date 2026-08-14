@@ -1,0 +1,26 @@
+# Keep the build context small. The company tree is 728 MB, almost all of it
+# assets that the application process never opens.
+
+# nginx serves /static/ straight off the host tree (see compose.yaml), and
+# Django only ever builds {% static %} URLs — it never reads these files.
+static/
+
+# media/ is bind-mounted read-write instead of baked in, so that uploads made
+# by the running app and the files nginx serves are the same bytes.
+media/
+
+# Stale database backups copied for exactness; nothing reads them. The live
+# db.sqlite3 is deliberately NOT excluded — docker-entrypoint.sh seeds the
+# volume from it on first start.
+db.sqlite3.bak
+db_17_1_2.sqlite3
+db_corrupted.sqlite3
+db_old.sqlite3
+
+# Local dev leftovers
+.venv/
+__pycache__/
+*.pyc
+staticfiles/
+tmp/
+.env

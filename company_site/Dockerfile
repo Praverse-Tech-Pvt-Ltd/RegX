@@ -10,7 +10,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    DJANGO_SETTINGS_MODULE=RAAI.settings_integration
+    DJANGO_SETTINGS_MODULE=RAAI.settings_integration \
+    # `adduser --system` gives the runtime user no home directory, so HOME
+    # resolves to /nonexistent: gunicorn's control server fails to start and
+    # matplotlib rebuilds its font cache in a fresh temp dir on every single
+    # import, which the company's pandas/matplotlib views do constantly.
+    HOME=/tmp \
+    MPLCONFIGDIR=/tmp/matplotlib
 
 WORKDIR /app
 

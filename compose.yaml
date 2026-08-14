@@ -45,7 +45,7 @@ services:
       DB_PORT: "5432"
       REDIS_URL: redis://redis:6379/0
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?MFA_ENCRYPTION_KEY is required}
-      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ALLOWED_HOSTS: localhost,127.0.0.1,backend
     volumes:
       - document_storage:/app/document_storage
@@ -91,12 +91,16 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Must be a build arg, not just runtime env: Next.js inlines
+        # NEXT_PUBLIC_* into the client bundle when it builds.
+        NEXT_PUBLIC_API_URL: ${INTEGRATED_APP_URL:-http://localhost:8080}
     restart: unless-stopped
     environment:
       # Same-origin through nginx: the browser calls /api/regx/v1/... on
       # :8080 and never crosses an origin, so the frontend CSP's connect-src
       # 'self' covers it and no CORS preflight is involved.
-      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_API_URL: ${INTEGRATED_APP_URL:-http://localhost:8080}
     depends_on:
       - backend
     ports:
@@ -118,11 +122,25 @@ services:
       CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
       COMPANY_REDIS_URL: redis://redis:6379/1
       COMPANY_DB_PATH: /app/data/db.sqlite3
+      # Required by AIDatabase.context_processors.base_url, which runs on
+      # every company template render and has no default — the company
+      # supplies it through the .env we deliberately did not copy (it holds
+      # their SECRET_KEY). Points at the nginx origin, not the container.
+      BASE_URL: ${COMPANY_BASE_URL:-http://localhost:8080}
+      # Read by AdminMaster.views.login. "LOCAL" is what the company's own
+      # .env uses and keeps their local login behaviour; "PRODUCTION" turns
+      # on their device-token second step for non-internal users. Left
+      # overridable so a real deployment can opt into the stricter path.
+      SERVER: ${COMPANY_SERVER_MODE:-LOCAL}
     volumes:
       # The SQLite file lives in a named volume so company logins, demo
       # bookings and session rows survive an image rebuild. docker-entrypoint.sh
       # seeds it from the copied db.sqlite3 on first start.
       - company_db:/app/data
+      # media/ is excluded from the image (see .dockerignore) and bind-mounted
+      # instead, so uploads written by the app are the same bytes nginx serves
+      # from /media/ rather than a divergent copy inside the container.
+      - ./company_site/media:/app/media
     depends_on:
       redis:
         condition: service_healthy
