@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">ANDA CTD SmartTemplate Icon - Blue</title>
+  <desc id="desc">Vector document icon with folded corner, checklist blocks, digital network nodes, and blue verification checkmark.</desc>
+  <defs>
+    <linearGradient id="darkBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00669B"/>
+      <stop offset="1" stop-color="#004A87"/>
+    </linearGradient>
+    <linearGradient id="lightBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A9D8F3"/>
+      <stop offset="1" stop-color="#5AA9D9"/>
+    </linearGradient>
+    <linearGradient id="midBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#65B4E2"/>
+      <stop offset="1" stop-color="#1788CF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Document outline -->
+  <path d="M95 46 H332 L417 131 V340" fill="none" stroke="url(#darkBlue)" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M95 46 V340" fill="none" stroke="url(#darkBlue)" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Folded corner -->
+  <path d="M332 46 V131 H417 Z" fill="url(#lightBlue)"/>
+  <path d="M332 46 V131 H417" fill="none" stroke="#004A87" stroke-width="8" stroke-linejoin="round" opacity=".25"/>
+
+  <!-- Document text lines -->
+  <rect x="176" y="188" width="205" height="15" rx="7.5" fill="#6BB5DF"/>
+  <rect x="176" y="235" width="205" height="15" rx="7.5" fill="#6BB5DF"/>
+  <rect x="176" y="282" width="105" height="15" rx="7.5" fill="#6BB5DF"/>
+
+  <!-- Left CTD module squares -->
+  <rect x="70" y="260" width="32" height="32" fill="#A9D8F3"/>
+  <rect x="70" y="316" width="32" height="32" fill="#00669B"/>
+  <rect x="70" y="400" width="32" height="32" fill="#00599B"/>
+  <rect x="117" y="272" width="27" height="27" fill="#C9E7F7"/>
+
+  <!-- Digital network motif -->
+  <g fill="none" stroke="#70B7E0" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M151 371 L196 326 L238 402 L170 455"/>
+    <path d="M170 455 L238 402 H313"/>
+  </g>
+  <g fill="#70B7E0">
+    <circle cx="196" cy="326" r="22"/>
+    <circle cx="238" cy="402" r="22"/>
+    <circle cx="170" cy="455" r="22"/>
+  </g>
+  <path d="M143 363 H70" stroke="#00669B" stroke-width="14" stroke-linecap="round"/>
+  <path d="M313 402 H242" stroke="#00669B" stroke-width="14" stroke-linecap="round"/>
+  <path d="M145 421 L116 392" stroke="#70B7E0" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Blue verification circle and checkmark -->
+  <circle cx="380" cy="403" r="85" fill="#FFFFFF"/>
+  <path d="M447 343 A85 85 0 1 0 471 383" fill="none" stroke="#00599B" stroke-width="24" stroke-linecap="butt"/>
+  <path d="M328 398 L374 444 L455 354" fill="none" stroke="url(#midBlue)" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
