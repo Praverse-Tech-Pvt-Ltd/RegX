@@ -1,0 +1,495 @@
+<!-- SIDEBAR -->
+{% load static %}
+<!-- NAVBAR CSS -->
+<nav class="dashboard-sidebar" id="dashboardSidebar">
+
+    <div class="dashboard-sidebar-inner">
+
+        <!-- TOGGLE BUTTON -->
+        <div class="sidebar-toggle-row">
+
+            <button type="button" class="sidebar-toggle-btn" id="sidebarToggle">
+
+                <i class="mdi mdi-dock-left"></i>
+
+            </button>
+
+        </div>
+
+        <!-- SIDEBAR MENU -->
+        <ul class="dashboard-sidebar-nav">
+            <!-- GLOBAL INSPECTIONS -->
+            <li class="dashboard-sidebar-item">
+
+                <a class="dashboard-sidebar-link {% if '/aidatabase/gmpc_module/' in request.path or '/aidatabase/render_gmpc_search/' in request.path or '/aidatabase/gmpc_dashboard/' in request.path %}active-sidebar{% endif %}"
+                    href="/aidatabase/gmpc_module/" data-tooltip="Global Inspection Database">
+
+                    <i class="mdi mdi-flask-outline dashboard-sidebar-icon"></i>
+
+                    <span class="dashboard-sidebar-label">
+                        Global Inspection Database
+                    </span>
+
+                </a>
+
+            </li>
+
+            <!-- SYSTEMS -->
+            <li class="dashboard-sidebar-item">
+
+                <a class="dashboard-sidebar-link {% if request.path == '/aidatabase/render_system_checklist/' %}active-sidebar{% endif %}"
+                    href="/aidatabase/render_system_checklist/" data-tooltip="cGMP Six System Checklist">
+
+                    <i class="mdi mdi-clipboard-text-outline dashboard-sidebar-icon"></i>
+
+                    <span class="dashboard-sidebar-label">
+                        cGMP Six System Checklist
+                    </span>
+
+                </a>
+
+            </li>
+
+            <!-- TOP 20 -->
+            <li class="dashboard-sidebar-item">
+
+                <!-- BUTTON -->
+                <a class="dashboard-sidebar-link d-flex justify-content-between align-items-center
+                {% if 'top20' in request.path %}active-sidebar{% endif %}" data-bs-toggle="collapse"
+                    href="#top20Dropdown" role="button" onclick="handleTop20Click(event)"
+                    aria-expanded="{% if 'top20' in request.path %}true{% else %}false{% endif %}"
+                    data-tooltip=" Top 20 Recurring Issues">
+
+                    <div class="d-flex align-items-center">
+
+                        <i class="mdi mdi-wrench dashboard-sidebar-icon"></i>
+
+                        <span class="dashboard-sidebar-label">
+                            Top 20 Recurring Issues
+                        </span>
+
+                    </div>
+
+                    <i class="mdi mdi-chevron-down"></i>
+
+                </a>
+
+                <!-- DROPDOWN -->
+                <div class="collapse {% if 'top20' in request.path %}show{% endif %}" id="top20Dropdown">
+
+                    <!-- INDIA -->
+                    <a class="dashboard-sidebar-link sub-sidebar-link" id="sidebar-india-link"
+                        href="/aidatabase/top20_recurring/?country=india">
+
+                        <span class="dashboard-sidebar-label">
+                            India Manufacturers
+                        </span>
+                        <i class="mdi mdi-chevron-down dropdown-caret ms-auto"></i>
+                    </a>
+                    <ul id="indiaSubmenu" class="sidebar-submenu-list"
+                        style="list-style: none; padding-left: 60px; display: none; margin-bottom: 10px;"></ul>
+
+                    <!-- USA -->
+                    <a class="dashboard-sidebar-link sub-sidebar-link" id="sidebar-usa-link"
+                        href="/aidatabase/top20_recurring/?country=usa">
+
+                        <span class="dashboard-sidebar-label">
+                            USA Manufacturers
+                        </span>
+                        <i class="mdi mdi-chevron-down dropdown-caret ms-auto"></i>
+                    </a>
+                    <ul id="usaSubmenu" class="sidebar-submenu-list"
+                        style="list-style: none; padding-left: 60px; display: none; margin-bottom: 10px;"></ul>
+
+                </div>
+
+            </li>
+
+
+            <!-- INVESTIGATOR -->
+            <li class="dashboard-sidebar-item">
+
+                <a class="dashboard-sidebar-link {% if request.path == '/aidatabase/new_investigator/' %}active-sidebar{% endif %}"
+                    href="/aidatabase/new_investigator/" data-tooltip="Investigator Profile">
+
+                    <i class="mdi mdi-account-search-outline dashboard-sidebar-icon"></i>
+
+                    <span class="dashboard-sidebar-label">
+                        Investigator Profile
+                    </span>
+
+                </a>
+
+            </li>
+
+            <!-- WARNING LETTER -->
+
+            <!-- INSPECTION GUIDE -->
+            <li class="dashboard-sidebar-item">
+
+                <a class="dashboard-sidebar-link {% if request.path == '/aidatabase/inspection_hub/' %}active-sidebar{% endif %}"
+                    href="/aidatabase/inspection_hub/" data-tooltip="Inspection Guide">
+
+                    <i class="mdi mdi-compass-outline dashboard-sidebar-icon"></i>
+
+                    <span class="dashboard-sidebar-label">
+                        Inspection Guide
+                    </span>
+
+                </a>
+
+            </li>
+             <li class="dashboard-sidebar-item">
+
+                <a class="dashboard-sidebar-link {% if request.path == '/aidatabase/warning_letter/' %}active-sidebar{% endif %}"
+                    href="/aidatabase/warning_letter/" data-tooltip="Warning Letter Database">
+
+                    <i class="mdi mdi-alert-outline dashboard-sidebar-icon"></i>
+
+                    <span class="dashboard-sidebar-label">
+                        Warning Letter Database
+                    </span>
+
+                </a>
+
+            </li>
+
+
+            <!-- TOP 10 INVESTIGATOR INTELLIGENCE -->
+            <li class="dashboard-sidebar-item">
+
+                <a class="dashboard-sidebar-link {% if request.path == '/aidatabase/top10_investigators/' %}active-sidebar{% endif %}" href="/aidatabase/top10_investigators/" data-tooltip="Top 10 Investigator Intelligence">
+
+                    <i class="mdi mdi-account-group-outline dashboard-sidebar-icon"></i>
+
+                    <span class="dashboard-sidebar-label">
+                        Top 10 Investigator Intelligence
+                    </span>
+
+                </a>
+
+            </li>
+
+            <!-- TOP 10 COMPANY INTELLIGENCE -->
+            <li class="dashboard-sidebar-item">
+
+                <a class="dashboard-sidebar-link {% if request.path == '/aidatabase/top10_companies/' %}active-sidebar{% endif %}" href="/aidatabase/top10_companies/" data-tooltip="Top 10 Company Intelligence">
+
+                    <i class="mdi mdi-domain dashboard-sidebar-icon"></i>
+
+                    <span class="dashboard-sidebar-label">
+                        Top 10 Company Intelligence
+                    </span>
+
+                </a>
+
+            </li>
+
+        </ul>
+
+    </div>
+
+</nav>
+<script>
+
+    // DEFAULT REDIRECT TO INDIA
+    if (
+        window.location.pathname.includes("/top20") &&
+        !window.location.pathname.includes("detail") &&
+        !window.location.search.includes("country=")
+    ) {
+        window.location.href =
+            "/aidatabase/top20_recurring/?country=india";
+    }
+
+    // HANDLE TOP 20 CLICK
+    function handleTop20Click(event) {
+        // If not already on top 20 page, navigate to India by default
+        if (!window.location.pathname.includes("/top20")) {
+            event.preventDefault();
+            window.location.href = "/aidatabase/top20_recurring/?country=india";
+        }
+    }
+
+    // ── Sidebar active state for India / USA sub-links ──
+    // The country tabs switch via JS (no URL change), so we must
+    // manage active-sidebar purely client-side.
+    function setSidebarCountryActive(country) {
+        var indiaLink = document.getElementById('sidebar-india-link');
+        var usaLink = document.getElementById('sidebar-usa-link');
+        if (!indiaLink || !usaLink) return;
+        indiaLink.classList.remove('active-sidebar');
+        usaLink.classList.remove('active-sidebar');
+        if (country === 'india') {
+            indiaLink.classList.add('active-sidebar');
+        } else if (country === 'usa') {
+            usaLink.classList.add('active-sidebar');
+        }
+    }
+
+    // Set on initial page load from URL param
+    (function () {
+        var params = new URLSearchParams(window.location.search);
+        var country = (params.get('country') || 'india').toLowerCase();
+        setSidebarCountryActive(country);
+    })();
+
+    // Listen for client-side country changes dispatched by the page
+    // The page should call: window.dispatchEvent(new CustomEvent('countryChanged', { detail: 'india' }))
+    window.addEventListener('countryChanged', function (e) {
+        setSidebarCountryActive((e.detail || '').toLowerCase());
+    });
+</script>
+<!-- SIDEBAR CSS -->
+<style>
+    /* SIDEBAR */
+
+    .dashboard-sidebar {
+        width: 270px !important;
+
+        height: 90vh !important;
+
+        background: #ffffff !important;
+
+        border-right: 1px solid #e5e7eb !important;
+
+        position: fixed !important;
+
+        top: 60px !important;
+        left: 0 !important;
+
+        padding: 5px !important;
+
+        overflow-y: auto !important;
+
+        z-index: 998 !important;
+    }
+
+    /* INNER */
+
+    .dashboard-sidebar-inner {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+
+    /* TOGGLE BUTTON */
+
+    .sidebar-toggle-row {
+        display: flex !important;
+        justify-content: flex-end;
+
+        margin-bottom: 15px !important;
+    }
+
+    .sidebar-toggle-btn {
+        width: 46px !important;
+        height: 46px !important;
+
+        border-radius: 14px !important;
+
+        border: 2px solid #0b5cab !important;
+
+        background: white !important;
+
+        color: #0b5cab !important;
+
+        font-size: 20px !important;
+
+        transition: 0.3s ease !important;
+    }
+
+    .sidebar-toggle-btn:hover {
+        background: #eff6ff !important;
+    }
+
+    /* MENU */
+
+    .dashboard-sidebar-nav {
+        list-style: none !important;
+
+        padding: 0 !important;
+        margin: 0 !important;
+
+        display: flex !important;
+        flex-direction: column !important;
+
+        gap: 12px !important;
+    }
+
+    /* ITEM */
+
+    .dashboard-sidebar-link {
+        display: flex !important;
+        align-items: center !important;
+
+        gap: 4px !important;
+
+        padding: 4px 18px !important;
+
+        border-radius: 14px !important;
+
+        text-decoration: none !important;
+
+        color: #0b5cab !important;
+
+        font-size: 14px !important;
+        font-weight: 600 !important;
+
+        transition: all 0.3s ease !important;
+    }
+
+    /* ICON */
+
+    .dashboard-sidebar-icon {
+        font-size: 21px !important;
+    }
+
+    /* HOVER */
+
+    .dashboard-sidebar-link:hover {
+        background: #eff6ff !important;
+        color: #0b3b8c !important;
+    }
+
+    .dashboard-sidebar-link:hover i {
+        color: #0b3b8c !important;
+    }
+
+    /* ACTIVE */
+
+    .active-sidebar {
+        background: linear-gradient(135deg, #0b5cab, #3d8ec9) !important;
+
+        color: white !important;
+
+        box-shadow: 0 6px 16px rgba(11, 92, 171, 0.18) !important;
+    }
+
+    .active-sidebar i {
+        color: white !important;
+    }
+
+    /* SUB MENU */
+
+    .sub-sidebar-link {
+        margin-top: 8px !important;
+
+        margin-left: 12px !important;
+
+        font-size: 14px !important;
+
+        padding: 12px 16px !important;
+
+        border-radius: 12px !important;
+    }
+
+    /* SCROLLBAR */
+
+    .dashboard-sidebar::-webkit-scrollbar {
+        width: 6px !important;
+    }
+
+    .dashboard-sidebar::-webkit-scrollbar-thumb {
+        background: #d1d5db !important;
+
+        border-radius: 10px !important;
+    }
+
+    /* MOBILE */
+
+    @media(max-width:991px) {
+
+        .dashboard-sidebar {
+            width: 100% !important;
+
+            height: auto !important;
+
+            position: relative !important;
+
+            top: 0 !important;
+        }
+
+    }
+
+    /* COLLAPSED STATE FIXES */
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 96px !important;
+        overflow: visible !important;
+    }
+
+    .sidebar-collapsed .sidebar-toggle-row {
+        justify-content: center !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link {
+        justify-content: center !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        width: 56px !important;
+        margin: 0 auto !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-label,
+    .sidebar-collapsed .dropdown-caret {
+        display: none !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-item {
+        display: block !important;
+    }
+
+    .sidebar-collapsed .collapse {
+        display: none !important;
+    }
+
+    /* TOOLTIPS FOR COLLAPSED STATE */
+    .sidebar-collapsed .dashboard-sidebar-item {
+        position: relative !important;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #106492;
+        color: #fff;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+        z-index: 1050;
+        pointer-events: none;
+        margin-left: 15px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]::before {
+        content: '';
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        border-width: 6px;
+        border-style: solid;
+        border-color: transparent #106492 transparent transparent;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+        z-index: 1050;
+        pointer-events: none;
+        margin-left: 3px;
+    }
+
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]:hover::after,
+    .sidebar-collapsed .dashboard-sidebar-link[data-tooltip]:hover::before {
+        opacity: 1;
+        visibility: visible;
+    }
+</style>

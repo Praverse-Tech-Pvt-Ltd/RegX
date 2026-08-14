@@ -1,0 +1,1731 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>RA-AI Tools - GMPC Dashboard</title>
+
+  <!-- plugins:css -->
+  <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+
+  <!-- Layout styles -->
+  <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+  <style>
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #0b5cab transparent;
+    }
+
+    .nav-link {
+      white-space: normal !important;
+      word-wrap: break-word !important;
+      overflow-wrap: break-word !important;
+      text-align: left !important;
+    }
+
+    .main-panel {
+      width: 100%;
+
+      border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(2px);
+    }
+
+    .content-wrapper {
+      background: none;
+    }
+
+    .footer {
+      background: white;
+    }
+
+    .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #0b5cab, #3d8ec9) !important;
+    }
+
+    .dashboard-page-body {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      padding-top: 60px;
+      min-height: 100vh;
+    }
+
+    .dashboard-main-panel {
+      flex: 1 1 auto;
+      margin-left: 250px;
+      width: calc(100% - 250px);
+      transition: all 0.3s ease;
+      transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .main-panel {
+      margin-left: 80px;
+      width: calc(100% - 80px);
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+      width: 96px;
+      min-width: 96px;
+      max-width: 96px;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+      width: 46px;
+      margin: 0 auto;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+      display: none;
+    }
+
+    .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+      justify-content: center;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .gmpc-dashboard {
+      background: #ffffffff;
+      border-radius: 18px;
+      padding: 24px;
+      margin-left: 10px;
+      min-height: calc(100vh - 112px);
+    }
+
+    .dashboard-kpi-row {
+      margin-bottom: 16px;
+    }
+
+    .summary-card {
+      background: #ffffff;
+      border: 1px solid #dce5f3;
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      height: 100%;
+      box-shadow: 0 4px 18px rgba(18, 62, 109, 0.06);
+    }
+
+    .summary-icon {
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      background: linear-gradient(180deg, #0b5cab 0%, #173f72 100%);
+      color: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      flex-shrink: 0;
+    }
+
+    .summary-content h6 {
+      margin: 0 0 6px;
+      color: #2a4f7d;
+      font-size: 15px !important;
+      font-weight: 700;
+      text-transform: none !important;
+    }
+
+    .summary-value {
+      font-size: 22px !important;
+      line-height: 1;
+      font-weight: 800;
+      color: #1c4577;
+      margin: 0;
+    }
+
+    .dashboard-panel {
+      background: #ffffff;
+      border: 1px solid #dce5f3;
+      border-radius: 14px;
+      box-shadow: 0 4px 18px rgba(18, 62, 109, 0.06);
+      height: 100%;
+    }
+
+    .dashboard-panel .card-body {
+      padding: 18px;
+    }
+
+    .panel-title {
+      color: #173f72;
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      text-transform: none !important;
+    }
+
+    .country-btn {
+      display: inline-block;
+      padding: 8px 18px;
+      margin: 5px;
+      border-radius: 20px;
+      border: 1px solid #448ebd;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: #044a70;
+      background: #fff;
+      transition: 0.2s;
+    }
+
+    .country-btn:hover {
+      color: #fff;
+      background: linear-gradient(90deg, #0b5cab, #3d8ec9);
+      border-color: transparent;
+    }
+
+    .active-country {
+      background: linear-gradient(90deg, #0b5cab, #173f72);
+      color: #fff !important;
+      border-color: transparent;
+    }
+
+    .country-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      max-height: 400px;
+      padding-right: 4px;
+    }
+
+    .country-entry {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .country-rank {
+      color: #2d4f7a;
+      font-weight: 800;
+      font-size: 15px;
+      text-align: center;
+    }
+
+    .country-name {
+      color: #163f71;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .country-progress {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #dce7f7;
+      overflow: hidden;
+    }
+
+    .country-progress-fill {
+      display: block;
+      height: 100%;
+      width: 0;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #0b5cab, #3d8ec9);
+      transition: width 0.3s ease;
+    }
+
+    .country-count {
+      color: #1a4b85;
+      font-weight: 800;
+      font-size: 15px;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .chart-canvas-wrap {
+      height: 320px;
+      position: relative;
+    }
+
+    @media (max-width: 991px) {
+      .dashboard-page-body {
+        flex-direction: column;
+        padding-top: 60px;
+      }
+
+      .dashboard-sidebar {
+        position: relative;
+        top: 0;
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 0 0 16px 16px;
+      }
+
+      .dashboard-main-panel {
+        width: 100% !important;
+        margin-left: 0 !important;
+      }
+    }
+
+    /* New styled components for mockup layout */
+    .dashboard-section-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #173f72;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #dce5f3;
+      padding-bottom: 8px;
+    }
+
+    .custom-dashboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      background: #ffffff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 18px rgba(18, 62, 109, 0.05);
+      border: 1px solid #dce5f3;
+    }
+
+    .custom-dashboard-table th, .custom-dashboard-table td {
+      border: 1px solid #dce5f3;
+      padding: 12px 16px;
+      text-align: center;
+    }
+
+    .custom-dashboard-table th {
+      background-color: #f4f7fb;
+      color: #173f72;
+      font-weight: 700;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .custom-dashboard-table td {
+      font-size: 15px;
+      color: #2a4f7d;
+    }
+
+    /* KPI Table styling */
+    .kpi-table th {
+      background-color: #1a4373;
+      color: #ffffff;
+    }
+
+    .kpi-row-val td {
+      font-size: 24px;
+      font-weight: 800;
+      color: #173f72;
+      background-color: #ffffff;
+    }
+
+    .kpi-row-sub th {
+      background-color: #f8fafc;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: none;
+      border-top: 2px solid #cbd5e1;
+    }
+
+    .kpi-row-sub-val td {
+      font-size: 16px;
+      font-weight: 700;
+      background-color: #fdfdfd;
+    }
+
+    /* Metadata table */
+    .meta-table th {
+      background-color: #1a4373;
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .meta-table td {
+      color: #2a4f7d;
+      font-size: 14px;
+      font-weight: 600;
+      background-color: #ffffff;
+    }
+
+    /* Stats summary table */
+    .stats-table th {
+      background-color: #1a4373;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .stats-row-val td {
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .stats-row-desc td {
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 600;
+      background-color: #fcfcfc;
+    }
+
+    /* Audit log tabs */
+    .audit-tabs-container {
+      margin-top: 30px;
+      background: #ffffff;
+      border: 1px solid #dce5f3;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 4px 18px rgba(18, 62, 109, 0.06);
+    }
+
+    .audit-nav-tabs {
+      display: flex;
+      gap: 10px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+
+    .audit-tab-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .audit-tab-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .audit-tab-btn.active {
+      background: linear-gradient(90deg, #0b5cab, #173f72);
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 4px 12px rgba(11, 92, 171, 0.2);
+    }
+
+    .audit-tab-content {
+      min-height: 200px;
+    }
+
+    .audit-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+
+    .audit-table th, .audit-table td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .audit-table th {
+      background-color: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .audit-table td {
+      font-size: 14px;
+      color: #334155;
+    }
+
+    .badge-status {
+      display: inline-block;
+      padding: 4px 8px;
+      font-weight: 700;
+      border-radius: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .badge-gmpc {
+      background-color: #dcfce7;
+      color: #15803d;
+    }
+
+    .badge-gmpda {
+      background-color: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .badge-gmpnc {
+      background-color: #fee2e2;
+      color: #b91c1c;
+    }
+
+    /* Site history style */
+    .history-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 15px;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+    }
+
+    .history-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+
+    .history-item {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-item-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .history-item-right {
+      text-align: right;
+    }
+
+    /* Autocomplete input styling */
+    .site-search-wrapper {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .site-search-input {
+      width: 100%;
+      height: 48px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      padding: 0 16px;
+      font-size: 15px;
+    }
+
+    .site-search-input:focus {
+      outline: none;
+      border-color: #0b5cab;
+      box-shadow: 0 0 0 3px rgba(11, 92, 171, 0.1);
+    }
+
+    .site-search-dropdown {
+      position: absolute;
+      top: 52px;
+      left: 0;
+      right: 0;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      z-index: 100;
+      max-height: 250px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .site-search-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #334155;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .site-search-item:hover {
+      background: #f1f5f9;
+      color: #0b5cab;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container-scroller">
+    <!-- Navbar -->
+    {% include './navbar.html' %}
+
+    <!-- Sidebar wrapper -->
+    <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+      <!-- Sidebar -->
+      {% include './sidebar.html' %}
+
+      <!-- Main panel -->
+      <div class="main-panel dashboard-main-panel">
+        <div class="content-wrapper GMPC-dashboard">
+
+          <!-- Page Header -->
+          <!-- Page Header -->
+          <div class="page-header">
+            <h3 class="page-title">
+              {% if selected_active_excel_name == 'eudra' %}EU - EMA · EudraGMDP Dashboard{% else %}UK- MHRA · GMDP Dashboard{% endif %}
+              <a href="/aidatabase/render_gmpc_search/?active_excel_name={{ selected_active_excel_name }}&search=1" class=" ms-4 btn active-header-link">Click Here to Search</a>
+            </h3>
+          </div>
+
+          <!-- Country Tabs -->
+          <div style="margin-bottom: 25px; text-align: center">
+            <a
+              href="/aidatabase/form483/"
+              class="country-btn {% if selected_active_excel_name == 'usa' %}active-country{% endif %}"
+            >
+              USA
+            </a>
+            {% for excel_option in available_excel_names %}
+            <a
+              href="/aidatabase/gmpc_dashboard/?active_excel_name={{ excel_option.value }}"
+              class="country-btn {% if excel_option.value == selected_active_excel_name %}active-country{% endif %}"
+            >
+              {{ excel_option.label }}
+            </a>
+            {% endfor %}
+          </div>
+
+          <!-- Table 1: GMPC KPI Table -->
+          <div class="table-responsive">
+            {% if selected_active_excel_name == 'mhra' %}
+            <table class="custom-dashboard-table kpi-table">
+              <thead>
+                <tr>
+                  <th style="width: 33.33%;">Total Certificates</th>
+                  <th style="width: 33.33%;">GMPC compliant</th>
+                  <th style="width: 33.33%;">Non-compliant</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="kpi-row-val">
+                  <td>{{ total_certificates }}</td>
+                  <td class="text-success">{{ compliance_pct }}%</td>
+                  <td class="text-danger">{{ non_compliance_pct }}%</td>
+                </tr>
+                <tr class="kpi-row-sub">
+                  <th>{{ total_sites }} Unique sites</th>
+                  <th>{{ compliance_count }} GMPC certificates</th>
+                  <th>{{non_compliance_count }} GMPNC records</th>
+                </tr>
+                {% comment %} <tr class="kpi-row-sub-val">
+                  <td> {{ total_sites }} </td>
+                  <td class="text-success">{{ compliance_count }}</td>
+                  <td class="text-danger">{{ non_compliance_count }}</td>
+                </tr> {% endcomment %}
+              </tbody>
+            </table>
+            {% else %}
+            <table class="custom-dashboard-table kpi-table">
+              <thead>
+                <tr>
+                  <th style="width: 25%;">Total records</th>
+                  <th style="width: 25%;">GMPC compliant</th>
+                  <th style="width: 25%;">Deficiency action</th>
+                  <th style="width: 25%;">Non-compliant</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="kpi-row-val">
+                  <td>{{ total_certificates }}</td>
+                  <td class="text-success">{{ compliance_pct }}%</td>
+                  <td class="text-primary">{{ other_pct }}%</td>
+                  <td class="text-danger">{{ non_compliance_pct }}%</td>
+                </tr>
+                <tr class="kpi-row-sub">
+                  <th>{{total_sites}} Unique sites</th>
+                  <th>{{ compliance_count }} GMPC certificates</th>
+                  <th>{{ other_count }} GMPDA records</th>
+                  <th>{{ non_compliance_count }} GMPNC records</th>
+                </tr>
+                {% comment %} <tr class="kpi-row-sub-val">
+                  <td>{{ total_sites }}</td>
+                  <td class="text-success">{{ compliance_count }}</td>
+                  <td class="text-primary">{{ other_count }}</td>
+                  <td class="text-danger">{{ non_compliance_count }}</td>
+                </tr> {% endcomment %}
+              </tbody>
+            </table>
+            {% endif %}
+          </div>
+
+          <!-- Table 2: Metadata Table -->
+          <div class="table-responsive">
+            <table class="custom-dashboard-table meta-table">
+              <thead>
+                <tr>
+                  <th style="width: 33.33%;">{{ inspections_last_12m }}</th>
+                  <th style="width: 33.33%;">{{ sites_with_mia }}</th>
+                  <th style="width: 33.33%;">{{ coverage_range }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Inspection last 12 months</td>
+                  <td>Site with MIA (Marketing Authorization) number</td>
+                  <td>Inspection Coverage</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Charts Section Grid -->
+          <div class="row g-3 mb-4">
+            <!-- Yearly Trend -->
+            <div class="col-lg-6">
+              <div class="dashboard-panel">
+                <div class="card-body">
+                  <h4 class="panel-title">
+                    {% if selected_active_excel_name == 'mhra' %}
+                    Annual Inspection Volume
+                    {% else %}
+                    Inspection Per Year
+                    {% endif %}
+                  </h4>
+                  <div class="chart-canvas-wrap">
+                    <canvas id="yearlyTrendsChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Compliance Breakdown -->
+            <div class="col-lg-6">
+              <div class="dashboard-panel">
+                <div class="card-body">
+                  <h4 class="panel-title">
+                    {% if selected_active_excel_name == 'mhra' %}
+                    Compliance Breakdown
+                    {% else %}
+                    Compliance Breakdown
+                    {% endif %}
+                  </h4>
+                  <div class="chart-canvas-wrap d-flex justify-content-center">
+                    <canvas id="statusBreakdownChart" style="max-height: 300px; max-width: 300px;"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {% if selected_active_excel_name == 'mhra' %}
+            <!-- Geographic Distribution (Top 10 countries) bar chart & Counts -->
+            <div class="col-lg-6">
+              <div class="dashboard-panel">
+                <div class="card-body">
+                  <h4 class="panel-title" style="margin-bottom: 5px;">Geographic Distribution (Top 10 countries) </h4>
+
+                  <div class="table-responsive mb-3">
+                    <table class="custom-dashboard-table text-center" style="border: 1px solid #dce5f3; font-size: 13px;">
+                      <thead>
+                        <tr>
+                          <th style="background-color: #B5CADF; font-weight: 800; color: #173f72; width: 35%;">UK Domestic</th>
+                          <th style="background-color: #B5CADF; font-weight: 800; color: #173f72; width: 35%;">International</th>
+                          <th style="background-color: #B5CADF; font-weight: 800; color: #173f72; width: 30%;">Current year 2026 Inspections</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style="font-size: 18px; font-weight: 800; color: #1c4577;">
+                          <td style="padding: 10px; border-right: 1px solid #dce5f3;">{{ uk_domestic_count }}</td>
+                          <td style="padding: 10px; border-right: 1px solid #dce5f3;">{{ international_count }}</td>
+                          <td style="padding: 10px;">{{ current_year_inspections }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="chart-canvas-wrap">
+                    <canvas id="topCountriesChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Inspection Type Breakdown (bar chart) -->
+            <div class="col-lg-6">
+              <div class="dashboard-panel">
+                <div class="card-body">
+                  <h4 class="panel-title">Inspection Type Breakdown </h4>
+                  <div class="chart-canvas-wrap">
+                    <canvas id="inspectionTypeChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% else %}
+            <!-- Top 10 Countries -->
+            <div class="col-lg-6">
+              <div class="dashboard-panel">
+                <div class="card-body">
+                  <h4 class="panel-title">Top 10 Countries By Records</h4>
+                  <div class="chart-canvas-wrap">
+                    <canvas id="topCountriesChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Most Active Countries Last 2 Years -->
+            <div class="col-lg-6">
+              <div class="dashboard-panel">
+                <div class="card-body">
+                  <h4 class="panel-title">Most Active  – last 2 years</h4>
+                  <div class="chart-canvas-wrap">
+                    <canvas id="activeCountriesChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Table 3: Changes summary table -->
+          <div class="table-responsive">
+            {% if selected_active_excel_name == 'mhra' %}
+            <table class="custom-dashboard-table stats-table">
+              <thead>
+                <tr>
+                  {% comment %} <th style="width: 25%;">New certificates</th>
+                  <th style="width: 25%;">Revoked / removed</th>
+                  <th style="width: 25%;">Status changed</th>
+                  <th style="width: 25%;">Unchanged</th> {% endcomment %}
+                  <th style="width: 25%;">{{newly_added_count}}</th>
+                  <th style="width: 25%;">{{removed_count }}</th>
+                  <th style="width: 25%;">{{status_changes_count}}</th>
+                  <th style="width: 25%;">{{unchanged_count}}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="stats-row-val">
+                  <td class="text-success" style="font-size:18px"> New Certificates </td>
+                  <td class="text-danger" style="font-size:18px">Revoked / Removed</td>
+                  <td class="text-primary" style="font-size:18px">Status Changed</td>
+                  <td class="text-muted" style="font-size:18px">Unchanged</td>
+                </tr>
+
+              </tbody>
+            </table>
+            {% else %}
+            <table class="custom-dashboard-table stats-table">
+              <thead>
+                <tr>
+                  <th style="width: 25%;">Status changes</th>
+                  <th style="width: 25%;">Newly added</th>
+                  <th style="width: 25%;">Removed</th>
+                  <th style="width: 25%;">Field updates</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="stats-row-val">
+                  <td class="text-primary">{{ status_changes_count }}</td>
+                  <td class="text-success">{{ newly_added_count }}</td>
+                  <td class="text-danger">{{ removed_count }}</td>
+                  <td class="text-warning">{{ field_updates_count }}</td>
+                </tr>
+                <tr class="stats-row-desc">
+                  <td>Sites changed compliance</td>
+                  <td>New site records</td>
+                  <td>Sites no longer listed</td>
+                  <td>Date / NCA / Address edits</td>
+                </tr>
+              </tbody>
+            </table>
+            {% endif %}
+          </div>
+
+          <!-- Interactive Tabs Section -->
+          <div class="audit-tabs-container mb-4">
+
+
+            {% if selected_active_excel_name == 'mhra' %}
+            <div class="audit-nav-tabs">
+              <button class="audit-tab-btn active" onclick="switchAuditTab('all-changes')">All changes</button>
+              <button class="audit-tab-btn" onclick="switchAuditTab('newly-added-mhra')">New</button>
+              <button class="audit-tab-btn" onclick="switchAuditTab('removed-mhra')">Revoked/Removed</button>
+              <button class="audit-tab-btn" onclick="switchAuditTab('status-changes-mhra')">Status changed</button>
+            </div>
+
+            <div class="audit-tab-content">
+              <!-- All changes tab -->
+              <div id="tab-all-changes" class="audit-pane">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                  <table class="audit-table">
+                    <thead>
+                      <tr>
+                        <th>Sr.</th>
+                        <th>Type</th>
+                        <th>Company / certificate</th>
+                        <th>Country</th>
+                        <th>Current Status</th>
+                        <th>Inspection date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in all_changes_list %}
+                      <tr>
+                        <td>
+                          <span class="fw-bold text-dark">{{ forloop.counter }}</span>
+                          {% if item.type == 'New' %}
+                          <span class="badge bg-success text-white py-1 px-2 rounded fw-bold">New</span>
+                          {% elif item.type == 'Revoked' %}
+                          <span class="badge bg-danger text-white py-1 px-2 rounded fw-bold">Revoked</span>
+                          {% else %}
+                          <span class="badge bg-primary text-white py-1 px-2 rounded fw-bold">Changed</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          <span class="fw-bold text-dark">{{ item.site }}</span>
+                          <div class="text-muted small">Certificate No: {{ item.cert_no }}</div>
+                        </td>
+                        <td>{{ item.country }}</td>
+                        <td>
+                          {% if item.type == 'Revoked' %}
+                          <span class="text-danger fw-bold">Certificate removed</span>
+                          {% elif '→' in item.status %}
+                          <span class="badge-status badge-gmpnc">{{ item.status }}</span>
+                          {% else %}
+                          <span class="badge-status badge-gmpc">{{ item.status }}</span>
+                          {% endif %}
+                        </td>
+                        <td>{{ item.date_str }}</td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No changes recorded.</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- New tab -->
+              <div id="tab-newly-added-mhra" class="audit-pane" style="display: none;">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                  <table class="audit-table">
+                    <thead>
+                      <tr>
+                        <th>Sr.</th>
+                        <th>Type</th>
+                        <th>Company / certificate</th>
+                        <th>Country</th>
+                        <th>Status</th>
+                        <th>Inspection date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+
+                      {% for item in newly_added_list %}
+                      <tr>
+                        <td>
+                          <span class="fw-bold text-dark">{{ forloop.counter }}</span>
+                          </td>
+                        <td><span class="badge bg-success text-white py-1 px-2 rounded fw-bold">New</span></td>
+                        <td>
+                          <span class="fw-bold text-dark">{{ item.site }}</span>
+                          <div class="text-muted small">Certificate No: {{ item.cert_no }}</div>
+                        </td>
+                        <td>{{ item.country }}</td>
+                        <td><span class="badge-status badge-gmpc">{{ item.doc_type }}</span></td>
+                        <td>{{ item.issued_date }}</td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No new site records found.</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Revoked/Removed tab -->
+              <div id="tab-removed-mhra" class="audit-pane" style="display: none;">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                  <table class="audit-table">
+                    <thead>
+                      <tr>
+                        <th>Sr.</th>
+                        <th>Type</th>
+                        <th>Company / certificate</th>
+                        <th>Country</th>
+                        <th>Status</th>
+                        <th>Last seen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in removed_list %}
+                      <tr>
+                        <td>
+                          <span class="fw-bold text-dark">{{ forloop.counter }}</span>
+                          </td>
+                        <td><span class="badge bg-danger text-white py-1 px-2 rounded fw-bold">Revoked</span></td>
+                        <td>
+                          <span class="fw-bold text-dark">{{ item.site }}</span>
+                          <div class="text-muted small">Certificate No: {{ item.last_cert }}</div>
+                        </td>
+                        <td>{{ item.country }}</td>
+                        <td><span class="text-danger fw-bold">Certificate removed</span></td>
+                        <td>{{ item.last_seen }}</td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No revoked or removed sites.</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Status changed tab -->
+              <div id="tab-status-changes-mhra" class="audit-pane" style="display: none;">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                  <table class="audit-table">
+                    <thead>
+                      <tr>
+                        <th>Sr.</th>
+                        <th>Type</th>
+                        <th>Company / certificate</th>
+                        <th>Country</th>
+                        <th>Status</th>
+                        <th>Inspection date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in status_changes_list %}
+                      <tr>
+                        <td>
+                          <span class="fw-bold text-dark">{{ forloop.counter }}</span>
+                        </td>
+                        <td><span class="badge bg-primary text-white py-1 px-2 rounded fw-bold">Changed</span></td>
+                        <td>
+                          <span class="fw-bold text-dark">{{ item.site }}</span>
+                          <div class="text-muted small">Certificate No: {{ item.cert_no }}</div>
+                        </td>
+                        <td>{{ item.country }}</td>
+                        <td>
+                          <span class="badge-status badge-gmpnc">{{ item.prev_status }}</span>
+                          <i class="mdi mdi-arrow-right text-muted mx-1"></i>
+                          <span class="badge-status badge-gmpc">{{ item.curr_status }}</span>
+                        </td>
+                        <td>{{ item.updated_date }}</td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No compliance status changes found.</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            {% else %}
+            <div class="audit-nav-tabs">
+              <button class="audit-tab-btn active" onclick="switchAuditTab('status-changes')">Status changes</button>
+              <button class="audit-tab-btn" onclick="switchAuditTab('newly-added')">Newly added</button>
+              <button class="audit-tab-btn" onclick="switchAuditTab('removed')">Removed</button>
+              <button class="audit-tab-btn" onclick="switchAuditTab('site-history')">Site History</button>
+            </div>
+
+            <div class="audit-tab-content">
+              <!-- Status changes tab -->
+              <div id="tab-status-changes" class="audit-pane">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                  <table class="audit-table">
+                    <thead>
+                      <tr>
+                        <th>Sr.</th>
+                        <th>Site</th>
+                        <th>Previous Status</th>
+                        <th>Current Status</th>
+                        <th>Country</th>
+                        <th>Updated date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in status_changes_list %}
+                      <tr>
+                        <td>
+                          <span class="fw-bold text-dark">{{ forloop.counter }}</span>
+                        </td>
+                        <td>
+                          <span class="fw-bold text-dark">{{ item.site }}</span>
+                          <div class="text-muted small">Eudra Ref. #: {{ item.cert_no }}</div>
+                        </td>
+                        <td><span class="badge-status badge-gmpnc">{{ item.prev_status }}</span></td>
+                        <td><span class="badge-status badge-gmpc">{{ item.curr_status }}</span></td>
+                        <td>{{ item.country }}</td>
+                        <td>{{ item.updated_date }}</td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No status changes found.</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Newly added tab -->
+              <div id="tab-newly-added" class="audit-pane" style="display: none;">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                  <table class="audit-table">
+                    <thead>
+                      <tr>
+                        <th>Sr.</th>
+                        <th>Site</th>
+                        <th>Document Type</th>
+                        <th>Certificate No.</th>
+                        <th>Country</th>
+                        <th>Issued date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in newly_added_list %}
+                      <tr>
+                        <td>
+                          <span class="fw-bold text-dark">{{ forloop.counter }}</span>
+                        </td >
+
+                        <td>
+                          <span class="fw-bold text-dark">{{ item.site }}</span>
+                          <div class="text-muted small">Eudra Ref. #: {{ item.cert_no }}</div>
+                        </td>
+                        <td><span class="badge-status {% if item.doc_type == 'GMPC' %}badge-gmpc{% elif item.doc_type == 'GMPDA' %}badge-gmpda{% else %}badge-gmpnc{% endif %}">{{ item.doc_type }}</span></td>
+                        <td>{{ item.cert_no }}</td>
+                        <td>{{ item.country }}</td>
+                        <td>{{ item.issued_date }}</td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No newly added site records.</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Removed tab -->
+              <div id="tab-removed" class="audit-pane" style="display: none;">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                  <table class="audit-table">
+                    <thead>
+                      <tr>
+                        <th>Sr.</th>
+                        <th>Site</th>
+                        <th>Last known status</th>
+                        <th>Last Certificate No.</th>
+                        <th>Country</th>
+                        <th>Last seen</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in removed_list %}
+                      <tr>
+                        <td>
+                          <span class="fw-bold text-dark">{{ forloop.counter }}</span>
+                        </td>
+                        <td>
+                          <span class="fw-bold text-dark">{{ item.site }}</span>
+                          <div class="text-muted small">Eudra Ref. #: {{ item.last_cert }}</div>
+                        </td>
+                        <td><span class="badge-status {% if item.last_status == 'GMPC' %}badge-gmpc{% elif item.last_status == 'GMPDA' %}badge-gmpda{% else %}badge-gmpnc{% endif %}">{{ item.last_status }}</span></td>
+                        <td>{{ item.last_cert }}</td>
+                        <td>{{ item.country }}</td>
+                        <td>{{ item.last_seen }}</td>
+                      </tr>
+                      {% empty %}
+                      <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">No removed sites found.</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Site History tab -->
+              <div id="tab-site-history" class="audit-pane" style="display: none;">
+                <div class="site-search-wrapper">
+                  <input type="text" class="site-search-input" id="siteSearchInput" placeholder="Search site name (e.g. Zydus)..." oninput="handleSiteSearch(this.value)">
+                  <div class="site-search-dropdown" id="siteSearchDropdown"></div>
+                </div>
+
+                <div id="siteHistoryResults" style="display: none;">
+                  <div class="history-card">
+                    <div class="history-header">
+                      <div class="history-title" id="histSiteName">Site Name</div>
+                      <span class="badge-status badge-gmpc" id="histCurrentStatus">Current: GMPC</span>
+                    </div>
+                    <div class="text-muted mb-3" id="histSubDetails">
+                      Eudra Ref.: <span class="fw-bold text-dark" id="histEudraRef">xxx</span>,
+                      Country: <span class="fw-bold text-dark" id="histCountry">xxx</span>,
+                      OMS NO.: <span class="fw-bold text-dark" id="histOmsNo">xxx</span>
+
+                    </div>
+
+                    <div id="histTimelineContainer">
+                      <!-- History items will be rendered dynamically -->
+                    </div>
+                  </div>
+                </div>
+                <div id="siteHistoryPlaceholder" class="text-center py-5 text-muted">
+                  <i class="mdi mdi-magnify fs-1 d-block mb-2"></i>
+                  Search for a site to view its certificate and inspection history timeline.
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        {% comment %} <footer class="footer">
+          <div class="d-sm-flex justify-content-center justify-content-sm-between">
+            <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">© Copyright ©2025 iPharmaAI. All Rights Reserved by <a href="https://icretegy.com" target="_blank">iCretegy Solutions</a>.</span>
+          </div>
+        </footer> {% endcomment %}
+      </div>
+    </div>
+  </div>
+
+  <!-- JS Plugins -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+  <script src="{% static 'assets/js/misc.js' %}"></script>
+
+  <!-- Pass Django Context to JS -->
+  {{ year_labels|json_script:"gmpc-year-labels" }}
+  {{ year_values|json_script:"gmpc-year-values" }}
+  {{ status_labels|json_script:"gmpc-status-labels" }}
+  {{ status_values|json_script:"gmpc-status-values" }}
+  {{ country_labels|json_script:"gmpc-country-labels" }}
+  {{ country_values|json_script:"gmpc-country-values" }}
+  {{ active_countries_labels|json_script:"gmpc-active-countries-labels" }}
+  {{ active_countries_values|json_script:"gmpc-active-countries-values" }}
+  {{ inspection_type_labels|json_script:"gmpc-inspection-type-labels" }}
+  {{ inspection_type_values|json_script:"gmpc-inspection-type-values" }}
+
+  <script>
+    // Read JSON Script Safe
+    function readJsonScript(id, fallback) {
+      const el = document.getElementById(id);
+      if (!el) return fallback;
+      try {
+        return JSON.parse(el.textContent);
+      } catch (e) {
+        console.error("Error parsing JSON script data for: " + id, e);
+        return fallback;
+      }
+    }
+
+    // Sidebar Collapse
+    function initSidebarToggle() {
+      const layout = document.getElementById('dashboardLayout');
+      const toggleButton = document.getElementById('sidebarToggle');
+      if (!layout || !toggleButton) return;
+
+      const storageKey = 'dashboard483SidebarCollapsed';
+      const savedState = localStorage.getItem(storageKey);
+      const isCollapsed = savedState === 'true';
+
+      function applyState(collapsed) {
+        layout.classList.toggle('sidebar-collapsed', collapsed);
+        toggleButton.setAttribute('aria-expanded', String(!collapsed));
+      }
+
+      applyState(isCollapsed);
+
+      toggleButton.addEventListener('click', () => {
+        const nextState = !layout.classList.contains('sidebar-collapsed');
+        localStorage.setItem(storageKey, String(nextState));
+        applyState(nextState);
+      });
+    }
+
+    // Initialize Charts
+    const valueLabelPlugin = {
+      id: 'valueLabelPlugin',
+      afterDatasetsDraw(chart) {
+        // Only draw labels when explicitly enabled for a chart
+        if (!chart.options || !chart.options.plugins || !chart.options.plugins.valueLabelPlugin || !chart.options.plugins.valueLabelPlugin.enabled) {
+          return;
+        }
+        const { ctx } = chart;
+        chart.data.datasets.forEach((dataset, datasetIndex) => {
+          const meta = chart.getDatasetMeta(datasetIndex);
+          if (!meta?.data) return;
+
+          meta.data.forEach((element, index) => {
+            const value = dataset.data[index];
+            if (value === null || value === undefined || value === '') return;
+
+            const x = element.x;
+            const y = element.y;
+            ctx.save();
+            ctx.font = '700 11px Poppins, sans-serif';
+            ctx.fillStyle = '#0f3f94';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(value, x, y - 6);
+            ctx.restore();
+          });
+        });
+      }
+    };
+
+    if (typeof Chart !== 'undefined' && !Chart.registry?.get?.('valueLabelPlugin')) {
+      Chart.register(valueLabelPlugin);
+    }
+
+    function initCharts() {
+      const isMhra = "{{ selected_active_excel_name }}" === "mhra";
+
+      // 1. Yearly trends chart (Bar/Line Chart)
+      const yrLabels = readJsonScript("gmpc-year-labels", []);
+      const yrValues = readJsonScript("gmpc-year-values", []);
+
+      const yearlyCtx = document.getElementById("yearlyTrendsChart");
+      if (yearlyCtx && yrLabels.length > 0) {
+        const ctx = yearlyCtx.getContext("2d");
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, '#0b5cab');
+        gradient.addColorStop(1, '#3d8ec9');
+
+        new Chart(ctx, {
+          type: isMhra ? "line" : "bar",
+          data: {
+            labels: yrLabels,
+            datasets: [{
+              label: "Inspections / Certificates",
+              data: yrValues,
+              backgroundColor: isMhra ? 'transparent' : gradient,
+              borderColor: '#0b5cab',
+              borderWidth: isMhra ? 3 : 1,
+              fill: isMhra ? false : true,
+              borderRadius: isMhra ? 0 : 6,
+              barPercentage: 0.5,
+              tension: 0.3,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              valueLabelPlugin: {
+                enabled: true
+              }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: "#64748b", font: { weight: "500" } }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: "#94a3b8" },
+                grid: { color: "#f1f5f9" }
+              }
+            }
+          }
+        });
+      }
+
+      // 2. Status Breakdown chart (Pie/Doughnut Chart)
+      const stLabels = readJsonScript("gmpc-status-labels", []);
+      const stValues = readJsonScript("gmpc-status-values", []);
+
+      const total = stValues.reduce((sum, value) => sum + Number(value), 0);
+      const statusCtx = document.getElementById("statusBreakdownChart");
+      if (statusCtx && stLabels.length > 0) {
+        new Chart(statusCtx, {
+          type: "doughnut",
+          data: {
+            labels: stLabels,
+            datasets: [{
+              data: stValues,
+              backgroundColor: isMhra ? [
+                "#10b981", // green for GMPC Compliant
+                "#f43f5e", // red for Non Compliant
+              ] : [
+                "#10b981", // green for GMPC
+                "#3b82f6", // blue for GMPDA
+                "#f43f5e", // red for GMPC non-compliant / non-compliance
+              ],
+              borderWidth: 1,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "bottom",
+                align: "start",
+                labels: {
+                  boxWidth: 12,
+                  font: { size: 12, weight: "bold" },
+                  padding: 15,
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    let label = context.label || '';
+                    if (label) {
+                      label += ': ';
+                    }
+                    const value = context.raw;
+                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                    return `${label}${value} (${percentage})`;
+                  }
+                }
+              }
+            },
+            cutout: "60%"
+          }
+        });
+      }
+
+      // 3. Top 10 Countries by records (Horizontal Bar Chart)
+      const tcLabels = readJsonScript("gmpc-country-labels", []);
+      const tcValues = readJsonScript("gmpc-country-values", []);
+      const topCountriesCtx = document.getElementById("topCountriesChart");
+      if (topCountriesCtx && tcLabels.length > 0) {
+        const ctx = topCountriesCtx.getContext("2d");
+        const gradient = ctx.createLinearGradient(0, 0, 300, 0);
+        gradient.addColorStop(0, '#10b981');
+        gradient.addColorStop(1, '#059669');
+
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: tcLabels.map(l => l.substring(0, 15)),
+            datasets: [{
+              label: "Records",
+              data: tcValues,
+              backgroundColor: gradient,
+              borderRadius: 6,
+              barPercentage: 0.6,
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              x: {
+                beginAtZero: true,
+                ticks: { color: "#94a3b8" },
+                grid: { color: "#f1f5f9" }
+              },
+              y: {
+                grid: { display: false },
+                ticks: { color: "#64748b", font: { weight: "500" } }
+              }
+            }
+          }
+        });
+      }
+
+      // 4. Most Active Countries Last 2 Years (Horizontal Bar Chart)
+      const acLabels = readJsonScript("gmpc-active-countries-labels", []);
+      const acValues = readJsonScript("gmpc-active-countries-values", []);
+      const activeCountriesCtx = document.getElementById("activeCountriesChart");
+      if (activeCountriesCtx && acLabels.length > 0) {
+        const ctx = activeCountriesCtx.getContext("2d");
+        const gradient = ctx.createLinearGradient(0, 0, 300, 0);
+        gradient.addColorStop(0, '#f59e0b');
+        gradient.addColorStop(1, '#d97706');
+
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: acLabels.map(l => l.substring(0, 15)),
+            datasets: [{
+              label: "Inspections (Last 2 Years)",
+              data: acValues,
+              backgroundColor: gradient,
+              borderRadius: 6,
+              barPercentage: 0.6,
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              x: {
+                beginAtZero: true,
+                ticks: { color: "#94a3b8" },
+                grid: { color: "#f1f5f9" }
+              },
+              y: {
+                grid: { display: false },
+                ticks: { color: "#64748b", font: { weight: "500" } }
+              }
+            }
+          }
+        });
+      }
+
+      // 5. Inspection Type Breakdown (Bar Chart) - MHRA only
+      const itLabels = readJsonScript("gmpc-inspection-type-labels", []);
+      const itValues = readJsonScript("gmpc-inspection-type-values", []);
+      const inspectionTypeCtx = document.getElementById("inspectionTypeChart");
+      if (inspectionTypeCtx && itLabels.length > 0) {
+        const ctx = inspectionTypeCtx.getContext("2d");
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, '#6366f1');
+        gradient.addColorStop(1, '#4f46e5');
+
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: itLabels,
+            datasets: [{
+              label: "Count",
+              data: itValues,
+              backgroundColor: gradient,
+              borderRadius: 6,
+              barPercentage: 0.4,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              x: {
+                grid: { display: false },
+                ticks: { color: "#64748b", font: { weight: "500" } }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: "#94a3b8" },
+                grid: { color: "#f1f5f9" }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    // Switch tab helper
+    function switchAuditTab(tabId) {
+      // Deactivate all buttons
+      document.querySelectorAll('.audit-tab-btn').forEach(btn => btn.classList.remove('active'));
+      // Activate clicked button
+      if (window.event && window.event.currentTarget) {
+        window.event.currentTarget.classList.add('active');
+      } else if (typeof event !== 'undefined' && event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+      }
+
+      // Hide all panes
+      document.querySelectorAll('.audit-pane').forEach(pane => pane.style.display = 'none');
+      // Show selected pane
+      document.getElementById('tab-' + tabId).style.display = 'block';
+    }
+
+    // Site Search Autocomplete
+    let searchTimeout = null;
+    function handleSiteSearch(query) {
+      clearTimeout(searchTimeout);
+      const dropdown = document.getElementById('siteSearchDropdown');
+
+      if (!query.trim()) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      searchTimeout = setTimeout(() => {
+        $.ajax({
+          url: window.location.pathname,
+          data: {
+            ajax: '1',
+            action: 'search_sites',
+            q: query,
+            active_excel_name: '{{ selected_active_excel_name }}'
+          },
+          dataType: 'json',
+          success: function(data) {
+            dropdown.innerHTML = '';
+            if (data.sites && data.sites.length > 0) {
+              data.sites.forEach(site => {
+                const item = document.createElement('div');
+                item.className = 'site-search-item';
+                item.textContent = site;
+                item.onclick = () => selectSite(site);
+                dropdown.appendChild(item);
+              });
+              dropdown.style.display = 'block';
+            } else {
+              const item = document.createElement('div');
+              item.className = 'site-search-item text-muted';
+              item.textContent = 'No sites found';
+              dropdown.appendChild(item);
+              dropdown.style.display = 'block';
+            }
+          }
+        });
+      }, 300);
+    }
+
+    // Select Site and get its History
+    function selectSite(siteName) {
+      document.getElementById('siteSearchDropdown').style.display = 'none';
+      document.getElementById('siteSearchInput').value = siteName;
+
+      $.ajax({
+        url: window.location.pathname,
+        data: {
+          ajax: '1',
+          action: 'get_site_history',
+          site_name: siteName,
+          active_excel_name: '{{ selected_active_excel_name }}'
+        },
+        dataType: 'json',
+        success: function(data) {
+          document.getElementById('histSiteName').textContent = data.site_name;
+
+          const statusBadge = document.getElementById('histCurrentStatus');
+          statusBadge.textContent = 'Current: ' + data.current_status;
+          statusBadge.className = 'badge-status';
+          if (data.current_status === 'GMPC') {
+            statusBadge.classList.add('badge-gmpc');
+          } else if (data.current_status === 'GMPDA') {
+            statusBadge.classList.add('badge-gmpda');
+          } else {
+            statusBadge.classList.add('badge-gmpnc');
+          }
+
+          document.getElementById('histEudraRef').textContent = data.nca_ref || 'N/A';
+          document.getElementById('histCountry').textContent = data.country || 'N/A';
+          document.getElementById('histOmsNo').textContent = data.oms_id || 'N/A';
+
+          const timelineContainer = document.getElementById('histTimelineContainer');
+          timelineContainer.innerHTML = '';
+
+          if (data.history && data.history.length > 0) {
+            data.history.forEach(item => {
+              const histItem = document.createElement('div');
+              histItem.className = 'history-item';
+
+              const left = document.createElement('div');
+              left.className = 'history-item-left';
+
+              const titleSpan = document.createElement('span');
+              titleSpan.className = 'fw-bold text-dark';
+              titleSpan.textContent = item.doc_type + ' - Issued ' + (item.issue_date || 'N/A');
+              left.appendChild(titleSpan);
+
+              const detailSpan = document.createElement('span');
+              detailSpan.className = 'text-muted small';
+              detailSpan.textContent = 'Certificate: ' + item.cert_no + ' | Inspection ended: ' + (item.inspection_end_date || 'N/A');
+              left.appendChild(detailSpan);
+
+              if (item.report_link) {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = item.report_link;
+                downloadLink.textContent = 'Download Report';
+                downloadLink.className = 'btn btn-sm btn-outline-primary mt-1';
+                left.appendChild(downloadLink);
+              }
+
+              const right = document.createElement('div');
+              right.className = 'history-item-right';
+
+              const statusPill = document.createElement('span');
+              statusPill.className = 'badge-status';
+              statusPill.textContent = item.doc_type;
+              if (item.doc_type === 'GMPC') {
+                statusPill.classList.add('badge-gmpc');
+              } else if (item.doc_type === 'GMPDA') {
+                statusPill.classList.add('badge-gmpda');
+              } else {
+                statusPill.classList.add('badge-gmpnc');
+              }
+              right.appendChild(statusPill);
+
+              histItem.appendChild(left);
+              histItem.appendChild(right);
+              timelineContainer.appendChild(histItem);
+            });
+          } else {
+            timelineContainer.innerHTML = '<div class="text-center text-muted py-3">No history entries found.</div>';
+          }
+
+          document.getElementById('siteHistoryResults').style.display = 'block';
+          document.getElementById('siteHistoryPlaceholder').style.display = 'none';
+        }
+      });
+    }
+
+    // Hide dropdown on click outside
+    document.addEventListener('click', function(e) {
+      if (e.target.id !== 'siteSearchInput' && e.target.id !== 'siteSearchDropdown') {
+        document.getElementById('siteSearchDropdown').style.display = 'none';
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+      initSidebarToggle();
+      initCharts();
+    });
+  </script>
+</body>
+
+</html>

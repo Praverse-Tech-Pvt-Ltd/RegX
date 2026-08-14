@@ -1,0 +1,1006 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>RA-AI Tools</title>
+    <!-- plugins:css -->
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <!-- endinject -->
+    <!-- Plugin css for this page -->
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+    <!-- End plugin css for this page -->
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <!-- End layout styles -->
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+      .nav-link {
+
+
+  white-space: normal !important;
+  word-wrap: break-word !important; /* Ensure long words break to the next line */
+  overflow-wrap: break-word !important; /* Ensures compatibility with modern browsers */
+  text-align: left !important; /* Optional: Adjust text alignment */
+}
+
+.main-panel{
+
+
+  background: linear-gradient(to right, #ffffff,rgb(228, 205, 244)) !important;
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(2px); /* Standard property */
+
+
+}
+
+@media screen and (max-width:1366px) {
+
+
+   .nav-item.nav-settings{
+
+     margin-left: 0px !important;
+   }
+ }
+.content-wrapper{
+ background: none;
+}
+.footer{
+ background: white;
+}
+
+.nav-item-dr{
+  background: #90dad7;
+  {% comment %} background: linear-gradient(to right, #f6e384, #ffd500) !important; {% endcomment %}
+  padding: 0 !important;
+}
+
+.nav-item-dr-li{
+  padding: 0  1.25rem!important;
+}
+.hover-link{
+  color:rgb(0, 0, 0) !important;
+  font-weight: 600;
+
+  padding:1.125rem 2.25rem !important;
+  i{
+    color: rgb(0, 0, 0) !important;
+  }
+}
+.hover-link:hover{
+ background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+  font-weight: 600;
+
+
+  i{
+    color: rgb(0, 0, 0) !important;
+  }
+}
+
+
+
+
+.nav-link:before{
+  color: white !important;
+}
+.nav-item-list{
+  padding:0.50rem 2.25rem !important;
+   color: rgb(0, 0, 0) !important;
+  font-weight: 600;
+  background: #90dad7;
+  {% comment %} background: linear-gradient(to right, #f6e384, #ffd500); {% endcomment %}
+
+  .nav-link:before{
+    color: rgb(0, 0, 0) !important;
+  }
+
+
+  a{
+    background: none !important;
+  }
+}
+
+
+
+.active{
+  background-color: #4A8A87 !important;
+
+  {% comment %} background: linear-gradient(to right, #f6e384, #ff8000) !important;  {% endcomment %}
+
+
+  .hover-link-list{
+
+  color: rgb(0, 0, 0) !important;
+ }
+ .menu-title{
+
+
+  color: rgb(0, 0, 0) !important;
+ }
+ .nav-link:before{
+  color: white !important;
+ }
+
+}
+td{
+  color: black !important;
+}
+
+
+
+
+.nav-item-list:hover{
+ background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+  {% comment %} background: linear-gradient(to right, #f6e384, #ff8000) !important;  {% endcomment %}
+
+  .nav-link:before{
+    color: white !important;
+    {% comment %} color: rgb(0, 0, 0) !important; {% endcomment %}
+  }
+   color: rgb(0, 0, 0) !important;
+
+  a{
+
+    color: rgb(0, 0, 0) !important;
+  }
+}
+.navbar-menu-wrapper{
+  padding-left: 0px !important;
+  padding-right: 0px !important;
+}
+ .nav-header-link{
+  font-size: 14px !important;
+  font-weight: bold;
+  text-decoration: none;
+
+  border-radius: 5px;
+  color: black !important;
+
+ }
+ @media (max-width: 1490px) {
+  .nav-header-link {
+
+    font-size: 12px !important;
+  }
+}
+ .nav-header-link-hover:hover{
+  color:#045c8d !important
+
+}
+
+ @media (min-width: 992px) {
+  .sidebar-icon-only .sidebar {
+      width: 70px;
+  }
+}
+.active-header-link{
+  color:  rgba(255, 255, 255, 1) !important;
+  background: linear-gradient(to right, #045c8d, #3485b3) !important;;
+}
+
+.hover-link-list{
+
+  color: black !important;
+}
+
+::placeholder {
+  color: rgb(0, 0, 0) !important;
+  opacity: 1 !important; /* Firefox */
+}
+::-ms-input-placeholder { /* Edge 12-18 */
+  color: red !important;
+}
+
+#customTable{
+  --bs-table-bg: none;
+}
+
+.headingRow{
+
+background: linear-gradient(to right, #65b9ff, #047edf 99%);
+}
+
+.count-container{
+  max-height: 400px;
+  overflow-y: scroll;
+
+}
+::-webkit-scrollbar {
+  -webkit-appearance: none;
+  width: 4px;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, .5);
+  -webkit-box-shadow: 0 0 1px rgba(255, 255, 255, .5);
+}
+.hover-div{
+display: flex;
+justify-content: space-between;
+padding: 10px;
+border-radius: 10px;
+
+ margin-bottom: 10px;
+p{
+  margin-bottom: 0px  !important;
+}
+}
+.hover-div:hover{
+  background-color: lightgray;
+}
+h4 {
+  font-size: 22px !important;
+}
+
+{% comment %} #traffic-chart-legend {
+    ul {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr); /* Two columns */
+        gap: 16px;
+        list-style: none;
+        padding: 0;
+      }
+
+      li {
+        background-color: rgba(240, 240, 240, 0.5);
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+      }
+
+      span {
+        width: 12px;
+        height: 12px;
+        margin-right: 8px;
+        display: inline-block;
+      }
+} {% endcomment %}
+
+
+/* Basic legend styling */
+.rounded-legend {
+    padding: 20px 0;
+    margin-top: 20px;
+}
+
+.rounded-legend ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.rounded-legend ul li {
+    display: flex;
+    align-items: center;
+    {% comment %} margin-bottom: 10px; {% endcomment %}
+}
+
+/* Important: This is the crucial styling for the color spans */
+.rounded-legend ul li span {
+    width: 12px;
+    height: 12px;
+    margin-right: 10px;
+    display: inline-block;
+    border-radius: 50%;
+}
+
+/* Specific styles for each chart's legend if needed */
+#traffic-chart-legend ul li span,
+#category-chart-legend ul li span {
+    {% comment %} ul {
+        display: grid !important;
+        grid-template-columns: repeat(2, 1fr); /* Two columns */
+        gap: 16px;
+        list-style: none;
+        padding: 0;
+      }
+      li {
+        background-color: rgba(240, 240, 240, 0.5);
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+      }
+      span {
+        margin-right: 8px;
+        display: inline-block;
+      } {% endcomment %}
+    min-width: 12px;  /* Ensure minimum width */
+    min-height: 12px; /* Ensure minimum height */
+}
+.navbar-menu-wrapper {
+  flex-grow: 1;
+}
+
+/* Legend position classes */
+.legend-bottom-left {
+    text-align: left;
+}
+
+.legend-vertical {
+    display: flex;
+    flex-direction: column;
+}
+.rectangle {
+  background-color: #fe9409;
+}
+.rectangle-container {
+  display: flex;
+  justify-content: center;
+  @media screen and (min-width: 468px) {
+    justify-content: end;
+  }
+}
+.reactangle-text {
+  font-family: "Poppins-Regular", Helvetica;
+  font-weight: 400;
+  color: #000000;
+  font-size: 24px;
+  letter-spacing: 0;
+  line-height: True;
+}
+@media screen and (min-width:2000px) {
+
+  .mainLogo{
+    padding: 4px;
+  }
+}
+.navbar-brand-wrapper{
+  width: fit-content !important;
+}
+.navbar-menu-wrapper{
+  width: fit-content !important;
+
+}
+.dropdown-item:active{
+  background-color:white
+}
+.dropdown-menu[data-bs-popper]{
+  top:70%
+}
+.navbar .navbar-brand
+{
+  width:145px;
+}
+
+    </style>
+  </head>
+  <body>
+    <div class="container-scroller">
+
+      <!-- partial:partials/_navbar.html -->
+     {% include 'navbar.html' %}
+      <!-- partial -->
+      <div class="container-fluid page-body-wrapper " style='margin-top: 80px !important; '>
+        <!-- partial:partials/_sidebar.html -->
+        <nav class="sidebar sidebar-offcanvas" id="sidebar">
+            <ul class="nav">
+            {% if user.is_authenticated %}
+              <li class="nav-item nav-profile">
+                <a href="#" class="nav-link">
+                  <div class="nav-profile-image">
+                    <!-- <img
+                      src="{% static 'assets/images/faces/face1.jpg' %}"
+                      alt="profile"
+                    /> -->
+                                      {% if request.user.logo %}
+                      <img src="{{ request.user.logo.url }}" alt="image" />
+                  {% else %}
+                             <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  />
+                  {% endif %}
+                    <span class="login-status online"></span>
+                    <!--change to offline or busy as needed-->
+                  </div>
+                  <div class="nav-profile-text d-flex flex-column">
+                    <span class="font-weight-bold mb-2">{{ request.user.first_name }}</span>
+                    <span class="text-secondary text-small">
+                    {% if request.user.designation %}
+                      {{ request.user.designation }}
+                    {% else %}
+                      Project Manager
+                    {% endif %}
+                  </span>
+                  </div>
+                  <i
+                    class="mdi mdi-bookmark-check text-success nav-profile-badge"
+                  ></i>
+                </a>
+              </li>
+              {% endif %}
+              {% if nasal_spray_deficiency %}
+              <li class="nav-item nav-item-dr active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/nasal_spray_deficiency/"
+                >
+                  <span class="menu-title">Nasal Spray</span>
+                </a>
+              </li>
+              {% if liquid_oral_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/liquid_oral_deficiency/"
+                >
+                  <span class="menu-title">Liquid Oral</span>
+                </a>
+              </li>
+              {% comment %} {% if iud_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/iud_deficiency/"
+                >
+                  <span class="menu-title">Intrauterin Device (IUD)</span>
+                </a>
+              </li> {% endcomment %}
+              {% if tdds_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/tdds-deficiency/"
+                >
+                  <span class="menu-title">TDDS</span>
+                </a>
+              </li>
+              {% comment %} {% if suppository_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/suppository_deficiency/"
+                >
+                  <span class="menu-title">Suppository</span>
+                </a>
+              </li> {% endcomment %}
+              {% if topicals_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/topicals_deficiency/"
+                >
+                  <span class="menu-title">Topicals</span>
+                </a>
+              </li>
+              {% if solid_oral_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/solid_oral_deficiency/"
+                >
+                  <span class="menu-title">Solid Oral</span>
+                </a>
+              </li>
+              {% if otic_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/otic_deficiency/"
+                >
+                  <span class="menu-title">Otic</span>
+                </a>
+              </li>
+              {% if ophthalmic_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/ophthalmic_deficiency/"
+                >
+                  <span class="menu-title">Ophthalmic</span>
+                </a>
+              </li>
+              {% if injectable_peptide_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/injectable_peptide_deficiency/"
+                >
+                  <span class="menu-title">Injectable - Peptide</span>
+                </a>
+              </li>
+              {% if injectable_general_deficiency %}
+              <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+              <li class="nav-item nav-item-dr mt-1">
+                {% endif %}
+                <a
+                  class="nav-link hover-link"
+                  href="../../aidatabase/majorcr/injectable_general_deficiency/"
+                >
+                  <span class="menu-title">Injectable - General</span>
+                </a>
+              </li>
+            </ul>
+          </nav>
+        <!-- partial -->
+        <div class="main-panel">
+            <div class="content-wrapper">
+              <div class="page-header">
+                <h3 class="page-title">
+                  <span class="page-title-icon bg-gradient-primary text-white me-2">
+                    <i class="mdi mdi-home"></i>
+                  </span> Complete Response Database
+                </h3>
+              </div>
+              <div class="row">
+                <div class="col-md-4 stretch-card grid-margin">
+                  <div class="card bg-gradient-danger card-img-holder text-white">
+                    <div class="card-body" style="max-height:159px;">
+                      <img src="{% static 'assets/images/dashboard/circle.svg' %}" class="card-img-absolute" alt="circle-image" />
+                      <h4 class="font-weight-normal mb-2">Total Complete Response Deficiencies Database
+                      </h4>
+                      <h2 class="mb-5">{{ total_records }}</h2>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-4 stretch-card grid-margin">
+                  <div class="card bg-gradient-success card-img-holder text-white">
+                    <div class="card-body" style="max-height:159px;">
+                      <img src="{% static 'assets/images/dashboard/circle.svg' %}" class="card-img-absolute" alt="circle-image" />
+                      <h4 class="font-weight-normal mb-3">Total Dosage Forms
+                      </h4>
+                      <h2>{{ total_dosage }}</h2>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-4 stretch-card grid-margin">
+                  <div class="card bg-gradient-info card-img-holder text-white">
+                    <div class="card-body" style="max-height:159px;">
+                      <img src="{% static 'assets/images/dashboard/circle.svg' %}" class="card-img-absolute" alt="circle-image" />
+                      <h4 class="font-weight-normal mb-3">Total Deficiency Types
+                      </h4>
+                      <h2 class="mb-5">{{ total_deficiency_type }}</h2>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-md-8 stretch-card grid-margin">
+                  <div class="row">
+                      <div class="col-md-6 mb-4">
+                          <div class="card bg-gradient-primary card-img-holder text-white h-100">
+                              <div class="card-body position-relative">
+                                  <img src="{% static 'assets/images/dashboard/circle.svg' %}" class="card-img-absolute" alt="circle-image" />
+                                  <h4 class="font-weight-normal mb-3">
+                                    Total Dosage Types
+                                  </h4>
+
+                                  <h2 class="mb-0">{{ total_dosage_type }}</h2>
+                              </div>
+                          </div>
+                      </div>
+                      <div class="col-md-6 mb-4">
+                          <div class="card card-img-holder text-white h-100" style="background-color:#ff7cce;">
+                              <div class="card-body position-relative">
+                                  <img src="{% static 'assets/images/dashboard/circle.svg' %}" class="card-img-absolute" alt="circle-image" />
+                                  <h4 class="font-weight-normal mb-3">
+                                      Total CMC Sections
+                                  </h4>
+                                  <h6>(Drug Product,Drug Substance)</h6>
+                                  <h2 class="mb-0">2</h2>
+                              </div>
+                          </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="card">
+                          <div class="card-body diff" style="border: 2px solid #ca7eff;border-radius:4px;">
+                                <div class="clearfix">
+                                    <h6 class="card-title float-start" style="margin-top:-16px; text-transform: none !important;">Dosage Form types by Deficiency Count</h6>
+                                </div>
+                                <canvas id="pieChartDosageChart"></canvas>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                          <div class="card">
+                              <div class="card-body diff" style="border: 2px solid #ff7cce;border-radius:4px;">
+                                  <div class="clearfix">
+                                      <h4 class="card-title float-start" style="margin-top:-10px; font-size: 18px !important; text-transform: none !important;">Deficiency by CMC Section</h4>
+                                  </div>
+                                  <canvas id="barChartCMCSection"></canvas>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+                </div>
+                <div class="col-md-4 stretch-card grid-margin">
+                  <div class="card">
+                      <div class="card-body" style="background-color:#6ab6f2;border-radius:4px !important;">
+                          <h5 class="font-weight-bold mb-3 text-white">Deficiency count based on Total Deficiency Types</h5>
+                          <div class="row count-container">
+                            <div class="col-md-12 mb-2">
+                                {% for name,count in deficiency_counts %}
+                                  <div class="hover-div border rounded" style="background-color:#2590e5;">
+                                      <p class="mb-1 fw-bold text-white">{{ name }}</p>
+                                      <p class="mb-0 fw-bold text-white">{{ count }}</p>
+                                  </div>
+                                  {% endfor %}
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              </div>
+              <div class="row">
+                <div class="col-md-12 grid-margin stretch-card">
+                    <div class="card">
+                      <div class="card-body">
+                            <div id="visit-sale-chart-legend" class="rounded-legend legend-horizontal legend-top-right float-end"></div>
+                            <canvas id="visit-sale-chart" class="mt-4"></canvas>
+                      </div>
+                    </div>
+                </div>
+              </div>
+              {% comment %} <div class="row">
+                <div class="col-md-12 grid-margin stretch-card">
+                  <div class="card">
+                      <div class="card-body">
+                          <div class="clearfix">
+                              <h4 class="card-title float-start">Deficiency Types Across Dosage Forms and Categories</h4>
+                          </div>
+                          <div style="height: 600px;">
+                              <canvas id="bubble-chart"></canvas>
+                          </div>
+                      </div>
+                  </div>
+                </div>
+              </div> {% endcomment %}
+            </div>
+
+            <!-- ALL Your Content Here -->
+          <!-- content-wrapper ends -->
+          <!-- partial:partials/_footer.html -->
+          <footer class="footer">
+            <div class="d-sm-flex justify-content-center justify-content-sm-between">
+              <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">© Copyright ©2025 iPharmaAI. All Rights Reserved by <a href="https://icretegy.com" target="_blank">iCretegy Solutions</a>.</span>
+              <!-- <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">Copyright © 2025 <a href="#" target="_blank">iPharmaAI</a>. All rights reserved.</span> -->
+              <!-- <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Hand-crafted & made with <i class="mdi mdi-heart text-danger"></i></span> -->
+            </div>
+          </footer>
+          <!-- partial -->
+        </div>
+        <!-- main-panel ends -->
+      </div>
+      <!-- page-body-wrapper ends -->
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+
+
+        jQuery(function($) {
+
+          var path = window.location.href;
+          console.log(path) // because the 'href' property of the DOM element is the absolute path
+          $('.navitem a').each(function() {
+           if (this.href === path) {
+            $(this).addClass('active');
+           }
+          });
+         });
+
+      // Enhanced chart creation function with better styling and responsiveness
+      function createChart(chartId, chartType, labels, data) {
+        const ctx = document.getElementById(chartId);
+
+        // Common options for better styling
+        const commonOptions = {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false  // Hide legends for all charts
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              padding: 12,
+              titleFont: {
+                size: 14
+              },
+              bodyFont: {
+                size: 13
+              }
+            }
+          }
+        };
+
+        // Specific options for different chart types
+        const chartOptions = {
+          pie: {
+            ...commonOptions,
+            //cutout: '60%', // This makes it a doughnut chart
+          },
+          bar: {
+            ...commonOptions,
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: {
+                  drawBorder: false
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                }
+              }
+            },
+            barThickness: 'flex',
+            maxBarThickness: 30
+          }
+        };
+
+        // Enhanced color palette with better contrast
+        const colors = [
+          'rgba(255, 99, 132, 0.8)',
+          'rgba(54, 162, 235, 0.8)',
+          'rgba(255, 206, 86, 0.8)',
+          'rgba(75, 192, 192, 0.8)',
+          'rgba(255, 191, 150, 1)',
+          'rgba(153, 102, 255, 0.8)',
+          'rgba(255, 159, 64, 0.8)',
+          'rgba(76, 175, 80, 1)',
+          'rgba(156, 39, 176, 1)',
+          'rgba(239, 83, 80, 1)',
+          'rgba(255, 120, 64, 1)'
+        ];
+
+        new Chart(ctx, {
+          type: chartType, // Convert pie to doughnut
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Count',
+              data: data,
+              backgroundColor: colors,
+              borderColor: colors.map(color => color.replace('0.8', '1')),
+              borderWidth: 1,
+              hoverOffset: 4
+            }]
+          },
+          options: chartType === 'pie' ? chartOptions.pie : chartOptions.bar
+        });
+      }
+
+      // Enhanced data fetching function with error handling and loading states
+      function fetchDataAndCreateChart(url, chartId, chartType) {
+        // Add loading state
+        const canvas = document.getElementById(chartId);
+        const container = canvas.parentElement;
+        container.style.position = 'relative';
+
+        const loadingDiv = document.createElement('div');
+        loadingDiv.innerHTML = 'Loading...';
+        loadingDiv.style.position = 'absolute';
+        loadingDiv.style.top = '50%';
+        loadingDiv.style.left = '50%';
+        loadingDiv.style.transform = 'translate(-50%, -50%)';
+        container.appendChild(loadingDiv);
+
+        fetch(url)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.json();
+          })
+          .then(data => {
+            container.removeChild(loadingDiv);
+            createChart(chartId, chartType, data.labels, data.counts);
+          })
+          .catch(error => {
+            console.error('Error fetching chart data:', error);
+            loadingDiv.innerHTML = 'Error loading data';
+            loadingDiv.style.color = 'red';
+          });
+      }
+
+      // Add CSS for better chart container styling
+      const style = document.createElement('style');
+      style.textContent = `
+        .diff {
+          height: 350px;
+          position: relative;
+        }
+
+        canvas {
+          height: 100% !important;
+        }
+      `;
+      document.head.appendChild(style);
+
+      // Initialize all charts
+      document.addEventListener('DOMContentLoaded', function() {
+        fetchDataAndCreateChart('../../aidatabase/major_cr_bar_chart_cmc_section/', 'barChartCMCSection', 'pie');
+        fetchDataAndCreateChart('../../aidatabase/major_cr_pie_chart_dosage_form/', 'pieChartDosageChart', 'pie');
+        fetchDataAndCreateChart('../../aidatabase/major_cr_bar_chart_category_vs_deficiency/', 'barChartCategoryVsDeficiency', 'bar');
+      });
+    </script>
+    <script>
+    (function ($) {
+        if ($("#visit-sale-chart").length) {
+          const ctx = document.getElementById('visit-sale-chart');
+
+          // Create gradient colors
+          const createGradient = (context, color1, color2) => {
+            const gradient = context.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, color1);
+            gradient.addColorStop(1, color2);
+            return gradient;
+          };
+
+          const graphGradient1 = ctx.getContext("2d");
+          const graphGradient2 = ctx.getContext("2d");
+
+          const gradientStrokeViolet = createGradient(graphGradient1,
+            'rgba(154, 85, 255, 1)', 'rgba(154, 85, 255, 1)');
+          const gradientStrokeBlue = createGradient(graphGradient2,
+            'rgba(254, 112, 150, 1)', 'rgba(254, 112, 150, 1)');
+
+          // Create the chart
+          const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: [], // To be populated from backend
+              datasets: [
+                {
+                  label: 'Dosage Type',
+                  data: [],
+                  backgroundColor: gradientStrokeViolet,
+                  borderColor: gradientStrokeViolet,
+                  borderWidth: 1
+                },
+                {
+                  label: 'Deficiency Types',
+                  data: [],
+                  backgroundColor: gradientStrokeBlue,
+                  borderColor: gradientStrokeBlue,
+                  borderWidth: 1
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                title: {
+                  display: true,
+                  text: 'Complete Response Database',
+                  font: {
+                    size: 20 // Increase the font size for the title
+                },
+                color:"black",
+                padding:{
+                  bottom:30
+                }
+                },
+                tooltip: {
+                  mode: 'index',
+                  intersect: false
+                },
+                legend: {
+                  position: 'top',
+                  labels: {
+                    font: {
+                      color:"black",
+                        size: 14 // Increase the font size for the legend labels
+                    },
+                    color:"black"
+                },
+
+                }
+              },
+              scales: {
+                x: {
+                  stacked: false,
+                  title: {
+                    display: true,
+                    text: '',
+                    color: "black",
+                    font: {
+                      size: 16
+                    }
+                  },
+                  ticks: {
+                    color: "black" // Make x-axis labels black (e.g., "Nasal Spray-Deficiency")
+                  }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: {
+                    display: true,
+                    text: 'Count',
+                    color: "black",
+                    font: {
+                      size: 16
+                    }
+                  },
+                  ticks: {
+                    color: "black" // Make y-axis labels (1, 1.0, etc.) black
+                  }
+                }
+              }
+            }
+          });
+
+          // Fetch data and update chart
+          fetch('../../aidatabase/get_major_cr_chart_data/')
+            .then(response => response.json())
+            .then(data => {
+              chart.data.labels = data.labels;
+              chart.data.datasets[0].data = data.dosageCounts;
+              chart.data.datasets[1].data = data.deficiencyCounts;
+              chart.update();
+            })
+            .catch(error => {
+              console.error('Error fetching data:', error);
+            });
+        }
+      })(jQuery);
+    </script>
+
+    <!-- container-scroller -->
+    <!-- plugins:js -->
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <!-- endinject -->
+    <!-- Plugin js for this page -->
+    <!-- <script src="{% static 'assets/vendors/chart.js/chart.umd.js' %}"></script> -->
+    <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+    <!-- End plugin js for this page -->
+    <!-- inject:js -->
+    <!-- <script src="{% static 'assets/js/off-canvas.js' %}"></script> -->
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+    <!-- endinject -->
+    <!-- Custom js for this page -->
+    {% comment %} <script src="{% static 'assets/js/dashboard.js' %}"></script>  {% endcomment %}
+    <!-- End custom js for this page -->
+
+  </body>
+</html>

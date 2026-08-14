@@ -1,0 +1,780 @@
+{% extends 'RATools/RAToolsBase.html' %}
+{% load static %}
+
+{% block content %}
+    {% comment %} <h1 class="h3 mb-0">{{ heading }}</h1>
+    <br> {% endcomment %}
+    <div class="card"  style=" overflow-y: auto !important;">
+        <div class="card-body">
+          <div class="pdf-page">
+            <img class="imgcontainer" src="{% static 'img/Topical.png' %}" alt="Page 1 Image">
+            {% comment %} <div class="top-left" style="font-family: 'Calibri'!important ">Semi Solid Dosage Form<p style="color: rgb(227,108,10); font-size: 49px; font-weight: bold;">CHECKLIST</p></div> {% endcomment %}
+          </div>
+          <div class="pdf-page pdf">
+            <div class="bordered-container">
+              <div class="header">
+                <!-- Placeholder for the logo image -->
+                <img src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="Company Logo" style="height: 60px; width:auto; margin-left: 10px;">
+
+                <!-- Centered content for title and table -->
+                <div class="header-content text-end">
+                  <div class="product-name mb-3">ANDA Review Checklist   <span class="text-decoration-underline">
+                    Topical Dosage Form
+                  </span></div>
+                  <div class="product-name text-end">Product Name:  <span class="text-decoration-underline">
+                    {{ product_name }}
+                  </span></div>
+                </div>
+              </div>
+            </div>
+            <hr style="opacity: 100;">
+
+            <div style="width:100%;height:800px;border:4px solid #000;box-sizing: border-box;margin-top:40px; ">
+              <div style=" height:787px; border:2px solid #000;box-sizing: border-box; margin: 2px; padding: 0px 10px;">
+
+                <div class="content">
+                  <div class="title">IMPORTANCE OF <span style="color: green;">SEMI SOLID [TOPICAL] DOSAGE FOR</span> CHECKLIST</div>
+                  <p>
+                     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In the  <b>
+                      pharmaceutical industry,
+                     </b> the <b>Semi-Solid (Topical) Dosage Form Checklist </b>plays a critical role in ensuring the safety, quality, and efficacy of products such as creams, ointments, gels, and lotions. By using an Semi Solid Dosage Form Checklist, companies can proactively assess and address potential deficiencies in their manufacturing and documentation processes, avoiding delays during regulatory review.
+                  </p>
+                  <p> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The <b>Semi-Solid Dosage Form Checklist </b>not only supports regulatory readiness but also expedites product approval and commercialization by reducing the likelihood of incomplete submissions or non-compliance findings. By ensuring complete compliance from the manufacturing processes to quality control and stability testing, the checklist helps enhance the credibility of submissions, foster trust with regulators, and facilitate faster approvals. Ultimately, a checklist mitigates risks associated with formulations, ensuring that the products are safe, effective, and readily available to meet critical medical needs.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% if page_flag %}
+          <div class="pdf-page pdf blurimg" >
+            <div>
+                <div class="form">
+                  <div class="login-header">
+                    <img src="{% static 'assets/icretegy/itechnical logo.png' %}" style="height: 89px;width: 110px;"alt="iCretegy Logo">
+                    <h3 style="margin-top:13px">LOGIN</h3>
+                    <p style="font-size: 15px;">You need to log in to access this content.</p>
+                  </div>
+                  <a href="../../adminmaster/login/"  style="text-decoration: none;">
+                    <button type="button">LOGIN</button>
+                  </a>
+                </div>
+              </div>
+          </div>
+          {% endif %}
+          {% if show_flag %}
+          <div class="pdf-page pdf">
+            <div class="bordered-container">
+              <div class="header">
+                <!-- Placeholder for the logo image -->
+                <img src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="Company Logo" style="height: 60px; width:auto; margin-left: 10px;">
+
+                <!-- Centered content for title and table -->
+                <div class="header-content text-end">
+                  <div class="product-name mb-3">ANDA Review Checklist   <span class="text-decoration-underline">
+                    Topical Dosage Form
+                  </span></div>
+                  <div class="product-name text-end">Product Name:  <span class="text-decoration-underline">
+                    {{ product_name }}
+                  </span></div>
+                </div>
+              </div>
+            </div>
+            <hr style="opacity: 100;">
+            <div class="content">
+              <h5 style="text-align:center;margin-bottom:20px; font-size: 24px;font-weight: bold;color: black;font-family: 'Times New Roman'; ">Table of Contents</h5>
+              <div>
+                <ol style="line-height:2; list-style-type: none;">
+                  <li style=" font-size: 18px;"> <a href="#tabel_header"style="text-decoration: none; color: black;font-weight:bold;">SEMI-SOLID [TOPICAL] DOSAGE FORM - INTERNAL ANDA CHECKLIST</a></li>
+                  {% comment %} {% for category, data in grouped_data.items %}
+                    {% for item in data %}
+                    <ul style="line-height:2; list-style-type: none;">
+                      <li style="font-size: 15px;"><a href="#{{ item }}" target="_self" class="table-link"  style="text-decoration: none; color: black;">{{ item }}</a></li>
+                    </ul>
+                    {% endfor %}
+                  {% endfor %} {% endcomment %}
+                  <ul style="line-height:2; list-style-type: none;">
+                    <li style="font-size: 15px;"><a href="#MODULE 1: ADMINISTRATIVE" target="_self" class="table-link"  style="text-decoration: none; color: black;font-weight: bold;">MODULE 1: ADMINISTRATIVE</a></li>
+                    <ul style="line-height:2; list-style-type: none;">
+                      <li style="font-size: 15px;"><a href="#1.14.1.5 Labeling History" target="_self" class="table-link" style="text-decoration: none; color: black;">1.14.1.5 Labeling History</a></li>
+                    </ul>
+
+                    <li style="font-size: 15px;"><a href="#3.2.P: DRUG PRODUCT" target="_self" class="table-link"  style="text-decoration: none; color: black;font-weight: bold;">3.2.P: DRUG PRODUCT</a></li>
+                    <ul style="line-height:2; list-style-type: none;">
+                      <li style="font-size: 15px;"><a href="#Description and Composition of the Drug Product" target="_self" class="table-link" style="text-decoration: none; color: black;">3.2.P.1 Description and Composition of the Drug Product</a></li>
+                      <li style="font-size: 15px;"><a href="#Pharmaceutical Development" target="_self" class="table-link" style="text-decoration: none; color: black;">3.2.P.2 Pharmaceutical Development</a></li>
+                      <li style="font-size: 15px;"><a href="#3.2.P.5.1 Specification (s)" target="_self" class="table-link" style="text-decoration: none; color: black;">3.2.P.5.1 Specification(s)</a></li>
+                      <li style="font-size: 15px;"><a href="#Container Closure System" target="_self" class="table-link" style="text-decoration: none; color: black;">3.2.P.7 Container Closure System</a></li>
+                      <li style="font-size: 15px;"><a href="#3.2.P.8.2 Post-Approval Stability Protocol and Stability Commitment (For Topical)" target="_self" class="table-link" style="text-decoration: none; color: black;">3.2.P.8.2 Post-Approval Stability Protocol and Stability Commitment (For Topical)</a></li>
+                      <li style="font-size: 15px;"><a href="#3.2.P.8.3 Stability Data (For Topical)" target="_self" class="table-link" style="text-decoration: none; color: black;">3.2.P.8.3 Stability Data (For Topical)</a></li>
+                    </ul>
+                  </ul>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div class="pdf-page pdf landscape">
+              <div class="bordered-container">
+                <div class="header">
+                  <!-- Placeholder for the logo image -->
+                  <img src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="Company Logo" style="height: 60px; width:auto; margin-left: 10px;">
+
+                  <!-- Centered content for title and table -->
+                  <div class="header-content text-end">
+                    <div class="product-name mb-3">ANDA Review Checklist   <span class="text-decoration-underline">
+                      Topical Dosage Form
+                    </span></div>
+                    <div class="product-name text-end">Product Name:  <span class="text-decoration-underline">
+                      {{ product_name }}
+                    </span></div>
+                  </div>
+                </div>
+              </div>
+              <hr style="opacity: 100;">
+              {% comment %} <ul >
+
+                <li style="mark" class="headinList">
+
+                 <div style="color:#000; font-weight: bold; line-height: 1.2;  margin-left: 8px; margin-top: 2px;margin-bottom: 11px; font-size: 20px; text-transform: uppercase;" id="tabel_header">SEMI-SOLID [TOPICAL] DOSAGE FORM - INTERNAL ANDA CHECKLIST</div>
+                </li>
+               </ul> {% endcomment %}
+               <div style="color:#000; font-weight: bold; line-height: 1.2;  margin-left: 8px; margin-top: 2px;margin-bottom: 11px; font-size: 20px; text-transform: uppercase;" id="tabel_header">SEMI-SOLID [TOPICAL] DOSAGE FORM - INTERNAL ANDA CHECKLIST</div>
+
+              <div>
+                {% comment %} <form method="POST" action="{% url 'save_anda_answers' user_report.id %}" id="edit-form"> {% endcomment %}
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="table-responsive border border-dark border-bottom-0 mb-3" style="overflow-x: auto;">
+                      {% for module_name, sections in organized_data.items %}
+                      <table class="table "  style="width: 100%;  ">
+                          <colgroup>
+                              <col style="width: 12%;">
+                              <col style="width: 88%;">
+                              {% comment %} <col style="width: 30%;"> {% endcomment %}
+                          </colgroup>
+
+                          <thead>
+
+                              <tr>
+                                  <th colspan="3" style="background-color: #92CDDC; padding: 8px; border-bottom: 1px solid black; font-family:  'Times New Roman'; font-size: 18px; font-weight: bold;"id="{{ module_name }}">
+                                      {{ module_name }}
+                                  </th>
+                              </tr>
+
+                          </thead>
+
+                          <tbody>
+                              {% for section, subsections in sections.items %}
+                                  <!-- Section Row -->
+                                  <tr>
+                                      <td style="background-color: #EAF1DD; font-weight: bold; border-right: 1px solid black; border-bottom: 1px solid black; padding: 8px; font-size: 16px;  text-align: center;">
+                                          {{ section }}
+                                      </td>
+                                      <td colspan="2" style="padding: 0;">
+                                          <table style="width: 100%; border-collapse: collapse;" class="table">
+                                              {% for subsection_name, questions in subsections.items %}
+                                                  <!-- Subsection Header -->
+                                                  {% if 'None' not in subsection_name %}
+                                                  <tr class="scroll">
+                                                      <td colspan="7"  style="background-color: #FFE5D9; padding: 8px; border-bottom: 1px solid black;  font-size: 17px; font-weight: bold;" id="{{ subsection_name }}">
+                                                          {{ subsection_name }}
+                                                      </td>
+                                                  </tr>
+                                                  {% endif %}
+                                                  <!-- Questions -->
+                                                  {% for question in questions %}
+                                                      <tr>
+                                                          <td  colspan="5" style="background-color: white; padding: 8px;  border-right: 1px solid black; border-bottom: 1px solid black;  white-space: normal !important;">
+                                                          <div style="display: flex; gap:4px ">
+                                                            <div class="" style="height: fit-content;">
+                                                              <span style="font-size:10px;">&#10687;</span>
+                                                             </div>
+                                                            <div class="tdChange question" style="white-space: normal !important; min-width: 100px !important;" class="tdChange">
+                                                              {{ question.question|safe }}
+                                                            </div>
+                                                          </div>
+                                                            </td>
+                                                          <td colspan="2" class="radio-cell" style="background-color: white; padding: 8px; width: 35%; border-bottom: 1px solid black;" >
+                                                              <div class="radio-group" style="gap:0px">
+                                                                  <label class="custom-radio-btn" style="padding-left: 17px !important; font-style: normal;">
+                                                                      <input type="radio"
+                                                                             name="answer_{{ question.id }}"
+                                                                             value="yes"
+                                                                             {% if question.checklist_answers.answer == 'yes' %}checked{% endif %}>
+                                                                      <span class="radio-checkmark"></span>
+                                                                      <span class="radio-label fw-bold" style="font-size: 17px !important;">Yes</span>
+                                                                  </label>
+                                                                  <label class="custom-radio-btn" style="padding-left: 17px !important; font-style: normal;">
+                                                                      <input type="radio"
+                                                                             name="answer_{{ question.id }}"
+                                                                             value="no"
+                                                                             {% if question.checklist_answers.answer == 'no' %}checked{% endif %}>
+                                                                      <span class="radio-checkmark"></span>
+                                                                      <span class="radio-label fw-bold" style="font-size: 17px !important;">No</span>
+                                                                  </label>
+                                                                  <label class="custom-radio-btn" style="padding-left: 17px !important; font-style: normal;">
+                                                                      <input type="radio"
+                                                                             name="answer_{{ question.id }}"
+                                                                             value="not_applicable"
+                                                                             {% if question.checklist_answers.answer == 'not_applicable' %}checked{% endif %}>
+                                                                      <span class="radio-checkmark"></span>
+                                                                      <span class="radio-label fw-bold" style="font-size: 17px !important;">N/A</span>
+                                                                  </label>
+                                                              </div>
+                                                          </td>
+                                                      </tr>
+                                                  {% endfor %}
+                                              {% endfor %}
+                                          </table>
+                                      </td>
+                                  </tr>
+
+                              {% endfor %}
+                          </tbody>
+                      </table>
+                      {% endfor %}
+                    </div>
+                  </div>
+          </div>
+          <div style="position: sticky; bottom: 0px; text-align: center; background-color: white;" >
+
+                    {% if request.user.role == "company_checker" %}
+                          {% if flag %}
+                                  <input type="hidden" id="checker_action" name="checker_action" value="">
+                                  <button type="submit" class="btn btn-warning" id="submit-button" style="z-index:1000;position:relative;">Save</button>
+                                  <button type="submit" class="btn btn-gradient-success" onclick="setAction('Approve')">Approve</button>
+                                  <button type="submit" class="btn btn-gradient-danger" onclick="setAction('Reject')">Reject</button>
+                          {% endif %}
+                      {% else %}
+                          {% if complete_flag %}
+                              <button type="submit" class="btn btn-warning" id="submit-button" style="z-index:1000;position:relative;">Submit</button>
+                              <a class="btn"  id="submit-complete-button" data-bs-toggle="modal" data-bs-target="#saveandcompletemodal" style="position:relative;z-index:1000">Save and Complete</a>
+                              <div class="modal fade" id="saveandcompletemodal" tabindex="-1" role="dialog" aria-labelledby="saveandcompletemodallabel" aria-hidden="true">
+                                  <div class="modal-dialog" style="top:10% !important" role="document">
+                                  <div class="modal-content modalContent border border-dark" >
+                                      <div class="modal-header">
+                                      <h5 class="modal-title" id="checklistNameModalLabel">Are you sure it is complete?</h5>
+                                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                                      </button>
+                                      </div>
+                                      <div class="modal-body">
+                                      <div class="form-check">
+                                          <input type="checkbox" class="form-check-input ms-1"  id="completed-checkbox" name="completed">
+                                          <label class="form-check-label" for="completed-checkbox">
+                                          I agree to complete this checklist and from now onwards I will not be able to change or edit this checklist
+                                          </label>
+                                      </div>
+                                      </div>
+                                      <div class="modal-footer">
+                                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                      <button type="submit" class="btn btn-primary" id="modal-submit-button" disabled>Submit</button>
+                                      </div>
+                                  </div>
+                                  </div>
+                              </div>
+                          {% endif %}
+
+                      {% endif %}
+                    <a href="/ratools/show_anda_semi_solid_topical_dosage_table"  style="position:relative;z-index:1000" class="btn btn-danger">Back to list</a>
+
+              </div>
+          </form>
+          {% endif %}
+
+       </div>
+    </div>
+
+<!-- Custom CSS for radio buttons that look like checkboxes -->
+<style>
+  .form {
+    position: relative;
+    z-index: 1;
+    background: #FFFFFF;
+    max-width: 360px;
+    margin: 0 auto 100px;
+    margin-top: 70px;
+    padding: 45px;
+    text-align: center;
+    box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+  }
+
+  .form button {
+    font-family: "Roboto", sans-serif;
+    text-transform: uppercase;
+    outline: 0;
+    background-color: #ef6603;
+    width: 100%;
+    border: 0;
+    padding: 15px;
+    color: #FFFFFF;
+    font-size: 14px;
+    -webkit-transition: all 0.3 ease;
+    transition: all 0.3 ease;
+    cursor: pointer;
+  }
+    .blurimg{
+      height: 100%;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-image: url('{% static "img/blur_img.png" %}');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 100%;
+    }
+  .landscape{
+    max-width: 278mm !important;
+  }
+  .tdChange{
+    ul,ol{
+      margin-bottom: 0rem !important;
+      line-height:1.15 !important;
+      li{
+        line-height: 1.15 !important;
+        text-indent: 0px;
+        padding-left: 8px;
+      }
+    }
+
+  }
+  .modalContent{
+    background-color:white
+ }
+  .card{
+    font-family: 'Times New Roman' ;
+}
+/* Base styles for table layout and overflow handling */
+table {
+table-layout: fixed; /* Ensures fixed column widths */
+width: 100%; /* Stretches table to the container */
+}
+.scroll{
+scroll-snap-type: both proximity;
+}
+.scroll > td {
+scroll-snap-align: center;
+}
+td p{
+
+text-align: justify !important;
+margin-bottom: 1px;
+}
+.table-link:hover{
+color: rgb(227, 108, 10) !important;
+}
+.question{
+p{
+line-height: 1;
+}
+img{
+width: 430px !important;
+height: auto !important;
+border-radius: 0% !important;
+}
+}
+.headinList::marker{
+margin-right: 20px;
+content: "1";
+font-size: 20px;
+font-weight: 900;
+}
+
+td {
+text-align: justify;
+word-wrap: break-word; /* Prevent long text from stretching the column */
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap; /* Avoid wrapping text */
+}
+
+td[style*="width: 5%"] {
+  width: 5%; /* Reinforce the width of the specific column */
+}
+
+/* Radio buttons styling */
+.radio-cell {
+  padding: 10px;
+  overflow: visible; /* Ensure no scrollbars */
+}
+
+.radio-group {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap; /* Allow wrapping to prevent overflow */
+}
+
+.custom-radio-btn {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding-left: 30px;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+  height: auto; /* Remove fixed height if any */
+}
+
+.custom-radio-btn input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.radio-checkmark {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  height: 20px;
+  width: 20px;
+  background-color: #fff;
+  border: 2px solid #ddd;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.custom-radio-btn:hover input ~ .radio-checkmark {
+  border-color: #ccc;
+}
+
+.custom-radio-btn input:checked ~ .radio-checkmark {
+  border-width: 6px;
+}
+
+.custom-radio-btn input[value="yes"]:checked ~ .radio-checkmark {
+  border-color: #4CAF50;
+}
+
+.custom-radio-btn input[value="no"]:checked ~ .radio-checkmark {
+  border-color: #F44336;
+}
+
+.custom-radio-btn input[value="not_applicable"]:checked ~ .radio-checkmark {
+  border-color: #FFA500;
+}
+
+.radio-label {
+  margin-left: 5px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* PDF page layout */
+.pdf-page {
+  width: 100%; /* Make width dynamic */
+  max-width: 210mm; /* A4 width for larger screens */
+  min-height: 266mm; /* A4 height */
+  margin: 0 auto;
+  padding: 20px; /* Adjust padding for smaller devices */
+  border: 1px solid #ddd;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+  page-break-after: always;
+  position: relative;
+  overflow: visible;
+}
+
+/* Watermark adjustments */
+.pdf {
+  position: relative;
+  isolation: isolate;
+}
+
+.pdf::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("{% static 'img/watermark.png' %}");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 70%;
+  opacity: 0.06;
+  z-index: -1;
+  mix-blend-mode: multiply;
+}
+
+/* Image container and text positioning */
+.pdf-page img {
+  width: 100%;
+  height: auto;
+}
+
+.imgcontainer {
+  position: relative;
+  text-align: center;
+  color: white;
+}
+
+.top-left {
+  position: absolute;
+  top: 369px;
+  left: 122px;
+  color: #014b54;
+  font-size: 60px;
+  font-weight: bold;
+  right: 60px;
+}
+
+/* Content styles */
+.content {
+  font-size: 14px;
+  line-height: 2.0;
+  text-align: justify;
+  padding: 20px;
+}
+
+.title {
+  font-weight: bold;
+  font-size: 16px;
+  text-align: center;
+  margin-top: 20px;
+  margin-bottom: 30px;
+  text-decoration: underline;
+}
+
+p {
+  margin-bottom: 30px;
+  line-height: 2;
+}
+
+.bordered-container {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 15px; /* Add space to prevent overlap */
+}
+
+/* Header layout adjustments */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap; /* Ensure wrapping on smaller screens */
+}
+
+.header img {
+  width: 100px;
+  height: auto;
+}
+
+.header-content {
+  flex: 1;
+  text-align: center;
+}
+
+h4 {
+  margin: 0 0 7px 0;
+  font-size: 16px;
+}
+
+.product-name {
+  font-size: 14px;
+}
+
+/* Button styles with hover effects */
+.btn-warning {
+  color: #000;
+  background-image: linear-gradient(to right, #ffcc00, #ff9900);
+  border-color: #ffc107;
+  transition: background-image 0.3s ease-in-out;
+}
+
+.btn-warning:hover {
+  background-image: linear-gradient(to right, #ff9900, #ffcc00);
+  color: #000;
+  border-color: #ffc107;
+}
+
+#submit-complete-button {
+  color: #000;
+  background-image: linear-gradient(101deg, #b241ff, #fe86ff);
+  border-color: #ffc107;
+  transition: background-image 0.3s ease-in-out;
+}
+
+#submit-complete-button:hover {
+  background-image: linear-gradient(101deg, #fe86ff, #b241ff);
+  color: #000;
+  border-color: #ffc107;
+}
+
+.btn-danger {
+  background-image: linear-gradient(101deg, #8b0000, #fc5c7d); /* Gradient background */
+  color: white; /* Text color */
+}
+
+.btn-danger:hover {
+  background-image: linear-gradient(101deg, #fc5c7d, #8b0000);
+  color: white; /* Ensure text remains white */
+}
+
+/* Smooth scrolling behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .pdf-page {
+      padding: 10px; /* Adjust padding for smaller screens */
+  }
+
+  .top-left {
+      font-size: 24px; /* Reduce font size for smaller screens */
+      top: 200px; /* Adjust positioning */
+      left: 50px;
+  }
+
+  .header img {
+      width: 80px; /* Reduce logo size */
+  }
+
+  .header-content {
+      font-size: 14px; /* Adjust text size */
+  }
+
+  .radio-label {
+      font-size: 12px; /* Smaller font size for radio labels */
+  }
+
+  .btn-warning, #submit-complete-button, .btn-danger {
+      font-size: 14px; /* Reduce button font size */
+      padding: 8px 12px; /* Adjust padding */
+  }
+}
+
+@media (max-width: 480px) {
+  .pdf-page {
+      padding: 5px; /* Further reduce padding */
+  }
+
+  .top-left {
+      font-size: 18px; /* Smaller font size */
+      top: 150px;
+      left: 30px;
+  }
+
+  .header img {
+      width: 60px; /* Further reduce logo size */
+  }
+
+  .radio-group {
+      flex-direction: column; /* Stack radio buttons */
+      align-items: flex-start;
+  }
+}
+
+</style>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('.table-link').forEach(link => {
+      link.addEventListener('click', function(event) {
+        event.preventDefault();
+        const targetId = this.getAttribute('href').substring(1);
+        const targetElement = document.getElementById(targetId);
+
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+
+          // Adjust the scroll position (e.g., scroll 100px more)
+          window.scrollBy(0, -50);
+        }
+      });
+    });
+    document.querySelectorAll(".tdChange.question").forEach(function (el) {
+        let childElements = Array.from(el.children);
+
+        // Check if the first child is a <ul> (avoid modifying structured lists)
+        if (childElements.length > 0 && childElements[0].tagName === "UL") {
+            let listItems = el.querySelectorAll("ul li");
+
+            if (listItems.length > 0) {
+                let updatedText = "";
+
+                listItems.forEach((li) => {
+                    updatedText += `<div style="display:flex;"> <span style='font-size:10px;margin-right:8px;margin-top: 3px;'>&#10687;</span> <span style ='line-height:1.15;'>  ${li.innerText.trim()} </span> </div> `;
+                });
+
+                el.innerHTML = updatedText; // Apply transformation
+            }
+        }
+
+        // **Check if the content is a bullet-point list using <br> instead of <ul>**
+        let hasBulletPoints = el.innerHTML.includes("⦿");
+
+        // Find the parent <div> with flex styling
+        let parentFlexDiv = el.closest("div[style*='display: flex']");
+
+        if (parentFlexDiv && hasBulletPoints) {
+            let extraBulletDivs = parentFlexDiv.querySelectorAll("div[style*='height: fit-content']");
+
+            extraBulletDivs.forEach((extraDiv) => {
+                if (extraDiv.innerText.trim() === "⦿") {
+                    extraDiv.remove(); // Remove only the div that contains just ⦿
+                }
+            });
+        }
+    });
+  });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Enable/disable modal submit based on checkbox
+        document.getElementById('completed-checkbox')?.addEventListener('change', function() {
+            document.getElementById('modal-submit-button').disabled = !this.checked;
+        });
+
+        // Handle form submissions
+        document.querySelector('form')?.addEventListener('submit', function(e) {
+            const isComplete = e.submitter?.id === 'modal-submit-button';
+            const message = isComplete
+                ? 'This will finalize the checklist. Are you sure?'
+                : 'Are you sure you want to submit?';
+
+            if (!confirm(message)) {
+                e.preventDefault();
+            }
+        });
+        // Handle "Back to List" confirmation
+    document.querySelector('.btn-danger')?.addEventListener('click', function(e) {
+      if (!confirm('Are you sure you want to go back to the list?')) {
+          e.preventDefault();
+      }
+    });
+
+});
+</script>
+<script>
+  // JavaScript to enable the button when the checkbox is checked
+  document.getElementById('completed-checkbox').addEventListener('change', function() {
+    const submitButton = document.getElementById('modal-submit-button');
+    if (this.checked) {
+      submitButton.removeAttribute('disabled'); // Enable the button
+    } else {
+      submitButton.setAttribute('disabled', 'disabled'); // Disable the button
+    }
+  });
+
+  function gettocategory(input) {
+    document.getElementById(input).scrollIntoView({ behavior: "smooth" });
+  }
+</script>
+<script>
+  // JavaScript to enable the button when the checkbox is checked
+  document.getElementById('completed-checkbox').addEventListener('change', function() {
+    const submitButton = document.getElementById('modal-submit-button');
+    if (this.checked) {
+      submitButton.removeAttribute('disabled'); // Enable the button
+    } else {
+      submitButton.setAttribute('disabled', 'disabled'); // Disable the button
+    }
+  });
+
+  function gettocategory(input) {
+    document.getElementById(input).scrollIntoView({ behavior: "smooth" });
+  }
+  function setAction(action) {
+    document.getElementById('checker_action').value = action;
+  }
+</script>
+{% endblock %}

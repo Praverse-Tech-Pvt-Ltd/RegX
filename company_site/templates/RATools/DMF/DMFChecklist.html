@@ -1,0 +1,1829 @@
+{% extends 'RATools/RAToolsBase.html' %} {% load static %} {% block content %}
+<div class="card"  style=" overflow-y: auto !important;">
+
+  <div class="card-body-main">
+    <div class="pdf-page">
+
+      <img
+        class="imgcontainer"
+        src="{% static 'img/40.png' %}"
+        alt="Page 1 Image"
+      />
+    </div>
+    <div class="pdf-page pdf">
+      <div class="bordered-container">
+        <table>
+          <tr>
+            <td rowspan="4">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class="img-fluid"
+                style="height: 100px"
+                alt="Company Logo"
+              />
+            </td>
+            <td colspan="9" class="fw-semibold">
+              Drug substance/ API Type II DMF REVIEW CHECKLIST - OPEN & CLOSED
+              PART
+            </td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">
+              Name of API: {{ checklist.name_of_api }}
+            </td>
+            <td class="fw-semibold">DMF No. : {{ checklist.dmf }}</td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">
+              Name of API Vendor: {{ checklist.name_of_api_vendor }}
+            </td>
+            <td rowspan="2" class="fw-semibold">DMF Version: {{ checklist.dmf_version }}</td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">
+              DMF CA/SA Status: {{ checklist.dmf_status }}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div
+        style="
+          width: 100%;
+          height: 800px;
+          border: 4px solid #000;
+          box-sizing: border-box;
+          margin-top: 40px;
+        "
+      >
+        <div
+          style="
+            height: 787px;
+            border: 2px solid #000;
+            box-sizing: border-box;
+            margin: 2px;
+            padding: 0px 10px;
+          "
+        >
+          <div class="content">
+            <div class="title">
+              IMPORTANCE OF
+              <span style="color: green">DMF Review & DMF CA </span> CHECKLIST
+            </div>
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In the
+              pharmaceutical industry, the Drug Master File (DMF) is a crucial
+              document that provides detailed information about the
+              manufacturing, processing, and storage of drug substances.
+            </p>
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The checklist is
+              structured to allow targeted reviews by multiple teams. The
+              quality management team focuses on reviewing key quality control
+              measures, while the Regulatory Affairs (RA) team ensures that the
+              DMF complies with all relevant regulations, particularly in the
+              open parts shared with agencies. This multi-tiered approach allows
+              for more robust oversight, enhancing the overall quality of the
+              DMF submission.
+            </p>
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;By using the
+              checklist, companies can streamline their compliance processes,
+              improve the credibility of their submissions, and foster smoother
+              regulatory approvals. It serves as a proactive measure to ensure
+              regulatory readiness and mitigate the risks associated with
+              incomplete or inaccurate submissions, supporting CA and SA of DMF.
+            </p>
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The DMF Compliance
+              Assessment (CA) Checklist is an essential tool designed to ensure
+              a comprehensive review of all DMF components, meeting the
+              stringent standards established by the USFDA. This checklist helps
+              confirm that the information in the DMF is accurate, complete, and
+              in line with current regulatory guidelines, enabling the CA to be
+              completed within a 60-day timeframe.
+            </p>
+            <p style="font-size: 15px; color: #000">
+              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;By DMF Review
+              Checklist, you can confirm that all aspects of the DMF are in
+              compliance, from the quality control measures to the manufacturing
+              processes. By ensuring that the DMF is fully compliant, companies
+              can enhance the credibility of their submissions, facilitate
+              smoother regulatory reviews, minimize the deficiency and support
+              the successful approval of their drug products.
+            </p>
+            <br />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if page_flag %}
+          <div class="pdf-page pdf blurimg" >
+            <div>
+                <div class="form">
+                  <div class="login-header">
+                    <img src="{% static 'assets/icretegy/itechnical logo.png' %}" style="height: 89px;width: 110px;"alt="iCretegy Logo">
+                    <h3 style="margin-top:13px">LOGIN</h3>
+                    <p style="font-size: 15px;">You need to log in to access this content.</p>
+                  </div>
+                  <a href="../../adminmaster/login/"  style="text-decoration: none;">
+                    <button type="button">LOGIN</button>
+                  </a>
+                </div>
+              </div>
+          </div>
+    {% endif %}
+    {% if show_flag %}
+    <div class="pdf-page pdf">
+      <div class="bordered-container">
+        <table>
+          <tr>
+            <td rowspan="4">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class="img-fluid"
+                style="height: 100px"
+                alt="Company Logo"
+              />
+            </td>
+            <td colspan="9" class="fw-semibold">
+              Drug substance/ API Type II DMF REVIEW CHECKLIST - OPEN & CLOSED
+              PART
+            </td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">
+              Name of API: {{ checklist.name_of_api }}
+            </td>
+            <td class="fw-semibold">DMF No. : {{ checklist.dmf }}</td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">
+              Name of API Vendor: {{ checklist.name_of_api_vendor }}
+            </td>
+            <td rowspan="2" class="fw-semibold">DMF Version: {{ checklist.dmf_version }}</td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">
+              DMF CA/SA Status: {{ checklist_name.dmf_status }}
+            </td>
+          </tr>
+        </table>
+      </div>
+      <h3
+        style="
+          text-align: center;
+          font-family: 'Times New Roman';
+          font-weight: bold;
+          font-size: 20px;
+          margin-top: 30px;
+        "
+      >
+        Table of Contents
+      </h3>
+      {% comment %} <ol style="line-height: 2; list-style-type: none; margin-top: 30px">
+        <li style="font-size: 18px">
+          <a
+            href="#tabel_header1"
+            style="text-decoration: none; color: black"
+            class="table-link"
+            >SUMMARY OF SPECIFIC DMF SECTIONS/INFORMATION TO BE REVIEWED BY
+            CROSS FUNCTIONAL TEAM</a
+          >
+          <ul style="line-height: 2; list-style-type: none">
+            <li style="font-size: 16px">
+              <a
+                href="#dmfrateam"
+                style="text-decoration: none; color: black"
+                class="table-link"
+                >Specific DMF Sections/Information to be Reviewed by Core RA
+                Team</a
+              >
+            </li>
+            <li style="font-size: 16px">
+              <a
+                href="#dmfardteam"
+                style="text-decoration: none; color: black"
+                class="table-link"
+                >Specific DMF Sections/Information to be Reviewed by ARD Team</a
+              >
+            </li>
+          </ul>
+        </li>
+        <li style="font-size: 18px">
+          <a
+            href="#tabel_header2"
+            style="text-decoration: none; color: black"
+            class="table-link"
+            >SPECIFIC DMF SECTIONS/INFORMATION TO BE REVIEWED BY QUALITY
+            MANAGEMENT TEAM</a
+          >
+        </li>
+        <li style="font-size: 18px">
+          <a
+            href="#tabel_header3"
+            style="text-decoration: none; color: black"
+            class="table-link"
+            >ENTIRE DMF SECTIONS/INFORMATION TO BE REVIEWED BY DMF TEAM (RA)</a
+          >
+        </li>
+        <li style="font-size: 18px">
+          <a
+            href="#tabel_header4"
+            style="text-decoration: none; color: black"
+            class="table-link"
+            >DMF REIVEW CHECKLIST OPEN AND CLOSED PART</a
+          >
+          <ul style="line-height: 2; list-style-type: none">
+            <li style="font-size: 16px">
+              <a
+                href="#responsibledep"
+                style="text-decoration: none; color: black"
+                class="table-link"
+                >Responsible Departments</a
+              >
+            </li>
+          </ul>
+        </li>
+
+        {% for module, ectd_nos in ca_grouped_data.items %}
+        <li style="font-size: 18px">
+          <a
+            href="javascript:void(0);"
+            onclick="gettocategory('{{ module }}')"
+            target="_self"
+            style="text-decoration: none; color: black"
+            class="table-link"
+          >
+            {{ module }}
+          </a>
+          <ul style="line-height: 2; list-style-type: none">
+            {% for ectd_no in ectd_nos %} {% if ectd_no != none %}
+            <li style="font-size: 16px">
+              <a
+                href="javascript:void(0);"
+                onclick="gettocategory('{{ ectd_no }}')"
+                target="_self"
+                style="text-decoration: none; color: black"
+                class="table-link"
+              >
+                {{ ectd_no }}
+              </a>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% endfor %}
+      </ol> {% endcomment %}
+      <ol style="line-height:2; list-style-type: none;">
+        <li style="font-size: 18px; font-weight:bold;"><a
+          href="#tabel_header4"
+          style="text-decoration: none; color: black"
+          class="table-link"
+          >
+        DMF review checklist open and closed part
+      </a></li>
+        <ul style="line-height:2; list-style-type: none;">
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.1.1 Nomenclature" style="text-decoration: none; color: black;">3.2.S.1.1 Nomenclature</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.1.2 Structure" style="text-decoration: none; color: black;">3.2.S.1.2 Structure</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.1.3 General Properties" style="text-decoration: none; color: black;">3.2.S.1.3 General Properties</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.2.1 Manufacturer - Drug Substance" style="text-decoration: none; color: black;">3.2.S.2.1 Manufacturer - Drug Substance</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.2.2 Description of Manufacturing Process and Process Controls (Open Part & Closed Part)" style="text-decoration: none; color: black;">3.2.S.2.2 Description of Manufacturing Process and Process Controls (Open Part & Closed Part)</a></li>
+            {% comment %} <li style="font-size: 15px;"><a class="table-link" href="#In addition to above following information should be provided in Closed Part" style="text-decoration: none; color: black;">3.2.S.2.2 Description of Manufacturing Process and Process Controls Closed( Restricted)</a></li> {% endcomment %}
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.2.3 Control of Materials Closed (restricted)" style="text-decoration: none; color: black;">3.2.S.2.3 Control of Materials Closed (Restricted)</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.2.4 Controls of Critical Steps and Intermediates Closed (restricted)" style="text-decoration: none; color: black;">3.2.S.2.4 Controls of Critical Steps and Intermediates Closed (Restricted)</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.2.5 Process Validation and/or Evaluation Closed (restricted)" style="text-decoration: none; color: black;">3.2.S.2.5 Process Validation and/or Evaluation Closed (Restricted)</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.2.6 Manufacturing Process Development Closed (restricted)" style="text-decoration: none; color: black;">3.2.S.2.6 Manufacturing Process Development Closed (Restricted)</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.3.1 Characterization" style="text-decoration: none; color: black;">3.2.S.3.1 Characterization</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.3.2 Impurities" style="text-decoration: none; color: black;">3.2.S.3.2 Impurities</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.4.1 Specification" style="text-decoration: none; color: black;">3.2.S.4.1 Specification</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.4.2 Analytical Procedures" style="text-decoration: none; color: black;">3.2.S.4.2 Analytical Procedures</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.4.3 Validation of Analytical Procedures" style="text-decoration: none; color: black;">3.2.S.4.3 Validation of Analytical Procedures</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.4.4 Batch Analysis" style="text-decoration: none; color: black;">3.2.S.4.4 Batch Analysis</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.4.5 Justification of Specification" style="text-decoration: none; color: black;">3.2.S.4.5 Justification of Specification</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.5 Reference Standards or Materials" style="text-decoration: none; color: black;">3.2.S.5 Reference Standards or Materials</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.6 Container Closure Systems" style="text-decoration: none; color: black;">3.2.S.6 Container Closure Systems</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.7 Stability" style="text-decoration: none; color: black;">3.2.S.7 Stability</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#Administrative Information/Statements:" style="text-decoration: none; color: black;">3.2.S Administrative Information/Statements</a></li>
+        </ul>
+        <li style="font-size: 18px; font-weight:bold;"> <a class="table-link" href="#dmf_ca" style="text-decoration: none; color: black;" >DMF CA checklist</a></li>
+        <ul style="line-height:2; list-style-type: none;">
+            <li style="font-size: 15px;"><a class="table-link" href="#DMF CRITICAL DETAILS" style="text-decoration: none; color: black;">DMF Critical Details</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#GENERAL INFORMATION" style="text-decoration: none; color: black;">General Information</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#MODULE 2: SUMMARIES" style="text-decoration: none; color: black;">Module 2: Summaries</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#2.3 Quality Overall Summary" style="text-decoration: none; color: black;">2.3 Quality Overall Summary</a></li>
+            <li style="font-size: 15px;"><a class="table-link" href="#MODULE 3: QUALITY" style="text-decoration: none; color: black;">Module 3: Quality</a></li>
+            <ul style="line-height:2; list-style-type: none;">
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S DRUG SUBSTANCE" style="text-decoration: none; color: black;">3.2.S Drug Substance</a></li>
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.1: General Information" style="text-decoration: none; color: black;">3.2.S.1 General Information</a></li>
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.2: Manufacture" style="text-decoration: none; color: black;">3.2.S.2 Manufacture</a></li>
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.3: Characterization" style="text-decoration: none; color: black;">3.2.S.3 Characterization</a></li>
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.4 Control of Drug Substance" style="text-decoration: none; color: black;">3.2.S.4 Control of Drug Substance</a></li>
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.5 Reference Standards or Materials" style="text-decoration: none; color: black;">3.2.S.5 Reference Standards or Materials</a></li>
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.6 Container/Closure System" style="text-decoration: none; color: black;">3.2.S.6 Container/Closure System</a></li>
+              <li style="font-size: 15px;"><a class="table-link" href="#3.2.S.7 Stability of the Drug Substance" style="text-decoration: none; color: black;">3.2.S.7 Stability of the Drug Substance</a></li>
+            </ul>
+
+            <li style="font-size: 15px;"><a class="table-link" href="#MODULE 3: 3.2.R REGIONAL INFORMATION (DRUG SUBSTANCE)" style="text-decoration: none; color: black;">Module 3: 3.2.R Regional Information (Drug Substance)</a></li>
+        </ul>
+    </ol>
+
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <table>
+            <tr>
+              <td rowspan="4">
+                <img
+                  src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                  class="img-fluid"
+                  style="height: 100px"
+                  alt="Company Logo"
+                />
+              </td>
+              <td colspan="9" class="fw-semibold">
+                Drug substance/ API Type II DMF REVIEW CHECKLIST - OPEN & CLOSED
+                PART
+              </td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API: {{ checklist.name_of_api }}
+              </td>
+              <td class="fw-semibold">DMF No. : {{ checklist.dmf }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API Vendor: {{ checklist.name_of_api_vendor }}
+              </td>
+              <td rowspan="2" class="fw-semibold">DMF Version: {{ checklist.dmf_version }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                DMF CA/SA Status: {{ checklist.dmf_status }}
+              </td>
+            </tr>
+          </table>
+        </div>
+        <table style="">
+          <tr>
+            <td
+              colspan="12"
+              class="text-center p-3 fw-semibold"
+              style="
+                background-color: #e36c0a;
+                color: white;
+                border: 3px dashed black !important;
+              "
+              id="tabel_header1"
+            >
+              SUMMARY OF SPECIFIC DMF SECTIONS/INFORMATION TO BE REVIEWED BY
+              CROSS FUNCTIONAL TEAM
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="12"
+              class="text-center fw-semibold"
+              style="
+                background-color: #002060;
+                color: white;
+                border: 2px dashed black !important;
+              "
+              id="dmfrateam"
+            >
+              Specific DMF Sections/Information to be Reviewed by Core RA Team
+            </td>
+          </tr>
+          <tr
+            style="
+              background-color: #b6dde8;
+              border: 2px dashed black !important;
+            "
+            class="text-black fw-bold"
+          >
+            <td colspan="2" class="text-center">Sr.#</td>
+            <td colspan="10 " class="text-center">DMF Sections Name</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">1</td>
+            <td colspan="10 ">3.2.S.2.1 Manufacturer - Drug substance</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">2</td>
+            <td colspan="10 ">3.2.S.4.1 Specification</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">3</td>
+            <td colspan="10 ">
+              Administrative Documents & Current Facility Template
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="12"
+              class="text-center fw-semibold"
+              style="
+                background-color: #002060;
+                color: white;
+                border: 2px dashed black !important;
+              "
+              id="dmfardteam"
+            >
+              Specific DMF Sections/Information to be Reviewed by ARD Team
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="12"
+              class="text-center text-black fw-bold"
+              style="
+                background-color: #b6dde8;
+                border: 2px dashed black !important;
+              "
+            >
+              DMF Sections Name
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">4</td>
+            <td colspan="10 ">3.2.S.1.3 General Properties</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">5</td>
+            <td colspan="10 ">3.2.S.3.1 Characterization</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">6</td>
+            <td colspan="10 ">3.2.S.3.2 Impurities</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">7</td>
+            <td colspan="10 ">3.2.S.4.1 Specification</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">8</td>
+            <td colspan="10 ">3.2.S.4.2 Analytical Procedures</td>
+          </tr>
+
+          <tr>
+            <td colspan="2" class="text-center">9</td>
+            <td colspan="10 ">3.2.S.4.3 Validation of Analytical Procedure</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">10</td>
+            <td colspan="10 ">3.2.S.4.5 Justification of Specification</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">11</td>
+            <td colspan="10 ">
+              Administrative Documents (Organic impurity, Genotoxic impurity,
+              Elemental impurity & Residual solvents statements)
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="12"
+              class="text-center p-3 fw-semibold"
+              style="
+                background-color: #e36c0a;
+                color: white;
+                border: 3px dashed black !important;
+              "
+              id="tabel_header2"
+            >
+              SPECIFIC DMF SECTIONS/INFORMATION TO BE REVIEWED BY QUALITY
+              MANAGEMENT TEAM
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="12"
+              class="text-center text-black fw-bold"
+              style="
+                background-color: #b6dde8;
+                border: 2px dashed black !important;
+              "
+            >
+              DMF SECTIONS
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">12</td>
+            <td colspan="10 ">3.2.S.2.1 Manufacturer Drug substance</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">13</td>
+            <td colspan="10 ">Current Facility Template</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <table>
+            <tr>
+              <td rowspan="4">
+                <img
+                  src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                  class="img-fluid"
+                  style="height: 100px"
+                  alt="Company Logo"
+                />
+              </td>
+              <td colspan="9" class="fw-semibold">
+                Drug substance/ API Type II DMF REVIEW CHECKLIST - OPEN & CLOSED
+                PART
+              </td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API: {{ checklist.name_of_api }}
+              </td>
+              <td class="fw-semibold">DMF No. : {{ checklist.dmf }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API Vendor: {{ checklist.name_of_api_vendor }}
+              </td>
+              <td rowspan="2" class="fw-semibold">DMF Version: {{ checklist.dmf_version }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                DMF CA/SA Status: {{ checklist.dmf_status }}
+              </td>
+            </tr>
+          </table>
+        </div>
+        <table>
+          <tr>
+            <td
+              colspan="12"
+              class="text-center p-3 fw-semibold"
+              style="
+                background-color: #e36c0a;
+                color: white;
+                border: 3px dashed black !important;
+              "
+              id="tabel_header3"
+            >
+              ENTIRE DMF SECTIONS/INFORMATION TO BE REVIEWED BY DMF TEAM (RA)
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="12"
+              class="text-center text-black fw-bold"
+              style="
+                background-color: #b6dde8;
+                border: 2px dashed black !important;
+              "
+            >
+              DMF SECTIONS
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">14</td>
+            <td>
+              3.2.S.1.1 Nomenclature General Information <br />
+              3.2.S.1.2 Structure <br />
+              3.2.S.1.3 General Properties
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">15</td>
+            <td>
+              3.2.S.2.1 Manufacturer- Drug Substance <br />
+              3.2.S.2.2 Description of Manufacturing Process and Process
+              Controls
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">16</td>
+            <td>
+              3.2.S.3.1 Characterization <br />
+              <!-- <td>3.2.S.3.1 Characterization <br> -->
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">17</td>
+            <td>
+              3.2.S.4.1 Specification <br />
+              3.2.S.4.2 Analytical Procedure <br />
+              3.2.S.4.3 Validation of Analytical Procedures <br />
+              3.2.S.4.4 Batch Analysis <br />
+              3.2.S.4.5 Justification of Specification
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">18</td>
+            <td>3.2.S.5 Reference Standards or Materials <br /></td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">19</td>
+            <td>3.2.S.6 Container Closer Systems <br /></td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">20</td>
+            <td>
+              3.2.S.7.1 Stability Summary and Conclusions <br />
+              3.2.S.7.2 Post Approval Stability Protocol and Commitment Letter
+              <br />
+              3.2.S.7.3 Stability Data
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">21</td>
+            <td>Administrative Documents & current Facility Template</td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-center">22</td>
+            <td>API Nitrosamine & NDSRIs Risk Assessment Report</td>
+          </tr>
+        </table>
+      </div>
+      {% comment %} DMF Review Table {% endcomment %}
+      <div class="pdf-page pdf  landscape">
+        <div class="bordered-container">
+          <table>
+            <tr>
+              <td rowspan="4">
+                <img
+                  src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                  class="img-fluid"
+                  style="height: 100px"
+                  alt="Company Logo"
+                />
+              </td>
+              <td colspan="9" class="fw-semibold">
+                Drug substance/ API Type II DMF REVIEW CHECKLIST - OPEN & CLOSED
+                PART
+              </td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API: {{ checklist.name_of_api }}
+              </td>
+              <td class="fw-semibold">DMF No. : {{ checklist.dmf }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API Vendor: {{ checklist.name_of_api_vendor }}
+              </td>
+              <td rowspan="2" class="fw-semibold">DMF Version: {{ checklist.dmf_version }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                DMF CA/SA Status: {{ checklist.dmf_status }}
+              </td>
+            </tr>
+          </table>
+        </div>
+        <div
+          id="tabel_header4"
+          class="heading text-center fw-semibold fs-5"
+          style="background-color: #002060; color: white"
+        >
+          DMF REIVEW CHECKLIST OPEN AND CLOSED PART
+        </div>
+        <div class="heading text-decoration-underline mt-4">
+          To be used by DMF (RA), RA, Site ARD and teams, involved in DMF
+          review, across all the locations.
+        </div>
+
+        <table class="table-bordered">
+          <tr>
+            <td
+              colspan="12"
+              class="text-center fw-bold"
+              style="background-color: #b6dde8"
+              id="responsibledep"
+            >
+              Responsible Departments
+            </td>
+            <td
+              colspan="1"
+              class="text-center fw-bold"
+              style="background-color: #b6dde8"
+            >
+              DMF
+            </td>
+            <td
+              colspan="1"
+              class="text-center fw-bold"
+              style="background-color: #b6dde8"
+            >
+              RA
+            </td>
+            <td
+              colspan="1"
+              class="text-center fw-bold"
+              style="background-color: #b6dde8"
+            >
+              ARD
+            </td>
+          </tr>
+
+          {% for module, categories in organized_data.items %}
+              {% for category, questions in categories.items %}
+                      <tr>
+                          <td colspan="2" rowspan="{{ questions|length|add:1 }}" class="text-dark fw-semibold" style="background-color: #E36C0A;" id="{{ module_name }}">
+                              {{ module }}
+                          </td>
+                          <td class="fw-semibold" colspan="10" style="background-color: #FAE2D5" id="{{ category }}">
+                              {{ category }}
+                          </td>
+                          {% if category == '3.2.S.1.3 General Properties' %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                          {% elif category == '3.2.S.2.1 Manufacturer - Drug Substance' %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                          {% elif category == '3.2.S.3.1 Characterization' %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                          {% elif category == '3.2.S.4.1 Specification' %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                          {% elif category == '3.2.S.4.2 Analytical Procedures' %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                          {% elif category == '3.2.S.4.3 Validation of Analytical Procedures' %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                          {% elif category == 'Administrative Information/Statements:' %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                          {% else %}
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                              <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                          {% endif %}
+                          {% comment %} <td class="fw-semibold" style="background-color: #FAE2D5">✓</td>
+                          <td class="fw-semibold" style="background-color: #FAE2D5">✕</td>
+                          <td class="fw-semibold" style="background-color: #FAE2D5">✕</td> {% endcomment %}
+                      </tr>
+                      {% for question in questions %}
+                          <tr>
+                              <td colspan="10" class="tdChange">{{ question.question|safe }}</td>
+                              <td><input name="drf_{{ question.id }}" type="checkbox" {% if question.checklist_answers.drf %}checked{% endif %}></td>
+                              <td><input name="ra_{{ question.id }}" type="checkbox" {% if question.checklist_answers.ra %}checked{% endif %}></td>
+                              <td><input name="ard_{{ question.id }}" type="checkbox" {% if question.checklist_answers.ard %}checked{% endif %}></td>
+                          </tr>
+                      {% endfor %}
+              {% endfor %}
+          {% endfor %}
+        </table>
+      </div>
+      {% comment %} Module Comment and Status {% endcomment %}
+      <div class="pdf-page pdf  landscape">
+        <div class="bordered-container">
+          <table>
+            <tr>
+              <td rowspan="4">
+                <img
+                  src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                  class="img-fluid"
+                  style="height: 100px"
+                  alt="Company Logo"
+                />
+              </td>
+              <td colspan="9" class="fw-semibold">
+                Drug substance/ API Type II DMF REVIEW CHECKLIST - OPEN & CLOSED
+                PART
+              </td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API: {{ checklist.name_of_api }}
+              </td>
+              <td class="fw-semibold">DMF No. : {{ checklist.dmf }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API Vendor: {{ checklist.name_of_api_vendor }}
+              </td>
+              <td rowspan="2" class="fw-semibold">DMF Version: {{ checklist.dmf_version }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                DMF CA/SA Status: {{ checklist.dmf_status }}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        {% comment %} Module Comment {% endcomment %}
+        <table class="">
+          <thead>
+            <tr
+              style="
+                background-color: #e36c0a;
+                border: 2px dashed black !important;
+                text-align: center;
+              "
+            >
+              <td width="200px" class="text-white fw-bold">Module</td>
+              <td class="text-white fw-bold">
+                Specific Remarks If Any By DMF/RA/ARD
+              </td>
+              <td width="100px" class="text-white fw-bold">Status</td>
+              <td width="100px" class="text-white fw-bold">Actions</td>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      {% comment %} DMF CA Checklist Table {% endcomment %}
+      <div class="pdf-page pdf  landscape">
+        <div class="bordered-container">
+          <table>
+            <tr>
+              <td rowspan="4">
+                <img
+                  src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                  class="img-fluid"
+                  style="height: 100px"
+                  alt="Company Logo"
+                />
+              </td>
+              <td colspan="9" class="fw-semibold">
+                Drug substance/ API Type II DMF REVIEW CHECKLIST - OPEN & CLOSED
+                PART
+              </td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API: {{ checklist.name_of_api }}
+              </td>
+              <td class="fw-semibold">DMF No. : {{ checklist.dmf }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                Name of API Vendor: {{ checklist.name_of_api_vendor }}
+              </td>
+              <td rowspan="2" class="fw-semibold">DMF Version: {{ checklist.dmf_version }}</td>
+            </tr>
+            <tr>
+              <td class="fw-semibold">
+                DMF CA/SA Status: {{ checklist.dmf_status }}
+              </td>
+            </tr>
+          </table>
+        </div>
+        <div
+          id="dmf_ca"
+          class="heading text-center fw-bold fs-5"
+          style="background-color: #002060; margin-bottom: 20px; color: white"
+        >
+          DMF CA CHECKLIST
+        </div>
+        <table class="table-bordered mb-3">
+            <colgroup>
+              <col style="width: 60%;"> <!-- Section column -->
+              <col style="width: 20%;"> <!-- Subsection column -->
+              <col style="width: 20%;"> <!-- Questions column -->
+            </colgroup>
+              {% for module, categories in ca_organized_data.items %}
+              {% if module %}
+                              <tr>
+                                  <th colspan="3" style="background-color: #E36C0A; color: white; font-weight: bold; padding: 8px;text-align: center;font-size: 18px;border: 3px dashed black !important" class="brown-header" id="{{ module }}">{{ module }}</th>
+                              </tr>
+                              {% endif %}
+                  {% for category, sub_categories in categories.items %}
+                  {% if category %}
+                              <tr>
+                                  <th colspan="3" class="brown-header fw-bold" style="background-color: #002060; color: white; padding: 6px;text-align: center;font-size: 17px;border: 3px dashed black !important">{{ category }}</th>
+                              </tr>
+                              {% endif %}
+                      {% for sub_category, ectd_nos in sub_categories.items %}
+                      {% if sub_category %}
+                              <tr>
+                                  <th colspan="3" class="brown-header" style="background-color: #215868 ; color: white; padding: 6px;text-align: center;font-size: 17px;border: 3px dashed black !important" id="{{ sub_category }}">{{ sub_category }}</th>
+                              </tr>
+                              {% endif %}
+                          {% for ectd_no, sub_categories in ectd_nos.items %}
+
+
+
+                              {% if ectd_no %}
+                              <tr>
+                                  <th colspan="3" class="subsection-header" style="background-color: #B6DDE8; color: black; padding: 6px;text-align: center;font-size: 17px;" id="{{ ectd_no }}">{{ ectd_no }}</th>
+                              </tr>
+                              {% endif %}
+                              {% for ectd_sub_category, questions in sub_categories.items %}
+                                  {% if ectd_sub_category %}
+                                      <tr>
+                                          <td colspan="3" style="background-color: #FDE9D9; color: black; padding: 6px;text-align: center;font-size: 17px;font-weight: bold;" class="brown-header">{{ ectd_sub_category }}</td>
+                                      </tr>
+                                  {% endif %}
+                                  {% for question in questions %}
+                                    <tr>
+                                        <td style="white-space:normal" class="tdChange">{{ question.question|safe }}</td>
+                                        <td class="radio-cell">
+                                            <div class="radio-group">
+                                                <label class="custom-radio-btn">
+                                                    <input type="radio" name="answer_{{ question.id }}" value="yes"
+                                                        {% if question.checklist_answers.answer == 'yes' %}checked{% endif %}>
+                                                    <span class="radio-checkmark"></span>
+                                                    <span class="radio-label" style="color: #008000; font-size: 17px !important;font-weight: bold;">Yes</span>
+                                                </label>
+
+                                                <label class="custom-radio-btn">
+                                                    <input type="radio" name="answer_{{ question.id }}" value="no"
+                                                        {% if question.checklist_answers.answer == 'no' %}checked{% endif %}>
+                                                    <span class="radio-checkmark"></span>
+                                                    <span class="radio-label" style="font-size: 17px !important; color: #FF0000;font-weight: bold;">No</span>
+                                                </label>
+
+                                                <label class="custom-radio-btn">
+                                                    <input type="radio" name="answer_{{ question.id }}" value="not_applicable"
+                                                        {% if question.checklist_answers.answer == 'not_applicable' %}checked{% endif %}>
+                                                    <span class="radio-checkmark"></span>
+                                                    <span class="radio-label" style="font-size: 17px !important;color: #FFC000;font-weight: bold;">N/A</span>
+                                                </label>
+                                            </div>
+                                        </td>
+                                        <td class="note">
+                                          <div>Notes:</div>
+                                          <div>{{ question.note }}</div>
+                                        </td>
+                                        {% comment %} <td>
+                                            <div >Notes:</div>
+                                            <textarea name="note_{{ question.id }}" rows="6" cols="15">{{ question.checklist_answers.comment|default:'' }}</textarea>
+                                        </td> {% endcomment %}
+                                    </tr>
+                                  {% endfor %}
+                              {% endfor %}
+                          {% endfor %}
+                      {% endfor %}
+                  {% endfor %}
+              {% endfor %}
+        </table>
+      </div>
+    </div>
+    <div style="position: sticky; bottom: 0px; text-align: center; background-color: white;" >
+
+
+    {% if request.user.role == "company_checker" %}
+      {% if flag %}
+              <input type="hidden" id="checker_action" name="checker_action" value="">
+              <button type="submit" class="btn btn-warning" id="submit-button" style="z-index:1000;position:relative;">Save</button>
+              <button type="submit" class="btn btn-gradient-success" style="padding: 9.2px 40px" onclick="setAction('Approve')">Approve</button>
+              <button type="submit" class="btn btn-gradient-danger" style="padding: 9.2px 40px" onclick="setAction('Reject')">Reject</button>
+      {% endif %}
+    {% else %}
+      {% if complete_flag %}
+      <button type="submit" class="btn btn-warning" id="submit-button" style="position:sticky; bottom: 0;  z-index: 100000;  ">Submit</button>
+
+          <a class="btn"  id="submit-complete-button" data-bs-toggle="modal" data-bs-target="#saveandcompletemodal" style="position:relative;z-index:1000">Save and Complete</a>
+          <div class="modal fade" id="saveandcompletemodal"   tabindex="-1" role="dialog" aria-labelledby="saveandcompletemodallabel" aria-hidden="true">
+              <div class="modal-dialog"  role="document">
+              <div class="modal-content modalContent border border-dark" >
+                  <div class="modal-header">
+                  <h5 class="modal-title" id="checklistNameModalLabel">Are you sure it is complete?</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                  </button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input ms-1"  id="completed-checkbox" name="completed">
+                        <label class="form-check-label" for="completed-checkbox">
+                        I agree to complete this checklist and from now onwards I will not be able to change or edit this checklist
+                        </label>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <button type="submit" class="btn btn-primary" id="modal-submit-button" disabled>Submit</button>
+                  </div>
+              </div>
+              </div>
+          </div>
+      {% endif %}
+    {% endif %}
+    <a href="/ratools/show_dmf_table"  style="position:relative;" class="btn btn-danger">Back to list</a>
+    </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+<script>
+  const existingComments = {{ existing_comments|safe }};
+  // Initial data structure for modules
+  const modules = [
+  { id: "3.2.S.1", name: "3.2.S.1", remarks: [""], statuses: [""] },
+  { id: "3.2.S.2.1", name: "3.2.S.2.1", remarks: [""], statuses: [""] },
+  { id: "3.2.S.4.1", name: "3.2.S.4.1", remarks: [""], statuses: [""] },
+  { id: "3.2.S.4.2", name: "3.2.S.4.2", remarks: [""], statuses: [""] },
+  { id: "3.2.S.4.3", name: "3.2.S.4.3", remarks: [""], statuses: [""] },
+  { id: "3.2.S.4.4", name: "3.2.S.4.4", remarks: [""], statuses: [""] },
+  { id: "3.2.S.4.5", name: "3.2.S.4.5", remarks: [""], statuses: [""] },
+  { id: "3.2.S.5", name: "3.2.S.5", remarks: [""], statuses: [""] },
+  { id: "3.2.S.6", name: "3.2.S.6", remarks: [""], statuses: [""] },
+  { id: "3.2.S.7", name: "3.2.S.7", remarks: [""], statuses: [""] },
+  { id: "statements", name: "statements", remarks: [""], statuses: [""] }
+  ];
+
+  // Initialize the table with existing data if available
+  function initializeTableData() {
+  if (typeof existingComments !== 'undefined' && Object.keys(existingComments).length > 0) {
+      modules.forEach(module => {
+          if (existingComments[module.name]) {
+              const moduleComments = existingComments[module.name];
+              if (moduleComments.remarks.length > 0) {
+                  module.remarks = moduleComments.remarks;
+                  module.statuses = moduleComments.statuses;
+              }
+          }
+      });
+  }
+  renderTable();
+  }
+  function renderTable() {
+    const tableBody = document.getElementById("tableBody");
+    tableBody.innerHTML = "";
+
+    modules.forEach((module, moduleIndex) => {
+      module.remarks.forEach((remark, remarkIndex) => {
+        const row = document.createElement("tr");
+
+        // Module cell (first column)
+        if (remarkIndex === 0) {
+          const moduleCell = document.createElement("td");
+          moduleCell.rowSpan = module.remarks.length + 1;
+          moduleCell.textContent = module.name;
+          moduleCell.style = "background-color: #DAE9F7; ";
+          moduleCell.className = "fw-bold text-center";
+
+          const hiddenInput = document.createElement("input");
+          hiddenInput.type = "hidden";
+          hiddenInput.name = `module_${moduleIndex}`;
+          hiddenInput.value = module.name;
+          moduleCell.appendChild(hiddenInput);
+
+          row.appendChild(moduleCell);
+        }
+
+        // Remarks cell (second column)
+        const remarksCell = document.createElement("td");
+        const inputMarks = document.createElement("input");
+        inputMarks.className = "w-100";
+        inputMarks.value = remark;
+        inputMarks.name = `remark_${moduleIndex}_${remarkIndex}`;
+        inputMarks.placeholder = "Enter remarks...";
+        inputMarks.addEventListener("input", (e) => {
+          updateRemark(module.id, remarkIndex, e.target.value);
+        });
+        remarksCell.appendChild(inputMarks);
+        row.appendChild(remarksCell);
+
+        // Status cell (third column)
+        const statusCell = document.createElement("td");
+        const statusInput = document.createElement("input");
+        statusInput.className = "w-100";
+        statusInput.name = `status_${moduleIndex}_${remarkIndex}`;
+        statusInput.value = module.statuses[remarkIndex] || ""; // Set the saved status value
+        statusInput.addEventListener("input", (e) => {
+          updateStatus(module.id, remarkIndex, e.target.value);
+        });
+        statusCell.appendChild(statusInput);
+        row.appendChild(statusCell);
+
+        // Actions cell (fourth column)
+        const actionsCell = document.createElement("td");
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "btn btn-danger btn-sm";
+        deleteButton.innerHTML = '<i class="fa fa-trash" aria-hidden="true"></i> Delete';
+        deleteButton.type = "button";
+        deleteButton.onclick = () => deleteRemark(module.id, remarkIndex);
+        actionsCell.appendChild(deleteButton);
+        row.appendChild(actionsCell);
+
+        tableBody.appendChild(row);
+      });
+
+      // Add "Add Row" button
+      const addRow = document.createElement("tr");
+      const addCell = document.createElement("td");
+      addCell.colSpan = 3;
+      const addButton = document.createElement("button");
+      addButton.className = "btn btn-primary btn-sm";
+      addButton.innerHTML = '<i class="fa fa-plus" aria-hidden="true"></i> Add Row';
+      addButton.type = "button";
+      addButton.onclick = () => addRemark(module.id);
+      addCell.appendChild(addButton);
+      addRow.appendChild(addCell);
+      tableBody.appendChild(addRow);
+    });
+  }
+
+  // Function to add a new remark
+  function addRemark(moduleId) {
+    const moduleIndex = modules.findIndex((m) => m.id === moduleId);
+    if (moduleIndex !== -1) {
+        // Get the current module
+        const module = modules[moduleIndex];
+
+        // Don't filter out empty remarks - just add to existing array
+        if (!Array.isArray(module.remarks)) {
+            module.remarks = [];
+        }
+        if (!Array.isArray(module.statuses)) {
+            module.statuses = [];
+        }
+
+        // Add the new empty values
+        module.remarks.push("");
+        module.statuses.push("");
+
+        // Re-render the table to reflect changes
+        renderTable();
+
+        // Focus the new input field
+        const allInputs = document.querySelectorAll(`input[name^="remark_${moduleIndex}"]`);
+        const lastInput = allInputs[allInputs.length - 1];
+        if (lastInput) {
+            lastInput.focus();
+        }
+    }
+  }
+
+  // Function to delete a remark
+  function deleteRemark(moduleId, remarkIndex) {
+      const moduleIndex = modules.findIndex((m) => m.id === moduleId);
+      if (moduleIndex !== -1) {
+          const module = modules[moduleIndex];
+
+          // Remove the remark and status at the specified index
+          module.remarks = module.remarks.filter((_, index) => index !== remarkIndex);
+          module.statuses = module.statuses.filter((_, index) => index !== remarkIndex);
+
+          // Ensure there's at least one empty row if all rows are deleted
+          if (module.remarks.length === 0) {
+              module.remarks = [""];
+              module.statuses = [""];
+          }
+
+          renderTable();
+      }
+  }
+
+  // Helper function to render a single table row
+  function renderTableRow(tableBody, module, moduleIndex, remarkIndex, remark) {
+  const row = document.createElement("tr");
+
+  // Module cell (first column)
+  if (remarkIndex === 0) {
+      const moduleCell = document.createElement("td");
+      moduleCell.rowSpan = module.remarks.filter(r => r !== "").length || 1;
+      moduleCell.textContent = module.name;
+      moduleCell.style = "background-color: #ff9900;";
+      moduleCell.className = "fw-semibold text-center";
+
+      const hiddenInput = document.createElement("input");
+      hiddenInput.type = "hidden";
+      hiddenInput.name = `module_${moduleIndex}`;
+      hiddenInput.value = module.name;
+      moduleCell.appendChild(hiddenInput);
+
+      row.appendChild(moduleCell);
+  }
+
+  // Remarks cell (second column)
+  const remarksCell = document.createElement("td");
+  const inputMarks = document.createElement("input");
+  inputMarks.className = "w-100";
+  inputMarks.value = remark;
+  inputMarks.name = `remark_${moduleIndex}_${remarkIndex}`;
+  inputMarks.placeholder = "Enter remarks...";
+  inputMarks.addEventListener("input", (e) => {
+      updateRemark(module.id, remarkIndex, e.target.value);
+  });
+  remarksCell.appendChild(inputMarks);
+  row.appendChild(remarksCell);
+
+  // Status cell (third column)
+  const statusCell = document.createElement("td");
+  const statusInput = document.createElement("input");
+  statusInput.className = "w-100";
+  statusInput.name = `status_${moduleIndex}_${remarkIndex}`;
+  statusInput.value = module.statuses[remarkIndex] || "";
+  statusInput.addEventListener("input", (e) => {
+      updateStatus(module.id, remarkIndex, e.target.value);
+  });
+  statusCell.appendChild(statusInput);
+  row.appendChild(statusCell);
+
+  // Actions cell (fourth column)
+  const actionsCell = document.createElement("td");
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "btn btn-danger btn-sm";
+  deleteButton.innerHTML = '<i class="fa fa-trash" aria-hidden="true"></i> Delete';
+  deleteButton.type = "button";
+  deleteButton.onclick = () => deleteRemark(module.id, remarkIndex);
+  actionsCell.appendChild(deleteButton);
+  row.appendChild(actionsCell);
+
+  tableBody.appendChild(row);
+  }
+
+  // Helper function to render the Add Row button
+  function renderAddRowButton(tableBody, module) {
+  const addRow = document.createElement("tr");
+  const addCell = document.createElement("td");
+  addCell.colSpan = 4;
+  const addButton = document.createElement("button");
+  addButton.className = "btn btn-primary btn-sm";
+  addButton.innerHTML = '<i class="fa fa-plus" aria-hidden="true"></i> Add Row';
+  addButton.type = "button";
+  addButton.onclick = () => addRemark(module.id);
+  addCell.appendChild(addButton);
+  addRow.appendChild(addCell);
+  tableBody.appendChild(addRow);
+  }
+
+  // Function to update a remark
+  function updateRemark(moduleId, remarkIndex, value) {
+  const moduleIndex = modules.findIndex((m) => m.id === moduleId);
+  if (moduleIndex !== -1) {
+      modules[moduleIndex].remarks[remarkIndex] = value;
+  }
+  }
+
+  // Function to update status
+  function updateStatus(moduleId, remarkIndex, value) {
+  const moduleIndex = modules.findIndex((m) => m.id === moduleId);
+  if (moduleIndex !== -1) {
+      modules[moduleIndex].statuses[remarkIndex] = value;
+  }
+  }
+
+  // Form submission handler
+  function handleFormSubmit(event) {
+  event.preventDefault();
+
+  const moduleData = modules.map(module => ({
+      module: module.name,
+      remarks: module.remarks.filter(remark => remark !== ""),
+      statuses: module.statuses.filter(status => status !== "")
+  }));
+
+  const form = event.target;
+  const structuredInput = document.createElement("input");
+  structuredInput.type = "hidden";
+  structuredInput.name = "comment_section";
+  structuredInput.value = JSON.stringify(moduleData);
+  form.appendChild(structuredInput);
+
+  form.submit();
+  }
+
+  // Initialize the table when the page loads
+  document.addEventListener('DOMContentLoaded', initializeTableData);
+
+  // Add form submit event listener
+  document.querySelector('form').addEventListener('submit', handleFormSubmit);
+  function gettocategory(input) {
+    console.log("Input:", input);
+    const element = document.getElementById(input);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    } else {
+      console.error("Element with ID", input, "not found.");
+    }
+  }
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('.table-link').forEach(link => {
+      link.addEventListener('click', function(event) {
+        event.preventDefault();
+        const targetId = this.getAttribute('href').substring(1);
+        const targetElement = document.getElementById(targetId);
+
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: "smooth", block: "start" });
+
+          // Adjust the scroll position (e.g., scroll 100px more)
+          window.scrollBy(0, -50);
+        }
+      });
+    });
+    // Enable/disable modal submit based on checkbox
+    document
+      .getElementById("completed-checkbox")
+      ?.addEventListener("change", function () {
+        document.getElementById("modal-submit-button").disabled = !this.checked;
+      });
+
+    // Handle form submissions
+    document.querySelector("form")?.addEventListener("submit", function (e) {
+      const isComplete = e.submitter?.id === "modal-submit-button";
+      const message = isComplete
+        ? "This will finalize the checklist. Are you sure?"
+        : "Are you sure you want to submit?";
+
+      if (!confirm(message)) {
+        e.preventDefault();
+      }
+    });
+    // Handle "Back to List" confirmation
+    document
+      .querySelector(".btn-danger")
+      ?.addEventListener("click", function (e) {
+        if (!confirm("Are you sure you want to go back to the list?")) {
+          e.preventDefault();
+        }
+      });
+  });
+</script>
+<script>
+  // JavaScript to enable the button when the checkbox is checked
+  document
+    .getElementById("completed-checkbox")
+    .addEventListener("change", function () {
+      const submitButton = document.getElementById("modal-submit-button");
+      if (this.checked) {
+        submitButton.removeAttribute("disabled"); // Enable the button
+      } else {
+        submitButton.setAttribute("disabled", "disabled"); // Disable the button
+      }
+    });
+
+  function gettocategory(input) {
+    document.getElementById(input).scrollIntoView({ behavior: "smooth" });
+  }
+  function setAction(action) {
+    document.getElementById("checker_action").value = action;
+  }
+</script>
+<head>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    rel="stylesheet"
+  />
+</head>
+<style>
+  .form {
+    position: relative;
+    z-index: 1;
+    background: #FFFFFF;
+    max-width: 360px;
+    margin: 0 auto 100px;
+    margin-top: 70px;
+    padding: 45px;
+    text-align: center;
+    box-shadow: 0 0 20px 0 rgba(0, 0, 0, 0.2), 0 5px 5px 0 rgba(0, 0, 0, 0.24);
+  }
+
+  .form button {
+    font-family: "Roboto", sans-serif;
+    text-transform: uppercase;
+    outline: 0;
+    background-color: #ef6603;
+    width: 100%;
+    border: 0;
+    padding: 15px;
+    color: #FFFFFF;
+    font-size: 14px;
+    -webkit-transition: all 0.3 ease;
+    transition: all 0.3 ease;
+    cursor: pointer;
+  }
+    .blurimg{
+      height: 100%;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-image: url('{% static "img/blur_img.png" %}');
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 100%;
+    }
+
+  .fw-semibold{
+    text-align: center;
+  }
+  .note{
+    font-size: 0.9375rem;
+  }
+  .tdChange{
+    ul,ol{
+      margin-bottom: 0rem !important;
+      line-height:1.15 !important;
+      li{
+        line-height: 1.15 !important;
+        text-indent: 0px;
+        padding-left: 8px;
+      }
+    }
+    img{
+      width: 430px !important;
+      height: auto !important;
+      border-radius: 0% !important;
+    }
+
+  }
+  .landscape{
+    width: 280mm !important;
+  }
+  .modalContent{
+    background-color:white
+ }
+  .card{
+    font-family: 'Times New Roman';
+  }
+  .table-link:hover {
+    color: rgb(227, 108, 10) !important;
+  }
+  td {
+    color: #000;
+    line-height: 1;
+  }
+  td p{
+    line-height: 1;
+    margin-bottom: 0%;
+  }
+  .MsoTableGrid {
+    width: 92% !important;
+  }
+  .table td img {
+    width: 200px !important;
+    height: auto !important;
+    border-radius: 0% !important;
+  }
+  .heading-table {
+    border: 1px solid black;
+  }
+  .upper-title {
+    background-color: rgba(251, 207, 126, 0.673);
+    font-weight: 700;
+  }
+  table {
+    /* Ensures fixed column widths */
+    width: 100%; /* Stretches table to the container */
+    border: 1px solid black !important;
+    border-collapse: collapse;
+  }
+  table tr {
+    page-break-inside: avoid; /* Prevent rows from splitting across pages */
+  }
+
+  td {
+    /* Prevent long text from stretching the column */
+
+    text-overflow: ellipsis;
+
+    border-bottom: 1px solid black !important;
+    border-right: 1px solid black !important;
+    padding: 8px;
+    vertical-align: middle;
+  }
+
+  label {
+    display: inline-block;
+    width: 100%; /* Make label take full width of the cell */ /* Set label height */
+    /* Vertically center text */
+    /* For the `<em>` style */
+    font-size: 14px;
+
+  }
+  td input{
+    text-align: center;
+  }
+  input[type="checkbox"] {
+    margin-right: 8px; /* Add space between checkbox and label */
+    margin-left: 9px;
+  }
+  th {
+    background-color: #317589;
+
+    vertical-align: middle;
+    padding: 8px;
+    border: 1px solid #000 !important;
+  }
+
+  .radio-cell {
+    padding: 10px;
+    overflow: visible; /* Ensure no scrollbars */
+  }
+
+  .radio-group {
+    justify-content: center !important;
+    display: flex;
+    align-items: center;/* Allow wrapping to prevent overflow */
+  }
+
+  .custom-radio-btn {
+    display: flex;
+
+    position: relative;
+    padding-left: 19px;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+    height: auto; /* Remove fixed height if any */
+  }
+
+  .custom-radio-btn input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .radio-checkmark {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    height: 20px;
+    width: 20px;
+    background-color: #fff;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+  }
+
+  .custom-radio-btn:hover input ~ .radio-checkmark {
+    border-color: #ccc;
+  }
+
+  .custom-radio-btn input:checked ~ .radio-checkmark {
+    border-width: 6px;
+  }
+
+  .custom-radio-btn input[value="yes"]:checked ~ .radio-checkmark {
+    border-color: #4caf50;
+  }
+
+  .custom-radio-btn input[value="no"]:checked ~ .radio-checkmark {
+    border-color: #f44336;
+  }
+
+  .custom-radio-btn input[value="not_applicable"]:checked ~ .radio-checkmark {
+    border-color: #ffa500;
+  }
+
+  .radio-label {
+    margin-left: 5px;
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  .pdf-page {
+    width: 222mm; /* A4 width */
+    min-height: 297mm; /* A4 height */
+    margin: 0 auto;
+    padding: 40px;
+    border: 1px solid #ddd;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+  }
+
+  /* Fix watermark positioning */
+  .pdf {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .pdf::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("{% static 'img/watermark.png' %}");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 70%;
+    opacity: 0.06;
+    z-index: -1;
+    mix-blend-mode: multiply;
+  }
+
+  .pdf-page img {
+    width: 100%;
+    height: 100%;
+  }
+
+  .imgcontainer {
+    position: relative;
+    text-align: center;
+    color: white;
+    height: 100%;
+  }
+
+  .top-left {
+    position: absolute;
+    top: 221px;
+    left: 130px;
+    color: rgb(33, 88, 104);
+    font-size: 66px;
+    font-weight: bold;
+    right: 60px;
+  }
+
+  .content {
+    font-size: 14px;
+    line-height: 2;
+    text-align: justify;
+    padding: 20px;
+  }
+
+  .title {
+    font-weight: bold;
+    font-size: 19px;
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 30px;
+    text-decoration: underline;
+  }
+
+  .upper {
+    display: flex;
+  }
+  p {
+    margin-bottom: 30px;
+    line-height: 2;
+  }
+
+  .bordered-container {
+    width: 100%;
+
+    box-sizing: border-box;
+    margin-bottom: 15px; /* add space to prevent overlap */
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+  }
+
+  .header img {
+    width: 100px;
+    height: auto;
+  }
+
+  .header-content {
+    flex: 1;
+  }
+
+  .header-left {
+    width: 100%;
+    padding-top: 10px;
+    padding-left: 130px;
+  }
+  h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    margin-left: 10px;
+  }
+
+  .product-name {
+    font-size: 14px;
+    margin-left: 220px;
+  }
+
+  @media print {
+    /* Ensures each page break for dynamic content */
+    .pdf-page {
+      page-break-after: always;
+    }
+  }
+
+  .btn-warning {
+    color: #000;
+    background-image: linear-gradient(to right, #ffcc00, #ff9900);
+    border-color: #ffc107;
+    padding: 0.575rem 2.5rem !important;
+    border-radius: 0.1875rem !important;
+    font-weight: 600 !important;
+    transition: background-image 0.3s ease-in-out;
+  }
+
+  .btn-warning:hover {
+    background-image: linear-gradient(to right, #ff9900, #ffcc00);
+    color: #000;
+    border-color: #ffc107;
+  }
+
+  #submit-complete-button {
+    color: #000;
+    font-weight: 600 !important;
+    padding: 0.575rem 2.5rem !important;
+    border-radius: 0.1875rem !important;
+
+    background-image: linear-gradient(101deg, #b241ff, #fe86ff);
+    border-color: #ffc107;
+    transition: background-image 0.3s ease-in-out;
+  }
+
+  #submit-complete-button:hover {
+    background-image: linear-gradient(101deg, #fe86ff, #b241ff);
+    color: #000;
+    border-color: #ffc107;
+  }
+
+  .btn-danger {
+    padding: 0.575rem 2.5rem !important;
+    font-weight: 600 !important;
+    border-radius: 0.1875rem !important;
+    background-image: linear-gradient(
+      101deg,
+      #8b0000,
+      #fc5c7d
+    ); /* Gradient background */
+    color: white; /* Text color */
+  }
+
+  /* Gradient effect on hover */
+  .btn-danger:hover {
+    background-image: linear-gradient(101deg, #fc5c7d, #8b0000);
+    color: white; /* Ensure text remains white */
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+
+  .table-header-blue {
+    background-color: #b6dde8 !important;
+  }
+  .table-header-dark {
+    background-color: #014b54 !important;
+    color: white !important;
+  }
+  .action-column {
+    min-width: 100px;
+  }
+  .action-btn {
+    border: none;
+    background: none;
+    padding: 5px;
+    cursor: pointer;
+  }
+  .action-btn:hover {
+    opacity: 0.8;
+  }
+  .fa-trash {
+    color: #dc3545;
+  }
+  input.table-input {
+    border: 1px solid #dee2e6;
+    width: 100%;
+    padding: 4px 8px;
+  }
+  input.table-input:focus {
+    outline: 2px solid #b6dde8;
+    border-color: transparent;
+  }
+
+  .main-header {
+    background-color: #f0f0f0;
+    font-weight: bold;
+    padding: 8px;
+    text-align: center;
+  }
+
+  .section-header {
+    background-color: #a8c6d8;
+    color: black;
+    padding: 8px;
+    text-align: center;
+  }
+
+  .subsection-header {
+    background-color: #1b4965;
+    color: white;
+    padding: 8px;
+  }
+
+  .brown-header {
+    background-color: #5e4c3e;
+    color: white;
+    padding: 8px;
+  }
+
+  .table-bordered td {
+    vertical-align: middle;
+  }
+</style>
+{% endblock %}

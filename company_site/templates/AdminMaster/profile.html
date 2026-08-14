@@ -1,0 +1,245 @@
+{% extends "AdminMaster/AdminMasterBase.html" %}
+{% load crispy_forms_tags %}
+{% load custom_filters %}
+
+{% block content %}
+<html>
+<head>
+    <title>Profile</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        /* Optional: Add custom styles for Select2 here */
+        .select2-container .select2-selection--single {
+            height: auto !important; /* Adjust height */
+        }
+        .report-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .report-checkbox {
+            flex: 1;
+            padding-right: 20px;
+        }
+
+        .report-level {
+            flex: 1;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Profile</h1>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <form id="profileForm" method="post" action="{{ action }}" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% crispy form %}
+                {% comment %} {{ form_2 }} {% endcomment %}
+                <div id="company_user_section">
+                    <div>
+                        <fieldset>
+                            <legend>Assign Reports and their levels:</legend>
+                            {% for report, report_field in form_2.assigned_report.field.choices %}
+                                {% if forloop.counter0 < form_2.assigned_report.field.choices|length|add:"-4" %}
+                                    <div class="report-row">
+                                        <div class="report-checkbox">
+                                            <input type="checkbox" name="assigned_report" value="{{ report }}" id="id_assigned_report_{{ forloop.counter0 }}"
+                                                {% if report in form_2.assigned_report.value %}checked{% endif %}>
+                                            <label for="id_assigned_report_{{ forloop.counter0 }}">{{ report }}</label>
+
+                                        </div>
+                                        <div class="report-level">
+                                            {% comment %} <label for="id_level_report_{{ forloop.counter }}">Level:</label> {% endcomment %}
+                                            {{ form_2|getattr_custom:forloop.counter }}
+                                        </div>
+                                    </div>
+                                {% else %}
+                                <div class="report-row">
+                                <div class="report-checkbox">
+                                    <input type="checkbox" name="assigned_report" value="{{ report }}" id="id_assigned_report_{{ forloop.counter0 }}"
+                                        {% if report in form_2.assigned_report.value %}checked{% endif %}>
+                                    <label for="id_assigned_report_{{ forloop.counter0 }}">{{ report }}</label>
+                                </div>
+                            </div>
+                                {% endif %}
+                            {% endfor %}
+                        </fieldset>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;margin-top:5px;">
+                        <div>
+                        <label for="assigned_checker_level_1">Assign the Checker for level 1</label>
+                        {{ form_2.assigned_checker_level_1 }}
+                        </div>
+                        <div>
+                        <label for="assigned_checker_level_2">Assign the Checker for level 2</label>
+                        {{ form_2.assigned_checker_level_2 }}
+                        </div>
+                        <div>
+                            <label for="assigned_checker_level_3">Assign the Checker for level 3</label>
+                            {{ form_2.assigned_checker_level_3 }}
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;margin-top:10px;">
+                        <div>
+                            <label for="assigned_checker_level_4">Assign the Checker for level 4</label>
+                            {{ form_2.assigned_checker_level_4 }}
+                        </div>
+                        <div>
+                            <label for="assigned_checker_level_5">Assign the Checker for level 5</label>
+                            {{ form_2.assigned_checker_level_5 }}
+                        </div>
+                        <div>
+                            <label for="assigned_checker_level_6">Assign the Checker for level 6</label>
+                            {{ form_2.assigned_checker_level_6 }}
+                        </div>
+                    </div>
+                    <div style="margin-top:10px;">
+                        <label for="assigned_checker_level_7">Assign the Checker for level 7</label>
+                        {{ form_2.assigned_checker_level_7 }}
+                    </div>
+                </div>
+                <div id="company_checker_section">
+                    <div>
+                      <fieldset>
+                        <legend>Give Permission to view sample reports.</legend>
+                        {% for report, report_field in form_2.view_sample_reports.field.choices %}
+                          <div class="report-row">
+                              <div class="report-checkbox">
+                                  <input type="checkbox" name="view_sample_reports" value="{{ report }}" id="id_view_sample_reports_{{ forloop.counter0 }}"
+                                      {% if report in form_2.view_sample_reports.value %}checked{% endif %}>
+                                  <label for="id_view_sample_reports_{{ forloop.counter0 }}">{{ report }}</label>
+                              </div>
+                          </div>
+                        {% endfor %}
+                      </fieldset>
+                    </div>
+                </div>
+
+                <div class="d-sm-flex align-items-center mb-4">
+                    <input type="submit" class="d-sm-inline-block btn btn-success shadow-sm" value="Submit" />
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+{% comment %} <script>
+    $('select').select2()
+</script> {% endcomment %}
+<script>
+    $('#profileForm').on('submit', function(event) {
+        event.preventDefault(); // Prevent the form from submitting immediately
+
+        var confirmation = confirm("Are you sure you want to save the changes?");
+        if (confirmation) {
+            this.submit(); // If the user confirms, submit the form
+        }
+    });
+</script>
+{% comment %} <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll('.report-row').forEach(function(row) {
+            let checkbox = row.querySelector('input[type="checkbox"]');
+            let levelInput = row.querySelector('input[type="number"]');
+
+            // Show or hide level input based on checkbox state
+            function toggleLevelInput() {
+                if (checkbox.checked) {
+                    levelInput.style.display = 'block';
+                } else {
+                    levelInput.style.display = 'none';
+                }
+            }
+
+            // Initial toggle based on pre-checked state
+            toggleLevelInput();
+
+            // Add event listener for checkbox
+            checkbox.addEventListener('change', toggleLevelInput);
+        });
+    });
+</script> {% endcomment %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('.report-row').forEach(function (row) {
+        let checkbox = row.querySelector('input[type="checkbox"]');
+        let levelInput = row.querySelector('input[type="number"]');
+
+        // Only proceed if both checkbox and levelInput exist
+        if (checkbox && levelInput) {
+            // Show or hide level input based on checkbox state
+            function toggleLevelInput() {
+                levelInput.style.display = checkbox.checked ? 'block' : 'none';
+            }
+
+            // Initial toggle based on pre-checked state
+            toggleLevelInput();
+
+            // Add event listener for checkbox
+            checkbox.addEventListener('change', toggleLevelInput);
+        }
+    });
+  });
+</script>
+<script>
+    // Initialize Select2 for all select elements except the role selector
+      $('select').not('select[name="role"]').select2();
+
+      // Initialize Select2 for role selector with specific event handling
+      $('select[name="role"]').select2().on('select2:select', function(e) {
+          handleRoleChange(e.target.value);
+      });
+
+      // Get the company user section element
+      const companyUserSection = document.getElementById('company_user_section');
+
+      // Hide the section initially
+      companyUserSection.style.display = 'none';
+
+      // Function to handle role change
+      function handleRoleChange(selectedRole) {
+          if (selectedRole === 'company_user') {
+              companyUserSection.style.display = 'block';
+          } else {
+              companyUserSection.style.display = 'none';
+          }
+      }
+
+      // Call the function initially with the current value
+      handleRoleChange($('select[name="role"]').val());
+</script>
+
+{% comment %} <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        for (let i = 0; i <= 34; i++) {
+            let checkbox = document.getElementById(`id_assigned_report_${i}`);
+            let levelInput = document.getElementById(`id_level_report_${i + 1}`);
+
+            if (checkbox && levelInput) {
+                // Function to toggle the visibility of level input
+                function toggleLevelInput() {
+                    if (checkbox.checked) {
+                        levelInput.style.display = "block";  // Show field
+                    } else {
+                        levelInput.style.display = "none";   // Hide field
+                        levelInput.value = "";  // Clear value when hidden
+                    }
+                }
+
+                // Initial check on page load
+                toggleLevelInput();
+
+                // Add event listener to each checkbox
+                checkbox.addEventListener("change", toggleLevelInput);
+            }
+        }
+    });
+</script> {% endcomment %}
+</html>
+{% endblock %}

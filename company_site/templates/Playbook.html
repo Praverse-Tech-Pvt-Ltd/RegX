@@ -1,0 +1,2304 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="light" lang="en" style="">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>FDA Inspection Playbook | iPharmaAI Regulatory Compliance</title>
+    <!-- plugins:css -->
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap"
+        rel="stylesheet">
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+
+        [data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease;
+        }
+
+        .accordion-item.active .accordion-content {
+            max-height: 5000px;
+            padding-bottom: 2rem;
+        }
+
+        .accordion-item.active .accordion-trigger .chevron {
+            transform: rotate(180deg);
+        }
+
+        /* Nested checklist details style */
+        .checklist-details {
+            margin-top: 0.25rem;
+        }
+
+        /* Style scrollbar for step navigation to show scrollability */
+        .step-nav-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        .step-nav-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+        .step-nav-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 3px;
+        }
+        .step-nav-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.45);
+        }
+        .step-nav-container {
+            -ms-overflow-style: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.25) rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #F0F0F0;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c3c6ce;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8d9197;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* --- Sidebar & Layout CSS --- */
+        .dashboard-page-body {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            padding-top: 60px;
+            min-height: 100vh;
+        }
+
+        .dashboard-main-panel {
+            flex: 1 1 auto;
+            margin-left: 270px;
+            width: calc(100% - 270px);
+            transition: all 0.3s ease;
+            transition: margin-left 0.25s ease;
+        }
+
+        /* When sidebar collapsed */
+        .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+            margin-left: 96px !important;
+            width: calc(100% - 96px) !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+            display: none;
+        }
+
+        .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+            justify-content: center;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .dashboard-layout.sidebar-collapsed .sidebar-submenu-list,
+        .dashboard-layout.sidebar-collapsed .dropdown-caret {
+            display: none !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+            width: 56px;
+            margin: 0 auto;
+            justify-content: center;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .submenu-link {
+            padding-left: 3.5rem !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .submenu-link {
+            padding-left: 0 !important;
+        }
+
+        @media (max-width: 991px) {
+            .dashboard-page-body {
+                flex-direction: column;
+                padding-top: 70px;
+            }
+
+            .dashboard-sidebar {
+                position: relative;
+                top: 0;
+                width: 100%;
+                min-width: 100%;
+                max-width: 100%;
+                height: auto;
+                border-radius: 0 0 16px 16px;
+            }
+
+            .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+                width: 100%;
+                min-width: 100%;
+                max-width: 100%;
+            }
+
+            .dashboard-main-panel {
+                width: 100% !important;
+            }
+        }
+
+        /* Fix Tailwind CSS conflict with Bootstrap collapse */
+        .navbar .collapse {
+            visibility: visible !important;
+        }
+
+        .navbar .nav-link {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px;
+            flex-direction: row !important;
+        }
+
+        .navbar .nav-link img {
+            display: inline-block !important;
+            vertical-align: middle;
+        }
+    </style>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed-variant": "#38437b",
+                        "surface-dim": "#F0F0F0",
+                        "on-tertiary": "#003257",
+                        "tertiary-fixed-dim": "#9dcaff",
+                        "surface-container-lowest": "#FFFFFF",
+                        "inverse-primary": "#48607b",
+                        "on-tertiary-fixed": "#001d35",
+                        "on-surface-variant": "#43474d",
+                        "secondary-fixed-dim": "#bac3ff",
+                        "on-primary": "#FFFFFF",
+                        "on-error": "#690005",
+                        "on-surface": "#011E36",
+                        "secondary-container": "#dee1ff",
+                        "on-secondary": "#212c63",
+                        "outline-variant": "#d1e4ff",
+                        "surface-container-low": "#F9FAFB",
+                        "surface-variant": "#e5e2e1",
+                        "secondary": "#38437b",
+                        "on-error-container": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "outline": "#8d9197",
+                        "tertiary": "#00497c",
+                        "on-tertiary-container": "#001d35",
+                        "background": "#FFFFFF",
+                        "surface-tint": "#011E36",
+                        "inverse-surface": "#303030",
+                        "surface-container-high": "#e5e2e1",
+                        "inverse-on-surface": "#F0F0F0",
+                        "on-secondary-fixed": "#08154d",
+                        "surface-container-highest": "#dee1ff",
+                        "on-primary-container": "#FFFFFF",
+                        "tertiary-container": "#d1e4ff",
+                        "primary-container": "#011E36",
+                        "tertiary-fixed": "#d1e4ff",
+                        "on-background": "#011E36",
+                        "on-primary-fixed": "#001d35",
+                        "primary-fixed": "#d0e4ff",
+                        "surface": "#F9FAFB",
+                        "alert-red": "#D32F2F",
+                        "primary-fixed-dim": "#b0c9e8",
+                        "structural-slate": "#4A5568",
+                        "on-primary-fixed-variant": "#304963",
+                        "surface-bright": "#FFFFFF",
+                        "surface-container": "#F2F4F7",
+                        "secondary-fixed": "#dee1ff",
+                        "primary": "#011E36",
+                        "on-secondary-container": "#001d35",
+                        "on-tertiary-fixed-variant": "#00497c",
+                        "pure-white": "#FFFFFF",
+                        "off-white": "#F0F0F0"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin-mobile": "16px",
+                        "section-gap": "48px",
+                        "base": "4px",
+                        "margin-desktop": "32px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "code-technical": ["Inter"],
+                        "headline-lg-mobile": ["Manrope"],
+                        "display-lg": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "title-lg": ["Inter"],
+                        "headline-md": ["Manrope"],
+                        "body-lg": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "code-technical": ["13px", { "lineHeight": "18px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "title-lg": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+
+<body class="font-body-md text-on-surface">
+    <div class="container-scroller">
+        <!-- Include navbar -->
+        {% include './navbar.html' %}
+
+        <!-- Wrapper div for sidebar + content -->
+        <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+            <!-- Include sidebar -->
+            {% include './sidebar.html' %}
+
+            <!-- Main panel content wrapper -->
+            <div class="main-panel dashboard-main-panel">
+                <div class="content-wrapper p-0 bg-white">
+                    <main class="max-w-7xl mx-auto px-margin-desktop py-12">
+        <!-- Hero Section -->
+        <header class="mb-12 bg-primary-container p-8 rounded-xl">
+            <h1 class="font-display-lg text-display-lg text-pure-white mb-4">USFDA INSPECTION STEP-BY-STEP PLAYBOOK</h1>
+            <p class="text-title-lg font-title-lg text-pure-white mb-4"style="font-style:italic;">(From <span class="text-[#916aad]">Readiness</span> → <span class="text-[#e73e3e]">Confidence</span> → <span class="text-[#6161ef]">Compliance</span>)</p>
+            <p class="text-body-lg text-on-primary-container/80 max-w-3xl">A Simple, Practical Guide for First-Time and
+                Every Time Inspected Facilities</p>
+            <p class="text-body-lg text-on-primary-container/80  mt-4">When an FDA investigator visits your
+                facility for the first time (Pre Approval Inspection) or anytime (Routine or Post Surveillance
+                Inspection) , it can feel overwhelming. But with the right preparation and a calm, organized approach,
+                you can handle the inspection professionally and confidently.</p>
+            <p class="text-body-lg text-on-primary-container/80 max-w-3xl mt-4">This playbook walks you through
+                everything - from before the investigator arrives to after they leave - in simple, easy-to-follow steps.
+            </p>
+            <div class="mt-8 mb-3 flex items-center gap-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-pure-white/60">8 Steps</span>
+                <div class="h-[1px] flex-grow bg-pure-white/10"></div>
+            </div>
+            <nav aria-label="Step navigation" class="step-nav-container flex flex-nowrap gap-4 items-center overflow-x-auto pb-3">
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-1">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">1</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">Prepare (Pre-Inspection)</span>
+                </a>
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-2">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">2</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">When the Investigator Arrives</span>
+                </a>
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-3">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">3</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">The Opening Meeting</span>
+                </a>
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-4">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">4</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">During the Inspection</span>
+                </a>
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-5">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">5</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">The Closing Meeting — FDA Form 483</span>
+                </a>
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-6">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">6</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">The Written Response</span>
+                </a>
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-7">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">7</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">After the Response — What Happens Next</span>
+                </a>
+                <a class="group flex items-center gap-2 transition-all text-on-primary-container opacity-80 font-medium hover:text-pure-white hover:opacity-100 whitespace-nowrap" href="#step-8">
+                    <span
+                        class="w-8 h-8 rounded-full bg-pure-white text-primary flex items-center justify-center font-bold text-sm group-hover:bg-secondary-fixed transition-colors">8</span>
+                    <span class="font-headline-md text-sm text-pure-white group-hover:underline">Staying Ready After the Inspection</span>
+                </a>
+            </nav>
+        </header>
+        <!-- Command Center Accordion Flow -->
+        <div class="space-y-4" id="playbook-accordion">
+            <!-- Step 1 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300 active"
+                id="step-1">
+                <button
+                    class="accordion-trigger w-full flex items-start justify-between p-6 text-left"
+                    onclick="toggleAccordion('step-1')"
+                    style="background-color: #E5E7EB; margin-bottom: 10px;">
+
+                    <!-- Left Side -->
+                    <div class="flex flex-col">
+
+                        <!-- Heading -->
+                        <div class="flex items-center gap-4">
+                            <span
+                                class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                                1
+                            </span>
+
+                            <h2 class="text-headline-md font-headline-md text-primary uppercase">
+                                Step 1: Prepare Before The Inspector Arrives
+                            </h2>
+                        </div>
+
+                        <!-- Quote -->
+                        <div class="mt-2 ml-14">
+                            <p class="text-body-md font-bold italic text-primary">
+                                “Don't prepare for inspection—operate in a way that you are always ready.”
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <!-- Chevron -->
+                    <span
+                        class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant mt-1">
+                        expand_more
+                    </span>
+
+                </button>
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+                       </p></i><p>Great inspections are won before the inspector walks through the door.
+                            Use this checklist to get ready in advance.</p>
+
+                        <!-- Sub-point 1.1 -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-1-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-1-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">1.1 Assign Your Inspection Team
+                                </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4">
+                                    <p class="text-body-md text-on-surface-variant">Pick specific people for each role
+                                        and make sure everyone knows their job:</p>
+                                    <ul class="space-y-2 text-body-md text-on-surface-variant">
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span
+                                                class=""><strong>Inspection Host</strong> - The main person who talks to
+                                                the investigator</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span
+                                                class=""><strong>Document Person</strong> - Collects and hands over
+                                                requested documents</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span
+                                                class=""><strong>Note-Taker / Scribe</strong> - Writes down everything
+                                                that happens</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span
+                                                class=""><strong>Subject Experts</strong> - One person per department
+                                                (Lab, Manufacturing, Warehouse, etc.)</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span
+                                                class=""><strong>Runner</strong> - Helps fetch things, arrange rooms,
+                                                and support the team</span></li>
+                                    </ul>
+                                    <div
+                                        class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm text-body-md italic">
+                                        📌 Always assign a backup for every role. If one person is absent on inspection
+                                        day, the backup steps in automatically.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Sub-point 1.2 -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-1-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-1-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">1.2 Set Up a Command Room</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4">
+                                    <p class="text-body-md text-on-surface-variant">Choose one conference room as your
+                                        internal 'base.' This is where your team coordinates, not where the investigator
+                                        sits.</p>
+                                    <ul class="space-y-2 text-body-md text-on-surface-variant">
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Stock
+                                                it with blank paper, pens, a printer, and a photocopier</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Keep
+                                                all SOPs, Batch records, and Quality Files accessible from this
+                                                room</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Have a
+                                                phone available for quick calls to legal/regulatory support</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Use a
+                                                whiteboard or chart paper to track all document requests in real
+                                                time</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Sub-point 1.3 -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-1-3">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-1-3')">
+                                <h3 class="text-title-lg font-title-lg text-primary">1.3 Organize Your Documents</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4">
+                                    <p class="text-body-md text-on-surface-variant">This is the most important
+                                        preparation you can do. If your documents are messy, missing, or out of date -
+                                        the inspection will go badly.</p>
+                                    <ul class="space-y-2 text-body-md text-on-surface-variant">
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Make a master list of all
+                                                SOPs, Batch Records, Validation Reports, Lab Records, And Quality files.</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Ensure all documents are
+                                                current - no outdated procedures in active use.</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Practice retrieving any
+                                                document within 30 minutes. If you can't do this, fix it now.</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Check that all training
+                                                records are complete and up to date for all employees.</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Confirm all deviations, OOS
+                                                results, and CAPAs are properly documented and closed or actively tracked.</span></li>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Sub-point 1.4 -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-1-4">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-1-4')">
+                                <h3 class="text-title-lg font-title-lg text-primary">1.4 Run a Practice (Mock)
+                                    Inspection</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4">
+                                    <p class="text-body-md text-on-surface-variant">At least once a year - and again
+                                        before any expected inspection - run a practice (mock) inspection internally or
+                                        with an external expert.</p>
+                                    <ul class="space-y-2 text-body-md text-on-surface-variant">
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Walk
+                                                through your facility as if an investigator is watching</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Ask
+                                                questions the way FDA would ask them</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span
+                                                class="">Identify any gaps and fix them before the real
+                                                inspection</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span
+                                                class="">Practice the opening meeting, document requests, and facility
+                                                tour</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Sub-point 1.5 -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-1-5">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-1-5')">
+                                <h3 class="text-title-lg font-title-lg text-primary">1.5 Brief All Employees</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4">
+                                    <p class="text-body-md text-on-surface-variant">Every employee needs to know what to
+                                        do if the FDA visits. Hold a short briefing session covering:</p>
+                                    <ul class="space-y-2 text-body-md text-on-surface-variant">
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Always
+                                                tell the truth - no exceptions</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Answer
+                                                only what is asked - do not add extra information</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">If
+                                                unsure of an answer, say 'I will need to verify that' and refer to a
+                                                supervisor</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Be
+                                                polite and professional at all times</span></li>
+                                        <li class="flex items-start gap-2"><span class="">•</span> <span class="">Do not
+                                                discuss internal problems or management disagreements</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Step 2 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300"
+                id="step-2">
+                <button
+                    class="accordion-trigger w-full flex items-start justify-between p-6 text-left"
+                    onclick="toggleAccordion('step-2')"
+                    style="background-color: #E5E7EB; margin-bottom: 10px;">
+
+                    <!-- Left Side -->
+                    <div class="flex flex-col">
+
+                        <!-- Heading -->
+                        <div class="flex items-center gap-4">
+                            <span
+                                class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                                2
+                            </span>
+
+                            <h2 class="text-headline-md font-headline-md text-primary uppercase">
+                                Step 2: When the Investigator Arrives
+                            </h2>
+                        </div>
+
+                        <!-- Quote -->
+                        <div class="mt-2 ml-14">
+                            <p class="text-body-md font-bold italic text-primary">
+                                “The investigator may arrive with or without prior notice. Stay calm.
+                                Follow these steps immediately.”
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <!-- Chevron -->
+                    <span
+                        class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant mt-1">
+                        expand_more
+                    </span>
+
+                </button>
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+                        <!-- Intro Card -->
+
+                        <!-- Sub-point 2.1 -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-2-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-2-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">2.1 First 5 Minutes - What to Do
+                                </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2"> The front desk or security must stay <b>calm and polite. Do
+                                            not panic.</b></li>
+                                        <li class="pl-2"> Politely ask the investigator to wait in the reception
+                                            area.</li>
+                                        <li class="pl-2"> Immediately call the Inspection Host - do not let the
+                                            investigator go anywhere unaccompanied.</li>
+                                        <li class="pl-2"> Do not answer any questions about the facility until the
+                                            Inspection Host arrives.</li>
+                                        <li class="pl-2"> Activate the rest of the Inspection Team through your
+                                            pre-agreed notification system (phone/email/PA).</li>
+                                    </ol>
+
+                                    <div
+                                        class="flex items-start gap-3 p-2 bg-error-container text-on-error border border-error rounded-lg mt-4 shadow-sm">
+                                        <span class="material-symbols-outlined text-error"
+                                            data-weight="fill">warning</span>
+                                        <div>
+                                            <p class="font-bold text-body-md">Never refuse entry to an FDA investigator
+                                            </p>
+                                            <p class="text-body-sm opacity-90 mt-0.5">Refusal is a violation of federal
+                                                law and will immediately escalate the situation.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 2.2 -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-2-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-2-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">2.2 Check the Investigator's
+                                    Credentials</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant">Before the inspection begins, you
+                                        have the right to verify who the investigator is:</p>
+                                    <ul
+                                        class="space-y-3 text-body-md text-on-surface-variant list-disc list-inside pl-1">
+                                        <li class="pl-2">Ask to see their official FDA photo identification (FDA
+                                            ID/Badge).</li>
+                                        <li class="pl-2">Ask to see the <strong class="text-on-surface">FDA Form 482</strong>
+                                                Note  <strong> scope and areas </strong> of inspection and
+                                            <strong>Do not delay</strong> acceptance.</li>
+                                        <li class="pl-2">Make a photocopy of both - this is standard and the
+                                            investigator expects it.</li>
+                                        <li class="pl-2">Write down the investigator's name, badge number, and time of
+                                            arrival in your inspection log.</li>
+                                        <li class="pl-2">Inform Site Head, QA Head, Inspection Core Team immediately.
+                                        </li>
+                                    </ul>
+
+                                    <div
+                                        class="p-4 bg-surface-container-low border-l-4 border-primary rounded-lg shadow-sm text-body-md mt-4">
+                                        <div class="flex items-start gap-2">
+                                            <span class="material-symbols-outlined text-primary"
+                                                data-weight="fill">push_pin</span>
+                                            <div>
+
+                                                <p class="text-body-sm text-on-surface-variant mt-0.5">The FDA Form 482
+                                                    tells you what kind of inspection it is and what regulations apply.
+                                                    Read it carefully.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Step 3 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300"
+                id="step-3">
+                <button
+                    class="accordion-trigger w-full flex items-start justify-between p-6 text-left"
+                    onclick="toggleAccordion('step-3')"
+                    style="background-color: #E5E7EB; margin-bottom: 10px;">
+
+                    <!-- Left Side -->
+                    <div class="flex flex-col">
+
+                        <!-- Heading -->
+                        <div class="flex items-center gap-4">
+                            <span
+                                class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                                3
+                            </span>
+
+                            <h2 class="text-headline-md font-headline-md text-primary uppercase">
+                                Step 3: The Opening Meeting
+                            </h2>
+                        </div>
+
+                        <!-- Quote -->
+                        <div class="mt-2 ml-14">
+                            <p class="text-body-md font-bold italic text-primary">
+                                “Once your team is assembled, hold a brief formal meeting with the investigator.
+                                This is called the Opening Meeting. Keep it professional and organized.”
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <!-- Chevron -->
+                    <span
+                        class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant mt-1">
+                        expand_more
+                    </span>
+
+                </button>
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+
+
+
+                        <!-- Sub-point 3.1: Initial Setup -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-3-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-3-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">📋3.1 Initial Setup</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <ul
+                                        class="grid grid-cols-1 md:grid-cols-3 gap-4 text-body-md text-on-surface-variant">
+                                        <li
+                                            class="p-4 bg-surface-container-low border border-outline-variant rounded flex flex-col gap-2">
+                                            <span
+                                                class="material-symbols-outlined text-primary text-2xl">meeting_room</span>
+                                            <span class="font-bold text-on-surface">Quiet Room</span>
+                                            <span>Provide a quiet, dedicated room for the investigator </span>
+                                        </li>
+                                        <li
+                                            class="p-4 bg-surface-container-low border border-outline-variant rounded flex flex-col gap-2">
+                                            <span class="material-symbols-outlined text-primary text-2xl">wifi</span>
+                                            <span class="font-bold text-on-surface">Basics &amp; Comfort</span>
+                                            <span>Arrange basic amenities: Wi-Fi connection (if allowed), printer
+                                                access, and water/coffee.</span>
+                                        </li>
+                                        <li
+                                            class="p-4 bg-surface-container-low border border-outline-variant rounded flex flex-col gap-2">
+                                            <span
+                                                class="material-symbols-outlined text-primary text-2xl">menu_book</span>
+                                            <span class="font-bold text-on-surface">Inspection Logbook</span>
+                                            <span>Start an  Logbook (time,requests,responses)</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 3.2: What to Cover & Opening Interaction -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-3-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-3-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">3.2 What to Cover in the Opening
+                                    Meeting</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2"> Welcome the investigator and introduce your team
+                                            members by name and role.</li>
+                                        <li class="pl-2"> Give a short overview of your facility — what you make,
+                                            how many people work there, and what regulatory approvals you hold (keep
+                                            under 5 minutes).</li>
+                                        <li class="pl-2"> Inform the investigator that all document requests
+                                            must go through your designated Document Person.</li>
+                                        <li class="pl-2"> Confirm that your escort will accompany them at all times
+                                            throughout the facility.</li>
+                                        <li class="pl-2"> Ask the investigator what their expected working hours are
+                                            and what general areas they plan to review.</li>
+                                        <li class="pl-2"> Let them know your note-taker will be documenting the
+                                            inspection on behalf of the facility — this is your right.</li>
+
+                                    <li>
+                                    <div
+                                        class="p-4 bg-surface-container-low border border-outline-variant rounded-lg mt-4 shadow-sm">
+                                        <div class="flex items-start gap-3">
+
+                                            <div>
+                                                <p class="font-bold text-body-md text-on-surface">🎤 Opening Interaction
+                                                    Protocol</p>
+                                                <p class="text-body-sm text-on-surface-variant mt-1"> Keep it
+                                                    professional and concise. </p>
+                                                <p class="text-body-sm text-on-surface-variant mt-1">	Provide: Site overview (brief) , Org chart , Product list / operations summary & Clarify scope, timing, and daily schedule </p>
+                                                {% comment %} <ul
+                                                    class="list-disc list-inside text-body-sm text-on-surface-variant mt-2 space-y-1 pl-1">
+                                                    <li>Brief Site Overview</li>
+                                                    <li>Current Organization Chart</li>
+                                                    <li>Product List / Operations Summary</li>
+                                                </ul> {% endcomment %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li class="pl-2">
+                                    <span class="font-semibold text-on-surface">🧑🤝🧑 Activate Inspection Team:</span>
+                                    <ul class="checklist-details list-disc list-inside pl-4 mt-1">
+                                        <li>Assign roles:</li>
+                                        <ul class="list-circle list-inside pl-4">
+                                            <li>Front Room (primary spokesperson/SME)</li>
+                                            <li>Back Room (document retrieval/support)</li>
+                                        </ul>
+                                        <li>Ensure key SMEs are on standby (QA, Production, QC, Engineering, IT).</li>
+                                    </ul>
+                                </li>
+
+
+
+                                </ol>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 3.3: Activate Inspection Team -->
+
+
+                        <!-- Sub-point 3.4: The 7 Golden Rules of Engagement -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-3-4">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-3-4')">
+                                <h3 class="text-title-lg font-title-lg text-primary">3.3 The 7 Golden Rules — Tell Your
+                                    Whole Team</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant font-medium mb-3">Train your entire
+                                        team to strictly follow these core rules during all interactions:</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div
+                                            class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm flex gap-3 items-start">
+                                            <span class="font-bold text-primary">1</span>
+                                            <div>
+                                                <p class="font-semibold text-on-surface text-body-md">Only answer the question that was asked.</p>
+                                                <p class="text-[12px] text-on-surface-variant mt-0.5">Answer truthfully, clearly, briefly. Nothing more.</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm flex gap-3 items-start">
+                                            <span class="font-bold text-primary">2</span>
+                                            <div>
+                                                <p class="font-semibold text-on-surface text-body-md">If you don't know, say 'I will find out and get back to you.'</p>
+                                                <p class="text-[12px] text-on-surface-variant mt-0.5">Never guess.</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm flex gap-3 items-start">
+                                            <span class="font-bold text-primary">3</span>
+                                            <div>
+                                                <p class="font-semibold text-on-surface text-body-md">Never lie or mislead the investigator.</p>
+                                                <p class="text-[12px] text-on-surface-variant mt-0.5">No guessing, no speculation, no over-explaining.</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm flex gap-3 items-start">
+                                            <span class="font-bold text-primary">4</span>
+                                            <div>
+                                                <p class="font-semibold text-on-surface text-body-md">Stay calm and professional</p>
+                                                <p class="text-[12px] text-on-surface-variant mt-0.5">Even if the investigator is tough or aggressive.</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm flex gap-3 items-start">
+                                            <span class="font-bold text-primary">5</span>
+                                            <div>
+                                                <p class="font-semibold text-on-surface text-body-md">Write down everything that happens,</p>
+                                                <p class="text-[12px] text-on-surface-variant mt-0.5">One voice at a time (avoid cross-talk).</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm flex gap-3 items-start">
+                                            <span class="font-bold text-primary">6</span>
+                                            <div>
+                                                <p class="font-semibold text-on-surface text-body-md">Ensure documents are Complete, approved, current and Consistent across records.</p>
+                                                <p class="text-[12px] text-on-surface-variant mt-0.5">Track every document shared (copy control)</p>
+                                            </div>
+                                        </div>
+                                        <div
+                                            class="p-3 bg-surface-container-low border-l-4 border-primary rounded shadow-sm flex gap-3 items-start sm:col-span-2">
+                                            <span class="font-bold text-primary">7</span>
+                                            <div>
+                                                <p class="font-semibold text-on-surface text-body-md">Never promise something you cannot deliver.</p>
+                                                <p class="text-[12px] text-on-surface-variant mt-0.5">Only commit to what you can actually do.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Step 4 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300"
+                id="step-4">
+                <button
+                    class="accordion-trigger w-full flex items-start justify-between p-6 text-left"
+                    onclick="toggleAccordion('step-4')"
+                    style="background-color: #E5E7EB; margin-bottom: 10px;">
+
+                    <!-- Left Side -->
+                    <div class="flex flex-col">
+
+                        <!-- Heading -->
+                        <div class="flex items-center gap-4">
+                            <span
+                                class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                                4
+                            </span>
+
+                            <h2 class="text-headline-md font-headline-md text-primary uppercase">
+                                Step 4: During the Inspection
+                            </h2>
+                        </div>
+
+                        <!-- Quote -->
+                        <div class="mt-2 ml-14">
+                            <p class="text-body-md font-bold italic text-primary">
+                                “Be prepared, Be precise, Be professional—confidence comes from compliance.”
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <!-- Chevron -->
+                    <span
+                        class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant mt-1">
+                        expand_more
+                    </span>
+
+                </button>
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+                        <!-- Intro Card -->
+                        <div
+                            class="p-4 bg-surface-container rounded-lg border border-outline-variant flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="flex items-start gap-3">
+                                <span class="material-symbols-outlined text-primary" data-weight="fill">info</span>
+                                <div>
+                                    <p class="text-body-sm text-on-surface-variant mt-1">The inspection could last one
+                                        day or several days. Here is how to manage it day by day.</p>
+                                        <p>
+                                            🔗 Remember : Golden Rules<br />
+                                                •	Stay calm, respectful, and transparent <br />
+                                                •	Consistency = credibility <br />
+                                                •	Data Integrity at all times (ALCOA+) <br />
+
+                                        </p>
+                                </div>
+                            </div>
+
+                                {% comment %} <div class="text-[12px]">
+                                    <span class="font-bold text-on-surface">Golden Rules:</span>
+                                    <span class="text-on-surface-variant">Calm &amp; Transparent | Consistency =
+                                        Credibility | Data Integrity (ALCOA+)</span>
+                                </div> {% endcomment %}
+                            </div>
+
+
+                        <!-- Sub-point 4.1: Handling Document Requests -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-4-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-4-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">4.1 Handling Document Requests</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant font-medium">The investigator will ask for many documents. Here is the right process:</p>
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2"> Write down every request in your Document Request Log —
+                                            date, time, what was asked for, and who is getting it.</li>
+                                        <li class="pl-2"> Before handing over any document, your Document
+                                            Person must quickly review it for accuracy and completeness.</li>
+                                        <li class="pl-2"> Always provide a clean photocopy — keep the original
+                                            in your facility whenever possible.</li>
+                                        <li class="pl-2"> If you need more time to retrieve a document, tell the
+                                            investigator honestly: <span class="italic font-medium">"We will have that
+                                                for you by [time]."</span></li>
+                                        <li class="pl-2"> If a document does not exist, say clearly: <span
+                                                class="italic font-medium">"That record does not exist in our
+                                                system."</span></li>
+                                        <li class="pl-2"> Never remove, hide, or change any document once an
+                                            inspection has started.</li>
+                                    </ol>
+
+                                    <div
+                                        class="flex items-start gap-3 p-2 bg-error-container text-on-error border border-error rounded-lg mt-4 shadow-sm">
+                                        <span class="material-symbols-outlined text-error"
+                                            data-weight="fill">warning</span>
+                                        <div>
+
+                                            <p class="text-body-sm opacity-90 mt-0.5">Never give the investigator a document that contains errors or is not the current version without first explaining it. This will look far worse than simply saying you need a moment to review.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 4.2: The Facility Tour -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-4-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-4-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">4.2 The Facility Tour</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant font-medium">The investigator will want to walk through your facility. Here is how to handle it:</p>
+                                    <ul
+                                        class="space-y-3 text-body-md text-on-surface-variant list-disc list-inside pl-1">
+                                        <li class="pl-2"><b style=" color:blue;">The Inspection Host leads the tour.</b> A departmental expert walks
+                                            alongside the investigator in their own area.</li>
+                                        <li class="pl-2">The note-taker walks behind and documents everything observed and discussed.</li>
+                                        <li class="pl-2"> <b style=" color:blue;">Before the tour</b> , quickly alert all supervisors that the
+                                            inspection is in progress in their sector.</li>
+                                        <li class="pl-2">Ensure strict line clearance, complete labeling, and absolute
+                                            cleanliness.</li>
+                                        <li class="pl-2">Operators should be calm, trained, and confident</li>
+                                        <li class="pl-2">Follow SOPs exactly as written</li>
+                                        <li class="pl-2">Make sure all areas are tidy, equipment is labeled correctly,
+                                            and logs are up to date.</li>
+                                        <li class="pl-2">•	If the investigator asks to see an area that is not in operation, explain this clearly and offer the relevant documentation instead.</li>
+                                    </ul>
+
+                                    <divy=
+                                        class="flex items-start gap-3 p-2 bg-error-container text-on-error border border-error rounded-lg mt-4 shadow-sm">
+                                        <span class="material-symbols-outlined text-error"
+                                            data-weight="fill">warning</span>
+                                        <div>
+
+                                            <p class="text-body-sm opacity-90 mt-0.5">If the investigator notices a problem in an area - do not try to hide it or quickly fix it without telling them. Acknowledge it, document it, and say you will investigate. Trying to hide observations makes things much worse.</p>
+                                        </div>
+                                    </divy=>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 4.3: Handling Employee Interviews -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-4-3">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-4-3')">
+                                <h3 class="text-title-lg font-title-lg text-primary">4.3 Handling Employee Interviews
+                                </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant font-medium">The investigator may want to speak directly with your employees. Here is the protocol:</p>
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2"> All interview requests go through the Inspection Host first.</li>
+                                        <li class="pl-2"> Listen fully; do not interrupt.</li>
+                                        <li class="pl-2"> Clarify respectfully if needed.</li>
+                                        <li class="pl-2"> Do not argue; document immediately.</li>
+                                        <li class="pl-2"> Begin internal assessment in back room.</li>
+                                        <li class="pl-2"> Briefly remind the employee before the interview: answer truthfully, answer only what is asked, say 'I don't know' if unsure.</li>
+                                        <li class="pl-2"> The Inspection Host or a senior team member should be present as an observer — not to interrupt, just to listen and take notes.</li>
+                                        <li class="pl-2"> After the interview, debrief with the employee privately to note any concerns.</li>
+                                    </ol>
+                                    <div
+                                        class="p-4 bg-surface-container-low border-l-4 border-primary rounded-lg shadow-sm text-body-md mt-4">
+                                        <div class="flex items-start gap-2">
+                                            <span class="material-symbols-outlined text-primary"
+                                                data-weight="fill">push_pin</span>
+                                            <div>
+
+                                                <p class="text-body-sm text-on-surface-variant mt-0.5">Never tell an employee what specific answers to give. That is obstruction. Just remind them to be truthful and to only answer what they are directly asked.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 4.4: Daily Routine During the Inspection -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-4-4">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-4-4')">
+                                <h3 class="text-title-lg font-title-lg text-primary">4.4 Daily Routine During the
+                                    Inspection</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant font-medium">Keep the command
+                                        structure synchronized through this daily operational rhythm:
+                                    </p>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="p-4 bg-surface-container-low border border-outline-variant rounded flex flex-col gap-2">
+                                            <span class="material-symbols-outlined text-primary text-2xl">wb_sunny</span>
+                                            <span class="font-bold text-on-surface">Morning (before investigator arrives)</span>
+                                            <p class="text-body-md text-on-surface-variant">Quick 20-minute team meeting - review yesterday's events, open document requests, and today's expected activities.</p>
+                                        </div>
+                                        <div class="p-4 bg-surface-container-low border border-outline-variant rounded flex flex-col gap-2">
+                                            <span class="material-symbols-outlined text-primary text-2xl">query_stats</span>
+                                            <span class="font-bold text-on-surface">During the Day</span>
+                                            <p class="text-body-md text-on-surface-variant">Track all requests in real time. Keep the investigation log updated. Flag any concerning patterns to legal counsel.</p>
+                                        </div>
+                                        <div class="p-4 bg-surface-container-low border border-outline-variant rounded flex flex-col gap-2">
+                                            <span class="material-symbols-outlined text-primary text-2xl">nights_stay</span>
+                                            <span class="font-bold text-on-surface">Evening (after investigator leaves)</span>
+                                            <p class="text-body-md text-on-surface-variant">Full team debrief - finalize notes, close out document log, identify any potential problem areas for the next day.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Step 5 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300"
+                id="step-5">
+                <button
+                    class="accordion-trigger w-full flex items-start justify-between p-6 text-left"
+                    onclick="toggleAccordion('step-5')"
+                    style="background-color: #E5E7EB; margin-bottom: 10px;">
+
+                    <!-- Left Side -->
+                    <div class="flex flex-col">
+
+                        <!-- Heading -->
+                        <div class="flex items-center gap-4">
+                            <span
+                                class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                                5
+                            </span>
+
+                            <h2 class="text-headline-md font-headline-md text-primary uppercase">
+                                Step 5: The Closing Meeting — FDA Form 483
+                            </h2>
+                        </div>
+
+                        <!-- Quote -->
+                        <div class="mt-2 ml-14">
+                            <p class="text-body-md font-bold italic text-primary">
+                                “At the end of the inspection, the investigator will hold a closing meeting.
+                                They will read out their observations — these are written on FDA Form 483.
+                                This is a critical moment.”
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <!-- Chevron -->
+                    <span
+                        class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant mt-1">
+                        expand_more
+                    </span>
+
+                </button>
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+                        <!-- Intro Card -->
+                        {% comment %} <div
+                            class="p-4 bg-surface-container rounded-lg border border-outline-variant flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary" data-weight="fill">info</span>
+                            <p class="text-body-md text-on-surface-variant">At the end of the inspection, the
+                                investigator will hold a closing meeting. They will read out their observations — these
+                                are written on FDA Form 483. This is a critical moment.</p>
+                        </div> {% endcomment %}
+
+                        <!-- Sub-point 5.1: How to Behave in the Closing Meeting -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-5-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-5-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">5.1 How to Behave in the Closing
+                                    Meeting</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2"> Have your full team present — Inspection Host, Document
+                                            Person, subject matter experts (SMEs), and legal counsel.</li>
+                                        <li class="pl-2">
+                                            <span style="color:red;">Do not argue or get defensive.</span> <span style="color:green;">Listen carefully to every observation.</span> Your
+                                            scribe must write down every single comment and observation.</li>
+                                        <li class="pl-2"> After all observations are read, you may politely
+                                            correct any clear factual errors — only if you have immediate, written proof
+                                            on hand.</li>
+                                        <li class="pl-2"><span style="color:green;">Accept the signed FDA Form 483</span> and sign to confirm
+                                            receipt. <span style="color:red;">Signing does NOT mean you admit to any violation or regulation
+                                            breach. </span></li>
+                                    </ol>
+
+                                    <div
+                                        class="p-4 bg-surface-container-low border-l-4 border-primary rounded-lg shadow-sm text-body-md mt-4">
+                                        <div class="flex items-start gap-2">
+                                            <span class="material-symbols-outlined text-primary"
+                                                data-weight="fill">push_pin</span>
+                                            <div>
+
+                                                <p class="text-body-sm text-on-surface-variant mt-0.5">The closing meeting is not the time to fight observations. Your written response - submitted after the inspection - is where you address them properly.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 5.2: What is on the FDA 483? -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-5-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-5-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">5.2 What is on the FDA Form 483?
+                                </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant font-medium">The FDA 483 lists the investigator's observations of conditions that may be violations of regulations. Think of each observation as a problem the investigator saw or noticed.
+                                    </p>
+                                    <ul
+                                        class="space-y-3 text-body-md text-on-surface-variant list-disc list-inside pl-1">
+                                        <li class="pl-2">It may include documentation issues, process concerns,
+                                            equipment maintenance problems, or operator training gaps.</li>
+                                        <li class="pl-2">Every single observation must be addressed in your final
+                                            submission — you cannot ignore or bypass any concern.</li>
+                                        <li class="pl-2"><span style="color:red;">The FDA Form 483 is not a final enforcement action</span> — it is a
+                                            preliminary list of concerns requiring your written explanation and CAPA
+                                            commitments.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Step 6 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300"
+                id="step-6">
+              <button class="accordion-trigger w-full p-6 text-left"
+    onclick="toggleAccordion('step-6')"
+    style="background-color: #E5E7EB; margin-bottom: 10px;">
+
+    <div class="flex items-start gap-4">
+        <span
+            class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+            6
+        </span>
+
+        <div class="flex-1">
+            <!-- Step Title -->
+            <h2 class="text-headline-md font-headline-md text-primary uppercase">
+                Step 6: AFTER THE INSPECTION — YOUR WRITTEN RESPONSE
+            </h2>
+
+            <!-- Tagline -->
+
+            <p class="text-body-md font-bold italic text-primary">
+                “A strong 483 response doesn’t just fix the issue—it strengthens the system.”
+            </p>
+        </div>
+
+        <span
+            class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">
+            expand_more
+        </span>
+    </div>
+</button>
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+                        <!-- Intro Card -->
+                        <div
+                            class="p-4 bg-surface-container rounded-lg border border-outline-variant flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="flex items-start gap-3">
+                                <span class="material-symbols-outlined text-primary" data-weight="fill">info</span>
+                                <div>
+                                    <!-- <p class="text-body-md font-bold text-primary italic">“A strong 483 response doesn’t
+                                        just fix the issue—it strengthens the system.”</p> -->
+                                    <p class="text-body-sm text-on-surface-variant mt-1"><span style="color:red;">Within 15 business days of receiving the FDA 483,</span> you must send a written response to the FDA. This response is the most important document you will write. 	<br /><span style="color:green;">A good response can prevent a Warning Letter.</span> <span style="color:red;">A poor response can invite one.</span></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 6.1: Cover Letter (Executive Summary) -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-6-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-6-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">6.1 Cover Letter (Executive
+                                    Summary)</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <!-- <p class="text-body-md text-on-surface-variant">The response should open with a
+                                        formal Cover Letter including:</p>                                     -->
+                                        <ul class="space-y-2 text-body-md text-on-surface-variant list-disc list-inside pl-1">                                        <li class="pl-2">Thank the investigator</li>                                        <li class="pl-2">State commitment to cGMP and data integrity</li>                                        <li class="pl-2">Summarize key systemic improvements</li>                                        <li class="pl-2">Provide contact person for follow-ups</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 6.2: How to Write a Good 483 Response -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-6-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-6-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">6.2 How to Write a Good 483
+                                    Response</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <div
+                                        class="p-3 bg-surface-container-low border border-outline-variant rounded flex flex-wrap gap-4 text-xs font-bold text-primary justify-center mb-3">
+                                        <span style="color:green;">BE TIMELY</span><span>•</span><span style="color:blue;">BE TRUTHFUL</span><span>•</span><span style="color:#7030a0;">BE THOROUGH</span><span>•</span><span style="color:#c8a796;">BE ACTIONABLE</span>
+                                    </div>
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2">Submit within 15 working days of receipt</li>
+                                        <li class="pl-2">Assign a single owner (QA lead) and cross-functional SMEs</li>
+                                        <li class="pl-2">Use a tracking sheet for each observation (owner, due dates,
+                                            status)</li>
+                                        <li class="pl-2">Address every single observation - do not skip any.</li>
+                                        <li class="pl-2">For each observation, state what happened (factually, without
+                                            being defensive).</li>
+                                        <li class="pl-2">Rephrase clearly to show understanding. Define scope
+                                            (product(s), batch(es), timeframe)</li>
+                                        <li class="pl-2">Explain why it happened - the root cause & Describe what
+                                            <span style="color:blue;">corrective (Creative)action</span>
+                                             you have taken or will take along with  <span style="color:green;">Proactive
+                                            (Preventive)</span> action you will take in post inspection.</li>
+                                        <li class="pl-2">Give a realistic completion date and name the person
+                                            responsible.</li>
+                                        <li class="pl-2">Attach supporting evidence for anything you have already
+                                            fixed</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 6.3: What to Avoid in Your Response -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-6-3">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-6-3')">
+                                <h3 class="text-title-lg font-title-lg text-primary">6.3 What to Avoid in Your Response
+                                </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <ul
+                                        class="space-y-3 text-body-md text-on-surface-variant list-disc list-inside pl-1">
+                                        <li class="pl-2">Do not argue with the FDA or say they are wrong — Clear,
+                                            concise, factual (no fluff), No blame shifting (own the issue) & Avoid
+                                            vague words: “will ensure,” “as needed,” “ongoing”</li>
+                                        <li class="pl-2">Use data and specifics (numbers, dates, versions).</li>
+                                        <li class="pl-2">Do not make vague promises like 'We will improve our system.'
+                                            Be specific.</li>
+                                        <li class="pl-2">Do not commit to timelines you cannot meet. If you say 3
+                                            months, deliver in 3 months.</li>
+                                        <li class="pl-2">Do not submit the response late. If you need more time,
+                                            contact FDA in advance and explain why.</li>
+                                    </ul>
+                                    <div
+                                        class="p-4 bg-surface-container-low border-l-4 border-primary rounded-lg shadow-sm text-body-md mt-4">
+                                        <div class="flex items-start gap-2">
+                                            <span class="material-symbols-outlined text-primary"
+                                                data-weight="fill">push_pin</span>
+                                            <div>
+                                                <p class="text-body-sm text-on-surface-variant mt-0.5">Have a regulatory
+                                                    consultant or legal counsel review your response before submitting.
+                                                    One poorly worded sentence can change the outcome significantly.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Step 7 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300"
+                id="step-7">
+                <button class="accordion-trigger w-full flex items-center justify-between p-6 text-left"
+                    onclick="toggleAccordion('step-7')" style="background-color: #E5E7EB; margin-bottom: 10px;">
+                    <div class="flex items-center gap-4">
+                        <span
+                            class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold">7</span>
+                        <h2 class="text-headline-md font-headline-md text-primary  uppercase">Step 7: After the Response — What
+                            Happens Next</h2>
+                    </div>
+                    <span
+                        class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                </button>
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+                        <!-- Intro Card -->
+                        <div
+                            class="p-4 bg-surface-container rounded-lg border border-outline-variant flex items-start gap-3">
+                            <span class="material-symbols-outlined text-primary" data-weight="fill">info</span>
+                            <p class="text-body-md text-on-surface-variant">After you submit your response, the FDA will
+                                classify your inspection into one of three operational categories.</p>
+                        </div>
+
+                        <!-- Sub-point 7.1: FDA Classifications -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-7-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-7-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">7.1 FDA Classifications</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2 overflow-x-auto">
+                                    <table class="w-full text-left border-collapse border border-outline-variant">
+                                        <thead>
+                                            <tr class="bg-primary-container text-pure-white">
+                                                <th class="p-4 border border-outline-variant font-title-lg">FDA
+                                                    Classification</th>
+                                                <th class="p-4 border border-outline-variant font-title-lg">What it
+                                                    Means</th>
+                                                <th class="p-4 border border-outline-variant font-title-lg">What You
+                                                    Should Do</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-body-md text-on-surface-variant">
+                                            <tr>
+                                                <td class="p-4 border border-outline-variant font-bold text-[#06a523]">
+                                                    NAI<br><span
+                                                        class="text-[12px] font-normal text-on-surface-variant">No
+                                                        Action Indicated</span>
+                                                </td>
+                                                <td class="p-4 border border-outline-variant">You passed. FDA found no
+                                                    significant issues. Best possible outcome.</td>
+                                                <td class="p-4 border border-outline-variant">Continue maintaining your
+                                                    quality systems. Keep records of the clean inspection.</td>
+                                            </tr>
+                                            <tr class="bg-surface-container">
+                                                <td class="p-4 border border-outline-variant font-bold text-[#0c5f9e]">
+                                                    VAI<br><span
+                                                        class="text-[12px] font-normal text-on-surface-variant">Voluntary
+                                                        Action Indicated</span>
+                                                </td>
+                                                <td class="p-4 border border-outline-variant">Minor issues were found.
+                                                    FDA is not taking formal action but expects you to fix the issues
+                                                    voluntarily.</td>
+                                                <td class="p-4 border border-outline-variant">Submit your corrective
+                                                    action plan. Fix the issues and document everything.</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="p-4 border border-outline-variant font-bold text-alert-red">
+                                                    OAI<br><span class="text-[12px] font-normal text-alert-red">Official
+                                                        Action Indicated</span>
+                                                </td>
+                                                <td
+                                                    class="p-4 border border-outline-variant">
+                                                    Significant problems were found. FDA is likely to issue a Warning
+                                                    Letter.</td>
+                                                <td
+                                                    class="p-4 border border-outline-variant">
+                                                    Engage regulatory counsel immediately. Prepare a comprehensive
+                                                    corrective action plan. Respond quickly and thoroughly.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 7.2: If You Receive a Warning Letter -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-7-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-7-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">7.2 If You Receive a Warning Letter
+                                </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <p class="text-body-md text-on-surface-variant">A Warning Letter is a formal notice
+                                        from FDA that your facility has serious violations. It is publicly posted on
+                                        FDA's website. Here is what to do:</p>
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2">Do not ignore it. You must respond within 15 business days.</li>
+                                        <li class="pl-2">Immediately engage a regulatory attorney or experienced regulatory consultant.</li>
+                                        <li class="pl-2">Develop a comprehensive corrective action plan that addresses every item in the letter.</li>
+                                        <li class="pl-2">Consider a voluntary recall if any product safety issue is identified.</li>
+                                        <li class="pl-2">Request a meeting with the FDA district office if appropriate.</li>
+                                    </ol>
+                                    <div
+                                        class="flex items-start gap-3 p-2 bg-error-container text-on-error border border-error rounded-lg mt-4 shadow-sm">
+                                        <span class="material-symbols-outlined text-error"
+                                            data-weight="fill">warning</span>
+                                        <div>
+                                            <p class="text-body-sm opacity-90 mt-0.5">A Warning Letter that is ignored
+                                                or poorly responded to can result in product seizure, injunction,
+                                                import alert, or consent decree. These consequences can shut down
+                                                facility operations permanently.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Step 8 -->
+            <section
+                class="accordion-item border border-outline-variant bg-surface-container-low rounded-lg transition-all duration-300"
+                id="step-8">
+                <button
+                    class="accordion-trigger w-full flex items-start justify-between p-6 text-left"
+                    onclick="toggleAccordion('step-8')"
+                    style="background:#E5E7EB; margin-bottom:10px;"
+                >
+
+                    <!-- LEFT SIDE -->
+                    <div class="flex flex-col">
+
+                        <!-- Heading Row -->
+                        <div class="flex items-center gap-4">
+                            <span
+                                class="bg-primary-container text-pure-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                                8
+                            </span>
+
+                            <h2 class="text-headline-md font-headline-md text-primary uppercase">
+                                Step 8: Staying Ready After the Inspection
+                            </h2>
+                        </div>
+
+                        <!-- Quote -->
+                        <div class="mt-2 ml-14">
+                            <p class="text-body-md font-bold text-primary italic">
+                                “Inspection ends in a day—compliance is demonstrated every day.”
+                            </p>
+
+                            <p class="text-body-sm text-on-surface-variant">
+                                (From Response → Reinforcement → Continuous Readiness)
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <!-- Chevron -->
+                    <span class="material-symbols-outlined chevron transition-transform duration-300 mt-1">
+                        expand_more
+                    </span>
+
+                </button>
+
+                <div class="accordion-content px-6 md:px-20">
+                    <div class="py-6 space-y-4">
+                        <!-- Intro Card -->
+                        <div
+                            class="p-4 bg-surface-container rounded-lg border border-outline-variant flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="flex items-start gap-3">
+                                <span class="material-symbols-outlined text-primary" data-weight="fill">info</span>
+                                <div class="space-y-2">
+                                    <p class="text-body-sm text-on-surface-variant">Once the inspection is over, your job is not done. Inspection readiness is not a one-time event - it is a continuous process.</p>
+                                    <ul class="list-disc list-inside text-body-sm text-on-surface-variant pl-4">
+                                        <li>Don’t “relax after inspection”—operate in a constant state of readiness</li>
+                                        <li>Turn observations into system improvements, not one-time fixes</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 8.1: What to Do in the 90 Days After the Inspection -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-8-1">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-8-1')">
+                                <h3 class="text-title-lg font-title-lg text-primary">8.1 What to Do in the 90 Days After the Inspection
+                                </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                    <ol
+                                        class="space-y-3 text-body-md text-on-surface-variant list-decimal list-inside pl-1">
+                                        <li class="pl-2">Convert all 483 actions into CAPA with owners, timelines, milestones</li>
+                                        <li class="pl-2">Weekly CAPA review dashboard (status, risks, delays)</li>
+                                        <li class="pl-2">
+                                            <strong>No overdue actions—</strong>
+                                            <span class="font-bold text-red-600">escalate early</span>
+                                        </li>
+                                        <li class="pl-2">Complete all corrective actions you committed to in your 483 response. On time, every time.</li>
+                                        <li class="pl-2">Update your SOPs and training records to reflect any gaps identified.</li>
+                                        <li class="pl-2">Run another mock inspection focused on the areas the investigator examined.</li>
+                                        <li class="pl-2">Debrief your entire quality team on the lessons learned.</li>
+                                        <li class="pl-2">Rebuild your inspection readiness posture - assume FDA may return within 6 to 12 months.</li>
+                                        <li class="pl-2">
+                                            <span class="font-bold text-blue-700">
+                                                “Inspection readiness = everyone’s responsibility”
+                                            </span>
+
+                                            <ul class="checklist-details list-disc list-inside pl-4 mt-1">
+                                                <li>Encourage early reporting of issues (no blame)</li>
+                                                <li>Recognize compliant behaviors</li>
+                                            </ul>
+                                        </li>
+                                        <li class="pl-2">	Inspection Readiness Kit (Always Ready)</li>
+                                        <li class="pl-2">	Updated:<ul class="checklist-details list-disc list-inside pl-4 mt-1"><li>a.	Site overview deck</li><li>b.	Org chart & SME list</li><li>c.	Product list / process flow</li><li>d.	Key SOP index</li></ul></li>                                        <li class="pl-2">Defined Front War Room / Back War Room roles</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Sub-point 8.2: Inspection Readiness Kit & Team Roles -->
+                        {% comment %} <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-8-2">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left"
+                                onclick="toggleAccordion('step-8-2')">
+                                <h3 class="text-title-lg font-title-lg text-primary">8.2 Inspection Readiness Kit &amp;
+                                    Team Roles</h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                    <!-- Content for 8.2 was removed as per instruction -->
+                                </div>
+                            </div>
+                        </div> {% endcomment %}
+
+                        <!-- Sub-point 8.3: The Simple Truth About Inspection Readiness -->
+                        <div class="accordion-item border border-outline-variant bg-surface-container rounded-lg transition-all duration-300"
+                            id="step-8-3">
+                            <button class="accordion-trigger w-full flex items-center justify-between p-4 text-left" style="background-color: #E5E7EB;"
+                                onclick="toggleAccordion('step-8-3')">
+                                <h3 class="text-title-lg font-title-lg text-primary">8.2 The Simple Truth About
+                                   Inspection Readiness </h3>
+                                <span
+                                    class="material-symbols-outlined chevron transition-transform duration-300 text-on-surface-variant">expand_more</span>
+                            </button>
+                            <div class="accordion-content px-4 pb-4">
+                                <div class="space-y-4 pt-2">
+                                <div
+                                    class="p-3 bg-surface-container-low border border-outline-variant rounded flex flex-wrap justify-center items-center gap-2 text-xs font-bold">
+
+                                    <span class="text-blue-700">AUDIT</span>
+
+                                    <span class="text-gray-800">→</span>
+
+                                    <span class="text-red-600">LEARN</span>
+
+                                    <span class="text-gray-800">→</span>
+
+                                    <span class="text-purple-600">IMPROVE</span>
+
+                                    <span class="text-gray-800">→</span>
+
+                                    <span class="text-blue-700">STANDARDIZE</span>
+
+                                    <span class="text-gray-800">→</span>
+
+                                    <span class="text-green-700">SUSTAIN</span>
+
+                                </div>
+                                    <p class="text-body-md text-on-surface-variant font-medium">Facilities that do well in FDA inspections are not lucky. They are prepared. They have:</p>
+                                    <ul class="space-y-2 text-body-md text-on-surface-variant list-disc list-inside">
+                                        <li>Clean, organized, accurate documentation - always.</li>
+                                        <li>Trained employees who know how to behave during an inspection.</li>
+                                        <li>A culture where quality problems are documented and fixed - not hidden.</li>
+                                        <li>A team that knows their roles and stays calm under pressure.
+                                        </li>
+                                        <li>A habit of regular self-inspection so nothing surprises them.
+                                        </li>
+                                    </ul>
+
+                                    <div
+                                        class="p-4 bg-surface-container-low border-l-4 border-primary rounded-lg shadow-sm text-body-md mt-4">
+                                        <div class="flex items-start gap-2">
+                                            <span class="material-symbols-outlined text-primary"
+                                                data-weight="fill">push_pin</span>
+                                            <div>
+
+                                                <p class="text-body-sm text-on-surface-variant mt-0.5">The single best predictor of a successful FDA inspection is the quality of what you do every day — not what you do when the investigator is in the building.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        <!-- Quick Checklist Section -->
+        <section class="mt-section-gap border-2 border-primary rounded-xl overflow-hidden shadow-xl"
+            id="checklist-section">
+            <div class="bg-primary-container p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <span class="material-symbols-outlined text-pure-white text-3xl" data-weight="fill">checklist</span>
+                    <div>
+                        <h2 class="text-headline-md font-headline-md text-pure-white leading-tight">QUICK CHECKLIST —
+                            PRINT AND KEEP HANDY</h2>
+                        <p class="text-label-caps text-on-primary-container/80 text-[10px] italic">“If it is not
+                            documented, it did not happen.”</p>
+                    </div>
+                </div>
+                {% comment %} <span class="bg-pure-white text-primary px-3 py-1 rounded-full text-label-caps font-bold">CRITICAL
+                    DEPLOYMENT</span> {% endcomment %}
+            </div>
+            <div class="bg-surface-container p-4 md:p-8 space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- BEFORE ANY INSPECTION -->
+                    <div>
+                        <div class="mb-4 border-b-2 border-[#5B7DB5] pb-2">
+                            <h4 class="text-label-caps font-label-caps text-primary">Before Any Inspection</h4>
+                            <p class="text-[10px] text-on-surface-variant italic mt-0.5">“Inspection readiness is not an
+                                event—it is a daily discipline.”</p>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Inspection team assigned with backups (War Room)</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Inspection team assigned with backups ready for War Room roles.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Command room set up and stocked</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Ensure command room is set up and stocked with supplies.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">All documents current and retrievable within 30 minutes</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Ensure all documents are current and retrievable within a 30-minute window.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Mock inspection completed</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Run mock inspections to identify and resolve compliance gaps.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">All staff briefed on inspection conduct</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Brief all staff members on professional conduct and communication protocols.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Legal/regulatory consultant contact saved</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Save and verify contact information for legal counsel and regulatory consultants.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">SOPs current, approved, and followed - Employees trained & confident - R&R clearly defined</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">SOPs current, approved, and followed. Employees trained &amp; confident. Roles and responsibilities (R&amp;R) clearly defined.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WHEN INVESTIGATOR ARRIVES -->
+                    <div>
+                        <h4 class="text-label-caps font-label-caps text-primary mb-4 border-b-2 border-[#5B7DB5] pb-2">
+                            When Investigator Arrives</h4>
+                        <div class="space-y-4">
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">No guessing / no assumptions Stay calm. Escort to reception.</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">No guessing / no assumptions Stay calm. Escort investigator to reception.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Call Inspection Host immediately</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Call the Inspection Host immediately. Keep the investigator accompanied at all times.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Check FDA credentials and FDA 482</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Ask to see and verify official FDA photo identification and the FDA Form 482.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Photocopy credentials and 482</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Photocopy credentials and official Notice of Inspection Form 482.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Activate full inspection team</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Immediately notify site leadership and activate the full inspection support team.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Log arrival time</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Record the investigator's name, badge number, and exact time of arrival in the logbook.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DURING THE INSPECTION - EVERY DAY -->
+                    <div>
+                        <h4 class="text-label-caps font-label-caps text-primary mb-4 border-b-2 border-[#5B7DB5] pb-2">
+                            During the Inspection - Every Day</h4>
+                        <div class="space-y-4">
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Be honest, clear, and concise. Answer only what is asked. If unsure → “I will check and revert.”</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Be honest, clear, and concise. Answer only what is asked. If unsure → “I will check and revert.”</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Front War Room / Back War Room defined. SMEs available on call & Clear communication flow.</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Front War Room / Back War Room defined. SMEs available on call &amp; clear communication flow.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">All document requests logged</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Write down every request in the document request log.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">No documents handed over without review</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Review every document for accuracy and completeness before handing it over.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Investigator escorted at all times</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Ensure the investigator is accompanied by an escort at all times.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">Notes taken for every activity</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Scribe documents every discussion, interview, and observation.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="checklist-item-row group cursor-pointer">
+                                <div class="flex items-start gap-3">
+                                    <input
+                                        class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                        type="checkbox">
+                                    <div class="flex-1">
+                                        <span class="text-body-md font-bold text-on-surface group-hover:text-primary transition-colors">End-of-day team debrief done</span>
+                                        <div class="checklist-details hidden">
+                                            <p class="text-[12px] text-on-surface-variant pt-1">Hold a meeting at the end of each day to review progress and prepare for tomorrow.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Closing Meeting & After Inspection Section -->
+                <div class="pt-8 border-t border-outline-variant">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <!-- AT THE CLOSING MEETING -->
+                        <div>
+                            <h4 class="text-label-caps font-label-caps text-primary mb-4 border-b-2 border-[#5B7DB5]  pb-2">
+                                At the Closing Meeting</h4>
+                            <div class="space-y-4">
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-alert-red transition-colors">Full team present</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Have the full team present, including host, QA lead, and counsel.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-alert-red transition-colors">All 483 observations written down</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Ensure the note-taker writes down every single observation exactly as read.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-alert-red transition-colors">FDA 483 received and signed</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Accept the signed Form 483 and sign to confirm receipt.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-alert-red transition-colors">Internal 483 response team assigned</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Assign the internal team responsible for drafting and reviewing the response.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AFTER THE INSPECTION -->
+                        <div>
+                            <h4 class="text-label-caps font-label-caps text-primary mb-4 border-b-2 border-[#5B7DB5]  pb-2">
+                                After the Inspection</h4>
+                            <div class="space-y-4">
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-secondary transition-colors">483 Response Drafted & Reviewed</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Draft the response and conduct cross-functional and legal reviews.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-secondary transition-colors">Response submitted within 15 business days</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Submit the final written response package to the FDA on time.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-secondary transition-colors">All CAPAs opened and tracked</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Initiate corrective actions and track progress via the CAPA system.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="checklist-item-row group cursor-pointer">
+                                    <div class="flex items-start gap-3">
+                                        <input
+                                            class="w-5 h-5 rounded border-outline-variant bg-white text-primary focus:ring-primary mt-1"
+                                            type="checkbox">
+                                        <div class="flex-1">
+                                            <span class="text-body-md font-bold text-on-surface group-hover:text-secondary transition-colors">Mock inspection updated and scheduled</span>
+                                            <div class="checklist-details hidden">
+                                                <p class="text-[12px] text-on-surface-variant pt-1">Update the mock inspection procedures and schedule the next exercise.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+                    <!-- Footer -->
+                    <footer class="bg-primary-container border-t border-outline-variant full-width bottom-0 mt-20">
+                    </footer>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Interactive Scripts -->
+    <script>
+        function toggleAccordion(id) {
+            const item = document.getElementById(id);
+            const isAlreadyActive = item.classList.contains('active');
+
+            // Toggle active state
+            if (isAlreadyActive) {
+                item.classList.remove('active');
+            } else {
+                item.classList.add('active');
+            }
+        }
+
+        // Handle navigation clicks for smooth scroll and auto-expand
+        document.querySelectorAll('nav a').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                const targetId = this.getAttribute('href').substring(1);
+                const targetEl = document.getElementById(targetId);
+
+                if (targetEl && targetEl.classList.contains('accordion-item')) {
+                    targetEl.classList.add('active');
+                }
+            });
+        });
+
+        // Initialize checkboxes with strike-through effect for manual checking
+        document.querySelectorAll('.checklist-item-row').forEach(row => {
+            const checkbox = row.querySelector('input[type="checkbox"]');
+            const textSpan = row.querySelector('.text-body-md');
+
+            if (checkbox && textSpan) {
+                // Ensure pointer-events-none is not blocking click events
+                checkbox.classList.remove('pointer-events-none');
+
+                // Clicking the row toggles the checkbox
+                row.addEventListener('click', function (e) {
+                    if (e.target !== checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        checkbox.dispatchEvent(new Event('change'));
+                    }
+                });
+
+                // Update styling when checkbox changes state
+                checkbox.addEventListener('change', function () {
+                    if (this.checked) {
+                        textSpan.classList.add('line-through', 'opacity-60');
+                    } else {
+                        textSpan.classList.remove('line-through', 'opacity-60');
+                    }
+                });
+            }
+        });
+
+        function initSidebarToggle() {
+            const layout = document.getElementById('dashboardLayout');
+            const toggleButton = document.getElementById('sidebarToggle');
+            if (!layout || !toggleButton) return;
+
+            const storageKey = 'dashboard483SidebarCollapsed';
+            const savedState = localStorage.getItem(storageKey);
+            const isCollapsed = savedState === 'true';
+
+            function applyState(collapsed) {
+                layout.classList.toggle('sidebar-collapsed', collapsed);
+                toggleButton.setAttribute('aria-expanded', String(!collapsed));
+                const toggleIcon = toggleButton.querySelector('i');
+                if (toggleIcon) {
+                    toggleIcon.className = 'mdi mdi-dock-left';
+                }
+            }
+
+            applyState(isCollapsed);
+
+            toggleButton.addEventListener('click', () => {
+                const nextState = !layout.classList.contains('sidebar-collapsed');
+                localStorage.setItem(storageKey, String(nextState));
+                applyState(nextState);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initSidebarToggle();
+        });
+    </script>
+
+
+
+{% include 'back_to_top.html' %}
+</body>
+
+</html>

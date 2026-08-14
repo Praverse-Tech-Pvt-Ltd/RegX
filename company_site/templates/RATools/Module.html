@@ -1,0 +1,338 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Module Simplification</title>
+    <!-- plugins:css -->
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+      html.lenis {
+        height: auto;
+      }
+      .lenis.lenis-smooth {
+        scroll-behavior: auto !important;
+      }
+
+      .text-blue{
+        color: #07699f !important;
+      }
+
+
+  .nav-link {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    text-align: left !important;
+  }
+
+  .main-panel {
+    width: 100%;
+    background: #f4f8fc !important;
+    border-radius: 16px;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(2px);
+  }
+
+  .content-wrapper {
+    background: none;
+  }
+
+  .footer {
+    background: white;
+  }
+
+  .nav-item-dr {
+    background: #90dad7;
+    padding: 0 !important;
+  }
+
+  .nav-item-dr-li {
+    padding: 0 1.25rem !important;
+  }
+
+  .hover-link {
+    color: rgb(0, 0, 0) !important;
+    font-weight: 600;
+    padding: 1.125rem 2.25rem !important;
+  }
+
+  .hover-link i {
+    color: rgb(0, 0, 0) !important;
+  }
+
+  .hover-link:hover {
+   background: linear-gradient(to right, #045c8d, #3485b3) !important;
+  }
+
+  .hover-link:hover i {
+    color: rgb(0, 0, 0) !important;
+  }
+
+  @media screen and (max-width:1366px) {
+
+    .nav-item.nav-settings {
+      margin-left: 0px !important;
+    }
+  }
+
+  .nav-link:before {
+    color: white !important;
+  }
+
+  .nav-item-list {
+    padding: 0.50rem 2.25rem !important;
+    color: rgb(0, 0, 0) !important;
+    font-weight: 600;
+    background: #90dad7;
+  }
+
+  .nav-item-list .nav-link:before {
+    color: rgb(0, 0, 0) !important;
+  }
+
+  .nav-item-list a {
+    background: none !important;
+  }
+
+
+
+  .text-truncate:hover {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        word-wrap: break-word;
+      }
+  .nav-item-list:hover {
+   background: linear-gradient(to right, #045c8d, #3485b3) !important;
+    color: rgb(0, 0, 0) !important;
+  }
+
+  .nav-item-list:hover .nav-link:before {
+    color: white !important;
+  }
+
+  .nav-item-list:hover a {
+    color: rgb(0, 0, 0) !important;
+  }
+
+  .navbar-menu-wrapper {
+    padding-left: 0px !important;
+    padding-right: 0px !important;
+    flex-grow: 1;
+  }
+
+  .nav-header-link {
+    font-size: 14px !important;
+    font-weight: bold;
+    text-decoration: none;
+    border-radius: 5px;
+    color: black !important;
+  }
+
+  @media (max-width: 1490px) {
+    .nav-header-link {
+      font-size: 12px !important;
+    }
+  }
+
+  .nav-header-link-hover:hover {
+    color: #045c8d !important;
+  }
+
+  .folder-card {
+  position: relative;
+}
+
+.download-zip-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  z-index: 10;
+  transition: 0.2s ease;
+}
+
+.download-zip-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0px 2px 10px rgba(0,0,0,0.15);
+}
+
+.download-zip-btn i {
+  font-size: 18px;
+  color: #07699f;
+}
+
+  @media (min-width: 992px) {
+    .sidebar-icon-only .sidebar {
+      width: 70px;
+    }
+  }
+  .hov:hover
+  {
+   transform: scale(1.1);
+     white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        word-wrap: break-word;
+  }
+
+  .active-header-link {
+    color: rgba(255, 255, 255, 1) !important;
+    background: linear-gradient(to right, #045c8d, #3485b3) !important;;
+  }
+
+  .hover-link-list {
+    color: black !important;
+  }
+
+    </style>
+  </head>
+  <body>
+    <div class="container-scroller"style="margin-top:80px">
+      <!-- partial:partials/_navbar.html -->
+       {% include 'navbar.html' %}
+
+      <!-- page-body-wrapper -->
+      <div class="container-fluid page-body-wrapper">
+        <div class="main-panel" style="width: 100%;">
+          <div class="content-wrapper">
+            <div class="container-fluid ">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <nav aria-label="breadcrumb" class="flex-grow-1">
+                  <ol class="breadcrumb bg-white p-3 rounded shadow-sm mb-0">
+                    <li class="breadcrumb-item"><a href="/ratools/modulehome/" class="text-decoration-none text-dark fw-bold">Home</a>
+</li>
+
+                    <li class="breadcrumb-item active" aria-current="page">
+                      <i class="mdi mdi-folder-open me-1"></i><span id="breadcrumb-path">{{path}}</span></li>
+                  </ol>
+                </nav>
+                {% if path %}
+<a href="?path={{ parent_path }}" class="btn btn-sm btn-light ms-3">
+  ← Back
+</a>
+{% endif %}
+
+              </div>
+
+              <div class="row mt-4">
+{% for file in files %}
+<div class="col-6 col-md-3 col-lg-2 mb-3">
+  <div class="card border-0 shadow-sm text-center p-3 hov folder-card
+       {% if file.is_folder and not file.flag %}opacity-50{% endif %}">
+
+    {% if file.is_folder %}
+
+      <!-- ✅ Download icon top-right -->
+      {% if file.flag %}
+        <a href="{% url 'download_folder_zip' %}?path={{ file.path }}"
+           class="download-zip-btn"
+           title="Download ZIP"
+           onclick="event.stopPropagation();">
+          <i class="mdi mdi-download"></i>
+        </a>
+      {% endif %}
+
+      {% if file.flag %}
+        <a href="?path={{ file.path }}" class="text-decoration-none text-dark">
+      {% else %}
+        <a href="javascript:void(0);" title="Access Denied">
+      {% endif %}
+
+        <i class="mdi mdi-folder text-blue" style="font-size: 5rem;"></i>
+        <h6 class="mt-2 mb-0 text-truncate">{{ file.name }}</h6>
+
+        {% if file.is_folder and not file.flag %}
+          <div class="text-danger small mt-1">No Access</div>
+        {% endif %}
+
+      </a>
+
+    {% else %}
+
+      <a href="{% url 'open_file' %}?file={{ file.path }}" target="_blank"
+         class="text-decoration-none text-dark">
+
+        {% if file.name|lower|slice:"-4:" == ".pdf" %}
+          <i class="mdi mdi-file-pdf-box text-danger" style="font-size: 5rem;"></i>
+        {% elif file.name|lower|slice:"-5:" == ".docx" or file.name|lower|slice:"-4:" == ".doc" %}
+          <i class="mdi mdi-file-word text-blue" style="font-size: 5rem;"></i>
+        {% else %}
+          <i class="mdi mdi-file text-secondary" style="font-size: 5rem;"></i>
+        {% endif %}
+
+        <h6 class="mt-2 mb-0 text-truncate">{{ file.name }}</h6>
+
+      </a>
+
+    {% endif %}
+
+  </div>
+</div>
+
+
+{% endfor %}
+
+
+              </div>
+            </div>
+          </div>
+          <!-- footer -->
+          <footer class="footer">
+            <div class="d-sm-flex justify-content-center justify-content-center">
+              <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">© Copyright ©2025 iPharmaAI. All Rights Reserved by <a href="https://icretegy.com" target="_blank">iCretegy Solutions</a>.</span>
+            </div>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <!-- plugins:js -->
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <script src="{% static 'assets/js/off-canvas.js' %}"></script>
+    <script src="{% static 'assets/js/hoverable-collapse.js' %}"></script>
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var pathElement = document.getElementById('breadcrumb-path');
+
+        if (pathElement) {
+          var fullPath = pathElement.textContent.trim();
+          if (fullPath) {
+            var parts = fullPath.split('/');
+            var html = '';
+            var currentLink = '';
+            parts.forEach(function(part, index) {
+              currentLink += (index === 0 ? '' : '/') + part;
+              if (index > 0) html += ' <span class="mx-1">-&gt;</span> ';
+              if (index === parts.length - 1) {
+                html += '<span class="fw-bold text-blue">' + part + '</span>';
+              } else {
+                html += '<a href="?path=' + encodeURIComponent(currentLink) + '" class="text-decoration-none text-dark fw-bold">' + part + '</a>';
+              }
+            });
+            pathElement.innerHTML = html;
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

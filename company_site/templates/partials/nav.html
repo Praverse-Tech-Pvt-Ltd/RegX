@@ -1,0 +1,114 @@
+<nav class="navbar default-layout-navbar col-lg-12 col-12 p-0 fixed-top position-fixed d-flex flex-row">
+      <div class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start">
+        <a class="navbar-brand brand-logo" href="../../../"><img
+            src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="logo"
+            style="width: 132px !important;height: 31px !important;" /></a>
+        <a class="navbar-brand brand-logo-mini" href="../../../"><img src="{% static 'assets/images/logo-mini.svg' %}"
+            alt="logo" /></a>
+      </div>
+      <div class="navbar-menu-wrapper d-flex align-items-stretch">
+
+        <ul class="navbar-nav navbar-nav-right">
+          <li class="nav-item d-none d-lg-block">
+            <a class="nav-link nav-header-link nav-header-link-hover" href="../../">
+              Home
+            </a>
+          </li>
+          <li class="nav-item d-none d-lg-block">
+            <a class="nav-link nav-header-link nav-header-link-hover" {% if request.user.role == "admin" %}
+              href="../../../adminmaster/adminbase" {% else %} href="../../../ratools/" {% endif %}>
+              Technical Tools
+            </a>
+          </li>
+          </li>
+          <li class="nav-item d-none d-lg-block    ">
+            <a class="  nav-link nav-header-link nav-header-link-hover  " href="/ratools/modulehome/">
+              ANDA CTD SmartTemplate
+            </a>
+            {% comment %}
+          <li class="nav-item d-none d-lg-block">
+            <a class="px-4 py-3 rounded-2  nav-header-link active-header-link" href="/aidatabase/form483/">
+              483 Observations Database
+            </a>
+          </li> {% endcomment %}
+          <li class="nav-item  d-lg-block position-relative ">
+            <a class=" px-4 py-3 rounded-2  nav-header-link active-header-link " href="#" id="observationsDropdown"
+              role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              483 Database
+            </a>
+            <!-- <ul class="dropdown-menu position-absolute w-100"  aria-labelledby="observationsDropdown"  style="margin-top:14px">
+              <li>
+                <a href="/aidatabase/form483/" class="dropdown-item fw-bold   nav-header-link-hover" style="font-size:14px">483 observations</a>
+
+              <a href="/aidatabase/warning_letter/" class="dropdown-item fw-bold nav-header-link-hover" style="font-size:14px">Warning Letter</a>
+
+              </li>
+            </ul> -->
+          </li>
+          {% if request.user.fda_deficiency_database %}
+          <li class="nav-item d-none d-lg-block">
+            <a class=" px-4 py-3 rounded-2  nav-header-link   " href="/aidatabase/ai_master_base/">
+              FDA Deficiency Database
+            </a>
+          </li>
+          {% endif %}
+          {% if request.user.complete_response_database %}
+          <li class="nav-item d-none d-lg-block">
+            <a class="nav-link nav-header-link nav-header-link-hover" href="/aidatabase/major_cr_base/">
+              Complete Response Database
+            </a>
+          </li>
+          {% endif %}
+          {% if user.is_authenticated %}
+          <li class="nav-item nav-profile dropdown">
+            <a class="nav-link dropdown-toggle" id="profileDropdown" href="#" data-bs-toggle="dropdown"
+              aria-expanded="false">
+              <div class="nav-profile-img">
+                <!-- <img src="{% static 'assets/images/faces/face1.jpg' %}" alt="image"> -->
+                {% if request.user.logo %}
+                <img src="{{ request.user.logo.url }}" alt="image" />
+                {% else %}
+                <img src="{% static 'assets/images/faces/face1.jpg' %}" alt="image" />
+                {% endif %}
+                <span class="availability-status online"></span>
+              </div>
+              <div class="nav-profile-text">
+                <p class="mb-1 text-black nav-header-link nav-header-link-hover ">{{ request.user.first_name }}</p>
+              </div>
+            </a>
+            <div class="dropdown-menu navbar-dropdown" aria-labelledby="profileDropdown">
+              <a class="dropdown-item nav-header-link" href="#">
+                <i class="mdi mdi-cached me-2 text-success"></i> Profile </a>
+              <div class="dropdown-divider"></div>
+          </li>
+
+          <li class="nav-item nav-logout d-none d-lg-block">
+            <a class="nav-link" href="/adminmaster/logout/">
+              <i class="mdi mdi-power text-dark"></i>
+            </a>
+          </li>
+          <li class="nav-item nav-settings d-none d-lg-block">
+            <a class="nav-link" href="#">
+              <i class="mdi mdi-format-line-spacing text-dark"></i>
+            </a>
+          </li>
+          {% else %}
+          <div class="flex">
+            <div class="rectangle-container">
+              <a class="nav-link rectangle rounded-2 text-dark px-4 py-2" href="../../ratools/requestdemo"
+                class="reactangle-text rectangle" style="background:#35b1f6; font-weight: bold;">Request a Demo</a>
+            </div>
+          </div>
+          <div class="rectangle-container mx-2">
+            <a class="nav-link rectangle rounded-2 text-dark px-4 py-2" href="../../adminmaster/login/"
+              style="font-weight: bold;" class="reactangle-text rectangle">Login</a>
+          </div>
+          {% endif %}
+
+        </ul>
+        <button class="navbar-toggler navbar-toggler-right d-lg-none align-self-center" type="button"
+          data-toggle="offcanvas">
+          <span class="mdi mdi-menu"></span>
+        </button>
+      </div>
+    </nav>

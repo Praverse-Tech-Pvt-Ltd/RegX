@@ -1,0 +1,1008 @@
+{% extends 'RATools/RAToolsBase.html' %}
+{% load static %}
+
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    {% if show_flag %}
+      <form method="POST" enctype="multipart/form-data" id="controlledCorrespondenceForm">
+          {% csrf_token %}
+          <div class="pdf-page pdf">
+              <div class="d-flex justify-content-center font-weight-light">First Page should be same as company letterhead</div>
+              <div class="d-flex flex-column mt-5">
+                  <div class="d-flex justify-content-end font-weight-bold">Controlled Correspondence – </div>
+                  <div class="d-flex justify-content-end font-weight-bold">Comment on Q1/Q2 Formulation of</div>
+                  <div class="d-flex justify-content-end"><input class="form-control w-25" style="padding: 10px; display: inline;" type="text" name="drugName" id="drugName" placeholder="Proposed Drug Product Name"></div>
+                  <div class="d-flex justify-content-end mt-3"><input class="form-control w-25" style="padding: 10px; display: inline;" type="date" id="date" placeholder="Select the date"></div>
+              </div>
+              <div class="d-flex flex-column mt-3">
+                  <div class="d-flex justify-content-start font-weight-bold" style="text-decoration: underline;">Via FDA CDER Direct NextGen Collaborative Portal</div>
+                  <div class="d-flex justify-content-start">Control Correspondence Coordinator</div>
+                  <div class="d-flex justify-content-start">Office of Generic Drugs (HFD 600)</div>
+                  <div class="d-flex justify-content-start">Metro Park North VII</div>
+                  <div class="d-flex justify-content-start">7620 Standish Place</div>
+                  <div class="d-flex justify-content-start">Rockville, MD 20855</div>
+              </div>
+              <div class="d-flex flex-column mt-4">
+                  <div>RE: <span class="font-weight-bold">Controlled Correspondence - Comment on Q1/Q2 Formulation of  <input type="text" id="drugName" class="form-control w-25" style="padding: 10px; display: inline;" placeholder="Proposed Drug Product Name"></span></div>
+                  <div class="mt-4">Dear Sir/Madam:</div>
+                  <div class="mt-2">This controlled correspondence is being submitted by <input type="text" id="andaApplicant" class="form-control w-25" style="padding: 10px; display: inline;" name="andaApplicant" placeholder="Enter ANDA applicant name"> name in connection with the development of <input type="text" class="form-control w-25" style="padding: 10px; display: inline;" id="drugName" placeholder="Proposed Drug Product Name"> for a potential ANDA submission.</div>
+                  <div class="mt-4">Relevant RLD and RS information: The information on the Reference Listed Drug (RLD), <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="brandName" name="brandName" placeholder="Brand Name (Generic name)">, <input type="text" class="form-control w-25" style="padding: 10px; display: inline;" id="strength" name="strength" placeholder="Strength">, of <input type="text" class="form-control w-25" style="padding: 10px; display: inline;" id="ndaApplicant" name="ndaApplicant" placeholder="Applicant Name"> (<input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="ndax" name="ndax" placeholder="NDA# NXXXXXX">) as listed in the prescription section of the electronic version of the Approved Drug Products with Therapeutic Equivalence Evaluations ("Orange Book") is as follows:</div>
+                  <div class="d-flex flex-column mt-3">
+                      <div class="d-flex justify-content-start font-weight-bold mt-1" style="text-decoration: underline;">RLD Information:</div>
+                      <div class="d-flex justify-content-start font-weight-bold mt-1">Active Ingredient:</div>
+                      <div class="d-flex justify-content-start font-weight-bold mt-1">Proprietary Name:</div>
+                      <div class="d-flex justify-content-start font-weight-bold mt-1">Dosage Form; Route of Administration:</div>
+                      <div class="d-flex justify-content-start font-weight-bold mt-1">Strength:</div>
+                      <div class="d-flex justify-content-start font-weight-bold mt-1">Reference Listed Drug:</div>
+                  </div>
+              </div>
+              <div class="d-flex flex-column mt-5">
+                  <div class="mt-4"> < Note: Take information of RLD from the Orange Book and add details on below page Ensure that the information matches the Orange Book as of the current date. > </div>
+              </div>
+          </div>
+            <div class="pdf-page pdf">
+              <div class="page-header">
+                <table class="table table-borderless">
+                    <tbody>
+                      <tr>
+                        <td rowspan="3" colspan="2" class="font-weight-light text-center border-bottom"><input class="form-control w-50" style="padding: 10px; display: inline;" type="file" name="logo" id="">{% if cctemplate.company_logo %}<img src="../../{{ cctemplate.company_logo }}" style="height: 130px;width: 180px; border-radius: 0%;"></img>{% endif %}</td>
+                        <td style="text-align: right;padding:1px;"><input class="form-control w-50" style="padding: 10px; display: inline;" type="text" id="drugName" placeholder="Proposed Drug Product Name"></div></td>
+                      </tr>
+                      <tr>
+                        <td style="text-align: right;padding:1px;">Controlled Correspondence</td>
+                      </tr>
+                      <tr>
+                        <td style="text-align: right;padding:1px;" class="border-bottom">Comments on Q1/Q2 Formulation</td>
+                      </tr>
+                    </tbody>
+                </table>
+              </div>
+              <div class="d-flex flex-column mt-5">
+                <div class="d-flex justify-content-start font-weight-bold mt-1">Reference Standard:</div>
+                <div class="d-flex justify-content-start font-weight-bold mt-1">TE Code:</div>
+                <div class="d-flex justify-content-start font-weight-bold mt-1">Application Number:</div>
+                <div class="d-flex justify-content-start font-weight-bold mt-1">Product Number:</div>
+                <div class="d-flex justify-content-start font-weight-bold mt-1">Approval Date:</div>
+                <div class="d-flex justify-content-start font-weight-bold mt-1">Application Holder Full Name:</div>
+                <div class="d-flex justify-content-start font-weight-bold mt-1">Marketing Status:</div>
+              </div>
+              <div class="d-flex flex-column mt-4">
+                <div class="d-flex justify-content-start font-weight-bold mt-2">Background:</div>
+                <div class="mt-2">For submission of generic <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="drugName" placeholder="Proposed Drug Product Name">, referring to RLD;  <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="brandName" name="brandName" placeholder="Brand Name (Generic name)">, <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="strength" name="strength" placeholder="Strength">, of <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="ndaApplicant" name="ndaApplicant" placeholder="Applicant Name"> (<input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="ndax" name="ndax" placeholder="NDA# NXXXXXX">),
+                  <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="andaApplicant" name="andaApplicant" placeholder="Enter ANDA applicant name"> name proposes a formulation which is qualitatively (Q1) and quantitatively (Q2) the same as that of the RLD.</div>
+                <div class="mt-4">In accordance with 21 CFR 320.22(b)(1), parenteral drug products may be eligible for a waiver of Bioequivalence studies, provided that the formulations are considered Q1/Q2 same as the RLD. Hence, this controlled correspondence is being submitted to determine whether the proposed formulation for a generic drug product, <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="drugName" placeholder="Proposed Drug Product Name"> is adequate to meet the criteria for qualitatively (Q1) and quantitatively (Q2) the same as compared to the Reference Listed Drug (RLD), NDA N<input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="ndax" name="ndax" placeholder="NDA# NXXXXXX"> <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="brandName" name="brandName" placeholder="Brand Name (Generic name)">, <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="strength" name="strength" placeholder="Strength"> of <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="ndaApplicant" placeholder="NDA Applicant name">  and therefore be eligible for a Bioequivalence waiver pursuant to 21 CFR 320.22(b)(1).</div>
+                <div class="mt-4">The proposed prototype formulations for the generic drug product, <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="drugName" placeholder="Proposed Drug Product Name"> are provided in below table.</div>
+              </div>
+            </div>
+            <div class="pdf-page pdf">
+              <div class="page-header">
+                <table class="table table-borderless">
+                    <tbody>
+                      <tr>
+                        <td rowspan="3" colspan="2" class="font-weight-light text-center border-bottom"><input class="form-control w-50" style="padding: 10px; display: inline;" type="file" name="logo" id="">{% if cctemplate.company_logo %}<img src="../../{{ cctemplate.company_logo }}"style="height: 130px;width: 180px; border-radius: 0%;"></img>{% endif %}</td>
+                        <td style="text-align: right;padding:1px;"><input class="form-control w-50" style="padding: 10px; display: inline;" type="text" id="drugName" placeholder="Proposed Drug Product Name"></td>
+                      </tr>
+                      <tr>
+                        <td style="text-align: right;padding:1px;">Controlled Correspondence</td>
+                      </tr>
+                      <tr>
+                        <td style="text-align: right;padding:1px;" class="border-bottom">Comments on Q1/Q2 Formulation</td>
+                      </tr>
+                    </tbody>
+                </table>
+              </div>
+              <div class="common-table">
+                <div style="text-decoration:underline;font-weight:bold;">Proposed Prototype Formulation 1:</div>
+                <table class="table table-bordered mt-2">
+                  <thead>
+                    <th>Sr. No</th>
+                    <th>Ingredients</th>
+                    <th>Salt/ Hydration</th>
+                    <th>RLD Formulation</th>
+                    <th>Proposed Generic Formulation</th>
+                    <th>Function</th>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="padding:1px;">1</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">2</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">3</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">4</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">5</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">6</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="5" style="padding:1px;"><input class="form-control w-25" style="padding: 10px; display: inline;" id="formulationNotes" placeholder="Add notes regarding the formulation (If any)"></input></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="common-table mt-4">
+                <div style="text-decoration:underline;font-weight:bold;">Proposed Prototype Formulation 2:</div>
+                <table class="table table-bordered mt-2">
+                  <thead>
+                    <th>Sr. No</th>
+                    <th>Ingredients</th>
+                    <th>Salt/ Hydration</th>
+                    <th>RLD Formulation</th>
+                    <th>Proposed Generic Formulation</th>
+                    <th>Function</th>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="padding:1px;">1</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">2</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">3</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">4</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">5</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">6</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="5" style="padding:1px;"><input class="form-control w-25" style="padding: 10px; display: inline;" id="formulationNotes" placeholder="Add notes regarding the formulation (If any)"></input></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="d-flex flex-column mt-5" style="font-size:small;">
+                <div>Note:</div>
+                <div>1.	Please add grade or type and appropriate units of the active ingredients and inactive ingredients in the product. Units like Amount/mL, Amount/gm, % W/W, %W/V, %V/V.</div>
+                <div>2.	It is recommended that inactive ingredient and formulation information be presented in above table same as to be submitted in the ANDA format. For dose packs (e.g., lyophilized product with a diluent), formulation compositions for both components (lyophilized product and the diluent) should be submitted.</div>
+              </div>
+            </div>
+            <div class="pdf-page pdf">
+              <div class="page-header">
+                <table class="table table-borderless">
+                    <tbody>
+                      <tr>
+                        <td rowspan="3" colspan="2" class="font-weight-light text-center border-bottom"><input class="form-control w-50" style="padding: 10px; display: inline;" type="file" name="logo" id="">{% if cctemplate.company_logo %}<img src="../../{{ cctemplate.company_logo }}"style="height: 130px;width: 180px; border-radius: 0%;"></img>{% endif %}</td>
+                        <td style="text-align: right;padding:1px;"><input class="form-control w-50" style="padding: 10px; display: inline;" type="text" id="drugName" placeholder="Proposed Drug Product Name"></td>
+                      </tr>
+                      <tr>
+                        <td style="text-align: right;padding:1px;">Controlled Correspondence</td>
+                      </tr>
+                      <tr>
+                        <td style="text-align: right;padding:1px;" class="border-bottom">Comments on Q1/Q2 Formulation</td>
+                      </tr>
+                    </tbody>
+                </table>
+              </div>
+              <div class="common-table mt-4">
+                <div style="text-decoration:underline;font-weight:bold;">Proposed Prototype Formulation 3:</div>
+                <table class="table table-bordered mt-2">
+                  <thead>
+                    <th>Sr. No</th>
+                    <th>Ingredients</th>
+                    <th>Salt/ Hydration</th>
+                    <th>RLD Formulation</th>
+                    <th>Proposed Generic Formulation</th>
+                    <th>Function</th>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style="padding:1px;">1</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">2</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">3</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">4</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">5</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td style="padding:1px;">6</td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                      <td style="padding:1px;"></td>
+                    </tr>
+                    <tr>
+                      <td colspan="5" style="padding:1px;"><input class="form-control w-25" style="padding: 10px; display: inline;"id="formulationNotes" placeholder="Add notes regarding the formulation (If any)"></input></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="d-flex flex-column mt-5" style="font-size:small;">
+                <div>Note:</div>
+                <div>1.	Please add grade or type and appropriate units of the active ingredients and inactive ingredients in the product. Units like Amount/mL, Amount/gm, % W/W, %W/V, %V/V.</div>
+                <div>2.	It is recommended that inactive ingredient and formulation information be presented in above table same as to be submitted in the ANDA format. For dose packs (e.g., lyophilized product with a diluent), formulation compositions for both components (lyophilized product and the diluent) should be submitted.</div>
+              </div>
+              <div class="d-flex flex-column mt-5">
+                <div>Kindly advise if any of the above proposed prototype formulations of <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="drugName" placeholder="Proposed Drug Product Name">
+                  are eligible for waiver to not conduct in-vivo Bioequivalence studies pursuant to 21 CFR 320.22(b)(1) based on Q1/Q2 sameness to the RLD, <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="brandName" name="brandName" placeholder="Brand Name (Generic name)">,
+                  <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="strength" name="strength" placeholder="Strength">, of
+                  <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="ndaApplicant" name="ndaApplicant" placeholder="Applicant Name">
+                  (<input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="ndax" name="ndax" placeholder="NDA# NXXXXXX">), and is therefore suitable for submission as an ANDA?</div>
+                <div class="mt-5"><span class="font-weight-bold">FDA review disciplines being requested:</span> Office of Research and Standard</div>
+              </div>
+              <div class="d-flex flex-column mt-5">
+                  <div>Should you require any additional information regarding this submission, please contact the undersigned <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="companyName" name="companyName" placeholder="Company name"> US regulatory Agent at the below mentioned contact details. The current US Agent Letter of Appointment from  <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="andaApplicant" name="andaApplicant" placeholder="Enter ANDA applicant name">  has been enclosed as Appendix 1.</div>
+              </div>
+              <div class="d-flex flex-column text-center justify-content-center mt-5">
+                <div><input class="form-control w-25" style="display: inline;" type="text" id="responsiblePerson" name="responsiblePerson" placeholder="Name of responsible person"></div>
+                <div>US Regulatory Agent for <input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="companyName" name="companyName" placeholder="Company name"></div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="email" id="email" name="email" placeholder="Email address"></div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="tel" id="telephone" name="telephone" placeholder="Telephone"></div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="tel" id="mobile" name="mobile" placeholder="Mobile"></div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="fax" name="fax" placeholder="Fax"></div>
+              </div>
+              <div class="d-flex flex-column text-center justify-content-center mt-5">
+                <div class="mt-5">Sincerely,</div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="usAgentCompany" name="usAgentCompany" placeholder="US Agent company name"></div>
+                <div>Signature<input class="form-control w-25" style="padding: 10px; display: inline;" type="file" name="signature" id="signature" accept="image/*">
+                  {% if cctemplate.signature %}
+                 <img src="../../{{ cctemplate.signature }}" style="height: 130px; width: 180px; border-radius: 0%;" alt="Signature">
+                  {% endif %}
+                </div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="responsiblePerson" name="responsiblePerson" placeholder="Name of responsible person"></div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="designation" name="designation" placeholder="Designation"></div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="usAgentCompany" name="usAgentCompany" placeholder="US Agent company name"></div>
+                <div><input class="form-control w-25" style="padding: 10px; display: inline;" type="text" id="usRegulatoryAgent" name="usRegulatoryAgent" placeholder="US Regulatory Agent for Company Name"></div>
+                <div class="mt-5">< Note: If the ANDA applicant is not from the US, include the US Agent who will submit this to the FDA. If an authorized agent is submitting the controlled correspondence, include a letter of authorization on corporate letterhead, dated within one year. The letter should state the name, address, and phone number of the company being represented. FDA will respond to the authorized agent or their representative. ></div>
+                <div class="text-center font-weight-bold mt-5">Appendix 1: Current US Regulatory Agent Letter of Appointment</div>
+              </div>
+            </div>
+            <div class="button-group mt-3">
+              <button type="button" class="btn btn-danger" onclick="clearFormData()">Clear Form</button>
+              <button type="submit" id="SubmitBtn" class="btn btn-primary">Submit</button>
+              <button type="submit" id="dowloadbtn" class="btn btn-info">Download Document</button>
+            </div>
+      </form>
+    {% else %}
+    <div style="display:flex;justify-content:center;">You do not have access for this Report.</div>
+    {% endif %}
+  </div>
+</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+
+<script>
+
+  $("#SubmitBtn").click(function() {
+      alert("Are you sure, you want to Submit form?");
+  });
+
+
+function syncInputFields(inputId) {
+  // Get all input elements with the specified ID
+  const inputs = document.querySelectorAll(`input[id="${inputId}"]`);
+
+  // Load saved value from localStorage if it exists
+  const savedValue = localStorage.getItem(inputId);
+  if (savedValue) {
+    inputs.forEach(input => {
+      if (input.type !== 'file') {
+        input.value = savedValue;
+      }
+    });
+  }
+
+  // Add input event listener to each input
+  inputs.forEach(input => {
+    input.addEventListener('input', function(e) {
+      if (e.target.type === 'file') {
+        const file = e.target.files[0];
+        if (file) {
+          // Handle file inputs
+          inputs.forEach(otherInput => {
+            if (otherInput !== e.target) {
+              const dataTransfer = new DataTransfer();
+              dataTransfer.items.add(file);
+              otherInput.files = dataTransfer.files;
+            }
+          });
+        }
+      } else {
+        // For non-file inputs, sync the value and save to localStorage
+        const newValue = e.target.value;
+        inputs.forEach(otherInput => {
+          if (otherInput !== e.target) {
+            otherInput.value = newValue;
+          }
+        });
+        localStorage.setItem(inputId, newValue);
+      }
+    });
+  });
+}
+
+// Function to save date field
+function saveDateField() {
+  const dateInput = document.getElementById('date');
+  if (dateInput) {
+    // Load saved date
+    const savedDate = localStorage.getItem('submissionDate');
+    if (savedDate) {
+      dateInput.value = savedDate;
+    }
+
+    // Save date when changed
+    dateInput.addEventListener('change', function(e) {
+      localStorage.setItem('submissionDate', e.target.value);
+    });
+  }
+}
+
+// Function to save formulation notes
+function saveFormulationNotes() {
+  const notesInputs = document.querySelectorAll('#formulationNotes');
+  notesInputs.forEach((input, index) => {
+    // Load saved notes
+    const savedNotes = localStorage.getItem(`formulationNotes${index}`);
+    if (savedNotes) {
+      input.value = savedNotes;
+    }
+
+    // Save notes when changed
+    input.addEventListener('input', function(e) {
+      localStorage.setItem(`formulationNotes${index}`, e.target.value);
+    });
+  });
+}
+
+// Function to clear form data
+function clearFormData() {
+  if (confirm('Are you sure you want to clear all form data?')) {
+    localStorage.clear();
+    location.reload();
+  }
+}
+
+// Add event listener after DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Sync all fields that need to be synchronized
+  const fieldsToSync = [
+    'andaApplicant',
+    'drugName',
+    'brandName',
+    'strength',
+    'ndaApplicant',
+    'ndax',
+    'companyName',
+    'responsiblePerson',
+    'usAgentCompany',
+    'email',
+    'telephone',
+    'mobile',
+    'fax',
+    'designation',
+    'usRegulatoryAgent',
+    'logo'
+  ];
+
+  fieldsToSync.forEach(fieldId => {
+    syncInputFields(fieldId);
+  });
+
+  // Save date and formulation notes
+  saveDateField();
+  saveFormulationNotes();
+
+  // Add form submit handler
+  const form = document.querySelector('form');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+    });
+  }
+});
+{% comment %} async function downloadFormAsPDF() {
+  try {
+    const pages = document.querySelectorAll('.pdf-page');
+    const pdfOptions = {
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a3',
+      hotfixes: ["px_scaling"]
+    };
+
+    const pdf = new jspdf.jsPDF(pdfOptions);
+
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) {
+        pdf.addPage();
+      }
+
+      const page = pages[i];
+
+      // Create temporary container with only fixed width
+      const tempContainer = document.createElement('div');
+      tempContainer.style.width = '297mm'; // A3 width
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.padding = '10mm';
+      document.body.appendChild(tempContainer);
+
+      // Clone page and set only width constraints
+      const pageClone = page.cloneNode(true);
+      pageClone.style.width = '100%';
+      pageClone.style.maxWidth = 'none';
+      tempContainer.appendChild(pageClone);
+
+      // Process form inputs
+      const inputs = pageClone.querySelectorAll('input:not([type="file"])');
+      inputs.forEach(input => {
+        const span = document.createElement('span');
+        span.textContent = input.value || '';
+        span.style.cssText = window.getComputedStyle(input).cssText;
+        span.style.width = 'auto';
+        input.parentNode.replaceChild(span, input);
+      });
+
+      // Set width for all elements while preserving height auto
+      const allElements = pageClone.getElementsByTagName('*');
+      Array.from(allElements).forEach(element => {
+        const style = window.getComputedStyle(element);
+        if (style.width !== 'auto') {
+          if (style.width.endsWith('px')) {
+            const parentWidth = element.parentElement.offsetWidth;
+            const elementWidth = element.offsetWidth;
+            const percentage = (elementWidth / parentWidth) * 100;
+            element.style.width = `${percentage}%`;
+          }
+        }
+        // Remove height constraints
+        element.style.height = 'auto';
+        element.style.maxHeight = 'none';
+        element.style.minHeight = '0';
+      });
+
+      // Wait for images to load
+      const images = pageClone.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
+      // Capture page content
+      const canvas = await html2canvas(pageClone, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        scrollY: -window.scrollY,
+        windowWidth: tempContainer.offsetWidth
+      });
+
+      // Calculate dimensions to fit page width
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Scale to fit width while allowing height to adjust
+      const margin = 10; // 10mm margin
+      const usableWidth = pageWidth - (2 * margin);
+      const aspectRatio = canvas.height / canvas.width;
+      const scaledWidth = usableWidth;
+      const scaledHeight = usableWidth * aspectRatio;
+
+      // If content height exceeds page height, add new page
+      if (scaledHeight > pageHeight - (2 * margin)) {
+        const numberOfPages = Math.ceil(scaledHeight / (pageHeight - (2 * margin)));
+        let heightRemaining = scaledHeight;
+        let sourceY = 0;
+
+        for (let pageNum = 0; pageNum < numberOfPages; pageNum++) {
+          if (pageNum > 0) {
+            pdf.addPage();
+          }
+
+          const currentPageHeight = Math.min(heightRemaining, pageHeight - (2 * margin));
+          const sourceHeight = (currentPageHeight / scaledHeight) * canvas.height;
+
+          pdf.addImage(
+            imgData,
+            'JPEG',
+            margin,
+            margin,
+            scaledWidth,
+            currentPageHeight,
+            undefined,
+            'FAST',
+            sourceY
+          );
+
+          heightRemaining -= currentPageHeight;
+          sourceY += sourceHeight;
+        }
+      } else {
+        // Content fits in one page
+        pdf.addImage(
+          imgData,
+          'JPEG',
+          margin,
+          margin,
+          scaledWidth,
+          scaledHeight,
+          undefined,
+          'FAST'
+        );
+      }
+
+      // Clean up
+      document.body.removeChild(tempContainer);
+    }
+
+    // Save the PDF
+    pdf.save('ControlledCorrespondence.pdf');
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('There was an error generating the PDF. Please try again.');
+  }
+}
+
+// Event listener setup
+document.addEventListener('DOMContentLoaded', function() {
+  const downloadBtn = document.getElementById('dowloadbtn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      const originalText = this.textContent;
+      this.disabled = true;
+      this.textContent = 'Generating PDF...';
+      try {
+        await downloadFormAsPDF();
+      } finally {
+        this.disabled = false;
+        this.textContent = originalText;
+      }
+    });
+  }
+}); {% endcomment %}
+
+async function downloadFormAsPDF() {
+  try {
+    const pages = document.querySelectorAll('.pdf-page');
+    const pdfOptions = {
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a3',
+      hotfixes: ["px_scaling"]
+    };
+
+    const pdf = new jspdf.jsPDF(pdfOptions);
+
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) {
+        pdf.addPage();
+      }
+
+      const page = pages[i];
+
+      // Create temporary container with only fixed width
+      const tempContainer = document.createElement('div');
+      tempContainer.style.width = '297mm'; // A3 width
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.padding = '10mm';
+      document.body.appendChild(tempContainer);
+
+      // Clone page and set only width constraints
+      const pageClone = page.cloneNode(true);
+      pageClone.style.width = '100%';
+      pageClone.style.maxWidth = 'none';
+      tempContainer.appendChild(pageClone);
+
+      // Process form inputs
+      const inputs = pageClone.querySelectorAll('input:not([type="file"])');
+      inputs.forEach(input => {
+        const span = document.createElement('span');
+        span.textContent = input.value || '';
+        span.style.cssText = window.getComputedStyle(input).cssText;
+        span.style.width = 'auto';
+        input.parentNode.replaceChild(span, input);
+      });
+
+      // Set width for all elements while preserving height auto
+      const allElements = pageClone.getElementsByTagName('*');
+      Array.from(allElements).forEach(element => {
+        const style = window.getComputedStyle(element);
+        if (style.width !== 'auto') {
+          if (style.width.endsWith('px')) {
+            const parentWidth = element.parentElement.offsetWidth;
+            const elementWidth = element.offsetWidth;
+            const percentage = (elementWidth / parentWidth) * 100;
+            element.style.width = `${percentage}%`;
+          }
+        }
+        // Remove height constraints
+        element.style.height = 'auto';
+        element.style.maxHeight = 'none';
+        element.style.minHeight = '0';
+      });
+
+      // Wait for images to load
+      const images = pageClone.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
+      // Capture page content
+      const canvas = await html2canvas(pageClone, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        scrollY: -window.scrollY,
+        windowWidth: tempContainer.offsetWidth
+      });
+
+      // Calculate dimensions to fit page width
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Scale to fit width while allowing height to adjust
+      const margin = 10; // 10mm margin
+      const usableWidth = pageWidth - (2 * margin);
+      const aspectRatio = canvas.height / canvas.width;
+      const scaledWidth = usableWidth;
+      const scaledHeight = usableWidth * aspectRatio;
+
+      // If content height exceeds page height, add new page
+      if (scaledHeight > pageHeight - (2 * margin)) {
+        const numberOfPages = Math.ceil(scaledHeight / (pageHeight - (2 * margin)));
+        let heightRemaining = scaledHeight;
+        let sourceY = 0;
+
+        for (let pageNum = 0; pageNum < numberOfPages; pageNum++) {
+          if (pageNum > 0) {
+            pdf.addPage();
+          }
+
+          const currentPageHeight = Math.min(heightRemaining, pageHeight - (2 * margin));
+          const sourceHeight = (currentPageHeight / scaledHeight) * canvas.height;
+
+          pdf.addImage(
+            imgData,
+            'JPEG',
+            margin,
+            margin,
+            scaledWidth,
+            currentPageHeight,
+            undefined,
+            'FAST',
+            sourceY
+          );
+
+          heightRemaining -= currentPageHeight;
+          sourceY += sourceHeight;
+        }
+      } else {
+        // Content fits in one page
+        pdf.addImage(
+          imgData,
+          'JPEG',
+          margin,
+          margin,
+          scaledWidth,
+          scaledHeight,
+          undefined,
+          'FAST'
+        );
+      }
+
+      // Clean up
+      document.body.removeChild(tempContainer);
+    }
+
+    // Save the PDF
+    pdf.save('ControlledCorrespondence.pdf');
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('There was an error generating the PDF. Please try again.');
+  }
+}
+
+// Event listener setup
+document.addEventListener('DOMContentLoaded', function() {
+  const downloadBtn = document.getElementById('dowloadbtn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+      const originalText = this.textContent;
+      this.disabled = true;
+      this.textContent = 'Generating PDF...';
+      try {
+        await downloadFormAsPDF();
+      } finally {
+        this.disabled = false;
+        this.textContent = originalText;
+      }
+    });
+  }
+});
+
+
+// origiinal
+{% comment %} // Function to download form as PDF
+async function downloadFormAsPDF() {
+  try {
+    // Get all pages that need to be converted
+    const pages = document.querySelectorAll('.pdf-page');
+    const pdfOptions = {
+      orientation: 'portrait',
+      unit: 'px',
+      format: 'a3',
+      hotfixes: ["px_scaling"]
+    };
+
+    // Create PDF instance
+    const pdf = new jspdf.jsPDF(pdfOptions);
+
+    // Process each page
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+
+      // Temporarily modify page style for capture
+      const originalStyle = page.style.cssText;
+      page.style.width = '816px';  // A4 width at 96 DPI
+      page.style.height = 'auto';  // Let height adjust to content
+      page.style.margin = '0';
+      page.style.padding = '20px';
+      page.style.backgroundColor = 'white';
+      page.style.position = 'relative';
+      page.style.overflow = 'visible';
+
+      // Calculate actual content height
+      const contentHeight = page.scrollHeight;
+
+      // Set canvas height to match content
+      const canvasOptions = {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        width: 816,
+        height: contentHeight,
+        windowWidth: 816,
+        windowHeight: contentHeight,
+        scrollY: -window.scrollY,
+        onclone: function(clonedDoc) {
+          // Process form inputs in cloned document
+          const clonedPage = clonedDoc.querySelector('.pdf-page');
+          const inputs = clonedPage.querySelectorAll('input:not([type="file"])');
+          inputs.forEach(input => {
+            if (input.type === 'text' || input.type === 'email' || input.type === 'tel' || input.type === 'date') {
+              const span = clonedDoc.createElement('span');
+              span.textContent = input.value || '';
+              span.style.cssText = window.getComputedStyle(input).cssText;
+              input.parentNode.replaceChild(span, input);
+            }
+          });
+
+          // Ensure all images are visible
+          const images = clonedPage.querySelectorAll('img');
+          images.forEach(img => {
+            if (img.src) {
+              img.style.display = 'block';
+              img.style.maxWidth = '100%';
+              img.style.height = 'auto';
+            }
+          });
+        }
+      };
+
+      // Wait for all images to load
+      await Promise.all(Array.from(page.querySelectorAll('img')).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
+      // Generate canvas
+      const canvas = await html2canvas(page, canvasOptions);
+
+      // Convert to image
+      const imgData = canvas.toDataURL('image/jpeg', 1.0);
+
+      // Add new page if not first page
+      if (i !== 0) {
+        pdf.addPage();
+      }
+
+      // Calculate dimensions
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+
+      // Scale to fit page width
+      const scale = pageWidth / imgWidth;
+      const scaledHeight = imgHeight * scale;
+
+      // If content is longer than page, split into multiple pages
+      let remainingHeight = scaledHeight;
+      let yOffset = 0;
+
+      while (remainingHeight > 0) {
+        if (yOffset > 0) {
+          pdf.addPage();
+        }
+
+        const currentPageHeight = Math.min(remainingHeight, pageHeight);
+        const currentPageRatio = currentPageHeight / scaledHeight;
+
+        pdf.addImage(
+          imgData,
+          'JPEG',
+          0,
+          -yOffset,
+          pageWidth,
+          scaledHeight,
+          undefined,
+          'FAST'
+        );
+
+        remainingHeight -= pageHeight;
+        yOffset += pageHeight;
+      }
+
+      // Restore original page style
+      page.style.cssText = originalStyle;
+    }
+
+    // Generate filename
+    const drugName = document.querySelector('input[name="drugName"]').value || 'Document';
+    const currentDate = new Date().toISOString().slice(0, 10);
+    const filename = `ControlledCorrespondence.pdf`;
+
+    // Save PDF
+    pdf.save(filename);
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('There was an error generating the PDF. Please try again.');
+  }
+}
+
+// Add event listeners when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  const downloadBtn = document.getElementById('dowloadbtn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', async function(e) {
+      e.preventDefault();
+
+      // Show loading state
+      const originalText = this.textContent;
+      this.disabled = true;
+      this.textContent = 'Generating PDF...';
+
+      try {
+        await downloadFormAsPDF();
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to generate PDF. Please try again.');
+      } finally {
+        // Restore button state
+        this.disabled = false;
+        this.textContent = originalText;
+      }
+    });
+  }
+}); {% endcomment %}
+</script>
+{% endblock %}

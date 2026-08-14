@@ -1,0 +1,696 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>RA-AI Tools</title>
+    <!-- plugins:css -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <!-- endinject -->
+    <!-- Plugin css for this page -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}"
+    />
+    <!-- End plugin css for this page -->
+    <!-- inject:css -->
+    <!-- endinject -->
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+    <!-- End layout styles -->
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important; /* Ensure long words break to the next line */
+        overflow-wrap: break-word !important; /* Ensures compatibility with modern browsers */
+        text-align: left !important; /* Optional: Adjust text alignment */
+      }
+      .nav-item-dr {
+        background: linear-gradient(to right, #f6e384, #ffd500) !important;
+        padding: 0 !important;
+      }
+
+      .nav-item-dr-li {
+        padding: 0 1.25rem !important;
+      }
+      .hover-link {
+        color: rgb(0, 0, 0) !important;
+        font-weight: 600;
+
+        padding: 1.125rem 2.25rem !important;
+        i {
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+      .hover-link:hover {
+        color: rgb(0, 0, 0) !important;
+        font-weight: 600;
+        background: linear-gradient(to right, #f6e384, #ff8000);
+
+        i {
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+
+      .nav-link:before {
+        color: white !important;
+      }
+      .nav-item-list {
+        padding: 0.5rem 2.25rem !important;
+        color: rgb(0, 0, 0) !important;
+        font-weight: 600;
+
+        background: linear-gradient(to right, #f6e384, #ffd500);
+
+        .nav-link:before {
+          color: rgb(0, 0, 0) !important;
+        }
+
+        a {
+          background: none !important;
+        }
+      }
+
+      .active {
+        background: linear-gradient(to right, #f6e384, #ff8000) !important;
+
+        .hover-link-list {
+          color: rgb(0, 0, 0) !important;
+        }
+        .menu-title {
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+
+      .nav-item-list:hover {
+        background: linear-gradient(to right, #f6e384, #ff8000) !important;
+
+        .nav-link:before {
+          color: rgb(0, 0, 0) !important;
+        }
+        color: rgb(0, 0, 0) !important;
+
+        a {
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+      .navbar-menu-wrapper{
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+      }
+      .nav-header-link {
+        font-size: 17px !important;
+        font-weight: bold;
+        text-decoration: none;
+
+        border-radius: 5px;
+        color: black !important;
+      }
+      @media (max-width: 1490px) {
+        .nav-header-link {
+
+          font-size: 12px !important;
+        }
+      }
+      .nav-header-link-hover:hover {
+      color: #045c8d !important
+    }
+
+      @media (min-width: 992px) {
+        .sidebar-icon-only .sidebar {
+          width: 70px;
+        }
+      }
+      .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+    }
+
+      .hover-link-list {
+        color: black !important;
+      }
+      .main-panel {
+        background: linear-gradient(
+          to right,
+          #ffffff,
+          rgb(228, 205, 244)
+        ) !important;
+        border-radius: 16px;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(2px); /* Standard property */
+      }
+      .content-wrapper {
+        background: none;
+      }
+      .footer {
+        background: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-scroller">
+      <div class="row p-0 m-0 proBanner" id="proBanner">
+        <div class="col-md-12 p-0 m-0">
+          <div
+            class="card-body card-body-padding d-flex align-items-center justify-content-between"
+          >
+            <div class="ps-lg-3"></div>
+            <div class="d-flex align-items-center justify-content-between">
+              <a
+                href="https://www.bootstrapdash.com/product/purple-bootstrap-admin-template/"
+                ><i class="mdi mdi-home me-3 text-white"></i
+              ></a>
+              <button id="bannerClose" class="btn border-0 p-0">
+                <i class="mdi mdi-close text-white mr-0"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- partial:partials/_navbar.html -->
+      <nav
+        class="navbar default-layout-navbar col-lg-12 col-12 p-0 fixed-top d-flex flex-row"
+      >
+        <div
+          class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start"
+        >
+          <a class="navbar-brand brand-logo" href="../../../"
+            ><img
+              src="{% static 'assets/icretegy/itechnical logo.png' %}"
+              alt="logo"
+              style="height: 60px; width: auto; margin-left: 10px"
+          /></a>
+          <a class="navbar-brand brand-logo-mini" href="../../../"
+            ><img src="{% static 'assets/images/logo-mini.svg' %}" alt="logo"
+          /></a>
+        </div>
+        <div class="navbar-menu-wrapper d-flex align-items-stretch">
+          <!-- <button
+            class="navbar-toggler navbar-toggler align-self-center"
+            type="button"
+            data-toggle="minimize"
+          >
+            <span class="mdi mdi-menu"></span>
+          </button> -->
+          <ul class="navbar-nav navbar-nav-right">
+            <li class="nav-item d-none d-lg-block">
+              <a
+                class="nav-link nav-header-link nav-header-link-hover"
+                href="../../../adminmaster/adminbase"
+              >
+                RA Tools
+              </a>
+            </li>
+            <li class="nav-item d-none d-lg-block">
+              <a
+                class="nav-link nav-header-link nav-header-link-hover"
+                href="../../aidatabase/form483/"
+              >
+                483 AI Database
+              </a>
+            </li>
+            <li class="nav-item d-none d-lg-block">
+              <a
+                class="nav-link nav-header-link nav-header-link-hover"
+                href="../../aidatabase/anda/nasal_spray_deficiency/"
+              >
+                ANDA AI Database
+              </a>
+            </li>
+            <li class="nav-item d-none d-lg-block">
+              <a
+                class="nav-link nav-header-link nav-header-link-hover"
+                href="../../aidatabase/majorcr/nasal_spray_deficiency/"
+              >
+                MajorCR AI Database
+              </a>
+            </li>
+            <li class="nav-item nav-profile dropdown">
+              <a
+                class="nav-link nav-header-link nav-header-link-hover dropdown-toggle"
+                id="profileDropdown"
+                href="#"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <div class="nav-profile-img">
+                  {% if request.user.logo %}
+                      <img src="{{ request.user.logo.url }}" alt="image" />
+                  {% else %}
+                             <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  />
+                  {% endif %}
+                  <!-- <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  /> -->
+                  <span class="availability-status online"></span>
+                </div>
+                <div class="nav-profile-text">
+                  <p class="mb-1 text-black">{{ request.user.first_name }}</p>
+                </div>
+              </a>
+              <div
+                class="dropdown-menu navbar-dropdown"
+                aria-labelledby="profileDropdown"
+              >
+                <a class="dropdown-item" href="#">
+                  <i class="mdi mdi-cached me-2 text-success"></i> Profile
+                </a>
+                <div class="dropdown-divider"></div>
+              </div>
+            </li>
+            <li class="nav-item dropdown">
+              <a
+                class="nav-link count-indicator dropdown-toggle"
+                id="notificationDropdown"
+                href="#"
+                data-bs-toggle="dropdown"
+              >
+                <i class="mdi mdi-bell-outline text-dark"></i>
+                <span class="count-symbol bg-danger"></span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end navbar-dropdown preview-list"
+                aria-labelledby="notificationDropdown"
+              >
+                <h6 class="p-3 mb-0">Notifications</h6>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item preview-item">
+                  <div class="preview-thumbnail">
+                    <div class="preview-icon bg-success">
+                      <i class="mdi mdi-calendar"></i>
+                    </div>
+                  </div>
+                  <div
+                    class="preview-item-content d-flex align-items-start flex-column justify-content-center"
+                  >
+                    <h6 class="preview-subject font-weight-normal mb-1">
+                      Event today
+                    </h6>
+                    <p class="text-gray ellipsis mb-0">
+                      Just a reminder that you have an event today
+                    </p>
+                  </div>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item preview-item">
+                  <div class="preview-thumbnail">
+                    <div class="preview-icon bg-warning">
+                      <i class="mdi mdi-cog"></i>
+                    </div>
+                  </div>
+                  <div
+                    class="preview-item-content d-flex align-items-start flex-column justify-content-center"
+                  >
+                    <h6 class="preview-subject font-weight-normal mb-1">
+                      Settings
+                    </h6>
+                    <p class="text-gray ellipsis mb-0">Update dashboard</p>
+                  </div>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item preview-item">
+                  <div class="preview-thumbnail">
+                    <div class="preview-icon bg-info">
+                      <i class="mdi mdi-link-variant"></i>
+                    </div>
+                  </div>
+                  <div
+                    class="preview-item-content d-flex align-items-start flex-column justify-content-center"
+                  >
+                    <h6 class="preview-subject font-weight-normal mb-1">
+                      Launch Admin
+                    </h6>
+                    <p class="text-gray ellipsis mb-0">New admin wow!</p>
+                  </div>
+                </a>
+                <div class="dropdown-divider"></div>
+                <h6 class="p-3 mb-0 text-center">See all notifications</h6>
+              </div>
+            </li>
+            <li class="nav-item nav-logout d-none d-lg-block">
+              <a class="nav-link" href="/adminmaster/logout/">
+                <i class="mdi mdi-power text-dark"></i>
+              </a>
+            </li>
+            <li class="nav-item nav-settings d-none d-lg-block">
+              <a class="nav-link" href="#">
+                <i class="mdi text-dark mdi-format-line-spacing"></i>
+              </a>
+            </li>
+          </ul>
+          <button
+            class="navbar-toggler navbar-toggler-right d-lg-none align-self-center"
+            type="button"
+            data-toggle="offcanvas"
+          >
+            <span class="mdi mdi-menu"></span>
+          </button>
+        </div>
+      </nav>
+      <!-- partial -->
+      <div class="container-fluid page-body-wrapper">
+        <!-- partial:partials/_sidebar.html -->
+        <nav class="sidebar sidebar-offcanvas" id="sidebar">
+          <ul class="nav">
+            <li class="nav-item nav-profile">
+              <a href="#" class="nav-link">
+                <div class="nav-profile-image">
+                  {% if request.user.logo %}
+                      <img src="{{ request.user.logo.url }}" alt="image" />
+                  {% else %}
+                             <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  />
+                  {% endif %}
+                  <span class="login-status online"></span>
+                  <!--change to offline or busy as needed-->
+                </div>
+                <div class="nav-profile-text d-flex flex-column">
+                  <span class="font-weight-bold mb-2">{{ request.user.first_name }}</span>
+                 <span class="text-secondary text-small">
+                    {% if request.user.designation %}
+                      {{ request.user.designation }}
+                    {% else %}
+                      Project Manager
+                    {% endif %}
+                  </span>
+                </div>
+                <i
+                  class="mdi mdi-bookmark-check text-success nav-profile-badge"
+                ></i>
+              </a>
+            </li>
+            <li class="nav-item nav-item-dr">
+              <a class="nav-link hover-link" href="/adminmaster/view_users"
+                >User</a
+              >
+            </li>
+            <li class="nav-item nav-item-dr mt-1">
+              <a class="nav-link hover-link" href="../../../">
+                <span class="menu-title">ANDA Facility Template</span>
+              </a>
+            </li>
+            <li class="nav-item nav-item-dr mt-1">
+              <a
+                class="nav-link hover-link"
+                data-bs-toggle="collapse"
+                href="#ui-basic"
+                aria-expanded="false"
+                aria-controls="ui-basic"
+              >
+                <span class="menu-title">ANDA Checklist</span>
+                <i class="menu-arrow"></i>
+              </a>
+              <div class="collapse" id="ui-basic">
+                <ul class="nav flex-column sub-menu">
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_mdi_dpi"
+                      >MDI & DPI</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_nasalspray_inhalation_checklist"
+                      >Nasal Spray & Inhalation Dosage</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_ophthalmic_dosage_table"
+                      >Ophthalmic Dosage</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_parenteral_dosage_table"
+                      >Parenteral Dosage</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_semi_solid_topical_dosage_table"
+                      >Semi Solid Topical Dosage</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_solid_oral_dosage_table"
+                      >Solid Oral Dosage</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_transdermal_dosage_table"
+                      >Transdermal</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_anda_general_table"
+                      >General ANDA</a
+                    >
+                  </li>
+                </ul>
+              </div>
+            </li>
+            {% if dmf_checklist_active %}
+            <li class="nav-item active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                data-bs-toggle="collapse"
+                href="#ui-DMF-Checklist"
+                aria-expanded="false"
+                aria-controls="ui-DMF-Checklist"
+              >
+                <span class="menu-title">DMF Checklist </span>
+                <i class="menu-arrow"></i>
+              </a>
+              <div class="collapse" id="ui-DMF-Checklist">
+                <ul class="nav flex-column sub-menu">
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_dmfca_table"
+                      >DMF CA
+                    </a>
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_dmf_review_table"
+                      >DMF Review</a
+                    >
+                  </li>
+                </ul>
+              </div>
+            </li>
+            {% if vp_checklist_active %}
+            <li class="nav-item active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                data-bs-toggle="collapse"
+                href="#ui-VP-Checklist"
+                aria-expanded="false"
+                aria-controls="ui-VP-Checklist"
+              >
+                <span class="menu-title">VP Checklist </span>
+                <i class="menu-arrow"></i>
+              </a>
+              <div class="collapse" id="ui-VP-Checklist">
+                <ul class="nav flex-column sub-menu">
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_mdi_dpi"
+                      >VP - MDI-DPI</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_nasal_inhalation"
+                      >VP - Nasal-Inhalation
+                    </a>
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_ophthalmic"
+                      >VP - Ophthalmic</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_liquidorals_table"
+                      >VP - Oral Liquids</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_parenteral_table"
+                      >VP - Parenteral</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_solidoral_table"
+                      >VP - Solid Oral</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_topical_table"
+                      >VP - Topical</a
+                    >
+                  </li>
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_vp_transdermal_table"
+                      >VP - Transdermal</a
+                    >
+                  </li>
+                </ul>
+              </div>
+            </li>
+            {% if white_paper_active %}
+            <li class="nav-item active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                data-bs-toggle="collapse"
+                href="#ui-White-Paper"
+                aria-expanded="false"
+                aria-controls="ui-White-Paper"
+              >
+                <span class="menu-title">White Paper </span>
+                <i class="menu-arrow"></i>
+              </a>
+              <div class="collapse" id="ui-White-Paper">
+                <ul class="nav flex-column sub-menu">
+                  {% comment %}
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/ratools/appendix_white_paper"
+                      >Appendix 1 Combination Product Assessment form
+                    </a>
+                  </li>
+                  {% endcomment %}
+
+                  <li class="nav-item nav-item-list">
+                    <a
+                      class="nav-link hover-link-list"
+                      href="/adminmaster/show_general_white_papers_table"
+                      >General White Paper</a
+                    >
+                  </li>
+                </ul>
+              </div>
+            </li>
+          </ul>
+        </nav>
+        <!-- partial -->
+        <div class="main-panel">
+          <div class="content-wrapper">
+            <!-- ALL Your Content Here -->
+            {% block content %} {% endblock %}
+          </div>
+          <!-- content-wrapper ends -->
+          <!-- partial:partials/_footer.html -->
+          <footer class="footer">
+            <div
+              class="d-sm-flex justify-content-center justify-content-sm-between"
+            >
+            <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">© Copyright ©2025 iPharmaAI. All Rights Reserved by <a href="https://icretegy.com" target="_blank">iCretegy Solutions</a>.</span>
+              <!-- <span
+                class="text-muted text-center text-sm-left d-block d-sm-inline-block"
+                >Copyright © 2025
+                <a href="#" target="_blank"
+                  >iPharmaAI</a
+                >. All rights reserved.</span
+              > -->
+              <!-- <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Hand-crafted & made with <i class="mdi mdi-heart text-danger"></i></span> -->
+            </div>
+          </footer>
+          <!-- partial -->
+        </div>
+        <!-- main-panel ends -->
+      </div>
+      <!-- page-body-wrapper ends -->
+    </div>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- container-scroller -->
+    <!-- plugins:js -->
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <!-- endinject -->
+    <!-- Plugin js for this page -->
+    <script src="{% static 'assets/vendors/chart.js/chart.umd.js' %}"></script>
+    <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+    <!-- End plugin js for this page -->
+    <!-- inject:js -->
+    <script src="{% static 'assets/js/off-canvas.js' %}"></script>
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+    <!-- endinject -->
+    <!-- Custom js for this page -->
+    <script src="{% static 'assets/js/dashboard.js' %}"></script>
+    <!-- End custom js for this page -->
+  </body>
+</html>
