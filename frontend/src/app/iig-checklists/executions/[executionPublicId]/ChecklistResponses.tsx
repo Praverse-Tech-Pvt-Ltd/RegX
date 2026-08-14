@@ -151,6 +151,48 @@ export function isEditableAnswerType(answerType: string | undefined): boolean {
   return (EDITABLE_ANSWER_TYPES as readonly string[]).includes(answerType ?? "");
 }
 
+/** Select answer types, whose stored value is a code and whose display is a label. */
+const SELECT_ANSWER_TYPES = new Set(["single_select", "multi_select"]);
+
+/**
+ * `5A-DEC-002` — render the approved label for a stored option value.
+ *
+ * A select response stores only the stable machine value. Showing that value to
+ * a reviewer would put an internal code where approved wording belongs, and
+ * prettifying it here would put *unapproved* wording there — both are
+ * explicitly forbidden, so the label comes from the server-resolved vocabulary
+ * or not at all.
+ *
+ * A value with no matching option falls back to the value itself rather than
+ * disappearing: an answer recorded against a vocabulary that has since changed
+ * must stay visible, because silently hiding a regulated answer is worse than
+ * showing a code.
+ */
+export function selectedOptionLabels(
+  question: ChecklistQuestion | undefined,
+  rawValue: unknown
+): string[] {
+  const options = question?.options ?? null;
+  const byValue = new Map((options ?? []).map((option) => [option.value, option.label]));
+
+  let values: string[] = [];
+  if (rawValue !== null && typeof rawValue === "object") {
+    const envelope = rawValue as { option?: unknown; options?: unknown };
+    if (typeof envelope.option === "string") {
+      values = [envelope.option];
+    } else if (Array.isArray(envelope.options)) {
+      values = envelope.options.filter((v): v is string => typeof v === "string");
+    }
+  }
+  return values.map((value) => byValue.get(value) ?? value);
+}
+
+/** Human-readable rendering of the governed applicability decision. */
+const APPLICABILITY_LABEL: Record<string, string> = {
+  not_applicable: "Not applicable — determined by rule",
+  review_required: "Applicability requires review",
+};
+
 /** The closed vocabulary `yes_no_na` accepts — a string set, not a boolean. */
 export const YES_NO_NA_OPTIONS = ["yes", "no", "not_applicable"] as const;
 
@@ -669,6 +711,18 @@ export function ChecklistResponses({
               <div>
                 <strong>{question?.question_text ?? question?.code ?? "Response"}</strong>
                 {provenance && <ProvenanceLabel kind={provenance} />}
+                {/* `5A-DEC-004` — the governed applicability decision, shown as
+                    the server derived it. Never recomputed here: the client has
+                    no business re-deciding whether a question applied. */}
+                {APPLICABILITY_LABEL[response.applicabilityOutcome] && (
+                  <span
+                    data-testid={`applicability-${response.publicId}`}
+                    data-outcome={response.applicabilityOutcome}
+                    style={{ marginLeft: "0.5rem", color: "#92400e" }}
+                  >
+                    {APPLICABILITY_LABEL[response.applicabilityOutcome]}
+                  </span>
+                )}
               </div>
 
               {/* A reviewer_conclusion answer is governed by its own endpoint,
@@ -922,6 +976,14 @@ export function ChecklistResponses({
                     {busy ? "Saving…" : "Save"}
                   </button>
                 </div>
+              ) : SELECT_ANSWER_TYPES.has(question?.answer_type ?? "") ? (
+                // `5A-DEC-002` — the approved label, never the machine value.
+                <p
+                  data-testid={`select-answer-${response.publicId}`}
+                  style={{ margin: "0.25rem 0", color: "#4b5563" }}
+                >
+                  {selectedOptionLabels(question, response.rawValue).join(", ") || "—"}
+                </p>
               ) : (
                 <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
                   {toEditableText(response.rawValue) || "—"}

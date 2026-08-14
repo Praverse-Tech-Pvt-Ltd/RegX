@@ -3,9 +3,16 @@ docs/MILESTONE_4D_1_IMPLEMENTATION_SPEC.md §5). No eval/exec, no
 dynamic attribute access, no arbitrary executable expression -- a fixed
 dispatch table keyed by `op`, plus a fixed set of composite operators.
 
-4D-1 validates and canonicalizes only. Runtime evaluation of a
-condition tree against a real execution context is a later Milestone
-4D stage.
+4D-1 validated and canonicalized only. Milestone 5A-P1 adds the runtime
+evaluator required by `5A-DEC-004`: persisting a rule without ever evaluating it
+is not sufficient for production, because a question would then be presented as
+applicable to every product regardless of what the approved rule says.
+
+The evaluator implements the already-approved semantics exactly (M4D3-APP-001
+through M4D3-APP-007) and invents no new vocabulary: same operators, same six
+registry fields, same three outcomes. It is a pure function -- no database
+access, no side effects, no `eval`, no `exec`, no dynamic attribute access --
+so an approved rule evaluates identically wherever and whenever it is run.
 """
 
 import json
@@ -117,3 +124,138 @@ def canonicalize(condition_json) -> str:
     insignificant whitespace, so semantically-identical rules
     serialized differently never produce different checksums."""
     return json.dumps(condition_json, sort_keys=True, separators=(",", ":"))
+
+
+# ---------------------------------------------------------------------------
+# Runtime evaluator -- `5A-DEC-004`, implementing M4D3-APP-001..007.
+#
+# Deliberately a mirror of the validator above rather than a second grammar:
+# the same operator sets drive both, so a tree that validates is a tree this
+# can evaluate. A node reaching the evaluator that matches neither shape is a
+# validator contract breach, not bad input, and raises RuntimeError to say so.
+# ---------------------------------------------------------------------------
+
+#: Sentinel for "this field is not in the context at all". Distinct from a
+#: context value of ``None``, which is a real answer meaning "known absent".
+_ABSENT = object()
+
+
+class ApplicabilityEvaluationError(RuntimeError):
+    """The validator's contract was broken -- a node shape reached the
+    evaluator that `validate_condition_json()` should already have refused.
+
+    A ``RuntimeError`` subclass on purpose (M4D3-APP-003): this is an internal
+    invariant failure, not a user-input validation error, and conflating the two
+    would let a genuine bug be reported to a client as if they had sent
+    something wrong.
+    """
+
+
+def _leaf_value(context, field: str):
+    """Read one field. Missing and explicitly-null are both absent."""
+    value = context.get(field, _ABSENT)
+    return _ABSENT if value is None else value
+
+
+def _evaluate_leaf(node, context) -> bool:
+    field = node["field"]
+    op = node["op"]
+    actual = _leaf_value(context, field)
+
+    # M4D3-APP-005 -- absence is decided first, for every operator. An absent
+    # field can only satisfy `not_exists`; every comparison against it is False
+    # rather than an error, so a rule never fails closed by accident on a
+    # product that simply has no value for that field.
+    if op == "exists":
+        return actual is not _ABSENT
+    if op == "not_exists":
+        return actual is _ABSENT
+    if actual is _ABSENT:
+        return False
+
+    expected = node.get("value")
+
+    if op == "eq":
+        return _scalar_equal(actual, expected)
+    if op == "neq":
+        return not _scalar_equal(actual, expected)
+    if op == "in":
+        return any(_scalar_equal(actual, candidate) for candidate in expected)
+    if op == "not_in":
+        return not any(_scalar_equal(actual, candidate) for candidate in expected)
+
+    # Numeric comparisons. A non-numeric actual value is False rather than a
+    # TypeError: the validator guarantees the *rule* side is numeric, but the
+    # context side comes from product data and may legitimately be a string.
+    if isinstance(actual, bool) or not isinstance(actual, int | float):
+        return False
+    if op == "gt":
+        return actual > expected
+    if op == "gte":
+        return actual >= expected
+    if op == "lt":
+        return actual < expected
+    if op == "lte":
+        return actual <= expected
+
+    raise ApplicabilityEvaluationError(f"Unknown leaf operator reached evaluator: {op!r}")
+
+
+def _scalar_equal(actual, expected) -> bool:
+    """Equality that refuses Python's bool/int conflation.
+
+    Without this, ``True == 1`` would make a rule comparing `iid.has_mde` to 1
+    match a boolean context value. Regulated branching must not turn on that.
+    """
+    if isinstance(actual, bool) != isinstance(expected, bool):
+        return False
+    return actual == expected
+
+
+def _evaluate_node(node, context, depth: int) -> bool:
+    if depth > MAX_RECURSION_DEPTH:
+        # Unreachable for a validated tree; a guard, not a limit, so a
+        # hand-built tree can never spin the interpreter.
+        raise ApplicabilityEvaluationError(
+            f"Condition tree exceeds max depth {MAX_RECURSION_DEPTH} at evaluation."
+        )
+    if not isinstance(node, dict):
+        raise ApplicabilityEvaluationError("Every condition node must be a JSON object.")
+
+    if "operator" in node and "conditions" in node:
+        op = node["operator"]
+        children = node["conditions"]
+        if op not in COMPOSITE_OPERATORS or not isinstance(children, list) or not children:
+            raise ApplicabilityEvaluationError(f"Malformed composite node: {op!r}")
+        # Evaluated in full rather than short-circuited: every child is a pure
+        # function of the same context, so there is nothing to save, and
+        # evaluating all of them means a malformed sibling is always detected
+        # instead of being hidden by an early exit.
+        results = [_evaluate_node(child, context, depth + 1) for child in children]
+        return all(results) if op == "all" else any(results)
+
+    if "field" in node and "op" in node:
+        return _evaluate_leaf(node, context)
+
+    # M4D3-APP-003.
+    raise ApplicabilityEvaluationError(
+        "Node must be either a composite ({operator, conditions}) or a leaf ({field, op, value?})."
+    )
+
+
+def evaluate_condition(condition_json, context) -> bool:
+    """Evaluate a validated condition tree against a context dict."""
+    if not isinstance(context, dict):
+        raise ApplicabilityEvaluationError("context must be a dict.")
+    return _evaluate_node(condition_json, context, depth=1)
+
+
+def evaluate_applicability(rule, context) -> str:
+    """M4D3-APP-001/004 -- the governed outcome for one rule and one context.
+
+    Returns the rule's own ``outcome_if_true`` / ``outcome_if_false``, never a
+    bare boolean: which branch means "not applicable" is the rule author's
+    decision, and hard-coding it here would silently override approved content.
+    """
+    matched = evaluate_condition(rule.condition_json, context)
+    return rule.outcome_if_true if matched else rule.outcome_if_false

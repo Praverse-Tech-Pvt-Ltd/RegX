@@ -56,7 +56,9 @@ from decimal import Decimal
 
 from common.csv_safety import csv_safe_cell
 
+from .applicability_runtime import derive_applicability_outcome
 from .calculation_translation import format_decimal_plain
+from .enums import AnswerType
 from .governed_vocabularies import HISTORY_REASON_ANSWER_OVERRIDDEN
 
 __all__ = [
@@ -395,6 +397,35 @@ def _override_projection(response) -> dict | None:
     return projected
 
 
+def _selected_option_labels(response) -> dict[str, str] | None:
+    """Approved labels for the option values this response actually selected.
+
+    Returns ``None`` unless the question is a select, a value was recorded, and
+    at least one selected value resolves to an approved label. Legacy
+    unlabelled vocabularies therefore add nothing to the payload, which keeps
+    pre-5A exports byte-identical to what they produced before.
+    """
+    from .question_options import labels_for, parse_options
+
+    question = response.question
+    if question.answer_type == AnswerType.SINGLE_SELECT:
+        raw = response.raw_value
+        selected = [raw["option"]] if isinstance(raw, dict) and "option" in raw else []
+    elif question.answer_type == AnswerType.MULTI_SELECT:
+        raw = response.raw_value
+        selected = list(raw["options"]) if isinstance(raw, dict) and "options" in raw else []
+    else:
+        return None
+    selected = [value for value in selected if isinstance(value, str)]
+    if not selected:
+        return None
+    parsed = parse_options(question.validation_rule or {}) or ()
+    if not any(option.label for option in parsed):
+        return None
+    # Sorted so the hashed bytes never depend on selection order.
+    return dict(sorted(labels_for(question.validation_rule or {}, selected).items()))
+
+
 def _response_projection(response, outcome, amendments=(), override_history=()) -> dict:
     question = response.question
     projection = {
@@ -409,7 +440,29 @@ def _response_projection(response, outcome, amendments=(), override_history=()) 
         "data_source_type_snapshot": response.data_source_type_snapshot,
         "system_derived_value": response.system_derived_value,
         "calculation": _outcome_projection(outcome),
+        # `5A-DEC-004` -- the governed applicability decision this execution was
+        # assessed under, derived from persisted state only (M4D3-PST-008/009).
+        # Inside the hashed payload because "this question did not apply" is a
+        # regulatory assertion the artifact makes, not a display detail.
+        "applicability_outcome": derive_applicability_outcome(response),
     }
+    # `5A-DEC-001` -- FDA-derived provenance: which approved resolver ran, which
+    # governed source release it read and which field of it -- or the explicit
+    # reason there is no value. Omitted for responses that are not FDA-derived,
+    # so the payload never carries a null that means nothing.
+    if response.source_provenance:
+        projection["source_provenance"] = response.source_provenance
+    # `5A-DEC-002` -- a select answer stores only its stable machine value, so
+    # the export must carry enough to interpret it years later. The approved
+    # labels for the values actually selected are emitted alongside; the whole
+    # vocabulary is not, because an unselected option is not part of what this
+    # execution recorded. Inside the hashed payload: re-labelling a selected
+    # option changes what the artifact says a reviewer chose, so it must change
+    # the checksum. Omitted entirely when nothing was selected or no approved
+    # label exists, rather than emitting an empty map that means nothing.
+    selected_labels = _selected_option_labels(response)
+    if selected_labels:
+        projection["selected_option_labels"] = selected_labels
     # Conditional per 4D4-DEC-005: reviewer provenance appears "only where
     # governed reviewer conclusion or amendment records exist". An empty list on
     # every response would be an invented record and would also put a meaningless
@@ -510,6 +563,14 @@ def build_export_artifact(*, execution, generated_at):
             "definition_code": version.definition.code,
             "version_public_id": str(version.public_id),
             "version_number": version.version_number,
+            # `5A-DEC-005` -- the regulator the version was approved under is
+            # governed provenance, so it is inside the hashed payload: changing
+            # it changes the checksum. Emitted unconditionally, including as ""
+            # for pre-5A content, because "not stated" is itself a fact an
+            # auditor must be able to read. Omitting the key when blank would
+            # make an unstated jurisdiction indistinguishable from an export
+            # produced before the field existed.
+            "jurisdiction": version.jurisdiction,
         },
         "responses": [
             _response_projection(
@@ -677,6 +738,7 @@ def render_csv(artifact) -> str:
         ("definition_code", payload["checklist_definition"]["definition_code"]),
         ("version_public_id", payload["checklist_definition"]["version_public_id"]),
         ("version_number", payload["checklist_definition"]["version_number"]),
+        ("jurisdiction", payload["checklist_definition"]["jurisdiction"]),
     ]
     for field, value in metadata:
         writer.writerow([_csv_cell(field), _csv_cell(value)])
