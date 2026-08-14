@@ -49,7 +49,7 @@ function OrangeBookSearchInner() {
       setSearched(true);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
-        router.push("/signin");
+        router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       } else {
         setError("Search failed.");
       }

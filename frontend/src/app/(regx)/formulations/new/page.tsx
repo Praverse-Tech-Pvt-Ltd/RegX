@@ -33,7 +33,7 @@ function NewProductPageInner() {
       router.push(`/formulations/${product.public_id}?tenant=${tenantSlug}`);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
-        router.push("/signin");
+        router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         return;
       }
       setFormError(err instanceof ApiError ? err.message : "Could not create product record.");

@@ -32,7 +32,7 @@ function ExecutionDetailPageInner() {
       .then(setExecution)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
-          router.push("/signin");
+          router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
           setError("Failed to load execution.");
         }
@@ -56,7 +56,7 @@ function ExecutionDetailPageInner() {
       setExecution(updated);
     } catch (err: unknown) {
       if (err instanceof ApiError && err.status === 401) {
-        router.push("/signin");
+        router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       } else if (err instanceof ApiError && err.status === 403) {
         setActionError("You do not have permission to perform this action.");
       } else if (err instanceof ApiError) {

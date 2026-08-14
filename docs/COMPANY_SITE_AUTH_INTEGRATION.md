@@ -71,6 +71,39 @@ as the page. That means:
 `CORS_ALLOWED_ORIGINS` is left in place for the standalone `:3000` development
 and Playwright setups, which still cross origins.
 
+## The journey from a company page into a REGX module
+
+Improved in the pre-push hardening pass, without touching the auth model.
+
+A visitor on a company page who clicks into a REGX module while holding no
+REGX session is bounced to `/signin` — that part was already true. What
+changed is that the bounce now carries where they were going:
+
+```
+/migration-batches?tenant=alpha
+  → /signin?next=%2Fmigration-batches%3Ftenant%3Dalpha
+  → (sign in)
+  → /migration-batches?tenant=alpha
+```
+
+Previously every sign-in landed on `/tenants` regardless of intent, which
+left the user to find their way back manually.
+
+`next` is attacker-controllable, so `safeReturnTarget()` in
+`frontend/src/app/signin/page.tsx` accepts only same-origin absolute paths. It
+rejects anything not starting with `/`, anything starting with `//` or `/\`
+(browsers treat both as protocol-relative and would leave the origin), and
+`/signin` itself so the flow cannot loop. Anything rejected falls back to
+`/tenants` — the previous behaviour. Five E2E cases cover this, including
+three hostile targets.
+
+No redirect loop exists in either direction: the company site's login is a
+plain Django view that never consults REGX, and the REGX pages never redirect
+to the company login.
+
+Note that pages are inconsistent about which status triggers the bounce —
+some use 401, some 403. That predates this work and was left alone.
+
 ## The honest cost: two logins
 
 A user who works with both the legacy company tools and the new REGX modules

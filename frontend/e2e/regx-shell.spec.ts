@@ -259,6 +259,81 @@ test.describe("static assets", () => {
   });
 });
 
+test.describe("sign-in journey", () => {
+  // The company site and REGX have separate authentication domains (see
+  // docs/COMPANY_SITE_AUTH_INTEGRATION.md). A visitor arriving from a company
+  // page into a REGX module must land on the REGX sign-in screen and then be
+  // returned to what they asked for, rather than being dropped on the tenant
+  // picker with no idea where they were going.
+  test("an unauthenticated module bounces to REGX sign-in carrying the return target", async ({
+    page,
+  }) => {
+    // This page treats 403 as "go and sign in"; others use 401. That
+    // inconsistency predates the integration and is left alone — the point
+    // here is only that whichever status a page bounces on, it carries the
+    // return target with it.
+    await page.route(API_GLOB, (route: Route) =>
+      route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Authentication credentials were not provided." }),
+      }),
+    );
+
+    await page.goto(`/migration-batches?tenant=${TENANT}`);
+    await expect(page).toHaveURL(/\/signin\?next=/);
+
+    const next = new URL(page.url()).searchParams.get("next");
+    expect(next).toContain("/migration-batches");
+    await expect(page.getByRole("heading", { name: /sign in/i })).toBeVisible();
+  });
+
+  // ?next= is attacker-controllable, so the sign-in screen must not become an
+  // open redirect. Each of these is signed in for real (against a mocked
+  // login) and must land on /tenants, never on the supplied target.
+  for (const hostile of [
+    "//evil.example.com/steal",
+    "https://evil.example.com/steal",
+    "/\\evil.example.com/steal",
+    "/signin",
+  ]) {
+    test(`refuses the return target ${hostile}`, async ({ page }) => {
+      await page.route(API_GLOB, (route: Route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ csrfToken: "test", email: "a@b.c" }),
+        }),
+      );
+
+      await page.goto(`/signin?next=${encodeURIComponent(hostile)}`);
+      await page.getByLabel("Email").fill("a@b.c");
+      await page.getByLabel("Password").fill("password123");
+      await page.getByRole("button", { name: /^sign in$/i }).click();
+
+      await expect(page).toHaveURL(/\/tenants$/);
+      expect(page.url()).not.toContain("evil.example.com");
+    });
+  }
+
+  test("honours a legitimate same-origin return target", async ({ page }) => {
+    await page.route(API_GLOB, (route: Route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ csrfToken: "test", email: "a@b.c" }),
+      }),
+    );
+
+    await page.goto("/signin?next=%2Fmigration-batches%3Ftenant%3Dalpha");
+    await page.getByLabel("Email").fill("a@b.c");
+    await page.getByLabel("Password").fill("password123");
+    await page.getByRole("button", { name: /^sign in$/i }).click();
+
+    await expect(page).toHaveURL(/\/migration-batches\?tenant=alpha/);
+  });
+});
+
 test.describe("mobile", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 

@@ -99,7 +99,11 @@ test("execution list page renders execution rows", async ({ page }) => {
   await page.goto(`/iig-checklists/executions?tenant=${TENANT}`);
   await expect(page.getByText("draft")).toBeVisible();
   await expect(page.getByText("approved")).toBeVisible();
-  const viewLinks = page.getByRole("link", { name: "View" });
+  // exact: true because getByRole matches the accessible name by substring by
+  // default. The page now renders the company shell, whose sidebar includes
+  // "DMF Review Checklist" — that contains "view", so the loose match counted
+  // three links instead of the two execution rows this test is about.
+  const viewLinks = page.getByRole("link", { name: "View", exact: true });
   await expect(viewLinks).toHaveCount(2);
 });
 

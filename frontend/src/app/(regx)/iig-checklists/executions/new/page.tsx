@@ -33,7 +33,7 @@ function NewExecutionPageInner() {
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
-          router.push("/signin");
+          router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else if (err instanceof ApiError && err.status === 403) {
           setActionError("You do not have permission to create executions.");
         } else if (err instanceof ApiError && err.status === 409) {

@@ -31,7 +31,7 @@ function NewDefinitionPageInner() {
       router.push(`/iig-checklists/${definition.public_id}?tenant=${tenantSlug}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        router.push("/signin");
+        router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         return;
       }
       if (err instanceof ApiError && err.status === 403) {

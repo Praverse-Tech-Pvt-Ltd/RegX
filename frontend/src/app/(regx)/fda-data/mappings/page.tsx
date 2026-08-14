@@ -145,7 +145,7 @@ function MappingsPageInner() {
       .then((resp) => setItems(resp.results))
       .catch((err: unknown) => {
         if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
-          router.push("/signin");
+          router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
           setError("Failed to load terminology mappings.");
         }
