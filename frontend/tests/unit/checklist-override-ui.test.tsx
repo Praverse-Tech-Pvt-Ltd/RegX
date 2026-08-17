@@ -43,7 +43,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import { ChecklistResponses } from "@/app/iig-checklists/executions/[executionPublicId]/ChecklistResponses";
+import { ChecklistResponses } from "@/app/(regx)/iig-checklists/executions/[executionPublicId]/ChecklistResponses";
 
 const TENANT = "alpha";
 const EXECUTION = "exec-public-0001";

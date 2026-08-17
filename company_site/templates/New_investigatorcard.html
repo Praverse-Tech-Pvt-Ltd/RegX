@@ -1,0 +1,1328 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Investigator Insights</title>
+<link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+  <!-- endinject -->
+  <!-- Plugin css for this page -->
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+  <!-- End plugin css for this page -->
+  <!-- Layout styles -->
+  <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+  <!-- End layout styles -->
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+  <style>
+    :root {
+      --bg-1: #f7f9fd;
+      --bg-2: #edf4ff;
+      --ink: #17324d;
+      --muted: #6f84a2;
+      --accent: #08b1d1;
+      --accent-2: #0f3f94;
+      --accent-3: #25729D;
+      --card: rgba(255, 255, 255, 0.96);
+      --line: rgba(18, 58, 96, 0.12);
+      --shadow: 0 18px 36px rgba(18, 58, 96, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--ink);
+      height: 100vh;
+      overflow: hidden;
+      /* background:
+        radial-gradient(circle at top left, rgba(8, 177, 209, 0.1), transparent 25%),
+        radial-gradient(circle at top right, rgba(15, 63, 148, 0.08), transparent 24%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2)); */
+    }
+
+    a { text-decoration: none; }
+
+    .nav-link {
+      white-space: normal !important;
+      word-wrap: break-word !important;
+      overflow-wrap: break-word !important;
+      text-align: left !important;
+    }
+
+    .nav-header-link {
+      font-size: 14px !important;
+      font-weight: bold;
+      text-decoration: none;
+      border-radius: 5px;
+      color: black !important;
+    }
+
+    .nav-header-link-hover:hover {
+      color: #045c8d !important;
+    }
+
+    .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+    }
+
+    .navbar-menu-wrapper {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      flex-grow: 1;
+      width: fit-content !important;
+    }
+
+    .navbar-brand-wrapper {
+      width: fit-content !important;
+    }
+
+    .dropdown-item:active {
+      background-color: white;
+    }
+
+    .dropdown-menu[data-bs-popper] {
+      top: 70%;
+    }
+
+    @media (max-width: 1490px) {
+      .nav-header-link {
+        font-size: 12px !important;
+      }
+    }
+
+    /* ── Dashboard sidebar layout ── */
+    .dashboard-page-body {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      padding-top: 70px;
+      min-height: 100vh;
+    }
+
+
+
+    .dashboard-main-panel {
+      flex: 1 1 auto;
+      margin-left: 270px;
+      width: calc(100% - 270px);
+      transition: all 0.3s ease;
+      transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+        margin-left: 96px !important;
+        width: calc(100% - 96px) !important;
+    }
+    /* Collapsed sidebar */
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+      width: 96px;
+      min-width: 96px;
+      max-width: 96px;
+    }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label { display: none; }
+    .dashboard-layout.sidebar-collapsed .sidebar-toggle-row { justify-content: center; }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+      display: flex;
+       flex-direction: column;
+      justify-content: center;
+    }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      width: 56px;
+      margin: 0 auto;
+    }
+
+    .content-area {
+      flex: 1;
+      min-width: 0;
+      padding: 18px 28px 0px;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 70px);
+    }
+
+    .cards-section-wrapper {
+      flex: 1;
+      overflow-y: auto;
+      padding-bottom: 42px;
+      padding-right: 10px;
+      margin-right: -10px;
+    }
+    .cards-section-wrapper::-webkit-scrollbar {
+      width: 6px;
+    }
+    .cards-section-wrapper::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .cards-section-wrapper::-webkit-scrollbar-thumb {
+      background: #c5d0db;
+      border-radius: 10px;
+    }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .hero-title {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 800;
+      color: #122f54;
+    }
+
+    .hero-title strong {
+      color: var(--accent-2);
+      font-size: 44px;
+      line-height: 1;
+      margin-left: 10px;
+    }
+
+    .hero-subtitle {
+      margin: 12px 0 0;
+      max-width: 760px;
+      color: #53708c;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+
+    .severity-legend {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 34px;
+      margin-bottom: 4px;
+      color: #5d6d86;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+      box-shadow: 0 5px 10px rgba(23, 50, 77, 0.1);
+    }
+
+    .legend-dot.critical { background: #f0444f; }
+    .legend-dot.high { background: #f59e1b; }
+    .legend-dot.medium { background: #14b8a6; }
+    .legend-dot.low { background: #4abf7a; }
+
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .search-shell {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      flex: 1;
+      min-width: 260px;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #d5dde8;
+      border-radius: 12px;
+      padding: 10px 20px;
+      box-shadow: 0 10px 28px rgba(15, 63, 148, 0.04);
+    }
+
+    .search-shell i {
+      color: #213b61;
+      font-size: 19px;
+      margin-top: 12px;
+      flex-shrink: 0;
+    }
+
+    .search-input-stack {
+      flex: 1;
+      min-width: 0;
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      height: 34px;
+      outline: none;
+      font-size: 16px;
+      font-weight: 650;
+      color: #172b4d;
+      min-width: 0;
+      padding: 0;
+    }
+
+    .search-suggestions {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #d5dde8;
+      border-radius: 12px;
+      box-shadow: 0 10px 28px rgba(15, 63, 148, 0.08);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
+
+    .search-suggestions.is-open {
+      display: block;
+    }
+
+    .search-suggestion-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #17324d;
+    }
+
+    .search-suggestion-item:hover {
+      background: #f2f7ff;
+    }
+
+    .selected-investigators {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 7px;
+      margin-top: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding-bottom: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: #c7d6e8 transparent;
+    }
+
+    .selected-investigators::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .selected-investigators::-webkit-scrollbar-thumb {
+      background: #c7d6e8;
+      border-radius: 999px;
+    }
+
+    .selected-investigator-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #eaf4ff, #dcecff);
+      color: #0f3f94;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid rgba(15, 63, 148, 0.16);
+      box-shadow: 0 6px 12px rgba(15, 63, 148, 0.08);
+    }
+
+    .selected-investigator-tag span:first-child {
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .selected-investigator-tag button {
+      border: 0;
+      background: rgba(15, 63, 148, 0.1);
+      color: #0f3f94;
+      cursor: pointer;
+      padding: 2px 6px;
+      font-size: 12px;
+      line-height: 1;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .selected-investigator-tag button:hover {
+      background: rgba(15, 63, 148, 0.18);
+    }
+
+    .search-input::placeholder {
+      color: #6a7890;
+      opacity: 1;
+    }
+
+    .toolbar-btn {
+      border: 1px solid #d5dde8;
+      border-radius: 12px;
+      padding: 0 26px;
+      min-width: 132px;
+      height: 52px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: white;
+      color: #5d6d86;
+      box-shadow: 0 10px 28px rgba(15, 63, 148, 0.04);
+      white-space: nowrap;
+      transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .toolbar-btn:hover {
+      border-color: #0f3f94;
+      color: #0f3f94;
+      box-shadow: 0 12px 28px rgba(15, 185, 157, 0.1);
+    }
+
+    .toolbar-btn.is-active {
+      border-color: #0f3f94;
+      color: #0f3f94;
+      box-shadow: 0 12px 28px rgba(15, 185, 157, 0.12);
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+
+    .investigator-card,
+    .skeleton-card {
+      background: var(--card);
+      border: 1px solid rgba(18, 58, 96, 0.18);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .investigator-card {
+      padding: 22px 22px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-height: 365px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .strictness-stripe {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 6px;
+    }
+
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: #123672;
+      line-height: 1.3;
+    }
+
+    .card-meta-line {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #40566f;
+    }
+
+    .card-submeta {
+      margin-top: 8px;
+      display: grid;
+      gap: 4px;
+      font-size: 11px;
+      color: #91a3ba;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .rate-ring {
+      position: relative;
+      width: 66px;
+      height: 66px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(var(--accent-3) var(--progress, 0%), #dfe8f1 0);
+      flex: 0 0 auto;
+    }
+
+    .rate-ring::before {
+      content: "";
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: white;
+      box-shadow: inset 0 0 0 1px rgba(18, 58, 96, 0.08);
+      position: absolute;
+    }
+
+    .rate-ring-value {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      line-height: 1;
+      font-size: 10px;
+      font-weight: 800;
+      color: #123672;
+    }
+
+    .strictness-label-text {
+      display: block;
+      font-size: 13px;
+      margin-top: 5px;
+      letter-spacing: 0.04em;
+      font-weight: 800;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .metric-box {
+      background: #f6f9fd;
+      border-radius: 18px;
+      padding: 14px 16px;
+      min-height: 86px;
+      border: 1px solid rgba(18, 58, 96, 0.04);
+    }
+
+    .metric-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #5f738d;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: 800;
+      color: #123672;
+    }
+
+    /* .metric-value.highlight {
+      color: #0b8a80;
+    } */
+
+    .card-footer {
+      margin-top: auto;
+    }
+
+    .card-btn {
+      width: 100%;
+      border: 0;
+      border-radius: 16px;
+      height: 54px;
+      cursor: pointer;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      background: #25729D;
+      box-shadow: 0 10px 18px rgba(21, 189, 183, 0.18);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .card-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 22px rgba(21, 189, 183, 0.22);
+    }
+
+    .status-box,
+    .error-box,
+    .empty-box {
+      grid-column: 1 / -1;
+      border-radius: 22px;
+      padding: 22px;
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid var(--line);
+      color: #36526f;
+      box-shadow: var(--shadow);
+    }
+
+    .error-box {
+      color: #8b1f1f;
+      border-color: rgba(219, 65, 65, 0.18);
+    }
+
+    .skeleton-card {
+      min-height: 365px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.84), rgba(233,242,255,0.98), rgba(255,255,255,0.84));
+      background-size: 200% 100%;
+      animation: shimmer 1.25s infinite linear;
+    }
+
+    .load-indicator {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 20px 0 6px;
+      color: #58728f;
+      font-weight: 600;
+    }
+
+    .load-indicator.is-visible {
+      display: flex;
+    }
+
+    .bottom-sentinel {
+      width: 100%;
+      height: 4px;
+    }
+
+    .detail-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 22, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1080;
+    }
+
+    .detail-modal.is-open {
+      display: flex;
+    }
+
+    .detail-dialog {
+      width: min(760px, 100%);
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      background: white;
+      border-radius: 28px;
+      box-shadow: 0 24px 48px rgba(9, 30, 66, 0.22);
+      padding: 24px;
+    }
+
+    .detail-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .detail-title {
+      margin: 0;
+      color: #123672;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .detail-close {
+      width: 42px;
+      height: 42px;
+      border: 0;
+      border-radius: 14px;
+      background: #f2f6fb;
+      color: #123672;
+      cursor: pointer;
+      font-size: 24px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .detail-panel {
+      border: 1px solid rgba(18, 58, 96, 0.1);
+      border-radius: 20px;
+      padding: 18px;
+      background: #fbfdff;
+    }
+
+    .detail-panel h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #5f738d;
+    }
+
+    .detail-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .detail-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      color: #17324d;
+      font-size: 14px;
+    }
+
+    .detail-row strong {
+      color: #123672;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 0 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    @media (max-width: 1350px) {
+      .cards-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 991px) {
+      body {
+        height: auto;
+        overflow: auto;
+      }
+      .dashboard-page-body {
+        flex-direction: column;
+        padding-top: 70px;
+      }
+      .dashboard-sidebar {
+        position: relative;
+        top: 0;
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 0 0 16px 16px;
+      }
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+      }
+      .dashboard-main-panel {
+        width: 100% !important;
+      }
+      .content-area {
+        padding: 20px 16px 30px;
+        height: auto;
+      }
+      .cards-section-wrapper {
+        overflow-y: visible;
+        padding-bottom: 0;
+        padding-right: 0;
+        margin-right: 0;
+      }
+      .hero {
+        flex-direction: column;
+      }
+      .hero-title strong {
+        display: block;
+        margin: 6px 0 0;
+      }
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .search-shell {
+        max-width: none;
+      }
+      .filter-bar {
+        flex-wrap: wrap;
+      }
+      .toolbar-btn {
+        flex: 1 1 160px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .cards-grid,
+      .metrics-grid,
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .investigator-card {
+        min-height: auto;
+      }
+
+      .card-top {
+        flex-direction: column;
+      }
+
+      .rate-ring {
+        align-self: flex-end;
+      }
+
+      .severity-legend {
+        gap: 14px 20px;
+      }
+
+      .filter-bar {
+        gap: 12px;
+      }
+
+      .search-shell {
+        flex-basis: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+ {% include './navbar.html' %}
+  <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+     {% include './sidebar.html' %}
+
+    <div class="dashboard-main-panel">
+    <main class="content-area">
+      <section class="hero">
+        <div>
+          <h2 class="hero-title">Total Investigators:<strong id="totalInvestigatorsCount">0</strong></h2>
+          <p class="hero-subtitle">
+       Showing top investigators by strictness score · Minimum 5 inspections · Resolved outcomes only
+
+
+          </p>
+        </div>
+
+        <div class="severity-legend" aria-label="Strictness score legend">
+          <span class="legend-item"><span class="legend-dot critical"></span>Critical &ge; 80%</span>
+          <span class="legend-item"><span class="legend-dot high"></span>High 65-79%</span>
+          <span class="legend-item"><span class="legend-dot medium"></span>Medium 50-64%</span>
+          <span class="legend-item"><span class="legend-dot low"></span>Low &lt; 50%</span>
+        </div>
+
+        <div class="filter-bar">
+
+          <div class="search-shell">
+            <i class="mdi mdi-magnify"></i>
+            <div class="search-input-stack">
+              <input
+                id="searchInput"
+                class="search-input"
+                type="text"
+                placeholder="Search investigator name..."
+                autocomplete="off"
+              />
+              <div id="searchSuggestions" class="search-suggestions" aria-live="polite"></div>
+            </div>
+          </div>
+          <button class="toolbar-btn severity-filter is-active" type="button" data-severity="all">All investigators</button>
+          <button class="toolbar-btn severity-filter" type="button" data-severity="critical">Critical &ge;80%</button>
+          <button class="toolbar-btn severity-filter" type="button" data-severity="high">High 65-79%</button>
+          <button class="toolbar-btn severity-filter" type="button" data-severity="medium">Medium 50-64%</button>
+          <button class="toolbar-btn severity-filter" type="button" data-severity="low">Low &lt;50%</button>
+        </div>
+      </section>
+              <div id="selectedInvestigators" class="selected-investigators" aria-live="polite" style="margin: 10px;"></div>
+
+
+    <div class="cards-section-wrapper" id="cardsScrollWrapper">
+      <section id="cardsGrid" class="cards-grid" aria-live="polite">
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+        <div class="skeleton-card"></div>
+      </section>
+
+      <div id="loadIndicator" class="load-indicator">
+        <i class="mdi mdi-loading mdi-spin"></i>
+        <span>Loading more investigators...</span>
+      </div>
+      <div id="scrollSentinel" class="bottom-sentinel" aria-hidden="true"></div>
+    </div>
+    </main>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      investigators: [],
+      filteredInvestigators: [],
+      currentPage: 0,
+      totalPages: 1,
+      totalInvestigators: 0,
+      hasNext: true,
+      isLoading: false,
+      searchTerm: "",
+      selectedInvestigators: [],
+      investigatorOptions: [],
+      activeSeverity: "all",
+      hasRenderedOnce: false,
+      pageSize: 10
+    };
+
+    function readBaseUrl() {
+      return window.location.origin;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function formatNumber(value, decimals = 0) {
+      const number = Number(value);
+      if (Number.isNaN(number)) return "0";
+      return number.toLocaleString(undefined, {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      });
+    }
+
+    function getSearchHaystack(item) {
+      return [
+        item.investigator_name,
+        item.most_active_year,
+        item.active_since,
+        item.last_inspection
+      ].join(" ").toLowerCase();
+    }
+
+    async function fetchInvestigatorOptions() {
+      if (state.investigatorOptions.length) {
+        return state.investigatorOptions;
+      }
+
+      try {
+        const response = await fetch(`${readBaseUrl()}/aidatabase/list_of_investigators/`, {
+          headers: { Accept: "application/json" }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        state.investigatorOptions = Array.isArray(payload.investigators) ? payload.investigators : [];
+        return state.investigatorOptions;
+      } catch (error) {
+        console.error("Failed to load investigator suggestions:", error);
+        return [];
+      }
+    }
+
+    function renderSelectedInvestigators() {
+      const container = document.getElementById("selectedInvestigators");
+      container.innerHTML = state.selectedInvestigators.map((name) => `
+        <span class="selected-investigator-tag">
+          <span>${escapeHtml(name)}</span>
+          <button type="button" aria-label="Remove ${escapeHtml(name)}" data-name="${escapeHtml(name)}">×</button>
+        </span>
+      `).join("");
+
+      container.querySelectorAll("button[data-name]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const name = button.getAttribute("data-name");
+          state.selectedInvestigators = state.selectedInvestigators.filter((item) => item !== name);
+          renderSelectedInvestigators();
+          applyFilters();
+        });
+      });
+    }
+
+    async function showSuggestions(query) {
+      const suggestionsBox = document.getElementById("searchSuggestions");
+      const normalizedQuery = String(query || "").trim().toLowerCase();
+
+      if (!normalizedQuery) {
+        suggestionsBox.innerHTML = "";
+        suggestionsBox.classList.remove("is-open");
+        return;
+      }
+
+      const options = await fetchInvestigatorOptions();
+      const filteredOptions = options.filter((name) =>
+        String(name).toLowerCase().includes(normalizedQuery)
+      );
+
+      if (!filteredOptions.length) {
+        suggestionsBox.innerHTML = '<div class="search-suggestion-item">No matching investigators found</div>';
+        suggestionsBox.classList.add("is-open");
+        return;
+      }
+
+      suggestionsBox.innerHTML = filteredOptions
+        .map((name) => `<div class="search-suggestion-item" data-name="${escapeHtml(name)}">${escapeHtml(name)}</div>`)
+        .join("");
+      suggestionsBox.classList.add("is-open");
+
+      suggestionsBox.querySelectorAll(".search-suggestion-item[data-name]").forEach((item) => {
+        item.addEventListener("click", () => {
+          const name = item.getAttribute("data-name");
+          if (name && !state.selectedInvestigators.includes(name)) {
+            state.selectedInvestigators.push(name);
+            renderSelectedInvestigators();
+            applyFilters();
+          }
+          document.getElementById("searchInput").value = "";
+          state.searchTerm = "";
+          suggestionsBox.innerHTML = "";
+          suggestionsBox.classList.remove("is-open");
+        });
+      });
+    }
+
+    function getSeverity(score) {
+      const value = Number(score) || 0;
+      if (value >= 80) return "critical";
+      if (value >= 65) return "high";
+      if (value >= 50) return "medium";
+      return "low";
+    }
+
+    function buildCard(item) {
+      const rate = Math.max(0, Math.min(100, Number(item.strictness_score) || 0));
+      const investigatorName = escapeHtml(item.investigator_name);
+
+      let stripeColor = "";
+      if (rate >= 80) stripeColor = "#f0444f"; // Red
+      else if (rate >= 65) stripeColor = "#F59E1B"; // Yellow
+      else if (rate >= 50) stripeColor = "#14B8A6"; // Darker Lime Green
+      else stripeColor = "#4ABF7A"; // Light Green
+
+      return `
+        <article class="investigator-card">
+          <div class="strictness-stripe" style="background-color: ${stripeColor};"></div>
+          <div class="card-top">
+            <div>
+              <h2 class="card-title">${investigatorName}</h2>
+              <div class="card-meta-line">Active since ${escapeHtml(item.active_since || "N/A")}</div>
+              <div class="card-submeta">
+                <span>Last inspection: ${escapeHtml(item.last_inspection || "N/A")}</span>
+                <span>${formatNumber(item.active_years)} yrs active</span>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              <div class="rate-ring" style="--progress:${rate}%;">
+                <div class="rate-ring-value">
+                  ${formatNumber(rate, rate % 1 ? 2 : 0)}%
+                </div>
+              </div>
+              <span class="strictness-label-text" style="color: ${stripeColor};">${item.strictness_label}</span>
+            </div>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric-box">
+              <div class="metric-label">Inspections</div>
+              <div class="metric-value">${formatNumber(item.inspection_count)}</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">OAI Observations</div>
+              <div class="metric-value highlight">${formatNumber(item.oai_classification_rate, 2)}%</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Avg 483s</div>
+              <div class="metric-value">${formatNumber(item.avg_483_observations_per_inspection, 1)}</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label">Peak Year</div>
+              <div class="metric-value">${escapeHtml(item.most_active_year || "N/A")}</div>
+            </div>
+
+          </div>
+
+          <div class="card-footer">
+            <button
+              class="card-btn"
+              type="button"
+              data-investigator="${investigatorName}">
+              View More <i class="mdi mdi-arrow-right"></i>
+            </button>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderCards() {
+      const grid = document.getElementById("cardsGrid");
+      const items = state.filteredInvestigators;
+
+      if (!items.length) {
+        grid.innerHTML = state.hasRenderedOnce
+          ? '<div class="empty-box">No investigators match the current filter.</div>'
+          : '<div class="skeleton-card"></div><div class="skeleton-card"></div><div class="skeleton-card"></div>';
+        return;
+      }
+
+      grid.innerHTML = items.map(buildCard).join("");
+      bindDetailButtons();
+    }
+
+    function applyFilters() {
+      const selectedTerms = state.selectedInvestigators.map((name) => String(name).trim().toLowerCase()).filter(Boolean);
+      const query = state.searchTerm.trim().toLowerCase();
+      state.filteredInvestigators = state.investigators.filter((item) => {
+        const haystack = getSearchHaystack(item);
+        const matchesSearch = selectedTerms.length
+          ? selectedTerms.some((term) => haystack.includes(term))
+          : (query ? haystack.includes(query) : true);
+        const meetsMinimumInspections =
+          state.activeSeverity === "all" || Number(item.resolved_inspection_count) >= 5;
+        const matchesSeverity =
+          state.activeSeverity === "all" || getSeverity(item.strictness_score) === state.activeSeverity;
+
+        return meetsMinimumInspections && matchesSearch && matchesSeverity;
+      }).sort((a, b) => {
+        const inspectionDifference = Number(b.inspection_count) - Number(a.inspection_count);
+        const strictnessDifference = Number(b.strictness_score) - Number(a.strictness_score);
+        const nameDifference = String(a.investigator_name || "").localeCompare(String(b.investigator_name || ""));
+
+        if (state.activeSeverity === "all") {
+          return inspectionDifference || strictnessDifference || nameDifference;
+        }
+
+        return strictnessDifference || inspectionDifference || nameDifference;
+      });
+
+      document.getElementById("totalInvestigatorsCount").textContent = formatNumber(state.totalInvestigators);
+      renderCards();
+    }
+
+    async function fetchPage(page) {
+      if (state.isLoading || (!state.hasNext && page !== 1)) return;
+
+      state.isLoading = true;
+      document.getElementById("loadIndicator").classList.add("is-visible");
+
+      try {
+        const endpoint = `${readBaseUrl()}/aidatabase/investigator_insights/?page=${page}&page_size=${state.pageSize}`;
+        const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const nextItems = Array.isArray(payload.investigator_insights) ? payload.investigator_insights : [];
+
+        state.currentPage = Number(payload.current_page) || page;
+        state.totalPages = Number(payload.total_pages) || 1;
+        state.totalInvestigators = Number(payload.total_investigators) || nextItems.length;
+        state.hasNext = Boolean(payload.has_next);
+        state.hasRenderedOnce = true;
+
+        if (page === 1) {
+          state.investigators = nextItems;
+        } else {
+          state.investigators = [...state.investigators, ...nextItems];
+        }
+
+        applyFilters();
+      } catch (error) {
+        console.error("Failed to load investigator insights:", error);
+        document.getElementById("cardsGrid").innerHTML = `
+          <div class="error-box">
+           Server error: we couldn't load investigator insights right now. Please try again later.
+          </div>
+        `;
+      } finally {
+        state.isLoading = false;
+        document.getElementById("loadIndicator").classList.remove("is-visible");
+      }
+    }
+
+    async function ensureSearchCoverage() {
+      const selectedTerms = state.selectedInvestigators.map((name) => String(name).trim().toLowerCase()).filter(Boolean);
+      const fallbackQuery = state.searchTerm.trim().toLowerCase();
+      if (!selectedTerms.length && !fallbackQuery) return;
+
+      while (state.hasNext && !state.isLoading) {
+        const existingMatch = state.investigators.some((item) => {
+          const haystack = getSearchHaystack(item);
+          return selectedTerms.length
+            ? selectedTerms.some((term) => haystack.includes(term))
+            : haystack.includes(fallbackQuery);
+        });
+
+        if (existingMatch) {
+          break;
+        }
+
+        await fetchPage(state.currentPage + 1);
+      }
+    }
+
+    function initSidebarToggle() {
+      const layout = document.getElementById("dashboardLayout");
+      const btn = document.getElementById("sidebarToggle");
+      if (!layout || !btn) return;
+
+      const storageKey = "systemsSidebarCollapsed";
+      const saved = localStorage.getItem(storageKey) === null ? false : localStorage.getItem(storageKey) === "true";
+
+      function applyState(collapsed) {
+        layout.classList.toggle("sidebar-collapsed", collapsed);
+        btn.setAttribute("aria-expanded", String(!collapsed));
+        btn.innerHTML = '<i class="mdi mdi-dock-left"></i>';
+      }
+
+      applyState(saved);
+      btn.addEventListener("click", () => {
+        const next = !layout.classList.contains("sidebar-collapsed");
+        localStorage.setItem(storageKey, String(next));
+        applyState(next);
+      });
+    }
+
+    async function reloadWithLargerPageSize() {
+      if (state.pageSize === 1000) return;
+      state.pageSize = 1000;
+      state.hasNext = true;
+      state.currentPage = 0;
+
+      while (state.isLoading) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      await fetchPage(1);
+    }
+
+    function bindSearch() {
+      const input = document.getElementById("searchInput");
+      const suggestionsBox = document.getElementById("searchSuggestions");
+
+      input.addEventListener("focus", async () => {
+        await reloadWithLargerPageSize();
+        if (input.value.trim()) {
+          await showSuggestions(input.value);
+        }
+      });
+
+      input.addEventListener("input", async (event) => {
+        state.searchTerm = event.target.value || "";
+        await showSuggestions(state.searchTerm);
+      });
+
+      input.addEventListener("keydown", async (event) => {
+        if (event.key === "Escape") {
+          suggestionsBox.innerHTML = "";
+          suggestionsBox.classList.remove("is-open");
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".search-input-stack")) {
+          suggestionsBox.innerHTML = "";
+          suggestionsBox.classList.remove("is-open");
+        }
+      });
+    }
+
+    function bindSeverityFilters() {
+      document.querySelectorAll(".severity-filter").forEach((button) => {
+        button.addEventListener("click", async () => {
+          state.activeSeverity = button.getAttribute("data-severity") || "all";
+
+          document.querySelectorAll(".severity-filter").forEach((filterButton) => {
+            filterButton.classList.toggle("is-active", filterButton === button);
+          });
+
+          await reloadWithLargerPageSize();
+          applyFilters();
+        });
+      });
+    }
+
+    function bindDetailButtons() {
+      document.querySelectorAll(".card-btn[data-investigator]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const investigatorName = button.getAttribute("data-investigator");
+          const nextUrl = `${readBaseUrl()}/aidatabase/particular_investigator/?investigator=${encodeURIComponent(investigatorName)}`;
+          window.location.href = nextUrl;
+        });
+      });
+    }
+
+    function initInfiniteScroll() {
+      const sentinel = document.getElementById("scrollSentinel");
+      const scrollWrapper = document.getElementById("cardsScrollWrapper");
+      let observer = null;
+      let currentIsDesktop = window.innerWidth > 991;
+
+      function createObserver(isDesktop) {
+        if (observer) observer.disconnect();
+        observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting && state.hasNext && !state.isLoading) {
+              fetchPage(state.currentPage + 1);
+            }
+          });
+        }, {
+          root: isDesktop ? scrollWrapper : null,
+          rootMargin: "240px 0px"
+        });
+        observer.observe(sentinel);
+      }
+
+      createObserver(currentIsDesktop);
+
+      window.addEventListener('resize', () => {
+        const isDesktop = window.innerWidth > 991;
+        if (isDesktop !== currentIsDesktop) {
+          currentIsDesktop = isDesktop;
+          createObserver(currentIsDesktop);
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initSidebarToggle();
+      bindSearch();
+      bindSeverityFilters();
+      initInfiniteScroll();
+      renderSelectedInvestigators();
+      fetchPage(1);
+    });
+  </script>
+
+  <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+  <script src="{% static 'assets/js/misc.js' %}"></script>
+  <script src="{% static 'assets/js/settings.js' %}"></script>
+  <script src="{% static 'assets/js/todolist.js' %}"></script>
+  <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+</body>
+</html>

@@ -140,21 +140,21 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 
 import SignInPage from "@/app/signin/page";
-import DocumentsPage from "@/app/documents/page";
-import DocumentDetailPage from "@/app/documents/[publicId]/page";
-import FdaReleasesPage from "@/app/fda-data/releases/page";
-import NewReleasePage from "@/app/fda-data/releases/new/page";
-import FdaReleaseDetailPage from "@/app/fda-data/releases/[publicId]/page";
-import ReconciliationPage from "@/app/fda-data/releases/[publicId]/reconciliation/page";
-import MappingsPage from "@/app/fda-data/mappings/page";
-import MappingDetailPage from "@/app/fda-data/mappings/[publicId]/page";
-import OrangeBookSearchPage from "@/app/fda-data/orange-book/page";
-import FormulationDetailPage from "@/app/formulations/[publicId]/page";
-import VersionDetailPage from "@/app/formulations/[publicId]/versions/[versionPublicId]/page";
-import IidPreviewPage from "@/app/iid-assessments/preview/page";
-import ChecklistDefinitionsPage from "@/app/iig-checklists/page";
-import ChecklistDefinitionDetailPage from "@/app/iig-checklists/[publicId]/page";
-import ChecklistVersionDetailPage from "@/app/iig-checklists/versions/[versionPublicId]/page";
+import DocumentsPage from "@/app/(regx)/documents/page";
+import DocumentDetailPage from "@/app/(regx)/documents/[publicId]/page";
+import FdaReleasesPage from "@/app/(regx)/fda-data/releases/page";
+import NewReleasePage from "@/app/(regx)/fda-data/releases/new/page";
+import FdaReleaseDetailPage from "@/app/(regx)/fda-data/releases/[publicId]/page";
+import ReconciliationPage from "@/app/(regx)/fda-data/releases/[publicId]/reconciliation/page";
+import MappingsPage from "@/app/(regx)/fda-data/mappings/page";
+import MappingDetailPage from "@/app/(regx)/fda-data/mappings/[publicId]/page";
+import OrangeBookSearchPage from "@/app/(regx)/fda-data/orange-book/page";
+import FormulationDetailPage from "@/app/(regx)/formulations/[publicId]/page";
+import VersionDetailPage from "@/app/(regx)/formulations/[publicId]/versions/[versionPublicId]/page";
+import IidPreviewPage from "@/app/(regx)/iid-assessments/preview/page";
+import ChecklistDefinitionsPage from "@/app/(regx)/iig-checklists/page";
+import ChecklistDefinitionDetailPage from "@/app/(regx)/iig-checklists/[publicId]/page";
+import ChecklistVersionDetailPage from "@/app/(regx)/iig-checklists/versions/[versionPublicId]/page";
 
 beforeEach(() => {
   nav.push.mockReset();

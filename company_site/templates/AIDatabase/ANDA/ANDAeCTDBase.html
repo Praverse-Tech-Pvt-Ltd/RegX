@@ -1,0 +1,966 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>RA-AI Tools</title>
+    <!-- plugins:css -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <!-- endinject -->
+    <!-- Plugin css for this page -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}"
+    />
+    <!-- End plugin css for this page -->
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+    <!-- End layout styles -->
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important; /* Ensure long words break to the next line */
+        overflow-wrap: break-word !important; /* Ensures compatibility with modern browsers */
+        text-align: left !important; /* Optional: Adjust text alignment */
+      }
+
+      .main-panel {
+        background: linear-gradient(
+          to right,
+          #ffffff,
+          rgb(228, 205, 244)
+        ) !important;
+        border-radius: 16px;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(2px); /* Standard property */
+      }
+      .content-wrapper {
+        background: none;
+      }
+      .footer {
+        background: white;
+      }
+
+      .nav-item-dr {
+        background: #90dad7;
+        {% comment %} background: linear-gradient(to right, #f6e384, #ffd500) !important; {% endcomment %}
+        padding: 0 !important;
+      }
+
+      .nav-item-dr-li {
+        padding: 0 1.25rem !important;
+      }
+      .hover-link {
+        color: rgb(0, 0, 0) !important;
+        font-weight: 600;
+
+        padding: 1.125rem 2.25rem !important;
+        i {
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+      .hover-link:hover{
+
+       background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+        color: black !important;
+        font-weight: 600;
+
+        i{
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+
+      .nav-link:before {
+        color: white !important;
+      }
+      .nav-item-list {
+        padding: 0.5rem 2.25rem !important;
+        color: rgb(0, 0, 0) !important;
+        font-weight: 600;
+
+        background: linear-gradient(to right, #f6e384, #ffd500);
+
+        .nav-link:before {
+          color: rgb(0, 0, 0) !important;
+        }
+
+        a {
+          background: none !important;
+        }
+      }
+
+      .active {
+        background-color: #4A8A87 !important;
+        .hover-link-list {
+          color: rgb(0, 0, 0) !important;
+        }
+        .menu-title {
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+
+      .nav-item-list:hover {
+        background: linear-gradient(to right, #f6e384, #ff8000) !important;
+
+        .nav-link:before {
+          color: rgb(0, 0, 0) !important;
+        }
+        color: rgb(0, 0, 0) !important;
+
+        a {
+          color: rgb(0, 0, 0) !important;
+        }
+      }
+      .navbar-menu-wrapper{
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+      }
+      .nav-header-link {
+        font-size: 14px !important;
+        font-weight: bold;
+        text-decoration: none;
+
+        border-radius: 5px;
+        color: black !important;
+      }
+      @media (max-width: 1490px) {
+        .nav-header-link {
+
+          font-size: 12px !important;
+        }
+      }
+      .nav-header-link-hover:hover {
+      color: #045c8d !important
+    }
+
+      @media (min-width: 992px) {
+        .sidebar-icon-only .sidebar {
+          width: 70px;
+        }
+      }
+      .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+    }
+
+      .hover-link-list {
+        color: black !important;
+      }
+
+      ::placeholder {
+        color: rgb(0, 0, 0) !important;
+        opacity: 1 !important; /* Firefox */
+      }
+      ::-ms-input-placeholder {
+        /* Edge 12-18 */
+        color: red !important;
+      }
+
+      #customTable {
+        --bs-table-bg: none;
+      }
+
+      .headingRow {
+        background: linear-gradient(to right, #65b9ff, #047edf 99%);
+      }
+      .table-scroll {
+        overflow-y: auto;
+      }
+      td{
+      color:black !important;
+      }
+      #details{
+        border-bottom-width: 2.5px;
+      }
+      .row{
+        font-size: none;
+      }
+    </style>
+    <style media="print">
+      /* Ensure the table takes up the full width of the page */
+      #printTableContainer {
+        display: block !important;
+        margin: 0;
+        padding: 0;
+      }
+
+      table {
+        width: 100% !important;
+        table-layout: fixed;  /* Prevents column overflow */
+        page-break-inside: avoid !important;
+        border-collapse: collapse;  /* Ensures there is no unwanted space between cells */
+      }
+
+      th, td {
+        padding: 5px !important; /* Reduces padding to make more content fit */
+        font-size: 12px !important; /* Adjusts font size for printing */
+      }
+
+      /* Prevent page breaks inside rows */
+      tr, td, th {
+        page-break-inside: avoid !important;
+        break-inside: avoid;
+      }
+
+      /* Ensure headings appear at the top of each page */
+      thead {
+        display: table-header-group;
+      }
+
+      /* Prevent margin and padding on the body */
+      body {
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-scroller">
+      <!-- partial:partials/_navbar.html -->
+      <nav class="navbar default-layout-navbar col-lg-12 col-12 p-0 fixed-top position-fixed d-flex flex-row">
+        <div
+          class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start"
+        >
+          <a class="navbar-brand brand-logo" href="../../../"
+            ><img
+              src="{% static 'assets/icretegy/itechnical logo.png' %}"
+              style="width: 132px !important;height: 31px !important;"
+              alt="logo"
+          /></a>
+          <a class="navbar-brand brand-logo-mini" href="../../../"
+            ><img src="{% static 'assets/images/logo-mini.svg' %}" alt="logo"
+          /></a>
+        </div>
+        <div class="navbar-menu-wrapper d-flex align-items-stretch">
+          <ul class="navbar-nav navbar-nav-right">
+            <li class="nav-item d-none d-lg-block">
+              <a class="nav-link nav-header-link nav-header-link-hover" href="../../">
+               Home
+             </a>
+           </li>
+            <li class="nav-item d-none d-lg-block">
+              <a
+                class="nav-link nav-header-link nav-header-link-hover"
+                {% if request.user.role == "admin" %} href="../../../adminmaster/adminbase" {% else %} href="../../../ratools/" {% endif %}
+              >
+                Technical Tools
+              </a>
+            </li>
+             <li class="nav-item d-none d-lg-block">
+              <a class="nav-link px-4 py-3 rounded-2 nav-header-link " href="/ratools/modulehome/">
+                <span class="menu-title">ANDA CTD SmartTemplate</span>
+              </a>
+              </li>
+           <li class="nav-item  d-lg-block position-relative " >
+              <a class=" nav-link nav-header-link nav-header-link-hover dropdown-toggle" href="#" id="observationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+               483 Database
+              </a>
+              <ul class="dropdown-menu position-absolute w-100 py-0"  aria-labelledby="observationsDropdown"  >
+                <li>
+                  <a href="/aidatabase/form483/" class="dropdown-item fw-bold  nav-header-link-hover" style="font-size:14px">483 observations</a>
+
+                  <a href="/aidatabase/warning_letter/" class="dropdown-item fw-bold nav-header-link-hover" style="font-size:14px">Warning Letter</a>
+
+                </li>
+              </ul>
+            </li>
+            {% if  request.user.fda_deficiency_database %}
+            <li class="nav-item d-none d-lg-block">
+              <a
+                class="px-4 py-3 rounded-2 nav-header-link active-header-link"
+                href="../../ai_master_base/"
+              >
+              FDA Deficiency Database
+              </a>
+            </li>
+            {% endif %}
+            {% if  request.user.complete_response_database %}
+            <li class="nav-item d-none d-lg-block">
+              <a
+                class="nav-link nav-header-link nav-header-link-hover"
+                href="../../major_cr_base/"
+              >
+              Complete Response Database
+              </a>
+            </li>
+            {% endif %}
+            <li class="nav-item nav-profile dropdown">
+              <a
+                class="nav-link dropdown-toggle"
+                id="profileDropdown"
+                href="#"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <div class="nav-profile-img">
+                  <!-- <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  /> -->
+                                    {% if request.user.logo %}
+                      <img src="{{ request.user.logo.url }}" alt="image" />
+                  {% else %}
+                             <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  />
+                  {% endif %}
+                  <span class="availability-status online"></span>
+                </div>
+                <div class="nav-profile-text">
+                  <p
+                    class="mb-1 text-black nav-header-link nav-header-link-hover"
+                  >
+                    {{ request.user.first_name }}
+                  </p>
+                </div>
+              </a>
+              <div
+                class="dropdown-menu navbar-dropdown"
+                aria-labelledby="profileDropdown"
+              >
+                <a class="dropdown-item nav-header-link" href="#">
+                  <i class="mdi mdi-cached me-2 text-success"></i> Profile
+                </a>
+                <div class="dropdown-divider"></div>
+            <li class="nav-item nav-logout d-none d-lg-block">
+              <a class="nav-link" href="/adminmaster/logout/">
+                <i class="mdi mdi-power text-dark"></i>
+              </a>
+            </li>
+            <li class="nav-item nav-settings d-none d-lg-block">
+              <a class="nav-link" href="#">
+                <i class="mdi mdi-format-line-spacing text-dark"></i>
+              </a>
+            </li>
+          </ul>
+          <button
+            class="navbar-toggler navbar-toggler-right d-lg-none align-self-center"
+            type="button"
+            data-toggle="offcanvas"
+          >
+            <span class="mdi mdi-menu"></span>
+          </button>
+        </div>
+      </nav>
+      <!-- partial -->
+      <div class="container-fluid page-body-wrapper">
+        <!-- partial:partials/_sidebar.html -->
+        <nav class="sidebar sidebar-offcanvas" id="sidebar">
+          <ul class="nav">
+            <li class="nav-item nav-profile">
+              <a href="#" class="nav-link">
+                <div class="nav-profile-image">
+                  <!-- <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="profile"
+                  /> -->
+                                    {% if request.user.logo %}
+                      <img src="{{ request.user.logo.url }}" alt="image" />
+                  {% else %}
+                             <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  />
+                  {% endif %}
+                  <span class="login-status online"></span>
+                  <!--change to offline or busy as needed-->
+                </div>
+                <div class="nav-profile-text d-flex flex-column">
+                  <span class="font-weight-bold mb-2">{{ request.user.first_name }}</span>
+                  <span class="text-secondary text-small">
+                    {% if request.user.designation %}
+                      {{ request.user.designation }}
+                    {% else %}
+                      Project Manager
+                    {% endif %}
+                  </span>
+                </div>
+                <i
+                  class="mdi mdi-bookmark-check text-success nav-profile-badge"
+                ></i>
+              </a>
+            </li>
+            {% if nasal_spray_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/nasal_spray_deficiency/"
+              >
+                <span class="menu-title">Nasal Spray</span>
+              </a>
+            </li>
+            {% if liquid_oral_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/liquid_oral_deficiency/"
+              >
+                <span class="menu-title">Liquid Oral</span>
+              </a>
+            </li>
+            {% comment %} {% if iud_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a class="nav-link hover-link" href="../../anda/iud_deficiency/">
+                <span class="menu-title">Intrauterin Device (IUD)</span>
+              </a>
+            </li> {% endcomment %}
+            {% if tdds_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a class="nav-link hover-link" href="../../anda/tdds-deficiency/">
+                <span class="menu-title">TDDS</span>
+              </a>
+            </li>
+            <!-- {% if suppository_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/suppository_deficiency/"
+              >
+                <span class="menu-title">Suppository</span>
+              </a>
+            </li> -->
+            {% if topicals_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/topicals_deficiency/"
+              >
+                <span class="menu-title">Topicals</span>
+              </a>
+            </li>
+            {% if solid_oral_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/solid_oral_deficiency/"
+              >
+                <span class="menu-title">Solid Oral</span>
+              </a>
+            </li>
+            {% if otic_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a class="nav-link hover-link" href="../../anda/otic_deficiency/">
+                <span class="menu-title">Otic</span>
+              </a>
+            </li>
+            {% if ophthalmic_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/ophthalmic_deficiency/"
+              >
+                <span class="menu-title">Ophthalmic</span>
+              </a>
+            </li>
+            {% if injectable_peptide_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/injectable_peptide_deficiency/"
+              >
+                <span class="menu-title">Injectable - Peptide</span>
+              </a>
+            </li>
+            {% if injectable_general_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/injectable_general_deficiency/"
+              >
+                <span class="menu-title">Injectable - General</span>
+              </a>
+            </li>
+            {% if technical_acceptance_deficiency %}
+            <li class="nav-item nav-item-dr mt-1 active">{% else %}</li>
+
+            <li class="nav-item nav-item-dr mt-1">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/technical_acceptance_deficiency/"
+              >
+                <span class="menu-title">ANDA Acceptance</span>
+              </a>
+            </li>
+            {% if ectd_acceptance_deficiency %}
+            <li class="nav-item nav-item-dr active mt-1">{% else %}</li>
+
+            <li class="nav-item nav-item-dr">
+              {% endif %}
+              <a
+                class="nav-link hover-link"
+                href="../../anda/ectd_acceptance_deficiency/"
+              >
+                <span class="menu-title">eCTD Acceptance</span>
+              </a>
+            </li>
+          </ul>
+        </nav>
+        <!-- partial -->
+        <div class="main-panel">
+          <div class="content-wrapper">
+            <div class="page-header">
+              <h3 class="page-title">
+                <span
+                  class="page-title-icon bg-gradient-primary text-white me-2"
+                >
+                  <i class="mdi mdi-home"></i>
+                </span>
+                {{ page_heading}}
+              </h3>
+              <nav aria-label="breadcrumb">
+                <ul class="breadcrumb">
+                  <li class="breadcrumb-item" aria-current="page">
+                    <span></span>Overview<i
+                      class="mdi mdi-alert-circle-outline icon-sm text-primary align-middle"
+                    ></i>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+            <!-- ALL Your Content Here -->
+            {% comment %} <div class="text-end">
+
+              <button class="btn btn-primary mb-3 " onclick="printFilteredTable()">Print</button>
+            </div> {% endcomment %}
+
+          <!-- Hidden table for printing -->
+          <div id="printTableContainer" style="display: none;">
+            <div>
+                <h3>{{ page_heading }}</h3>
+                {% if is_filter %}
+                    <div>
+                        <strong>Applied Filters:</strong>
+                        <div>{% if dosage_form %} <span><strong>Dosage Form:</strong> {{ dosage_form }}</span> {% endif %}</div>
+                        <div>{% if cmc_section %} <span><strong>CMC Section:</strong> {{ cmc_section }}</span> {% endif %}</div>
+                        <div>{% if category_of_deficiency %} <span><strong>Category of Deficiency:</strong> {{ category_of_deficiency }}</span> {% endif %}</div>
+                        <div>{% if deficiency_type %} <span><strong>Deficiency Type:</strong> {{ deficiency_type }}</span> {% endif %}</div>
+                    </div>
+                {% endif %}
+                <div style="margin-top: 10px;"><strong>Total Deficiency:</strong> {{ full_data|length }} out of {{ original_total_count }}</div>
+            </div>
+
+            <table class="table table-bordered" style="margin-top: 15px;">
+                <thead>
+                    <tr>
+                        <th width="10%">Sr. No.</th>
+                        {% for header in table_headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in full_data %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            {% if not is_filter %}
+                                {% if nasal_spray_deficiency or iud_deficiency or otic_deficiency or suppository_deficiency or injectable_peptide_deficiency or injectable_general_deficiency %}
+                                    <td width='10%'>{{ row.cmc_section }}</td>
+                                    <td width='10%'>{{ row.deficiency_type }}</td>
+                                    <td width='10%'>{{ row.category_of_deficiency }}</td>
+                                {% else %}
+                                    <td width='60%'>{{ row.dosage }}</td>
+                                    {% comment %} <td width='10%'>{{ row.cmc_clinic }}</td> {% endcomment %}
+                                    <td width='10%'>{{ row.deficiency_type }}</td>
+                                    {% comment %} <td width='10%'>{{ row.category_of_deficiency }}</td> {% endcomment %}
+                                {% endif %}
+                            {% endif %}
+                            <td style="white-space: normal !important; min-width: 500px !important; text-align: justify; line-height: 1.15;" class="deficiencyData">
+                                {{ row.deficiency|safe }}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-dark">No data available</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+          </div>
+
+            <div class="row">
+              <div class="container bg-light shadow rounded p-4 col-md-8">
+                <div class="row ">
+                  {% if show_flag %}
+                  <div class="col-md-12" style="height: 600px;">
+                    {% if is_filter %}
+                    <div class="d-flex justify-content-between mb-2" style="align-items: center; ">
+                        <div class="d-flex flex-column">
+                          <div style="font-weight: bold; font-size: 18px; margin-bottom: 4px;">Applied Filters:</div>
+                          <div>{% if dosage_form %} <span style="font-weight: bold;"> Dosage: {{dosage_form}} </span> {% endif %}</div>
+                          <div>{% if cmc_clinic %} <span style="font-weight: bold;"> CMC/Clinic: {{cmc_clinic}} </span> {% endif %}</div>
+                          <div>{% if deficiency_type %} <span style="font-weight: bold;"> Deficiency Type: </span> {{deficiency_type}} {% endif %}</div>
+                        </div>
+                         <div style="font-size: 18px; ">
+                          <span style="font-weight: bold;">Total Deficiency:</span>
+                          {{ page_obj.paginator.count }} out of {{ original_total_count }}
+                        </div>
+                        {% comment %} <div class="" style="font-size: 18px;"> <span style="font-weight: bold;">Total Deficiency:</span> {{ page_obj.paginator.count }}</div> {% endcomment %}
+                    </div>
+
+                    {% endif %}
+
+                    {% if is_filter %}
+                    <div style="max-height: 507px; overflow-y: auto; display: block;">
+                    {% else %}
+
+                    <div class="text-end mb-3" style="font-size: 18px;"> <span style="font-weight: bold;">Total Deficiency:</span> {{ page_obj.paginator.count }}</div>
+                    <div style="max-height: 560px; overflow-y: auto; display: block;">
+                      {% endif %}
+
+
+                    <table id="customTable" class="table table-hover">
+                      <thead style="position: sticky; top: 0; background: white; z-index: 2;">
+                        <tr class="headingRow">
+                          <th>Sr. No.</th>
+                          {% for header in table_headers %}
+                          <th>{{ header }}</th>
+                          {% endfor %}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for row in data %}
+
+                        <tr class="table-scroll" id="details">
+                          <td style="width: 1%;">{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                          {% if not is_filter %}
+                          <td
+                            class="table-col-1"
+                            style="white-space: wrap !important"
+                          >
+                            {{ row.dosage }}
+                          </td>
+                          {% comment %} <td
+                            class="table-col-2"
+                            style="white-space: wrap !important"
+                          >
+                            {{ row.cmc_clinic }}
+                          </td> {% endcomment %}
+                          <td
+                            class="table-col-3"
+                            style="white-space: wrap !important"
+                          >
+                            {{ row.deficiency_type }}
+                          </td>
+                          {% endif %}
+                          <td
+                            class="table-col-4 tdP deficiencyData"
+                            style="    white-space: normal; !important; text-align:justify; !important;  min-width:500px !important;line-height: 1.15;"
+                          >
+                            {{ row.deficiency|safe }}
+                          </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                          <td colspan="4" class="text-center text-dark">
+                            No Data Available, Please Apply Filters to Search
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                    </div>
+                  </div>
+                  {% else %}
+                    <div class="table-scroll d-flex justify-content-center p-4">You do not have access to this page.</div>
+                  {% endif %}
+                </div>
+
+                <div class="col-md-12 text-start mt-3 text-end">
+                  {% if page_obj.has_previous %}
+                      <a style="text-decoration: none;" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                         id="prevPage"
+                         class="badge badge-danger">
+                          Previous
+                      </a>
+                  {% else %}
+                      <span class="badge badge-secondary">Previous</span>
+                  {% endif %}
+
+                  <!-- Numbered pages -->
+                  {% for i in page_obj.paginator.page_range %}
+                      {% if page_obj.number == i %}
+                          <span >{{ i }}</span>
+                      {% elif i > page_obj.number|add:'-4' and i < page_obj.number|add:'4' %}
+                          <a style="text-decoration: none;color: #9a55ff;" href="?page={{ i }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                             >
+                              {{ i }}
+                          </a>
+                      {% endif %}
+                  {% endfor %}
+
+                  {% if page_obj.has_next %}
+                      <a style="text-decoration: none;" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                         id="nextPage"
+                         class="badge badge-danger">
+                          Next
+                      </a>
+                  {% else %}
+                      <span class="badge badge-secondary">Next</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="container bg-light shadow rounded p-4 col-md-3">
+                <div class="row">
+                  <div class="col-md-12">
+                    <h4>Advanced Filters</h4>
+                    <hr />
+                    <form action="" method="GET" class="mb-4">
+                      {% csrf_token %}
+                      <div class="form-row">
+                          <div class="form-group">
+                              <label for="dosage">Dosage Form</label>
+                              {{ filter.form.dosage }}
+                          </div>
+                          {% comment %} <div class="form-group">
+                              <label for="cmc_clinic">CMC/Clinic</label>
+                              {{ filter.form.cmc_clinic }}
+                          </div> {% endcomment %}
+                          <div class="form-group">
+                              <label for="deficiency_type">Deficiency Type</label>
+                              {{ filter.form.deficiency_type }}
+                          </div>
+                      </div>
+                      <div class="form-group">
+                          {% comment %} <label for="deficiency">Search Deficiency</label> {% endcomment %}
+                          <label for="deficiency">Keyword</label>
+                          <input type="text" class="form-control" id="deficiency"
+                                 name="search_deficiency"
+                                 {% comment %} placeholder="AI search here..." {% endcomment %}
+                                 placeholder="Search by Keyword..."
+                                 value="{{ request.POST.search_deficiency|default:'' }}">
+                      </div>
+                      <div style="display: flex;gap: 10px;">
+                        <button type="submit" class="btn btn-success">Search</button>
+                        <button type="button" class="btn btn-info" onclick="clearFilters()">Clear</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- content-wrapper ends -->
+          <!-- partial:partials/_footer.html -->
+          <footer class="footer">
+            <div
+              class="d-sm-flex justify-content-center justify-content-sm-between"
+            >
+            <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">© Copyright ©2025 iPharmaAI. All Rights Reserved by <a href="https://icretegy.com" target="_blank">iCretegy Solutions</a>.</span>
+              <!-- <span
+                class="text-muted text-center text-sm-left d-block d-sm-inline-block"
+                >Copyright © 2025
+                <a href="#" target="_blank"
+                  >iPharmaAI</a
+                >. All rights reserved.</span
+              > -->
+              <!-- <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Hand-crafted & made with <i class="mdi mdi-heart text-danger"></i></span> -->
+            </div>
+          </footer>
+          <!-- partial -->
+        </div>
+        <!-- main-panel ends -->
+      </div>
+      <!-- page-body-wrapper ends -->
+    </div>
+    <script>
+      function printFilteredTable() {
+        const printContainer = document.getElementById("printTableContainer");
+        const printContent = printContainer.innerHTML;
+
+        const printWindow = window.open('', '_blank', 'toolbar=no,scrollbars=yes,resizable=yes,fullscreen=yes');
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Print Table</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            margin: 20px;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-top: 20px;
+                        }
+                        th, td {
+                            border: 1px solid #000;
+                            padding: 8px;
+                            text-align: left;
+                            vertical-align: top;
+                        }
+                        h3, strong {
+                            margin: 10px 0;
+                        }
+                        @media print {
+                            .no-print {
+                                display: none !important;
+                            }
+                        }
+                            .print-btn {
+                            display: block;
+                            margin: 20px;
+                            padding: 10px 20px;
+                            background: #3b82f6;
+                            color: white;
+                            border: none;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            text-align: center;
+                        }
+                        </style>
+                </head>
+                <body>
+                    <button class="no-print print-btn" onclick="window.print()">Print</button>
+                    ${printContent}
+                </body>
+            </html>
+        `);
+
+        printWindow.document.close();
+        printWindow.focus();
+    }
+
+    </script>
+    <!-- container-scroller -->
+    <!-- plugins:js -->
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <!-- endinject -->
+    <!-- Plugin js for this page -->
+    <script src="{% static 'assets/vendors/chart.js/chart.umd.js' %}"></script>
+    <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+    <!-- End plugin js for this page -->
+    <!-- inject:js -->
+    <script src="{% static 'assets/js/off-canvas.js' %}"></script>
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+    <!-- endinject -->
+    <!-- Custom js for this page -->
+    <script src="{% static 'assets/js/dashboard.js' %}"></script>
+    <!-- End custom js for this page -->
+  </body>
+  <style>
+    .td p {
+      white-space: wrap;
+    }
+    td{
+      color: black !important;
+    }
+  </style>
+  <script>
+    function clearFilters() {
+      window.location.href = window.location.pathname;
+  }
+    jQuery(function($) {
+      var path = window.location.href;
+      console.log(path) // because the 'href' property of the DOM element is the absolute path
+      $('ul a').each(function() {
+       if (this.href === path) {
+        $(this).addClass('active');
+       }
+      });
+     });
+     document.addEventListener("DOMContentLoaded", function () {
+      const deficiencyDataElements = document.querySelectorAll(".deficiencyData p");
+
+      deficiencyDataElements.forEach(element => {
+          element.innerHTML = element.innerHTML.replace(/•/g, "<br>• ");
+      });
+      const urlParams = new URLSearchParams(window.location.search);
+      const searchTerm = urlParams.get('search_deficiency');
+
+      // If there's a search term in the URL, set it in the input field
+      if (searchTerm) {
+          document.getElementById('deficiency').value = searchTerm;
+          highlightText(searchTerm);
+      }
+       function highlightText(deficiency) {
+          const deficiencyDataElements = document.querySelectorAll(".deficiencyData");
+
+          console.log("Search term:", deficiency);
+          console.log("Number of elements to search:", deficiencyDataElements.length);
+
+          deficiencyDataElements.forEach(element => {
+              console.log("Checking element:", element);
+
+              // Perform the replacement only if the element's content contains the deficiency term
+              if (element.innerHTML.toLowerCase().includes(deficiency.toLowerCase())) {
+                  console.log("Highlighting term in:", element.innerHTML);
+
+                  // Replace the deficiency term with a span that has the bg-info class for highlighting
+                  element.innerHTML = element.innerHTML.replace(new RegExp(deficiency, 'gi'),
+                      `<span style="font-size:16px;font-weight:bold">${deficiency}</span>`);
+              }
+
+          });
+      }
+
+  });
+  </script>
+</html>

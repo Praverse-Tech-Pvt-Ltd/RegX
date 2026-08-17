@@ -54,7 +54,7 @@ import {
   MAX_REVIEWER_CONCLUSION_CHARS,
   isReviewerConclusionAmendment,
   reviewerConclusionError,
-} from "@/app/iig-checklists/executions/[executionPublicId]/ChecklistResponses";
+} from "@/app/(regx)/iig-checklists/executions/[executionPublicId]/ChecklistResponses";
 
 const TENANT = "alpha";
 const EXECUTION = "exec-public-0001";

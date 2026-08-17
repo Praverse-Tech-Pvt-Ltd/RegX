@@ -1,0 +1,641 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>iPharmaAI · FDA INSPECTION RESOURCE HUB</title>
+    <!-- plugins:css -->
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet">
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            color: #011E36;
+        }
+
+        .navy-bg {
+            background-color: #02476D;
+        }
+
+        .navy-text {
+            color: #011E36;
+        }
+
+        .navy-border {
+            border-color: #011E36;
+        }
+
+        .step-line::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            width: 100%;
+            height: 1px;
+            background-color: #011E36;
+            opacity: 0.2;
+            z-index: -1;
+        }
+
+        /* --- Sidebar CSS --- */
+        .dashboard-page-body {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            padding-top: 60px;
+            min-height: 100vh;
+        }
+
+        .dashboard-main-panel {
+            flex: 1 1 auto;
+            margin-left: 270px;
+            width: calc(100% - 270px);
+            transition: all 0.3s ease;
+            transition: margin-left 0.25s ease;
+        }
+
+        /* When sidebar collapsed */
+        .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+            margin-left: 96px !important;
+            width: calc(100% - 96px) !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+            display: none;
+        }
+
+        .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+            justify-content: center;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .dashboard-layout.sidebar-collapsed .sidebar-submenu-list,
+        .dashboard-layout.sidebar-collapsed .dropdown-caret {
+            display: none !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+            width: 56px;
+            margin: 0 auto;
+            justify-content: center;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .submenu-link {
+            padding-left: 3.5rem !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .submenu-link {
+            padding-left: 0 !important;
+        }
+
+        @media (max-width: 991px) {
+            .dashboard-page-body {
+                flex-direction: column;
+                padding-top: 70px;
+            }
+
+            .dashboard-sidebar {
+                position: relative;
+                top: 0;
+                width: 100%;
+                min-width: 100%;
+                max-width: 100%;
+                height: auto;
+                border-radius: 0 0 16px 16px;
+            }
+
+            .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+                width: 100%;
+                min-width: 100%;
+                max-width: 100%;
+            }
+
+            .dashboard-main-panel {
+                width: 100% !important;
+            }
+        }
+
+        /* Fix Tailwind CSS conflict with Bootstrap collapse */
+        .navbar .collapse {
+            visibility: visible !important;
+        }
+
+        .navbar .nav-link {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px;
+            flex-direction: row !important;
+        }
+
+        .navbar .nav-link img {
+            display: inline-block !important;
+            vertical-align: middle;
+        }
+    </style>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#011E36",
+                        "on-primary-container": "#ffffff",
+                        "surface": "#ffffff",
+                        "background": "#ffffff",
+                        "outline": "#011E36",
+                        "on-surface": "#011E36"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "24px",
+                        "gutter": "24px",
+                        "sm": "12px",
+                        "xl": "64px",
+                        "base": "8px",
+                        "lg": "40px",
+                        "xs": "4px",
+                        "margin": "32px"
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+
+<body class="bg-white text-[#011E36]" >
+    <div class="container-scroller">
+        <!-- Include navbar -->
+        {% include './navbar.html' %}
+
+        <!-- Wrapper div for sidebar + content -->
+        <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+            <!-- Include sidebar -->
+            {% include './sidebar.html' %}
+
+            <!-- Main panel content wrapper -->
+            <div class="main-panel dashboard-main-panel">
+                <div class="content-wrapper p-0 bg-white">
+                    <!-- Hero Section -->
+                    <header class="py-xl px-margin  mx-auto border-b bg-[#02476D] border-white/20" style="height:550px !important;">
+                        <div class="text-center max-w-4xl mx-auto">
+                            <span
+                                class="inline-block border px-3 py-1 text-[10px] font-bold tracking-[0.2em] mb-md uppercase text-white border-white">Regulatory
+                                Intelligence</span>
+                            <p class="text-[10px] tracking-[0.3em] font-semibold mb-sm opacity-60 text-white">iPharmaAI
+                                • FDA INSPECTION RESOURCE HUB</p>
+                            <h1 class="text-5xl md:text-7xl font-bold tracking-tight mb-sm text-white">FDA Inspection
+                                Intelligence Hub
+                            </h1>
+                            <h2 class="text-xl md:text-2xl font-medium opacity-70 mb-lg text-white"><i>From Readiness to
+                                Confidence to
+                                Compliance</i></h2>
+                            <p class="text-lg opacity-80 max-w-2xl mx-auto leading-relaxed text-white">
+                                Two comprehensive FDA inspection resources - a verified regulatory <span style="white-space: nowrap;">Do's &amp; Don'ts guide</span>
+                                 and a
+                                step-by-step operational Playbook - built exclusively from FDA's own regulatory
+                                language.
+                            </p>
+                            <div class="mt-xl flex flex-wrap justify-center gap-md">
+
+
+                            </div>
+                        </div>
+                    </header>
+                    <!-- Content Overview: The Two Core Modules -->
+
+
+                        <!-- old -->
+                    <section class="py-xl px-margin bg-white">
+                        <div class="max-w-[1440px] mx-auto">
+                                         <section class="pt-4  px-margin bg-white">
+                        <div class="max-w-[1440px] mx-auto text-center mb-xl">
+                            <h2 class="text-4xl font-bold navy-text mb-md">What's Inside Each Resource</h2>
+                            <p class="text-lg opacity-80 max-w-2xl mx-auto leading-relaxed">Both documents are complementary - the Do's & Don'ts provides the regulatory <i>what</i> and <i>why</i>, the Playbook provides the operational <i>how</i>.</p>
+                        </div>
+                    </section>
+                            <div class="grid md:grid-cols-2 gap-xl">
+                                <!--Card 1: Do's & Don'ts Guide Summary-->
+                                <div class=" p-xl flex flex-col items-center text-center rounded-[40px] bg-white"
+                                    style="transform: translateY(0px); border-top:11px solid #fe9409; border-left:1px solid #011E36; border-right:1px solid #011E36; border-bottom:1px solid #011E36">
+                                    <div class="mb-md">
+                                        <span class="material-symbols-outlined text-5xl navy-text">balance</span>
+                                    </div>
+                                    <p class="text-xs font-bold uppercase tracking-widest opacity-60 mb-xs">Regulatory
+                                        Reference Guide
+                                    </p>
+                                    <h3 class="text-3xl font-bold mb-lg">Do's &amp; Don'ts Guide</h3>
+                                    <p class="text-sm opacity-80 leading-relaxed mb-xl max-w-md">
+                                        Verified FDA regulatory language mapped to severity levels - Critical, Major,
+                                        Minor, and IBP -
+                                        across all three inspection roles: management, QC unit, and production &amp; lab
+                                        personnel.
+                                    </p>
+                                    <a href="/aidatabase/usfda_guideline/"
+                                        class="mt-auto bg-[#f49b14] border border-[#011E36] navy-text font-bold text-s py-3 px-xl rounded-full flex items-center gap-sm hover:bg-[#011E36] hover:text-white transition-all text-center justify-center"
+                                        style="transform: translateY(0px); text-decoration: none;">
+                                        Open Guide
+                                    </a>
+                                </div>
+                                <!-- Card 2: Inspection Playbook Summary -->
+                                <div class=" p-xl flex flex-col items-center text-center rounded-[40px] bg-white"
+                                    style="transform: translateY(0px); border-top:11px solid #2CB354; border-left:1px solid #011E36; border-right:1px solid #011E36; border-bottom:1px solid #011E36">
+                                    <div class="mb-md">
+                                        <span class="material-symbols-outlined text-5xl navy-text">assignment</span>
+                                    </div>
+                                    <p class="text-xs font-bold uppercase tracking-widest opacity-60 mb-xs">Step-by-Step
+                                        Field Guide</p>
+                                    <h3 class="text-3xl font-bold mb-lg">Inspection Playbook</h3>
+                                    <p class="text-sm opacity-80 leading-relaxed mb-xl max-w-md">
+                                        A practical, 8-step operational guide for first-time and every-time inspected
+                                        facilities from
+                                        pre-inspection preparation through post-inspection CAPA management and
+                                        continuous readiness.
+                                    </p>
+                                    <a href="/aidatabase/playbook/"
+                                        class="mt-auto border border-[#011E36] bg-[#2CB354] navy-text font-bold text-s py-3 px-xl rounded-full flex items-center gap-sm hover:bg-[#011E36] hover:text-white transition-all"
+                                        style="transform: translateY(0px);">
+                                        Open Playbook
+                                </a>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="py-xl px-margin bg-[#fcfcfc]">
+                        <div class="max-w-[1440px] mx-auto">
+                            <div class="flex flex-col md:flex-row gap-gutter">
+                                <!-- Card 1: Do's & Don'ts Guide -->
+                                <div class="flex-1 border border-[#011E36] p-lg flex flex-col bg-white"
+                                    style="transform: translateY(0px);">
+                                    <div class="mb-lg">
+                                        <div class="flex items-start gap-sm mb-base">
+                                            <div class="w-10 h-10 flex-shrink-0"><img alt="Scales Icon"
+                                                    class="w-full h-full object-contain"
+                                                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpFqVmm1K0jFyZpX6rlVmRpXcrhoUrcZtmeBDLT-VqZChEC3KlKBBk4sSZxJ7y1FqC4bhvi55A3aAHfQinwG6mP2lnqyLsJEdCq_n9AOxv5l1f-uOH_6vZF-PocbJI9qcCipoMfTXToLTLxGd_iCnvmw4CWKxvazds2xD1xMRxXkQoy41dz_bByeMlPJ8wKIsSnDClmqwPc5FFCkcCJsxOktO09aaLVfHUWhQEPkssCyu8lIX36Y30OGh3YnlvoVxuT_wtbIGU4w">
+                                            </div>
+                                            <div>
+                                                <!-- <p
+                                                    class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-xs">
+                                                    Regulatory
+                                                    Reference Guide</p> -->
+                                                <h3 class="text-3xl font-bold">Do's &amp; Don'ts Guide</h3>
+                                            </div>
+                                        </div>
+                                        <!-- <div class="flex gap-2 flex-wrap mt-sm"><span
+                                                class="border border-red-600 text-red-600 text-[9px] font-bold px-2 py-0.5">CRITICAL</span><span
+                                                class="border border-orange-500 text-orange-500 text-[9px] font-bold px-2 py-0.5">MAJOR</span><span
+                                                class="border border-blue-500 text-blue-500 text-[9px] font-bold px-2 py-0.5">MINOR</span><span
+                                                class="border border-[#011E36] text-[#011E36] text-[9px] font-bold px-2 py-0.5">IBP</span>
+                                        </div> -->
+                                    </div>
+                                    <p class="text-sm font-semibold mb-lg italic opacity-70"> FDA Terminology
+                                        Corrections - what the
+                                        FDA actually says vs. consulting jargon</p>
+                                    <div class="space-y-lg flex-grow">
+                                        <div>
+                                            <h4
+                                                class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                <!-- <span class="material-symbols-outlined text-sm">groups</span> -->
+                                                <span class="text-[25px] font-semibold opacity-100">·</span>
+                                                Section 1: Firm Management &amp; Quality Unit Representatives
+                                            </h4>
+                                            <ul
+                                                class="text-sm space-y-2 opacity-80 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                <li class="">o Entry procedures · Credential verification · Inspection
+                                                    scope
+                                                    confirmation</li>
+                                                <li class="">o Communication protocols · Record requests · Verbal
+                                                    commitments policy
+                                                </li>
+                                                <li class="">o Closing meeting conduct · FDA 483 receipt and response
+                                                    timeline</li>
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <h4
+                                                class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                <!-- <span class="material-symbols-outlined text-sm">description</span> -->
+                                                <span class="text-[25px] font-semibold opacity-100">·</span>
+
+                                                Section 2: Quality Control Unit - Document Review &amp; Data Integrity
+                                            </h4>
+                                            <ul
+                                                class="text-sm space-y-2 opacity-80 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                <li class="">o ALCOA principles in practice - full regulatory citation
+                                                    mapping</li>
+                                                <li class="">o Audit trail requirements · Electronic records · OOS
+                                                    investigation rules
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <div>
+                                            <h4
+                                                class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                <!-- <span class="material-symbols-outlined text-sm">biotech</span> -->
+                                                <span class="text-[25px] font-semibold opacity-100">·</span>
+
+                                                Section 3: Production &amp; Laboratory Personnel
+                                            </h4>
+                                            <ul
+                                                class="text-sm space-y-2 opacity-80 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                <li class="">o Equipment status labeling · Facility conduct · Gowning
+                                                    requirements</li>
+                                                <li class="">o Contemporaneous documentation · Chromatographic data
+                                                    retention</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                </div>
+                                <!-- Card 2: Inspection Playbook Overview -->
+                                <div class="flex-1 border border-[#011E36] p-lg flex flex-col bg-white"
+                                    style="transform: translateY(0px);">
+                                    <div class="mb-lg">
+                                        <div class="flex items-center gap-sm mb-base">
+                                            <img alt="Clipboard Icon" class="w-9 h-9 object-contain"
+                                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuA8q1TNz5I7uaXUilwcZ0Gzh77VytL2_EarT4Yeu7h_6pC8hIosFRqaU1R-4HLd_KzyFmaiennNVRhWtibJPGZuurRT0To0YGezRGEWF26IjASpJarhcqjd_HT6AsilHhzWMKMgMc2uOKdFckATu9DaRNnGg1L_g1g_02g2ZfpgN5yipiKq3XEtOG0FRrNXsilBuh2U2eEJn6H0AWNVoRSYTyRYYox5ZX5y2BThZJuTr71t2JWr0CZOFKN0VeJvdiezmTxB-oNflA">
+                                            <h3 class="text-3xl font-bold">
+                                                <!-- <span class="block text-lg font-medium opacity-70 mb-1">Step-by-Step
+                                                    Field Guide</span> -->
+                                                <span class="block">Inspection Playbook</span>
+                                            </h3>
+                                        </div>
+                                        <!-- <p class="text-sm opacity-70">Step-by-step operational execution strategies for
+                                            high-stakes
+                                            environments.</p> -->
+                                    </div>
+                                    <div class="space-y-sm flex-grow overflow-y-auto">
+                                        <div class="space-y-md">
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">settings</span> -->
+                                                    <span class="text-[25px] font-semibold opacity-100">·</span>
+
+                                                    Step 1: Pre-inspection preparation
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                    Team roles,
+                                                    Command room, Documents, Mock Inspection</p>
+                                            </div>
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">badge</span> -->
+                                                     <span class="text-[25px] font-semibold opacity-100">·</span>
+
+                                                    Step 2: Arrival protocol
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                    First 5 minutes,
+                                                    Credential Verification, Form FDA 482</p>
+                                            </div>
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">groups</span>            -->
+                                                    <span class="text-[25px] font-semibold opacity-100">·</span>
+                                                    Step 3: Opening meeting
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                    Setup, Team
+                                                    activation, 7 Golden Rules</p>
+                                            </div>
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">visibility</span> -->
+                                                     <span class="text-[25px] font-semibold opacity-100">·</span>
+
+                                                    Step 4: During inspection
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                    Document
+                                                    handling, Facility tour, Employee interviews. Daily routine: Morning
+                                                    brief ·
+                                                    Real-time tracking · Evening debrief</p>
+                                            </div>
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">handshake</span> -->
+                                                     <span class="text-[25px] font-semibold opacity-100">·</span>
+                                                    Step 5: Closing meeting
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                    Form FDA 483
+                                                    receipt, signing protocol</p>
+                                            </div>
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">edit_note</span> -->
+                                                     <span class="text-[25px] font-semibold opacity-100">·</span>
+                                                    Step 6: Written 483 response
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">4
+                                                    principles,
+                                                    What to avoid, timelines</p>
+                                            </div>
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">assignment_turned_in</span> -->
+                                                     <span class="text-[25px] font-semibold opacity-100">·</span>
+                                                    Step 7: FDA classification
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                    NAI · VAI · OAI ·
+                                                    Warning Letter protocol</p>
+                                            </div>
+                                            <div>
+                                                <h4
+                                                    class="text-xs font-bold uppercase tracking-widest mb-sm flex items-center gap-2">
+                                                    <!-- <span class="material-symbols-outlined text-sm">update</span> -->
+                                                     <span class="text-[25px] font-semibold opacity-100">·</span>
+                                                    Step 8: 90-day post-inspection readiness cycle
+                                                </h4>
+                                                <p class="text-xs opacity-70 border-l border-[#011E36]/10 pl-md ml-xs">
+                                                    Continuous
+                                                    improvement and sustainable compliance</p>
+                                            </div>
+                                            <div class="border border-[#011E36] p-sm bg-[#011E36]/5 flex items-center gap-sm mt-md"
+                                                style="transform: translateY(0px);">
+                                                <!-- <span class="material-symbols-outlined text-xl">print</span> -->
+
+                                                <div>
+                                                    <span
+                                                        class="text-[10px] font-bold uppercase tracking-wider block">Quick
+                                                        Print
+                                                        Checklist</span>
+                                                    <p class="text-[9px] opacity-70 italic">all phases in a single
+                                                        reference sheet</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <!-- Central 8-Step Workflow Timeline -->
+                    <!-- Feature Highlighting: Built on FDA's Actual Words -->
+                    <section class="py-xl px-margin max-w-[1440px] mx-auto">
+                        <div class="grid md gap-xl items-center">
+                            <div>
+                                <h2 class="text-xs font-bold tracking-[0.3em] uppercase navy-text mb-sm">Why It Matters
+                                </h2>
+                                <h3 class="text-4xl font-bold navy-text mb-md">Built on FDA's Actual Words</h3>
+                                <p class="text-lg opacity-80 mb-xl leading-relaxed">
+                                    Most inspection guides use terms that don't appear anywhere in FDA regulatory
+                                    documents. This
+                                    resource corrects that - every DO and DON'T is directly cited to its regulatory
+                                    source.
+                                </p>
+                                <div class="grid md:grid-cols-3 gap-md">
+                                    <div class="flex flex-col gap-md group border border-[#011E36] p-md bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all"
+                                        style="background-color: #e0f2fe;">
+                                        <span class="text-xl font-bold text-[#0284c7] px-1">01</span>
+                                        <div>
+                                            <h4 class="text-sm font-bold uppercase tracking-widest mb-xs text-[#0284c7]">Verified
+                                                Regulatory Language Only</h4>
+                                            <p class="text-sm text-[#011E36]">Every instruction is grounded in IOM 2025, 21
+                                                CFR 210/211/Part 11, or FDA guidance documents. Consulting-only terms are explicitly
+                                                labeled as IBP (Industry Best Practice) with no FDA source.</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col gap-md group border border-[#011E36] p-md bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all"
+                                        style="background-color: #e6ffed;">
+                                        <span class="text-xl font-bold text-[#22c55e] px-1">02</span>
+                                        <div>
+                                            <h4 class="text-sm font-bold uppercase tracking-widest mb-xs text-[#22c55e]">
+                                                Severity-Classified Guidance
+                                            </h4>
+                                            <p class="text-sm text-[#011E36]">Every Do and Don't is tagged Critical, Major,
+                                                Minor, or IBP - so you know exactly what constitutes a potential CGMP violation vs. a
+                                                best practice recommendation.</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-col gap-md group border border-[#011E36] p-md bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all"
+                                        style="background-color: #fffbe0;">
+                                        <span class="text-xl font-bold text-[#eab308] px-1">03</span>
+                                        <div>
+                                            <h4 class="text-sm font-bold uppercase tracking-widest mb-xs text-[#eab308]">March 2026 FDA
+                                                Draft Guidance Incorporated</h4>
+                                            <p class="text-sm text-[#011E36]">The newest FDA draft guidance on responding to
+                                                Form FDA 483 observations (Docket FDA-2025-D-1504, March 9, 2026) is fully integrated
+                                                - including the 15-business day response requirement and CAPA commitment policy.</p>
+                                        </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </section>
+                    <!-- Call to Action -->
+
+                    <!-- Footer -->
+                    <footer class="bg-white border-t border-[#011E36]/10">
+                    </footer>
+                    <script>
+                        // Minimal interaction logic
+                        document.querySelectorAll('.border').forEach(el => {
+                            el.addEventListener('mouseenter', () => {
+                                if (el.classList.contains('hover:border-[#011E36]')) {
+                                    el.style.transform = 'translateY(-2px)';
+                                    el.style.transition = 'all 0.2s ease';
+                                }
+                            });
+                            el.addEventListener('mouseleave', () => {
+                                el.style.transform = 'translateY(0)';
+                            });
+                        });
+                    </script>
+
+                    <!-- Close wrappers -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function initSidebarToggle() {
+            const layout = document.getElementById('dashboardLayout');
+            const toggleButton = document.getElementById('sidebarToggle');
+            if (!layout || !toggleButton) return;
+
+            const storageKey = 'dashboard483SidebarCollapsed';
+            const savedState = localStorage.getItem(storageKey);
+            const isCollapsed = savedState === 'true';
+
+            function applyState(collapsed) {
+                layout.classList.toggle('sidebar-collapsed', collapsed);
+                toggleButton.setAttribute('aria-expanded', String(!collapsed));
+                const toggleIcon = toggleButton.querySelector('i');
+                if (toggleIcon) {
+                    toggleIcon.className = 'mdi mdi-dock-left';
+                }
+            }
+
+            applyState(isCollapsed);
+
+            toggleButton.addEventListener('click', () => {
+                const nextState = !layout.classList.contains('sidebar-collapsed');
+                localStorage.setItem(storageKey, String(nextState));
+                applyState(nextState);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initSidebarToggle();
+        });
+    </script>
+
+    <div id="snapdom-sandbox" data-snapdom-sandbox="true" aria-hidden="true"
+        style="position: absolute; left: -9999px; top: -9999px; width: 0px; height: 0px; overflow: hidden;"></div>
+{% include 'back_to_top.html' %}
+</body>
+
+</html>

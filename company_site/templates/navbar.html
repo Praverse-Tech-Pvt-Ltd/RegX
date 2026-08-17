@@ -1,0 +1,551 @@
+{% load static %}
+<!-- GOOGLE FONT -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=block" rel="stylesheet">
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg custom-navbar fixed-top">
+
+    <div class="container-fluid px-4">
+
+        <!-- LOGO -->
+        <a class="navbar-brand" href="/">
+            <img src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                 alt="logo"
+                 class="navbar-logo"
+                 style="width: 145px; max-width: 100%; height: auto;">
+        </a>
+
+        <!-- MOBILE TOGGLER -->
+        <button class="navbar-toggler border-0 shadow-none"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#mainNavbar">
+
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- NAVBAR CONTENT -->
+        <div class="collapse navbar-collapse" id="mainNavbar">
+
+            <!-- CENTER NAVIGATION -->
+            <ul class="navbar-nav mx-auto align-items-lg-center gap-lg-2">
+
+                <li class="nav-item">
+
+                    <a class="nav-link custom-nav-link
+                    {% if '/aidatabase/form483/' in request.path or '/aidatabase/render_yearofinspection/' in request.path or '/aidatabase/render_system_checklist/' in request.path or '/aidatabase/new_investigator/' in request.path or '/aidatabase/top20_recurring/' in request.path or '/aidatabase/render_top20recurring_detail/' in request.path or '/aidatabase/gmpc_module/' in request.path or '/aidatabase/render_warning_letter/' in request.path or '/aidatabase/warning_letter/' in request.path or '/aidatabase/auditiq/' in request.path  or '/aidatabase/inspection_hub/' in request.path  or '/aidatabase/usfda_guideline/' in request.path or '/aidatabase/section_inspection/' in request.path %}
+                        active-nav
+                    {% endif %}"
+
+                    href="/aidatabase/auditiq/">
+
+                           <img src="{% static 'assets/icretegy/483_observations_logo.png' %}"
+                 alt="logo"
+
+                 style="width: 20px !important;  height: auto; mix-blend-mode: darken;"> <span class="">Audit IQ</span>
+
+                    </a>
+
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link custom-nav-link {% if request.path == '/ratools/modulehome/' %}active-nav{% endif %}"
+                       href="/ratools/modulehome/">
+                       <img src="{% static 'img/ANDA_CTD_SmartTemplate_Icon_Blue.svg' %}"  style="width: 20px !important;  height: auto; mix-blend-mode: darken;"/> ANDA CTD SmartTemplate
+                    </a>
+                </li>
+
+               <li class="nav-item">
+                    <a class="nav-link custom-nav-link {% if request.path == '/ratools/' %}active-nav{% endif %}"
+                       href="/ratools/">
+                              <img src="{% static 'assets/icretegy/technical_tools_logo.png' %}"
+                 alt="logo"
+
+                 style="width: 20px !important;  height: auto; mix-blend-mode: darken;"> <span class="ms-1">RegX</span>
+
+                    </a>
+                </li>
+                {% if request.path != '/' %}
+
+                    {% if request.user.fda_deficiency_database %}
+                    <li class="nav-item">
+
+                        <a class="nav-link custom-nav-link
+                        {% if request.path == '/aidatabase/ai_master_base/' %}active-nav{% endif %}"
+
+                        href="/aidatabase/ai_master_base/">
+
+                            FDA Deficiency Database
+
+                        </a>
+
+                    </li>
+                    {% endif %}
+
+                    {% if request.user.complete_response_database %}
+                    <li class="nav-item">
+
+                        <a class="nav-link custom-nav-link
+                        {% if request.path == '/aidatabase/major_cr_base/' %}active-nav{% endif %}"
+
+                        href="/aidatabase/major_cr_base/">
+
+                            Complete Response Database
+
+                        </a>
+
+                    </li>
+                    {% endif %}
+
+                {% endif %}
+            </ul>
+
+        <!-- RIGHT SIDE -->
+        <div class="d-flex align-items-center gap-3 mt-4 mt-lg-0 ms-lg-auto">
+
+            {% if user.is_authenticated %}
+
+            <!-- REQUEST DEMO -->
+            <a href="../../ratools/requestdemo"
+            class="demo-btn me-2">
+                Schedule Consultation
+            </a>
+            <!-- NOTIFICATION -->
+            {% if '/aidatabase/' in request.path and '/aidatabase/ai_master_base/' not in request.path and '/aidatabase/major_cr_base/' not in request.path and '/aidatabase/majorcr/' not in request.path and '/aidatabase/anda/' not in request.path and '/gmpc_dashboard/' not in request.path  and '/render_gmpc_search/' not in request.path %}
+                {% include '_notification_dropdown.html' %}
+            {% endif %}
+            <!-- PROFILE -->
+            <div class="dropdown profile-dropdown">
+
+                <a class="d-flex align-items-center gap-2 profile-toggle"
+                href="#"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false">
+
+                    <div class="profile-img-wrapper">
+
+                        {% if request.user.logo %}
+                            <img src="{{ request.user.logo.url }}"
+                                alt="profile"
+                                class="profile-img">
+                        {% else %}
+                            <img src="{% static 'assets/images/faces/face1.jpg' %}"
+                                alt="profile"
+                                class="profile-img">
+                        {% endif %}
+
+                    </div>
+
+                    <span class="profile-name">
+                        {{ request.user.first_name }}
+                    </span>
+
+                </a>
+
+                <!-- DROPDOWN -->
+                <ul class="dropdown-menu dropdown-menu-end profile-menu">
+
+                    {% comment %} <li>
+                        <a class="dropdown-item" href="#">
+                            <i class="mdi mdi-account-outline me-2"></i>
+                            Profile
+                        </a>
+                    </li> {% endcomment %}
+
+
+                    <li>
+                        <a class="dropdown-item text-danger"
+                        href="/adminmaster/logout/">
+                            <i class="mdi mdi-logout me-2"></i>
+                            Logout
+                        </a>
+                    </li>
+
+                </ul>
+
+            </div>
+
+            {% else %}
+
+            <!-- LOGIN -->
+            <a href="../../adminmaster/login/"
+            class="login-btn">
+                Login
+            </a>
+
+            <!-- REQUEST DEMO -->
+            <a href="../../ratools/requestdemo"
+            class="demo-btn">
+                Schedule Consultation
+            </a>
+
+            {% endif %}
+
+        </div>
+        </div>
+
+    </div>
+
+</nav>
+
+<!-- NAVBAR CSS -->
+<style>
+
+body{
+    font-family: 'Inter', sans-serif;
+}
+
+/* NAVBAR */
+navbar ul,
+.navbar li{
+    list-style: none !important;
+}
+
+.notification-dropdown,
+.notification-dropdown li{
+    list-style: none !important;
+}
+
+.notification-dropdown::marker,
+.notification-dropdown li::marker{
+    display: none !important;
+    content: "" !important;
+}
+.custom-navbar {
+    height: 60px;
+
+    background: rgba(255,255,255,0.95);
+
+    backdrop-filter: blur(12px);
+
+    border-bottom: 1px solid #e5e7eb;
+
+    z-index: 999;
+}
+
+/* LOGO */
+
+.navbar-logo {
+    width: 145px;
+    height: auto;
+}
+
+/* NAVIGATION */
+/* MEDIUM LAPTOP RESPONSIVE FIX */
+
+@media (min-width: 992px) and (max-width: 1366px){
+
+    /* NAV LINKS */
+
+    .custom-nav-link{
+
+
+
+        white-space: nowrap !important;
+    }
+
+    /* NAVBAR GAP */
+
+    .custom-navbar .navbar-nav{
+
+        gap: 4px !important;
+    }
+
+    /* LOGO */
+
+    .navbar-logo{
+
+        width: 120px !important;
+    }
+
+    /* REQUEST DEMO BUTTON */
+
+    .demo-btn{
+
+        padding: 10px 14px !important;
+    }
+
+    /* PROFILE */
+
+    .profile-toggle{
+
+        padding: 4px 6px !important;
+    }
+
+    .profile-name{
+
+        display: none !important;
+    }
+
+    /* RIGHT SIDE SPACING */
+
+    .custom-navbar .ms-lg-auto{
+
+        gap: 10px !important;
+    }
+
+}
+.custom-navbar .navbar-nav{
+    flex-wrap: nowrap !important;
+
+    overflow: hidden;
+
+    gap: 4px;
+}
+@media (min-width: 992px) {
+    .custom-navbar .navbar-nav {
+        position: absolute;
+        left: 48%;
+        transform: translateX(-50%);
+    }
+}
+
+.custom-nav-link {
+    color: #374151 !important;
+
+    font-size: 12px;
+    font-weight: 600;
+     white-space: nowrap !important;
+
+    padding: 10px 18px !important;
+
+
+
+    border-radius: 10px;
+}
+@media (min-width: 992px) and (max-width: 1500px){
+
+    .custom-nav-link{
+
+        padding: 10px 18px !important;
+    }
+
+    .navbar-logo{
+
+        width: 120px !important;
+    }
+
+    .demo-btn{
+
+        padding: 10px 14px !important;
+
+        font-size: 11px !important;
+    }
+
+    .profile-name{
+        display: none !important;
+    }
+
+}
+/* HOVER */
+
+.custom-nav-link:hover {
+    background: #eff6ff;
+
+    color: #0b3b8c !important;
+}
+
+/* ACTIVE */
+
+.active-nav {
+    background: #eef4ff;
+
+    color: #0b3b8c !important;
+
+    border-radius: 10px;
+
+    padding: 10px 18px !important;
+
+    font-weight: 600;
+}
+
+/* DATABASE */
+
+.database-link {
+    background: #eef4ff;
+
+    color: #0b3b8c !important;
+
+    border-radius: 10px;
+
+    padding: 10px 18px !important;
+
+    font-weight: 600;
+}
+
+.database-link:hover {
+    background: #dbeafe;
+
+    color: #0b3b8c !important;
+}
+
+/* LOGIN BUTTON */
+
+.login-btn {
+    text-decoration: none;
+
+    padding: 11px 22px;
+
+    border: 1px solid #d1d5db;
+
+    border-radius: 12px;
+
+    color: #111827;
+
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.login-btn:hover {
+    background: #f3f4f6;
+
+    color: #0b3b8c;
+}
+
+/* REQUEST DEMO */
+
+.demo-btn {
+    text-decoration: none;
+
+    padding: 12px 24px;
+
+    border-radius: 12px;
+
+    background: linear-gradient(135deg, #0b5cab, #3d8ec9);
+
+    color: white;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    box-shadow: 0 4px 14px rgba(37,99,235,0.25);
+}
+
+.demo-btn:hover {
+    transform: translateY(-2px);
+
+    box-shadow: 0 8px 20px rgba(37,99,235,0.35);
+
+    color: white;
+}
+
+/* MOBILE */
+
+@media (max-width: 991px) {
+
+    .custom-navbar {
+        height: auto;
+
+        padding: 12px 0;
+    }
+
+    .navbar-collapse {
+        padding-top: 20px;
+    }
+
+    .navbar-nav {
+        gap: 10px;
+    }
+
+    .d-flex.gap-3 {
+        flex-direction: column;
+
+        align-items: stretch !important;
+    }
+
+    .login-btn,
+    .demo-btn {
+        width: 100%;
+
+        text-align: center;
+    }
+}
+/* PROFILE */
+
+.profile-toggle{
+    text-decoration: none;
+
+    padding: 6px 10px;
+
+    border-radius: 14px;
+}
+
+.profile-toggle:hover{
+    background: #f3f4f6;
+}
+
+.profile-img-wrapper{
+    position: relative;
+}
+
+.profile-img{
+    width: 42px;
+    height: 42px;
+
+    border-radius: 50%;
+
+    object-fit: cover;
+
+    border: 2px solid #e5e7eb;
+}
+
+.online-dot{
+    position: absolute;
+
+    right: 1px;
+    bottom: 1px;
+
+    width: 10px;
+    height: 10px;
+
+    background: #22c55e;
+
+    border-radius: 50%;
+
+    border: 2px solid white;
+}
+
+.profile-name{
+    color: #111827;
+
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.profile-menu{
+    border: none;
+
+    border-radius: 14px;
+
+    padding: 10px;
+
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.profile-menu .dropdown-item{
+    border-radius: 10px;
+
+    padding: 10px 14px;
+
+    font-size: 14px;
+}
+
+.profile-menu .dropdown-item:hover{
+    background: #f3f4f6;
+}
+
+/* MOBILE */
+
+@media (max-width: 991px){
+
+    .profile-toggle{
+        width: 100%;
+
+        justify-content: center;
+    }
+
+}
+</style>

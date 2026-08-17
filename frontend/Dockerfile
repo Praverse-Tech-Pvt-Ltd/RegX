@@ -10,6 +10,13 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* values are inlined into the client bundle at BUILD time, so
+# setting this only as a runtime environment variable in compose has no
+# effect — the bundle would keep whatever was baked in here. Behind nginx the
+# API is same-origin (:8080), which is what keeps CORS and the CSP's
+# connect-src 'self' satisfied.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN npm run build
 
 FROM base AS runner

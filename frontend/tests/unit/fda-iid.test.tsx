@@ -123,19 +123,19 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import FdaReleasesPage from "@/app/fda-data/releases/page";
-import NewReleasePage from "@/app/fda-data/releases/new/page";
-import FdaReleaseDetailPage from "@/app/fda-data/releases/[publicId]/page";
-import ReconciliationPage from "@/app/fda-data/releases/[publicId]/reconciliation/page";
-import MappingsPage from "@/app/fda-data/mappings/page";
-import MappingDetailPage from "@/app/fda-data/mappings/[publicId]/page";
-import OrangeBookSearchPage from "@/app/fda-data/orange-book/page";
-import OrangeBookDetailPage from "@/app/fda-data/orange-book/[publicId]/page";
-import FormulationDetailPage from "@/app/formulations/[publicId]/page";
-import NewProductPage from "@/app/formulations/new/page";
-import VersionDetailPage from "@/app/formulations/[publicId]/versions/[versionPublicId]/page";
-import IidPreviewPage from "@/app/iid-assessments/preview/page";
-import SnapshotDetailPage from "@/app/iid-assessments/[publicId]/page";
+import FdaReleasesPage from "@/app/(regx)/fda-data/releases/page";
+import NewReleasePage from "@/app/(regx)/fda-data/releases/new/page";
+import FdaReleaseDetailPage from "@/app/(regx)/fda-data/releases/[publicId]/page";
+import ReconciliationPage from "@/app/(regx)/fda-data/releases/[publicId]/reconciliation/page";
+import MappingsPage from "@/app/(regx)/fda-data/mappings/page";
+import MappingDetailPage from "@/app/(regx)/fda-data/mappings/[publicId]/page";
+import OrangeBookSearchPage from "@/app/(regx)/fda-data/orange-book/page";
+import OrangeBookDetailPage from "@/app/(regx)/fda-data/orange-book/[publicId]/page";
+import FormulationDetailPage from "@/app/(regx)/formulations/[publicId]/page";
+import NewProductPage from "@/app/(regx)/formulations/new/page";
+import VersionDetailPage from "@/app/(regx)/formulations/[publicId]/versions/[versionPublicId]/page";
+import IidPreviewPage from "@/app/(regx)/iid-assessments/preview/page";
+import SnapshotDetailPage from "@/app/(regx)/iid-assessments/[publicId]/page";
 
 beforeEach(() => {
   nav.push.mockReset();

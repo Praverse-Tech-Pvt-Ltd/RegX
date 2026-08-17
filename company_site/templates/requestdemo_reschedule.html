@@ -1,0 +1,265 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reschedule Your Booking | iPharmaAI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;700&display=swap"
+    rel="stylesheet" />
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+  <style>
+    :root {
+      --blue: #26acf5;
+      --blue-mid: #0272ae;
+      --text: #1a2a3a;
+      --muted: #5a7a94;
+      --ff-d: "Syne", sans-serif;
+      --ff-b: "DM Sans", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--ff-b);
+      color: var(--text);
+      background: #f4f8fc;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    .rs-wrap {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 60px 20px 80px;
+    }
+
+    .rs-logo {
+      display: block;
+      height: 40px;
+      margin: 0 auto 32px;
+      filter: brightness(0) saturate(100%) invert(20%) sepia(80%) saturate(1500%) hue-rotate(180deg);
+    }
+
+    .rs-card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(2, 40, 61, .1);
+      padding: 32px;
+    }
+
+    .rs-card h1 {
+      font-family: var(--ff-d);
+      font-size: 22px;
+      font-weight: 800;
+      text-align: center;
+      margin: 0 0 6px;
+    }
+
+    .rs-card > p {
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+      margin: 0 0 24px;
+    }
+
+    .rs-error {
+      background: #fdeaea;
+      color: #c23636;
+      border: 1px solid #f3c8c8;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 18px;
+    }
+
+    .rs-field {
+      margin-bottom: 16px;
+    }
+
+    .rs-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .rs-field input,
+    .rs-field select {
+      width: 100%;
+      height: 46px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      padding: 0 14px;
+      font-size: 14px;
+    }
+
+    .rs-slots {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .rs-slot-btn {
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      padding: 9px 0;
+      font-size: 13px;
+      font-weight: 600;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .rs-slot-btn.selected {
+      border-color: var(--blue);
+      background: rgba(38, 172, 245, .1);
+      color: var(--blue-mid);
+    }
+
+    .rs-slot-btn:disabled {
+      opacity: .4;
+      text-decoration: line-through;
+      cursor: not-allowed;
+    }
+
+    .rs-empty {
+      grid-column: 1 / -1;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 12px 0;
+    }
+
+    .rs-submit {
+      width: 100%;
+      height: 48px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #26acf5, #0272ae);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      margin-top: 20px;
+    }
+
+    .rs-submit:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .rs-back {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="rs-wrap">
+    <img src="{% static 'assets/icretegy/iPharmaAI_white.png' %}" class="rs-logo" alt="iPharmaAI" />
+
+    <div class="rs-card">
+      <h1>Pick a New Time</h1>
+      <p>Currently: {{ booking.slot_date|date:"l, F j, Y" }} at {{ booking.slot_time|time:"g:i A" }} IST</p>
+
+      {% if error_message %}
+      <div class="rs-error"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ error_message }}</div>
+      {% endif %}
+
+      <form method="post" id="rsForm">
+        {% csrf_token %}
+        <div class="rs-field">
+          <label for="rsDate">New Date</label>
+          <input type="date" id="rsDate" required />
+        </div>
+        <div class="rs-field">
+          <label>Available Times (IST)</label>
+          <div class="rs-slots" id="rsSlots">
+            <p class="rs-empty">Pick a date to see available times.</p>
+          </div>
+        </div>
+        <input type="hidden" name="newDate" id="rsNewDate" />
+        <input type="hidden" name="newTime" id="rsNewTime" />
+        <button type="submit" class="rs-submit" id="rsSubmit" disabled>Confirm New Time</button>
+      </form>
+
+      <a href="{% url 'requestdemo_manage' booking.manage_token %}" class="rs-back">&larr; Back to booking</a>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var dateInput = document.getElementById('rsDate');
+      var slotsBox = document.getElementById('rsSlots');
+      var newDateInput = document.getElementById('rsNewDate');
+      var newTimeInput = document.getElementById('rsNewTime');
+      var submitBtn = document.getElementById('rsSubmit');
+
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var minDate = new Date(today.getTime() + 24 * 60 * 60 * 1000); // tomorrow at the earliest
+      dateInput.min = minDate.toISOString().slice(0, 10);
+      var maxDate = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
+      dateInput.max = maxDate.toISOString().slice(0, 10);
+
+      function pad2(n) { return String(n).padStart(2, '0'); }
+      function to12h(time) {
+        var parts = time.split(':').map(Number);
+        var period = parts[0] >= 12 ? 'PM' : 'AM';
+        var h12 = (parts[0] % 12) || 12;
+        return h12 + ':' + pad2(parts[1]) + ' ' + period;
+      }
+
+      dateInput.addEventListener('change', function () {
+        newTimeInput.value = '';
+        submitBtn.disabled = true;
+        if (!dateInput.value) return;
+        slotsBox.innerHTML = '<p class="rs-empty">Loading&hellip;</p>';
+        fetch('/ratools/requestdemo/availability?date=' + encodeURIComponent(dateInput.value))
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.holiday || !data.slots || !data.slots.length) {
+              slotsBox.innerHTML = '<p class="rs-empty">' + (data.holidayName ? 'Unavailable (' + data.holidayName + ')' : 'No slots available that day') + '</p>';
+              return;
+            }
+            var html = '';
+            data.slots.forEach(function (slot) {
+              var booked = data.bookedSlots.indexOf(slot) !== -1;
+              html += '<button type="button" class="rs-slot-btn" data-slot="' + slot + '" ' + (booked ? 'disabled' : '') + '>' + to12h(slot) + '</button>';
+            });
+            slotsBox.innerHTML = html;
+            Array.prototype.slice.call(slotsBox.querySelectorAll('[data-slot]:not(:disabled)')).forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                Array.prototype.slice.call(slotsBox.querySelectorAll('.rs-slot-btn')).forEach(function (b) { b.classList.remove('selected'); });
+                btn.classList.add('selected');
+                newDateInput.value = dateInput.value;
+                newTimeInput.value = btn.dataset.slot;
+                submitBtn.disabled = false;
+              });
+            });
+          })
+          .catch(function () {
+            slotsBox.innerHTML = '<p class="rs-empty">Couldn&rsquo;t load availability. Please try again.</p>';
+          });
+      });
+    })();
+  </script>
+</body>
+
+</html>

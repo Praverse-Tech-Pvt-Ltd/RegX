@@ -1,0 +1,29 @@
+# core.autocrlf is true on the development machine, which would rewrite these
+# files to CRLF on checkout. A shell script with CRLF line endings fails in a
+# Linux container with "bad interpreter: no such file or directory", so the
+# files that containers execute or parse must stay LF regardless of platform.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.conf          text eol=lf
+docker-entrypoint.sh text eol=lf
+
+# Company binary assets — never touch these, and keep them out of textual
+# diffs. The company site is carried in verbatim and any normalisation would
+# corrupt fonts, images and the SQLite database.
+*.sqlite3       binary
+*.gif           binary
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.svg           binary
+*.ico           binary
+*.mp4           binary
+*.woff          binary
+*.woff2         binary
+*.ttf           binary
+*.eot           binary
+*.otf           binary
+*.pdf           binary
+*.xlsx          binary
+*.docx          binary
+*.zip           binary

@@ -1,0 +1,1549 @@
+{% extends 'RATools/RAToolsBase.html' %} {% load static %} {% block content %}
+<div class="card">
+  <div class="card-body-main">
+    <form action="">
+      <div class="pdf-page pdf" style="background-color: #f6f6e9">
+        <div class="text-center mb-3">
+          <img
+            src="{% static 'assets/icretegy/itechnical logo.png' %}"
+            class="border border-dark rounded-2 w-25"
+            style="height: 100px"
+            alt="Company Logo"
+          />
+        </div>
+
+        <div class="main-form">
+          <div class="heading text-center fw-bold fs-5" style="color: #67cce8">
+            Combination Product Assessment Form
+          </div>
+          <div class="form-container border border-dark p-3">
+            <div class="form-1 border border-dark p-2">
+              <div class="row me-0">
+                <div for="" class="col-2 fw-semibold pe-0">
+                  Product Name & Strength:
+                </div>
+                <input class="col-10" type="text" name="product_name" id="" />
+              </div>
+              <div class="row me-0 mt-3">
+                <div for="" class="col-2 fw-semibold pe-0">ANDA/NDA #</div>
+                <input class="col-4" type="text" name="" id="" />
+                <div for="" class="col-2 fw-semibold pe-0">Applicant:</div>
+                <input class="col-4" type="text" name="" id="" />
+              </div>
+              <div class="row me-0 mt-3">
+                <div for="" class="col-2 fw-semibold pe-0">
+                  Product manufacturing site:
+                </div>
+                <input class="col-4 h-50" type="text" name="" id="" />
+                <div for="" class="col-2 fw-semibold pe-0">Package Type:</div>
+                <input class="col-4 h-50" type="text" name="" id="" />
+              </div>
+              <div class="row mt-3">
+                <div class="col-2 fw-semibold">Dosage Form:</div>
+
+                <div class="checkbox-grid col-10">
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="ir-tablets" name="dosage-form" />
+                    <div class="fw-semibold" for="ir-tablets">IR Tablets</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="ir-capsules"
+                      name="dosage-form"
+                    />
+                    <div class="fw-semibold" for="ir-capsules">IR Capsules</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="er-dr-tablets"
+                      name="dosage-form"
+                    />
+                    <div class="fw-semibold" for="er-dr-tablets">
+                      ER/DR Tablets
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="er-dr-capsules"
+                      name="dosage-form"
+                    />
+                    <div class="fw-semibold" for="er-dr-capsules">
+                      ER/DR Capsules
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="topical-solution"
+                      name="dosage-form"
+                    />
+                    <div class="fw-semibold" for="topical-solution">
+                      Topical Solution
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="sublingual" name="dosage-form" />
+                    <div class="fw-semibold" for="sublingual">
+                      Sublingual Tablets/film
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="topical-gel"
+                      name="dosage-form"
+                    />
+                    <div class="fw-semibold" for="topical-gel">
+                      Topical/Transdermal Gel
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="nasal-spray"
+                      name="dosage-form"
+                    />
+                    <div class="fw-semibold" for="nasal-spray">Nasal Spray</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="oral-syrup" name="dosage-form" />
+                    <div class="fw-semibold" for="oral-syrup">
+                      Oral Syrup/Solution/Suspension
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="ointment" name="dosage-form" />
+                    <div class="fw-semibold" for="ointment">Ointment/Cream</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="inhalation" name="dosage-form" />
+                    <div class="fw-semibold" for="inhalation">Inhalation</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="injection" name="dosage-form" />
+                    <div class="fw-semibold" for="injection">
+                      Injection/Peptide/Complex Product
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input
+                      type="checkbox"
+                      id="transdermal"
+                      name="dosage-form"
+                    />
+                    <div class="fw-semibold" for="transdermal">
+                      Transdermal/TDDS
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" id="ophthalmic" name="dosage-form" />
+                    <div class="fw-semibold" for="ophthalmic">Ophthalmic</div>
+                  </div>
+                  <div class="custom-checkbox">
+                    <input type="checkbox" id="other1" name="dosage-form" />
+                    <input type="text" placeholder="Other" />
+                  </div>
+                  <div class="custom-checkbox">
+                    <input type="checkbox" id="other2" name="dosage-form" />
+                    <input type="text" placeholder="Other" />
+                  </div>
+                  <div class="custom-checkbox">
+                    <input type="checkbox" id="other3" name="dosage-form" />
+                    <input type="text" placeholder="Other" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="heading text-center fw-bold fs-5 mt-3 mb-2">
+              Basis of Submission
+            </div>
+            <div class="form-2 border border-dark p-2">
+              <div class="row me-0">
+                <div for="" class="col-2 fw-semibold pe-0">RLD Product:</div>
+                <input class="col-10" type="text" name="" id="" />
+              </div>
+              <div class="row me-0 mt-3">
+                <div for="" class="col-2 fw-semibold pe-0">ANDA/NDA #</div>
+                <input class="col-10" type="text" name="" id="" />
+              </div>
+              <div class="row me-0 mt-3">
+                <div for="" class="col-2 fw-semibold pe-0">
+                  ANDA/NDA Applicant:
+                </div>
+                <input class="col-10" type="text" name="" id="" />
+              </div>
+              <div class="row mt-3">
+                <div class="col-2 fw-semibold">Market Availability:</div>
+
+                <div class="checkbox-item col-2">
+                  <input type="checkbox" id="rx" name="market-availability" />
+                  <label for="rx">Rx</label>
+                  <input type="checkbox" id="otc" name="market-availability" />
+                  <label for="otc">OTC</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- <div class="form-container border border-dark p-3">
+                <div class="form-1 border border-dark p-2  ">
+                    <div class="heading text-center fw-bold fs-5 mb-2">Stack Holder</div>
+
+                    <table class="table table-bordered">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th>Department</th>
+                                <th>Name of the Person</th>
+                                <th>Date and Signature</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Formulation Development</td>
+                                <td>    Prepare by: <input class="ms-4" type="text" name="" id=""></td>
+                                <td><input type="text" name="" id=" " class="w-100"></td>
+                            </tr>
+                            <tr>
+                                <td>RA Manager</td>
+                                <td>Reviewed by: <input  style="margin-left: 12px;" type="text" name="" id=""></td>
+                                <td> <input type="text" name="" id=" " class="w-100">   </td>
+                            </tr>
+                            <tr>
+                                <td>Analytical Development</td>
+                                <td>Reviewed by: <input style="margin-left: 13px;" type="text" name="" id=""></td>
+                                <td> <input type="text" name="" id=" " class="w-100">   </td>
+                            </tr>
+                            <tr>
+                                <td>Regulatory Affairs</td>
+                                <td>Reviewed by: <input style="margin-left: 13px;" type="text" name="" id=""></td>
+                                <td> <input type="text" name="" id=" " class="w-100">   </td>
+                            </tr>
+                            <tr>
+                                <td>VP Regulatory Affairs</td>
+                                <td>Approved by: <input style="margin-left: 12px;" type="text" name="" id=""></td>
+                                <td> <input type="text" name="" id=" " class="w-100">   </td>
+                            </tr>
+                            <tr>
+                                <td>SVP Quality Management</td>
+                                <td>Approved by: <input style="margin-left: 12px;" type="text" name="" id=""></td>
+                                <td> <input type="text" name="" id=" " class="w-100">   </td>
+                            </tr>
+                            <tr>
+                                <td>SVP Regulatory Affairs</td>
+                                <td>Approved by: <input style="margin-left: 12px;" type="text" name="" id=""></td>
+                                <td> <input type="text" name="" id=" " class="w-100">   </td>
+                            </tr>
+                        </tbody>
+                    </div>
+              </div> -->
+        <table class="table form-table">
+          <tbody>
+            <tr>
+              <td width="40%" class="form-label fw-semibold">
+                [Company Name]'s Product Name
+              </td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">[Company Name]'s ANDA/NDA#</td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Date of NDA/ANDA Submission
+              </td>
+              <td>
+                <input type="date" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Current Status of [Company Name]'s ANDA/NDA
+              </td>
+              <td>
+                <div class="checkbox-group">
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="literaturePhase" />
+                    <div class="" for="literaturePhase">
+                      Under Literature Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="developmentPhase" />
+                    <div class="checkbox-item-div" for="developmentPhase">
+                      Under Development Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Under Execution Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="submissionPhase" />
+                    <div class="checkbox-item-div" for="submissionPhase">
+                      Under Submission Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="fdaSubmitted" />
+                    <div class="checkbox-item" for="fdaSubmitted">
+                      Application Submitted to FDA
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="approved" />
+                    <div class="checkbox-item-div" for="approved">
+                      Approved Application (Date of Approval)
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Name of the Reference Listed Drug
+              </td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">NDA/ANDA #</td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">Applicant Name of RLD</td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- <div class="form-container border border-dark p-3">
+                  <div class="form-1 border border-dark p-2  ">
+                      <div class="heading text-center fw-bold fs-5 mb-2">Stack Holder</div>
+
+                      <table class="table table-bordered">
+                          <thead class="table-secondary">
+                              <tr>
+                                  <th>Department</th>
+                                  <th>Name of the Person</th>
+                                  <th>Date and Signature</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <tr>
+                                  <td>Formulation Development</td>
+                                  <td>    Prepare by: <input class="ms-4" type="text" name="" id=""></td>
+                                  <td><input type="text" name="" id=" " class="w-100"></td>
+                              </tr>
+                              <tr>
+                                  <td>RA Manager</td>
+                                  <td>Reviewed by: <input  style="margin-left: 12px;" type="text" name="" id=""></td>
+                                  <td> <input type="text" name="" id=" " class="w-100">   </td>
+                              </tr>
+                              <tr>
+                                  <td>Analytical Development</td>
+                                  <td>Reviewed by: <input style="margin-left: 13px;" type="text" name="" id=""></td>
+                                  <td> <input type="text" name="" id=" " class="w-100">   </td>
+                              </tr>
+                              <tr>
+                                  <td>Regulatory Affairs</td>
+                                  <td>Reviewed by: <input style="margin-left: 13px;" type="text" name="" id=""></td>
+                                  <td> <input type="text" name="" id=" " class="w-100">   </td>
+                              </tr>
+                              <tr>
+                                  <td>VP Regulatory Affairs</td>
+                                  <td>Approved by: <input style="margin-left: 12px;" type="text" name="" id=""></td>
+                                  <td> <input type="text" name="" id=" " class="w-100">   </td>
+                              </tr>
+                              <tr>
+                                  <td>SVP Quality Management</td>
+                                  <td>Approved by: <input style="margin-left: 12px;" type="text" name="" id=""></td>
+                                  <td> <input type="text" name="" id=" " class="w-100">   </td>
+                              </tr>
+                              <tr>
+                                  <td>SVP Regulatory Affairs</td>
+                                  <td>Approved by: <input style="margin-left: 12px;" type="text" name="" id=""></td>
+                                  <td> <input type="text" name="" id=" " class="w-100">   </td>
+                              </tr>
+                          </tbody>
+                      </div>
+                </div> -->
+
+        <h1
+          class="form-title mx-auto"
+          style="border-bottom: 2px solid red; width: fit-content"
+        >
+          Combination Product Assessment Form
+        </h1>
+        <table class="table form-table">
+          <tbody>
+            <tr>
+              <td width="40%" class="form-label fw-semibold">
+                [Company Name]'s Product Name
+              </td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">[Company Name]'s ANDA/NDA#</td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Date of NDA/ANDA Submission
+              </td>
+              <td>
+                <input type="date" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Current Status of [Company Name]'s ANDA/NDA
+              </td>
+              <td>
+                <div class="checkbox-group">
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="literaturePhase" />
+                    <div class="" for="literaturePhase">
+                      Under Literature Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="developmentPhase" />
+                    <div class="checkbox-item-div" for="developmentPhase">
+                      Under Development Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Under Execution Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="submissionPhase" />
+                    <div class="checkbox-item-div" for="submissionPhase">
+                      Under Submission Phase
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="fdaSubmitted" />
+                    <div class="checkbox-item" for="fdaSubmitted">
+                      Application Submitted to FDA
+                    </div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="approved" />
+                    <div class="checkbox-item-div" for="approved">
+                      Approved Application (Date of Approval)
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Name of the Reference Listed Drug
+              </td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">NDA/ANDA #</td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">Applicant Name of RLD</td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <table class="table form-table">
+          <tbody>
+            <tr>
+              <td width="40%" class="form-label fw-semibold">
+                RLD Package Configuration with all parts (with Picture is more
+                appropriate)
+              </td>
+              <td>
+                <input type="file" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                [Company Name] Package Configuration with all parts (with
+                Picture is more appropriate)
+              </td>
+              <td>
+                <input type="file" class="w-100" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <table class="table form-table">
+          <tbody>
+            <tr>
+              <td rowspan="3" width="40%" class="form-label fw-semibold">
+                Description of each device constituent parts
+              </td>
+              <td class="form-label">
+                <textarea name="" class="w-100" id="" rows="4"></textarea>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="form-label fw-semibold">
+                <textarea class="w-100" name="" id="" rows="4"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                <textarea class="w-100" name="" id="" rows="4"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">[Company Name]'s ANDA/NDA#</td>
+              <td>
+                <input type="text" class="w-100" />
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Is RLD label describes any cross labeled use with device?
+              </td>
+              <td class="">
+                <input class="" type="Radio" />Yes
+                <input type="Radio" class="ms-2" />No
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Type of Combination Product
+              </td>
+              <td>
+                <div class="checkbox-group">
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="literaturePhase" />
+                    <div class="">Single Entity</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="developmentPhase" />
+                    <div class="checkbox-item-div" for="developmentPhase">
+                      Co-packaged
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Cross Labeled
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Class of device according to [Company Name]’s Global Quality
+                Standard (GQS_0016: Design Controls for Combination Products)
+              </td>
+              <td>
+                <div class="checkbox-group">
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="literaturePhase" />
+                    <div class="">Category I Device</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="developmentPhase" />
+                    <div class="checkbox-item-div" for="developmentPhase">
+                      Category II Device
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Category III Device
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <table class="table form-table">
+          <tbody>
+            <tr>
+              <td width="40%" class="form-label fw-semibold">
+                Category of the device
+              </td>
+              <td>
+                <div class="checkbox-group">
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="literaturePhase" />
+                    <div class="">Convenience Kit or Co-Package</div>
+                  </div>
+                  <div class="checkbox-item">
+                    <input type="checkbox" class="mt-1" id="developmentPhase" />
+                    <div class="checkbox-item-div" for="developmentPhase">
+                      Prefilled Drug Delivery Device/System
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Prefilled Biologic Delivery Device/System
+                    </div>
+                  </div>
+
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Device Coated/Impregnated/Otherwise Combined with Drug
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Device Coated or Otherwise Combined with Biologic
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Drug/Biologic Combination
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Separate Products Requiring Cross Labeling
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Possible Combination Based on Cross Labeling of Separate
+                      Products
+                    </div>
+                  </div>
+                  <div class="checkbox-item form-item">
+                    <input type="checkbox" class="mt-1" id="executionPhase" />
+                    <div class="checkbox-item-div" for="executionPhase">
+                      Other Type of Part 3 Combination Product (e.g.,
+                      Drug/Device/Biological Product)
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Describe plan of device assembly: Who is going to assemble final
+                device? (In-house/CMO/Supplier)
+              </td>
+              <td class="form-label">
+                <textarea name="" class="w-100" id="" rows="4"></textarea>
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Is “Instructions For Use” available with Package Insert of RLD?
+              </td>
+              <td class="">
+                <input class="" type="Radio" />Yes
+                <input type="Radio" class="ms-2" />No
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Is there any difference between RLD and [Company Name]’s device?
+              </td>
+              <td class="">
+                <input class="" type="Radio" />Yes
+                <input type="Radio" class="ms-2" />No
+              </td>
+            </tr>
+
+            <tr>
+              <td class="form-label fw-semibold">
+                If yes, Is there any difference between RLD and [Company Name]
+                proposed Instructions for Use?
+              </td>
+              <td class="">
+                <input class="" type="Radio" />Yes
+                <input type="Radio" class="ms-2" />No
+              </td>
+            </tr>
+            <tr>
+              <td class="form-label fw-semibold">
+                Any other attributes specific to the Product (e.g. planned
+                in-vitro, in-vivo BE studies)
+              </td>
+              <td class="form-label">
+                <textarea name="" class="w-100" id="" rows="4"></textarea>
+              </td>
+            </tr>
+            <!-- <tr>
+                            <td    class="form-label fw-semibold">Conclusion and strategy:</td>
+                           <td>
+
+                               <div>Is it falls under combination product category?</div>
+                                <input class="" type="Radio"  >Yes
+                                <input type="Radio" class="ms-2"  >No
+                                <input type="Radio" class="ms-2"  >Not sure, require controlled correspondence submission.
+                                <div>If yes, please describe below further plan and identify key responsible for each activity. Additionally refer decision tree to further decide action plan.
+                                    Action Plan (Please modify as require for Approved, Pending and To be filed ANDAs) to be filled out in Appendix 1.
+                                    </div>
+                           </td>
+
+                        </tr> -->
+          </tbody>
+        </table>
+      </div>
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <table class="table form-table">
+          <tbody>
+            <tr>
+              <td width="40%" class="form-label fw-semibold">
+                Conclusion and strategy:
+              </td>
+              <td>
+                <div class="mb-3">
+                  Is it falls under combination product category?
+                </div>
+                <input class="ms-2" type="Radio" />Yes <br />
+                <input type="Radio" class="ms-2" />No <br />
+                <input type="Radio" class="ms-2" />Not sure, require controlled
+                correspondence submission.
+                <div class="mt-3">
+                  If yes, please describe below further plan and identify key
+                  responsible for each activity. Additionally refer decision
+                  tree to further decide action plan. Action Plan (Please modify
+                  as require for Approved, Pending and To be filed ANDAs) to be
+                  filled out in Appendix 1.
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="heading text-decoration-underline fw-semibold fs-5">
+          Decision tree for Threshold analysis and/or Human Factor Study: (Note:
+          The decision tree may not be applicable to approved products and an
+          appropriate justification statement can be included instead)
+        </div>
+        <div class="my-4">
+          <img
+            class="w-100 h-auto"
+            src="{% static 'img/iigappendix1whitepaper.png' %}"
+            alt="Page 1 Image"
+          />
+        </div>
+      </div>
+
+      <div class="pdf-page pdf">
+        <div class="bordered-container">
+          <div class="row align-items-center">
+            <!-- Placeholder for the logo image -->
+            <div class="col-2" style="padding-right: 0px">
+              <img
+                src="{% static 'assets/icretegy/itechnical logo.png' %}"
+                class=" "
+                style="height: 75px; border-right: 1px solid black"
+                alt="Company Logo"
+              />
+            </div>
+
+            <!-- Centered content for title -->
+            <div class="col-10" style="padding-left: 0px">
+              <div class="fs-6 fw-semibold text-end me-2 mb-0">
+                Combination Product Assessment Form <br />
+                Version No. 01
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="heading fw-semibold fs-4">
+          Appendix 1: <span class="ms-4">List of Item</span>
+        </div>
+        <div class="mt-4">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>QSR Document List</th>
+                <th>Ownership</th>
+                <th>Initial Template will be Shared by</th>
+                <th>Responsibility to Review and Fill out Information</th>
+                <th>Review and Completion by</th>
+                <th>Final Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Threshold Analysis Study Protocol</td>
+                <td>RA - Clinical</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>RA CMC and RA - Clinical</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr>
+                <td>Threshold Analysis Finding Report</td>
+                <td>RA - Clinical</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>RA CMC and RA - Clinical</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr>
+                <td>Design & Development Plan</td>
+                <td>RA - CMC</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>RA - CMC & FRD</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr>
+                <td>Design History File (DHF)</td>
+                <td>FRD & QA</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>FRD, RA-CMC, RA - Clinical, ARD, QA</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr>
+                <td>
+                  Finished Product Risk Analysis – Part of ANDA submission.
+                </td>
+                <td>RA - CMC</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>FRD, RA-CMC, RA - Clinical, ARD, QA</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr>
+                <td>
+                  QSR Document (Design Summary) – Part of ANDA submission.
+                </td>
+                <td>RA - CMC</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>RA - CMC, RA - Clinical and QA</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr>
+                <td>21 CFR cGMP and QSR Compliance Certification</td>
+                <td>QM</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>-</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr>
+                <td>
+                  Vendor Documents<br />(ISO compliance statements & FEI #)
+                </td>
+                <td>SSSM Team</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td>RA - CMC</td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+                <td><input type="text" name="" id="" class="w-100" /></td>
+              </tr>
+              <tr class="action-row">
+                <td colspan="6">
+                  &lt;add more action items as necessary for given dosage
+                  form/product&gt;
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {% if complete_flag != True %}
+        <button
+          type="submit"
+          class="btn btn-warning"
+          id="submit-button"
+          style="z-index: 1000; position: relative"
+        >
+          Submit
+        </button>
+        <a
+          class="btn"
+          id="submit-complete-button"
+          data-bs-toggle="modal"
+          data-bs-target="#saveandcompletemodal"
+          style="position: relative; z-index: 1000"
+          >Save and Complete</a
+        >
+        <div
+          class="modal"
+          id="saveandcompletemodal"
+          tabindex="-1"
+          role="dialog"
+          aria-labelledby="saveandcompletemodallabel"
+          aria-hidden="true"
+        >
+          <div class="modal-dialog" style="top: 75% !important" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="checklistNameModalLabel">
+                  Are you sure it is complete?
+                </h5>
+                <button
+                  type="button"
+                  class="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="Close"
+                >
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="form-check">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    id="completed-checkbox"
+                    name="completed"
+                  />
+                  <label class="form-check-label" for="completed-checkbox">
+                    I agree to complete this checklist and from now onwards I
+                    will not be able to change or edit this checklist
+                  </label>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  data-bs-dismiss="modal"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  class="btn btn-primary"
+                  id="modal-submit-button"
+                  disabled
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+        <a
+          href={{
+          back_to_list
+          }}
+          style="position: relative; z-index: 1000"
+          class="btn btn-danger"
+          >Back to list</a
+        >
+      </div>
+    </form>
+
+    <div></div>
+  </div>
+</div>
+
+<style>
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .form-title {
+    color: #e083e0;
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  label {
+    font-weight: 500;
+  }
+
+  .custom-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .custom-checkbox input[type="text"] {
+    width: 150px;
+  }
+  .heading-table {
+    border: 1px solid black;
+  }
+  .upper-title {
+    background-color: rgba(251, 207, 126, 0.673);
+    font-weight: 700;
+  }
+  table {
+    /* Ensures fixed column widths */
+    width: 100%; /* Stretches table to the container */
+    border: 1px solid black !important;
+  }
+
+  td {
+    /* Prevent long text from stretching the column */
+
+    text-overflow: ellipsis;
+
+    border-bottom: 1px solid black !important;
+    border-right: 1px solid black !important;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  td {
+    padding: 8px;
+    vertical-align: middle;
+  }
+  label {
+    display: inline-block;
+    width: 100%; /* Make label take full width of the cell */ /* Set label height */
+    /* Vertically center text */
+    font-style: italic; /* For the `<em>` style */
+    font-size: 14px;
+  }
+  input[type="checkbox"] {
+    margin-right: 8px; /* Add space between checkbox and label */
+  }
+  th {
+    background-color: #317589;
+
+    vertical-align: middle;
+    padding: 8px;
+    border: 1px solid #000 !important;
+  }
+
+  .radio-cell {
+    padding: 10px;
+    overflow: visible; /* Ensure no scrollbars */
+  }
+
+  .radio-group {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap; /* Allow wrapping to prevent overflow */
+  }
+
+  .custom-radio-btn {
+    display: flex;
+    align-items: center;
+    position: relative;
+    padding-left: 30px;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+    height: auto; /* Remove fixed height if any */
+  }
+
+  .custom-radio-btn input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .radio-checkmark {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    height: 20px;
+    width: 20px;
+    background-color: #fff;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+  }
+
+  .custom-radio-btn:hover input ~ .radio-checkmark {
+    border-color: #ccc;
+  }
+
+  .custom-radio-btn input:checked ~ .radio-checkmark {
+    border-width: 6px;
+  }
+
+  .custom-radio-btn input[value="yes"]:checked ~ .radio-checkmark {
+    border-color: #4caf50;
+  }
+
+  .custom-radio-btn input[value="no"]:checked ~ .radio-checkmark {
+    border-color: #f44336;
+  }
+
+  .custom-radio-btn input[value="not_applicable"]:checked ~ .radio-checkmark {
+    border-color: #ffa500;
+  }
+
+  .radio-label {
+    margin-left: 5px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .pdf-page {
+    width: 230mm; /* A4 width */
+    min-height: 260mm; /* A4 height */
+    margin: 0 auto;
+    height: 260mm;
+    padding: 40px;
+    border: 1px solid #ddd;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Fix watermark positioning */
+  .pdf {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .pdf::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("{% static 'img/watermark.png' %}");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 70%;
+    opacity: 0.06;
+    z-index: -1;
+    mix-blend-mode: multiply;
+  }
+
+  .pdf-page img {
+    width: 100%;
+    height: 100%;
+  }
+
+  .imgcontainer {
+    position: relative;
+    text-align: center;
+    color: white;
+    height: 100%;
+  }
+
+  .top-left {
+    position: absolute;
+    top: 282px;
+    left: 130px;
+    color: #014b54;
+    font-size: 50px;
+    font-weight: bold;
+    right: 60px;
+  }
+
+  .content {
+    font-size: 14px;
+    line-height: 2;
+    text-align: justify;
+    padding: 20px;
+  }
+
+  .title {
+    font-weight: bold;
+    font-size: 16px;
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 50px;
+    text-decoration: underline;
+  }
+
+  .upper {
+    display: flex;
+  }
+  p {
+    margin-bottom: 30px;
+  }
+
+  .bordered-container {
+    width: 100%;
+    border: 1px solid #000;
+    box-sizing: border-box;
+    margin-bottom: 15px; /* add space to prevent overlap */
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+  }
+
+  .header img {
+    width: 100px;
+    height: auto;
+  }
+
+  .header-content {
+    flex: 1;
+  }
+
+  .header-left {
+    width: 100%;
+    padding-top: 10px;
+    padding-left: 130px;
+  }
+  h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    margin-left: 10px;
+  }
+
+  .product-name {
+    font-size: 14px;
+    margin-left: 220px;
+  }
+
+  @media print {
+    /* Ensures each page break for dynamic content */
+    .pdf-page {
+      page-break-after: always;
+    }
+  }
+
+  .btn-warning {
+    color: #000;
+    background-image: linear-gradient(to right, #ffcc00, #ff9900);
+    border-color: #ffc107;
+    transition: background-image 0.3s ease-in-out;
+  }
+
+  .btn-warning:hover {
+    background-image: linear-gradient(to right, #ff9900, #ffcc00);
+    color: #000;
+    border-color: #ffc107;
+  }
+
+  #submit-complete-button {
+    color: #000;
+    background-image: linear-gradient(101deg, #b241ff, #fe86ff);
+    border-color: #ffc107;
+    transition: background-image 0.3s ease-in-out;
+  }
+
+  #submit-complete-button:hover {
+    background-image: linear-gradient(101deg, #fe86ff, #b241ff);
+    color: #000;
+    border-color: #ffc107;
+  }
+
+  .btn-danger {
+    background-image: linear-gradient(
+      101deg,
+      #8b0000,
+      #fc5c7d
+    ); /* Gradient background */
+    color: white; /* Text color */
+  }
+
+  /* Gradient effect on hover */
+  .btn-danger:hover {
+    background-image: linear-gradient(101deg, #fc5c7d, #8b0000);
+    color: white; /* Ensure text remains white */
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+
+  .table-header-blue {
+    background-color: #b6dde8 !important;
+  }
+  .table-header-dark {
+    background-color: #014b54 !important;
+    color: white !important;
+  }
+  .action-column {
+    min-width: 100px;
+  }
+  .action-btn {
+    border: none;
+    background: none;
+    padding: 5px;
+    cursor: pointer;
+  }
+  .action-btn:hover {
+    opacity: 0.8;
+  }
+  .fa-trash {
+    color: #dc3545;
+  }
+  input.table-input {
+    border: 1px solid #dee2e6;
+    width: 100%;
+    padding: 4px 8px;
+  }
+  input.table-input:focus {
+    outline: 2px solid #b6dde8;
+    border-color: transparent;
+  }
+  .add-button-container {
+    margin-top: 20px;
+  }
+</style>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    addRow();
+  });
+
+  function createInputCell(name, value = "") {
+    return `<input type="text" class="table-input" name="${name}" value="${value}">`;
+  }
+
+  function addRow() {
+    const tbody = document.getElementById("ProductTableBody");
+    const nextItemNo = tbody.children.length + 1;
+
+    const newRow = document.createElement("tr");
+    newRow.dataset.rowId = Date.now() + Math.random();
+    newRow.innerHTML = `
+        <td class="text-center text-muted">${nextItemNo}</td>
+        <td>${createInputCell("Sr. No.")}</td>
+        <td colspan="2">${createInputCell("Ingredients")}</td>
+        <td>${createInputCell("function")}</td>
+        <td>${createInputCell("mgPerDose")}</td>
+
+
+        <td class="text-center">
+            <button class="action-btn" onclick="deleteRow(this)">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+        </td>
+    `;
+
+    tbody.appendChild(newRow);
+    renumberRows();
+  }
+
+  function deleteRow(button) {
+    const row = button.closest("tr");
+    if (document.getElementById("tableBody").children.length > 1) {
+      row.remove();
+      renumberRows();
+    }
+  }
+
+  function renumberRows() {
+    const rows = document
+      .getElementById("tableBody")
+      .getElementsByTagName("tr");
+    Array.from(rows).forEach((row, index) => {
+      row.querySelector("td:first-child").textContent = (index + 1).toString();
+    });
+  }
+</script>
+
+<head>
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    rel="stylesheet"
+  />
+</head>
+{% endblock %}

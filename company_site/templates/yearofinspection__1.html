@@ -1,0 +1,3345 @@
+﻿{% load static %}
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}" />
+    <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/style.css">
+
+<script src="https://cdn.jsdelivr.net/npm/typeit@8.7.1/dist/index.umd.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+
+
+
+    <!-- End plugin css for this page -->
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Kaushan Script"
+    />
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css?family=Josefin Sans"
+    />
+
+    <style>
+      * {
+        margin: 0px;
+        padding: 0px;
+      }
+      body {
+        background: linear-gradient(to right, #ffffff, #f4a3ff);
+      }
+      .btn {
+        padding: 1px 0.375rem !important;
+      }
+      .seachbar {
+        border-width: 1.5px;
+        border-color: #fb0206;
+        font-size: 20px;
+        border-radius: 10px !important;
+        background-color: #dbd7d4;
+      }
+      .suggestions-dropdown {
+        position: absolute;
+        border: 1px solid #ccc;
+        background-color: white;
+        width: 50%;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1;
+        display: none;
+      }
+
+      .suggestions-dropdown div {
+        padding: 8px;
+        cursor: pointer;
+      }
+
+      .suggestions-dropdown div:hover {
+        background-color: #f0f0f0;
+      }
+
+      .selected-companies {
+        margin-left: 5px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        text-align: left !important;
+      }
+      .navbar-menu-wrapper{
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+      }
+
+      .nav-header-link {
+        font-size: 14px !important;
+        font-weight: bold;
+        text-decoration: none;
+        border-radius: 5px;
+        color: black !important;
+      }
+      @media (max-width: 1490px) {
+        .nav-header-link {
+
+          font-size: 12px !important;
+        }
+      }
+      .nav-header-link-hover:hover {
+      color: #045c8d !important
+    }
+
+      .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+    }
+
+      .nav-item-dr {
+        background: #90dad7;
+        padding: 0 !important;
+      }
+
+      .nav-item-dr-li {
+        padding: 0 1.25rem !important;
+      }
+
+      .hover-link {
+        color: rgb(0, 0, 0) !important;
+        font-weight: 600;
+        padding: 1.125rem 2.25rem !important;
+      }
+
+      .hover-link:hover {
+       background: linear-gradient(to right, #045c8d, #3485b3) !important;
+      }
+
+      .nav-item-list {
+        padding: 0.5rem 2.25rem !important;
+        color: rgb(0, 0, 0) !important;
+        font-weight: 600;
+        background: #90dad7;
+      }
+
+      .nav-item-list:hover {
+       background: linear-gradient(to right, #045c8d, #3485b3) !important;
+        color: rgb(0, 0, 0) !important;
+      }
+
+      .hover-link-list {
+        color: black !important;
+      }
+
+      .nav-profile-text p {
+        margin-bottom: 0;
+        color: black !important;
+      }
+      .selected-companies span {
+        margin-right: 10px;
+        background-color: #007bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 20px;
+        cursor: pointer;
+      }
+
+      .selected-companies span:hover {
+        background-color: #0056b3;
+      }
+
+
+
+
+
+    .card {
+        background: rgba(233,93,0,0.1);
+        border: 2px solid #E95D00;
+        border-radius: 15px;
+        padding: 20px;
+        max-width: 450px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .info-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 8px;
+    }
+
+    .icon {
+        font-size: 1.2em;
+    }
+
+    .label {
+        font-weight: bold;
+        color: #333;
+    }
+
+    .inspection-table {
+
+        border-collapse: collapse;
+        margin: 10px 0;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .inspection-table th, .inspection-table td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ddd;
+    }
+
+    .inspection-table th {
+        background-color: #f8f8f8;
+    }
+
+    .system-boxes {
+        display: flex;
+        position: relative;
+    }
+
+    .system-box {
+
+        background-color: #e6f3ff;
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    .system-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+
+    .year-tag {
+        background-color: #ff9999;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        color: white;
+    }
+
+    .system-details {
+        font-size: 0.9em;
+        color: #666;
+    }
+
+    .investigator-section {
+        margin: 20px 0;
+        color: #ff0000;
+    }
+
+    .print-button {
+        width: 100%;
+        padding: 12px;
+        background-color: #4a67e8;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 1em;
+        transition: background-color 0.3s;
+    }
+
+    .print-button:hover {
+        background-color: #3951b9;
+    }
+
+    .future-date {
+        color: blue;
+        text-decoration: underline;
+    }
+    .cardContainer{
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(3,1fr);
+    }
+
+    .year-boxes-container,
+.date-boxes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.year-box,
+.date-box {
+  padding: 8px 16px;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.year-box:hover,
+.date-box:hover {
+  border-color: #4CAF50;
+  background: #f0f9f0;
+}
+
+.year-box.active,
+.date-box.active {
+  background: #4CAF50;
+  color: white;
+  border-color: #4CAF50;
+}
+
+.system-box {
+  border: 1px solid #ccc;
+  padding: 10px;
+  display: grid;
+
+  margin: 5px;
+  cursor: pointer;
+}
+
+.system-box.selected {
+  background-color: lightblue; /* Highlight selected */
+  border-color: blue;
+}
+.details-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 1rem;
+}
+
+.column {
+  width: 33.33%;
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.header {
+  padding: 1rem;
+  color: white;
+  font-weight: normal;
+}
+
+.content {
+  height: 300px;
+  background-color: #f0f0f0;
+}
+
+.footer {
+  height: 1rem;
+}
+
+/* Column specific colors */
+.date .header, .date .footer {
+  background-color: #5850c9;
+}
+
+.investigator .header, .investigator .footer {
+  background-color: #82c91e;
+}
+
+.system .header, .system .footer {
+  background-color: #cd9661;
+}
+@media (min-width: 576px) {
+  .modal-dialog {
+      max-width: 800px;
+      margin: 1.75rem auto;
+  }
+}
+    :root {
+        --primary-color: #2563eb;
+        --secondary-color: #3b82f6;
+        --accent-color: #60a5fa;
+        --background-color: #f8fafc;
+        --card-background: #ffffff;
+        --text-primary: #1e293b;
+        --text-secondary: #475569;
+    }
+
+    body {
+        font-family: 'Poppins', sans-serif;
+        background: var(--background-color);
+        color: var(--text-primary);
+    }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        padding: 2rem;
+        border-radius: 0 0 1rem 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .system-selector {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+        font-size: 17px;
+
+    }
+
+    .system-chip {
+        background: var(--card-background);
+        border: 2px solid var(--accent-color);
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .system-chip:hover {
+      background:var(--accent-color);;
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .system-chip.active {
+        background: var(--primary-color);
+        color: white;
+    }
+   .btn-container {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .search-btn {
+      {% comment %} padding: 12px 25px; {% endcomment %}
+      font-size: 16px;
+
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .search-btn:hover {
+      background-color: #0056b3;
+    }
+
+    .card-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        gap: 1.5rem;
+        padding: 1rem;
+    }
+
+
+    .data-card {
+        background: var(--card-background);
+        border-radius: 1rem;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        padding: 1.5rem;
+        transition: transform 0.3s ease;
+        border: 1px solid blue !important;
+    }
+
+    .data-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .card-header {
+        border-bottom: 2px solid var(--accent-color);
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .company-name {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+    .selected-Compni{
+      display: flex;
+    width: 250px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+
+    .info-grid {
+        display: grid;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--text-secondary);
+    }
+
+    .year-selector {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        /*margin: 1rem 0;*/
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        justify-content: center;
+    }
+
+    .year-chip {
+        background: var(--card-background);
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+        border: 1px solid var(--accent-color);
+        transition: all 0.2s ease;
+        font-size: 17px;
+        height: 30px;
+    }
+
+    .year-chip:hover {
+      background:var(--accent-color);;
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+
+    .year-chip.active {
+      background: hsl(222, 75.90%, 52.70%);
+
+        color: white;
+    }
+
+    .year-details {
+        margin-top: 1rem;
+    }
+
+    .year-section {
+        background: #f8fafc;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    .navbar-brand-wrapper{
+      width: fit-content !important;
+    }
+    .navbar-menu-wrapper{
+      width: fit-content !important;
+
+    }
+
+    .inspection-date {
+        background: white;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        border: 1px solid #e2e8f0;
+    }
+
+    .inspection-date h6 {
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+
+    .system-details {
+        margin-left: 1rem;
+        padding: 0.5rem 0;
+        border-left: 2px solid var(--accent-color);
+        padding-left: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .system-name {
+        font-weight: 500;
+
+    }
+
+    .observation-count {
+
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+
+    .investigator-info {
+        font-style: italic;
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        padding: 0.5rem;
+        background: #f1f5f9;
+        border-radius: 0.25rem;
+    }
+    {% comment %} Types Of Establishment Css  type_of_establishment-selector - esta_system-chip{% endcomment %}
+    .type_of_establishment-selector {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      font-size: 17px;
+
+  }
+
+  .esta_system-chip {
+      background: var(--card-background);
+      border: 2px solid var(--accent-color);
+      padding: 0.5rem 1rem;
+      border-radius: 2rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+  }
+  .esta_system-chip:hover {
+    background:var(--accent-color);;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+  }
+
+  .esta_system-chip.active {
+      background: var(--primary-color);
+      color: white;
+  }
+    .print-button {
+        margin-top: 1rem;
+        width: 100%;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        font-weight: 500;
+    }
+
+    .print-button:hover {
+        background: var(--secondary-color);
+    }
+
+    @media print {
+        .year-details {
+            display: block !important;
+        }
+        .dashboard-header,
+        .system-selector,
+        .print-button {
+            display: none;
+        }
+    }
+    .system-details {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        margin: 5px 0;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    .system-details:hover {
+        background-color: #f0f0f0;
+    }
+
+    .system-details.selected {
+        background-color: #007bff;
+        color: white !important;
+        border: 2px solid #0056b3;
+    }
+    .content{
+        text-align: justify !important;
+    }
+
+
+  {% comment %} .search-input {
+      width: 20%;
+      padding: 1rem;
+      border: 2px solid var(--accent-color);
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.3s ease;
+      background: white;
+  }
+  .select-input{
+
+    padding: 12px;
+    border-radius: 5px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    outline: none;
+    transition: border-color 0.3s ease;
+    background: white;
+  } {% endcomment %}
+ {% comment %} .search-input::placeholder{
+  color: black !important;
+ }
+
+  .search-input:focus ,.select-input:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  } {% endcomment %}
+
+
+  {% comment %} .com_suggestions-list {
+      position: absolute;
+      top: 85%;
+      left: 0;
+      right: 0;
+      width: 200%;
+      background: white;
+      border: 1px solid var(--accent-color);
+      border-radius: 0.5rem;
+      margin-top: 0.5rem;
+
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      display: none;
+  }
+  {% endcomment %}
+  .com_suggestions-list-2{
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    width: 50%;
+    background: white;
+    border: 1px solid var(--accent-color);
+    border-radius: 0.5rem;
+    margin-top: 0.5rem;
+
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    display: none;
+  }
+
+  .com_suggestions-list.active {
+      display: block;
+  }
+
+  .suggestion-item {
+
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+  }
+
+  .suggestion-item:hover {
+      background: var(--background-color);
+  }
+
+  .selected-systems {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1rem 0;
+  }
+
+  .system-tag {
+      background: var(--primary-color);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+  }
+
+  .remove-tag {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      padding: 0;
+      font-size: 1.2rem;
+      line-height: 1;
+      opacity: 0.8;
+      transition: opacity 0.2s ease;
+  }
+
+  .remove-tag:hover {
+      opacity: 1;
+  }
+  .header{
+    display: flex !important;
+    justify-content: space-between;
+  }
+
+
+  .s-content{
+    border: 1px solid gray;
+    padding: 20px;
+    color: black;
+  }
+  .observation-image {
+    max-width: 100%; /* Ensures it doesn't exceed container width */
+    height: auto; /* Maintains aspect ratio */
+    display: block;
+    margin: 10px 0;
+  }
+
+
+
+  .search-input, .form-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+
+
+  .main-container{
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    {% comment %} margin: 10px; {% endcomment %}
+    padding: 5px 20px 15px 20px;
+    border-radius: 10px;
+    background-color:aliceblue
+  }
+  @media screen and (max-width:1366px) {
+
+
+    .nav-item.nav-settings{
+
+      margin-left: 0px !important;
+    }
+
+    .card-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(370px, 1fr));
+      gap: 1.5rem;
+      padding: 1rem;
+  }
+
+  }
+  .select2-selection__choice__remove{
+    right:0 !important;
+    left:auto !important;
+    color:black !important;
+  }
+  .select2-selection__choice{
+    font-size:.9rem !important;
+    padding:8px !important;
+  }
+  select2-selection__choice__display{
+    font-size:12px !important;
+  }
+
+
+  .select2-selection{
+    border-color:#007bff !important;
+  }
+  .select2-container{
+    width:100% !important;
+  }
+  .select2-search__field{
+    height:25px !important;
+  }
+  .form-label{
+    font-size: 13px;
+    font-weight: 500;
+    color: black;
+    {% comment %} text-transform:uppercase; {% endcomment %}
+    padding-left: .3rem;
+
+    margin-bottom:0px !important;
+  }
+  .select2-selection__rendered{
+    display:none !important;
+  }
+  .loading-container {
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  .loader {
+    width: 48px;
+    height: 48px;
+    border: 5px solid #FFF;
+    border-bottom-color:rgb(0, 119, 255);
+    border-radius: 50%;
+    display: inline-block;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+    }
+
+    @keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+    }
+    .loading-text{
+      font-size: 18px !important;
+      margin-top:10px;
+      font-family: 'Roboto Mono' !important;
+    }
+  .select2-results__option--selected{
+    color: white !important;
+    background-color: #007bff !important;
+  }
+  .select2-results__option--selectable{
+    margin-bottom:2px !important;
+  }
+
+
+  .table-responsive {
+    max-height: 200vh; /* allows table to grow but limits max height */
+    overflow-y: auto;
+    margin:10px !important;
+    {% comment %} margin:10px !important; {% endcomment %}
+
+  }
+
+  /* Make the table full width inside the scrollable div */
+  .table-responsive table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: #fff;
+    border-radius: 8px;
+    border: 1px solid var(--accent-color);
+  }
+
+  /* Table header sticky */
+  thead th {
+    position: sticky;
+    top: 0;
+    background-color: var(--primary-color) !important;
+    color: white;
+    z-index: 2;
+    text-align: center;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 15px;
+    border: 1px solid var(--accent-color);
+  }
+
+  /* General cell styling */
+  td {
+    padding: 12px 15px;
+    text-align: left;
+    border: 1px solid #d0d0d0;
+    color: #333;
+  }
+
+  /* Row styling */
+  tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+
+  tr:hover {
+    background-color: #f1f1f1;
+    transition: background-color 0.3s ease;
+  }
+
+  /* Empty cell placeholder */
+  td:empty::before {
+    content: "N/A";
+    color: #888;
+    font-style: italic;
+  }
+  .dropdown-item:hover {
+
+     background-color: white;
+}
+</style>
+  </head>
+  <body>
+    <nav class="navbar default-layout-navbar col-lg-12 col-12 p-0 fixed-top position-fixed d-flex flex-row">
+      <div class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start">
+        <a class="navbar-brand brand-logo" href="../../../"><img src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="logo" style="width: 132px !important;height: 31px !important;"/></a>
+        <a class="navbar-brand brand-logo-mini" href="../../../"><img src="{% static 'assets/images/logo-mini.svg' %}" alt="logo" /></a>
+      </div>
+      <div class="navbar-menu-wrapper d-flex align-items-stretch">
+
+        <ul class="navbar-nav navbar-nav-right">
+          <li class="nav-item d-none d-lg-block">
+            <a class="nav-link nav-header-link nav-header-link-hover" href="../../">
+              Home
+            </a>
+          </li>
+          <li class="nav-item d-none d-lg-block">
+            <a class="nav-link nav-header-link nav-header-link-hover " {% if request.user.role == "admin" %} href="../../../adminmaster/adminbase" {% else %} href="../../../ratools/" {% endif %}>
+              Technical Tools
+            </a>
+          </li>
+          <li class="nav-item  d-lg-block position-relative " >
+            <a class="px-4 py-3 rounded-2 nav-header-link dropdown-toggle" href="#" id="observationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              483 Observations Database
+            </a>
+            <ul class="dropdown-menu position-absolute w-100"  aria-labelledby="observationsDropdown" >
+              <li>
+                <a href="/aidatabase/form483/" class="dropdown-item fw-bold  nav-header-link-hover" style="font-size:14px">483 observations</a>
+
+              <a href="/aidatabase/warning_letter/" class="dropdown-item fw-bold nav-header-link-hover" style="font-size:14px">Warning Letter</a>
+
+
+              </li>
+            </ul>
+          </li>
+
+
+          <li class="nav-item d-none d-lg-block">
+            <a class="nav-link nav-header-link nav-header-link-hover" href="/aidatabase/ai_master_base/">
+              FDA Deficiency Database
+            </a>
+          </li>
+          <li class="nav-item d-none d-lg-block">
+            <a class="nav-link nav-header-link nav-header-link-hover" href="/aidatabase/major_cr_base/">
+              Complete Response Database
+            </a>
+          </li>
+          {% comment %} <li class="nav-item nav-profile dropdown">
+            <a class="nav-link dropdown-toggle" id="profileDropdown" href="#" data-bs-toggle="dropdown" aria-expanded="false">
+              <div class="nav-profile-img">
+                <img src="{% static 'assets/images/faces/face1.jpg' %}" alt="image">
+                <span class="availability-status online"></span>
+              </div>
+              <div class="nav-profile-text">
+                <p class="mb-1 text-black nav-header-link nav-header-link-hover ">{{ request.user.first_name }}</p>
+              </div>
+            </a>
+            <div class="dropdown-menu navbar-dropdown" aria-labelledby="profileDropdown">
+              <a class="dropdown-item nav-header-link " href="#">
+                <i class="mdi mdi-cached me-2 text-success"></i> Profile </a>
+              <div class="dropdown-divider"></div>
+            </div>
+          </li> {% endcomment %}
+          {% comment %} <li class="nav-item dropdown">
+            <a class="nav-link count-indicator dropdown-toggle" id="notificationDropdown" href="#" data-bs-toggle="dropdown">
+              <i class="mdi mdi-bell-outline text-dark"></i>
+              <span class="count-symbol bg-danger"></span>
+            </a>
+            <div class="dropdown-menu dropdown-menu-end navbar-dropdown preview-list" aria-labelledby="notificationDropdown">
+              <h6 class="p-3 mb-0">Notifications</h6>
+              <div class="dropdown-divider"></div>
+              <a class="dropdown-item preview-item">
+                <div class="preview-thumbnail">
+                  <div class="preview-icon bg-success">
+                    <i class="mdi mdi-calendar "></i>
+                  </div>
+                </div>
+                <div class="preview-item-content d-flex align-items-start flex-column justify-content-center">
+                  <h6 class="preview-subject font-weight-normal mb-1">Event today</h6>
+                  <p class="text-gray ellipsis mb-0"> Just a reminder that you have an event today </p>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
+              <a class="dropdown-item preview-item">
+                <div class="preview-thumbnail">
+                  <div class="preview-icon bg-warning">
+                    <i class="mdi mdi-cog"></i>
+                  </div>
+                </div>
+                <div class="preview-item-content d-flex align-items-start flex-column justify-content-center">
+                  <h6 class="preview-subject font-weight-normal mb-1">Settings</h6>
+                  <p class="text-gray ellipsis mb-0"> Update dashboard </p>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
+              <a class="dropdown-item preview-item">
+                <div class="preview-thumbnail">
+                  <div class="preview-icon bg-info">
+                    <i class="mdi mdi-link-variant"></i>
+                  </div>
+                </div>
+                <div class="preview-item-content d-flex align-items-start flex-column justify-content-center">
+                  <h6 class="preview-subject font-weight-normal mb-1">Launch Admin</h6>
+                  <p class="text-gray ellipsis mb-0"> New admin wow! </p>
+                </div>
+              </a>
+              <div class="dropdown-divider"></div>
+              <h6 class="p-3 mb-0 text-center">See all notifications</h6>
+            </div>
+          </li> {% endcomment %}
+          <li class="nav-item nav-logout d-none d-lg-block">
+            <a class="nav-link" href="/adminmaster/logout/">
+              <i class="mdi mdi-power text-dark"></i>
+            </a>
+          </li>
+          <li class="nav-item  d-none d-lg-block">
+            <a class="nav-link" href="#">
+              <i class="mdi mdi-format-line-spacing text-dark"></i>
+            </a>
+          </li>
+        </ul>
+        <button class="navbar-toggler navbar-toggler-right d-lg-none align-self-center" type="button" data-toggle="offcanvas">
+          <span class="mdi mdi-menu"></span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="" style="margin-top:80px">
+
+
+      <div class="main-container mx-1 container-fluid " >
+
+        <div class="mb-4 d-flex flex-wrap justify-content-between align-items-center " style="    margin: 0px 10px 20px 10px !important; ">
+          <div class="d-flex flex-wrap flex-grow-1" style="gap:21px">
+            <div class="flex-grow-1" style="max-width: 20%;">
+              <label for="monthFrom" class="form-label">From <span class="ms-1" style="font-size: 0.6rem;">(MM/YYYY)</span></label>
+              <input type="text" id="monthFrom" class="form-control" style="background-color: white; border-color: #007bff; padding: .45rem 0.5rem; font-size: 14px;">
+            </div>
+
+            <div class="flex-grow-1" style="max-width: 20%;">
+              <label for="monthTo" class="form-label">To <span class="ms-1" style="font-size: 0.6rem;">(MM/YYYY)</span></label>
+              <input type="text" id="monthTo" class="form-control" style="background-color: white; border-color: #007bff; padding: .45rem 0.5rem; font-size: 14px;">
+            </div>
+          </div>
+
+          <button class="btn btn-danger px-3 py-2" id="clearData" style="font-size:15px ">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+              <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+              <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+            </svg>
+            Clear
+          </button>
+        </div>
+
+          <div class="row g-3 flex-wrap mx-auto">
+              <div class="col-md" style="margin-top:0px">
+                <label for="company" class="form-label">Company</label>
+                <select id="companySelect" multiple class="form-select  w-100 "></select>
+              </div>
+             {% comment %} <div class="col-md">
+              <select id="yearselector-select" multiple class="form-select w-100 ">
+                <option value="2020">2020</option>
+                <option value="2021">2021</option>
+                <option value="2022">2022</option>
+                <option value="2023">2023</option>
+              </select>
+            </div>  {% endcomment %}
+
+            <div class="col-md" style="margin-top:0px">
+              <label class="form-label">Investigator</label>
+              <select id="investigatorSelect" multiple class="form-select w-100 "></select>
+            </div>
+            <div class="col-md" style="margin-top:0px">
+              <label class="form-label">System</label>
+              <select id="System-select" multiple class="form-select w-100 ">
+
+              </select>
+            </div>
+            <div class="col-md" style="margin-top:0px">
+              <label class="form-label">Type of Establishment</label>
+              <select id="typeOfEstablishment-select" multiple class="form-select w-100 ">
+
+              </select>
+            </div>
+            <div class="col-md" style="margin-top:0px">
+              <label class="form-label">Search By Keywords</label>
+              <input
+                type="text"
+                class="form-control w-100"
+                style="padding:5px !important; border-color:#007bff !important"
+                placeholder="Search here..."
+                id="KeywordSearchInput"
+               />
+            </div>
+          </div>
+
+
+
+    </div>
+    <div>
+
+
+      {% comment %} <div class="btn-container">
+        <button class="search-btn" onclick="search()">Search</button>
+      </div> {% endcomment %}
+
+      <div class="statistics-container  container" id="staticContainer" style="display: none;">
+        <div id="statisticsTableContainer" class="d-flex justify-content-between w-100 mt-4 ">
+          <div class=" mb-2 " style=" font-weight: bold;">
+            <span>Total Observations</span>:<span id="totalObservation"></span>
+            <hr>
+
+          </div>
+          <div class=" mb-2  " style="font-weight: bold;">
+            <span>Total System</span>:<span id="totalSystem"></span>
+            <hr>
+
+          </div>
+          <div class=" mb-2  " style="font-weight: bold;">
+            <span>Total Investigator</span>:<span id="totalInvestigator"></span>
+            <hr>
+          </div>
+          <div class=" mb-2  " style="font-weight: bold;">
+            <span>Total Types of Establishment</span>:<span id="totalEstablishments"></span>
+            <hr>
+
+          </div>
+           <div class=" mb-2  " style="font-weight: bold;">
+            <span>Total Companies</span>:<span id="totalCompanies"></span>
+            <hr>
+          </div>
+        </div>
+      </div>
+      <div class="statistics-container  container" id="staticContainerkey" style="display: none;">
+        <div id="statisticsTableContainerkey" class="d-flex justify-content-center w-100 mt-3">
+          <div class="  " style=" font-weight: bold;">
+            <span>Total Observations</span>:<span id="totalObservationKey"></span>
+            <hr style="margin: 0px !important;">
+          </div>
+
+        </div>
+      </div>
+
+
+      <div id="loading-container" class="loading-container"  style="display: none;">
+        <span class="loader"></span>
+        <p id="loading-text" class="loading-text"></p>
+      </div>
+      <div id="card-container" class="card-container"></div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+{% comment %} <script>
+    const yearList = [
+        '2020',
+        '2021',
+        '2022',
+         '2023',
+         '2024'       ];
+    let selectedYears = [];
+    let Year = [];
+
+    function createValidId(str) {
+        return str.toLowerCase()
+                 .replace(/[^a-z0-9]/g, '-')
+                 .replace(/-+/g, '-')
+                 .replace(/^-|-$/g, '');
+    }
+
+    function initializeSystemSelector() {
+        const selector = document.getElementById('year-selector');
+        yearList.forEach(year => {
+            const chip = document.createElement('div');
+            chip.className = 'system-chip';
+            chip.textContent = year;
+            chip.onclick = () => toggleSystem(chip, year);
+            selector.appendChild(chip);
+        });
+    }
+
+    function toggleYear(chip, yearData) {
+        chip.classList.toggle('active');
+        if (chip.classList.contains('active')) {
+            selectedyear.push(year);
+        } else {
+            selectedyear = selectedyear.filter(s => s !== year);
+        }
+        fetchData();
+    }
+
+    function getCSRFToken() {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+              const cookie = cookies[i].trim();
+              if (cookie.startsWith("csrftoken=")) {
+                  return cookie.split("=")[1];
+              }
+          }
+          return "";
+      }
+
+    async function fetchData() {
+        if (selectedSystems.length === 0) {
+            document.getElementById('card-container').innerHTML =
+                '<p class="text-center">Please select at least one system</p>';
+            return;
+        }
+        const csrfToken = getCSRFToken();
+
+        try {
+            const response = await fetch('https://icretools.com/aidatabase/company_object/',
+            //const response = await fetch('http://127.0.0.1:8000/aidatabase/company_object/',
+             {
+                method: 'POST',
+                headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+                body: JSON.stringify({ year_of_inspection: selectedSystems })
+            });
+            const data = await response.json();
+            companiesData = data.data;
+            renderCards();
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            document.getElementById('card-container').innerHTML =
+                '<p class="text-center text-red-500">Error loading data. Please try again.</p>';
+        }
+    }
+
+    function renderCards() {
+        const container = document.getElementById('card-container');
+        container.innerHTML = '';
+
+        companiesData.forEach(company => {
+            const card = createCard(company);
+            container.appendChild(card);
+        });
+    }
+
+    function createCard(company) {
+        const card = document.createElement('div');
+        card.className = 'data-card';
+        const cardId = `card-${createValidId(company.company_name)}`;
+        card.id = cardId;
+
+        const years = Object.keys(company.year_of_inspection);
+
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="company-name">${company.company_name}</div>
+            </div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span>Type:</span>
+                    <span>${company.type_of_establishment}</span>
+                </div>
+                <div class="info-item">
+                    <span>Location:</span>
+                    <span>${company.location}</span>
+                </div>
+                <div class="info-item">
+                    <span>FDA Observations:</span>
+                    <span>${company.total_fda_observation}</span>
+                </div>
+            </div>
+            <div>
+                <label>Select Years:</label>
+                <div class="year-selector" id="year-selector-${createValidId(company.company_name)}">
+                    ${years.map(year => `
+                        <div class="year-chip" data-year="${year}">
+                            ${year}
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="year-details" id="${cardId}-details"></div>
+            <button class="print-button" onclick="printCard('${cardId}')">Print Selected Years</button>
+        `;
+
+        const yearSelector = card.querySelector(`.year-selector`);
+        yearSelector.addEventListener('click', (e) => {
+            const yearChip = e.target.closest('.year-chip');
+            if (yearChip) {
+                yearChip.classList.toggle('active');
+                updateYearDetails(cardId);
+            }
+        });
+
+        return card;
+    }
+
+    function updateYearDetails(cardId) {
+        const card = document.getElementById(cardId);
+        const detailsContainer = document.getElementById(`${cardId}-details`);
+        const selectedYears = Array.from(card.querySelectorAll('.year-chip.active')).map(chip => chip.dataset.year);
+
+        if (selectedYears.length === 0) {
+            detailsContainer.innerHTML = '';
+            return;
+        }
+
+        const company = companiesData.find(c => `card-${createValidId(c.company_name)}` === cardId);
+
+        detailsContainer.innerHTML = selectedYears.map(year => {
+            const yearData = company.year_of_inspection[year];
+
+            return `
+                <div class="year-section">
+                    <h5>Year ${year}</h5>
+                    ${Object.entries(yearData).map(([date, data]) => `
+                        <div class="inspection-date">
+                            <h6>Date: ${date}</h6>
+                            <div class="investigator-info">
+                                Investigator: ${data.metadata.fda_investigators}
+                            </div>
+                            ${Object.entries(data.systems).map(([system, details]) => `
+                                <div class="system-details" onclick="toggleSystemSelection(this)">
+                                    <div class="system-name">${system}</div>
+                                    <div class="observation-count">
+                                            Total Observations: ${details.observation_count}
+                                    </div>
+                                    <div class="observations-list" style="display:none">
+                                        ${Object.entries(details.observations).map(([obsTitle, obsData]) => `
+                                            <div class="observation">
+                                                <h6><strong>${obsTitle}</strong></h6>
+                                                ${obsData.contents.map(con => `
+                                                    <div class="content-item">
+
+                                                        <p class="content" style="text-align:justify"> ${con.content}</p>
+                                                        ${con.image ? `<img src="${con.image}" alt="Observation Image" />` : ''}
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Function to toggle selection of system-details divs
+    function toggleSystemSelection(element) {
+        element.classList.toggle('selected'); // Toggle selection
+    }
+
+    function printCard(cardId) {
+        const card = document.getElementById(cardId);
+        const selectedYears = Array.from(card.querySelectorAll('.year-chip.active')).map(chip => chip.dataset.year);
+
+        if (selectedYears.length === 0) {
+            alert('Please select at least one year to print');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        const companyName = card.querySelector('.company-name').textContent;
+
+        // Clone the details container for printing
+        const detailsContainer = document.getElementById(`${cardId}-details`).cloneNode(true);
+
+        // Only keep systems that have the 'selected' class
+        detailsContainer.querySelectorAll('.system-details').forEach(system => {
+            if (!system.classList.contains('selected')) {
+                system.remove(); // Remove non-selected systems
+            } else {
+                const observationsList = system.querySelector('.observations-list');
+                if (observationsList.innerHTML.trim() !== '') {
+                    observationsList.style.display = 'block'; // Ensure observations are visible
+                }
+            }
+        });
+
+        const printContent = `
+            <html>
+                <head>
+                    <title>Inspection Details - ${companyName}</title>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+                    <style>
+                        body { font-family: 'Poppins', sans-serif; padding: 20px; }
+                        .company-header { margin-bottom: 20px; }
+                        .year-section {
+                            margin-bottom: 30px;
+                            background: #f8fafc;
+                            padding: 20px;
+                            border-radius: 8px;
+                        }
+                        .inspection-date {
+                            margin: 15px 0;
+                            padding: 15px;
+                            background: white;
+                            border-radius: 8px;
+                            border: 1px solid #e2e8f0;
+                        }
+                        .system-details {
+                            margin-left: 20px;
+                            padding-left: 15px;
+                            border-left: 2px solid #3b82f6;
+                        }
+                        .investigator-info {
+                            font-style: italic;
+                            color: #475569;
+                            margin: 10px 0;
+                            padding: 8px;
+                            background: #f1f5f9;
+                            border-radius: 4px;
+                        }
+                        .observations-list {
+                            display: block !important;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="company-header">
+                        <h2>${companyName}</h2>
+                        <p>Type: ${card.querySelector('.info-item:nth-child(1) span:last-child').textContent}</p>
+                        <p>Location: ${card.querySelector('.info-item:nth-child(2) span:last-child').textContent}</p>
+                    </div>
+                    ${detailsContainer.innerHTML}
+                </body>
+            </html>
+        `;
+
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.print();
+    }
+
+    initializeSystemSelector();
+</script> {% endcomment %}
+<script>
+
+    let filetrData=[]
+    let selectedYears = [];
+    let selectedCompanies=[]
+    let startMonthYear=""
+    let endMonthYear=""
+    let debounceTimer;
+    let keyword_search = []
+    let selectedInvestigators=[]
+    let selectedSystems=[]
+    let selectedTypeEstablishment = []
+    let placeholder="Search here..."
+
+
+{% comment %} document.getElementById("monthFrom").addEventListener("change", fetchDataBasedOnDateRange);
+document.getElementById("monthTo").addEventListener("change", fetchDataBasedOnDateRange); {% endcomment %}
+const currentDate = new Date();
+const maxMonth = currentDate.getFullYear() + "-" + String(currentDate.getMonth() + 1).padStart(2, '0');
+
+flatpickr("#monthFrom", {
+  dateFormat: "Y-m",
+  maxDate: maxMonth,
+  minDate: "2019-01",
+  plugins: [
+    new monthSelectPlugin({
+      shorthand: true, // optional
+      dateFormat: "Y-m", // defaults to "F Y"
+      altFormat: "F Y",
+    })
+  ],
+  onChange: fetchDataBasedOnDateRange
+});
+
+flatpickr("#monthTo", {
+  dateFormat: "Y-m",
+  maxDate: maxMonth,
+  minDate: "2019-01",
+  plugins: [
+    new monthSelectPlugin({
+      shorthand: true,
+      dateFormat: "Y-m",
+      altFormat: "F Y",
+    })
+  ],
+  onChange: fetchDataBasedOnDateRange
+});
+function fetchDataBasedOnDateRange() {
+  startMonthYear = document.getElementById("monthFrom").value;
+  endMonthYear = document.getElementById("monthTo").value;
+  console.log("Fetching data between:", startMonthYear, "and", endMonthYear);
+
+  fetchData()
+}
+  // for year........
+    {% comment %} const yearList = [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+    ]; {% endcomment %}
+
+  {% comment %} initializeSystemSelector(); {% endcomment %}
+
+  {% comment %} function initializeSystemSelector() {
+    const selector = document.getElementById('year-selector');
+
+    // Create a default 'Select Year' option
+    let opt = document.createElement("option");
+
+
+    opt.disabled = true;  // Option cannot be selected
+    opt.selected = true;  // This makes it the default selected option
+    selector.appendChild(opt);
+
+    // Loop through yearList and create an option for each year
+    yearList.forEach(year => {
+
+        let opt = document.createElement("option");
+        opt.value = year;  // Setting the value of the option
+        opt.innerText = year;  // Display year as option text
+        selector.appendChild(opt);
+    });
+
+    // Add event listener for change event
+    selector.addEventListener('change', function() {
+        const selectedYear = Number(selector.value);  // Get the selected year
+
+        if (selectedYear) {
+            if (selectedYears.includes(selectedYear)) {
+                //console.log("into to there")
+                // Show popup if the year is already selected
+                alert("This year has already been selected!");  // Popup alert
+            } else {
+                // Add the selected year to the array if not already present
+                selectedYears.push(selectedYear);
+                console.log('Selected Years:', selectedYears);
+                updateSelectedyear();
+
+            }
+        }
+    });
+
+
+
+} {% endcomment %}
+
+
+{% comment %} function removeYear(year) {
+  console.log("Removing", year);
+  selectedYears = selectedYears.filter(s => s !== year);
+  updateSelectedyear();
+} {% endcomment %}
+
+{% comment %} function updateSelectedyear() {
+  const container = document.getElementById('selectedYearMenu');
+   container.innerHTML = ""; // Clear previous content
+
+  selectedYears.forEach(year => {
+      const tagDiv = document.createElement("div");
+      tagDiv.className = "system-tag";
+
+      tagDiv.textContent = year;
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "remove-tag";
+      removeBtn.innerHTML = "&times;";
+      removeBtn.addEventListener("click", () => removeYear(year));
+
+      tagDiv.appendChild(removeBtn);
+      container.appendChild(tagDiv);
+  });
+  fetchData()
+  //console.log(selectedYears);
+} {% endcomment %}
+
+
+/*  function toggleYear(chip, year) {
+    chip.classList.toggle('active');
+
+    if (chip.classList.contains('active')) {
+      if (!selectedYears.includes(year)) {
+        selectedYears.push(year);
+      }
+    } else {
+      selectedYears = selectedYears.filter(s => s !== year);
+    }
+
+
+    fetchData()
+  } */
+
+  // for the investigator....
+
+  let investigators = [];
+
+
+  // selected compnies............#
+  let allCompanies=[]
+  let summary
+  // calation
+  let select2DataCompany
+  const staticContainer=document.getElementById("staticContainer")
+
+
+
+  document.addEventListener("DOMContentLoaded", () => {
+    fetchCompanies()
+    fetchInvestigator();
+
+
+    const staticContainerkey=document.getElementById("staticContainerkey")
+
+    // for compniess........
+    const searchInput = document.getElementById("companiesSearch");
+    const suggestionsList = document.getElementById("com_suggestionsList");
+    const investigatorSearchInput = document.getElementById("investigatorSearchInput");
+  // const investigatorSelectedSystems = document.getElementById("sinvestigatorSelectedSystems");
+    const investigatorSuggestionsList = document.getElementById("investigatorSuggestionsList");
+    const selectedYearMenu = document.getElementById("selectedYearMenu");
+    const selectedELMenu = document.getElementById("selectedELMenu");
+    const KeywordSearchInput = document.getElementById('KeywordSearchInput');
+
+
+    const clearData=document.getElementById("clearData")
+    const totalObservation=document.getElementById("totalObservation")
+    const totalSystem=document.getElementById("totalSystem")
+
+    const totalInvestigator=document.getElementById("totalInvestigator")
+    const totalCompanies=document.getElementById("totalCompanies")
+    const totalEstablishments = document.getElementById("totalEstablishments")
+
+
+  clearData.addEventListener("click",()=>{
+    const cardContainer=document.getElementById("card-container")
+      cardContainer.innerHTML=""
+      totalCompanies.innerHTML="0"
+      window.location.reload()
+    })
+
+    async function fetchCompanies() {
+      // First, initialize Select2 with loading state
+      $('#companySelect').select2({
+        placeholder: "Loading companies...",
+        disabled: true,
+        data: [] // Start with empty data
+      });
+
+      try {
+        const response = await fetch("{{ base_url }}/aidatabase/list_of_company/");
+        const data = await response.json();
+        const allCompanies = data.companies;
+
+        select2DataCompany = allCompanies.map((item) => ({
+          id: item,
+          text: item
+        }));
+
+        // Destroy and reinitialize with data
+        $('#companySelect').select2('destroy');
+        $('#companySelect').select2({
+          data: select2DataCompany,
+          placeholder: "Search here...",
+          width: '100%' // Ensure full width
+        });
+
+        // Enable the select
+        $('#companySelect').prop('disabled', false);
+
+      } catch (error) {
+        console.error("Error fetching companies:", error);
+
+        // Update the existing Select2 with error state
+        $('#companySelect').select2('destroy');
+        $('#companySelect').select2({
+          placeholder: "Failed to load companies",
+          disabled: true,
+          data: []
+        });
+      }
+    }
+
+
+    //fetch inversigator
+    $('#companySelect').on('change', function () {
+      const selectedData = $(this).select2('data');
+      selectedCompanies = [...selectedData]; // update global selected
+
+      // Update the dropdown list:
+      const unselected = select2DataCompany.filter(
+        item => !selectedCompanies.find(sel => sel.id === item.id)
+      );
+
+      const updatedData = [...selectedCompanies, ...unselected];
+
+      // Rebuild the dropdown
+      $('#companySelect').empty().select2({
+        data: updatedData,
+        placeholder: placeholder
+      });
+
+      // Re-select selected values
+      $('#companySelect').val(selectedCompanies.map(c => c.id)).trigger('change.select2');
+
+      // For your logic
+      const selectedNames = selectedCompanies.map(item => item.text);
+      console.log("Selected Companies:", selectedNames);
+
+      // Call your data fetch function
+      fetchData();
+    });
+
+
+    // Show All Companies When Input is Focused
+   /* searchInput.addEventListener("focus", () => {
+      const selectedYearMenu=document.getElementById("selectedYearMenu")
+      selectedYearMenu.style.display="none"
+        if (allCompanies.length === 0) {
+            fetchCompanies().then(() => displayCompanies(allCompanies));
+        } else {
+            displayCompanies(allCompanies);
+        }
+     //   selectedCompanies.style.display="none"
+    });
+    searchInput.addEventListener("focusout",()=>{
+        const selectedYearMenu=document.getElementById("selectedYearMenu")
+      selectedYearMenu.style.display="flex"
+    })
+*/
+    // Filter Companies on Input
+   /* searchInput.addEventListener("input", () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filteredCompanies = allCompanies.filter(company =>
+            company.toLowerCase().includes(searchTerm)
+        );
+        displayCompanies(filteredCompanies);
+    });*/
+
+    // Function to Display Companies
+   /* function displayCompanies(companies) {
+        suggestionsList.innerHTML = "";
+        if (companies.length === 0) {
+
+            return;
+        }
+
+        suggestionsList.style.display = "block";
+
+        companies.forEach(company => {
+            const div = document.createElement("div");
+            div.className = "suggestion-item";
+            div.textContent = company;
+            div.onclick = () => selectCompany(company);
+            suggestionsList.appendChild(div);
+        });
+    }
+        */
+
+    // Select a Company from the List
+  /*  function selectCompany(company) {
+
+        searchInput.value = company;
+        suggestionsList.style.display = "none";
+        if (!selectedCompanies.includes(company)) {
+          selectedCompanies.push(company);
+          updateSelectedSystemsTags()
+      }
+      else{
+        alert("already Selected")
+      }
+      document.getElementById('companiesSearch').value = '';
+
+    }
+      */
+
+  // remover company........
+    /*      function removeCompany(company) {
+            console.log("for delting",company )
+            selectedCompanies = selectedCompanies.filter(s => s !== company);
+              updateSelectedSystemsTags();
+
+          }
+          // update the company list........
+          function updateSelectedSystemsTags() {
+
+            const container = document.getElementById('selectedCompanies');
+            container.innerHTML = ""; // Clear previous content
+
+            selectedCompanies.forEach(company => {
+                const tagDiv = document.createElement("div");
+                tagDiv.className = "system-tag";
+                tagDiv.textContent = company;
+
+                const removeBtn = document.createElement("button");
+                removeBtn.className = "remove-tag";
+                removeBtn.innerHTML = "&times;";
+
+                removeBtn.addEventListener("click", () => removeCompany(company)); // Properly attach event
+
+                tagDiv.appendChild(removeBtn);
+                container.appendChild(tagDiv);
+            });
+            console.log(selectedCompanies)
+            fetchData()
+          }
+*/
+    // Hide Dropdown if Clicked Outside
+    /*    document.addEventListener("click", (event) => {
+            if (!searchInput.contains(event.target) && !suggestionsList.contains(event.target)) {
+                suggestionsList.style.display = "none";
+            }
+        });*/
+  });
+
+  KeywordSearchInput.addEventListener("input", () => {
+    const keyword = KeywordSearchInput.value.trim();
+    clearTimeout(debounceTimer);
+
+    debounceTimer = setTimeout(() => {
+      if (keyword) {
+        keyword_search = [keyword]; // or just `keyword` if API expects string
+      } else {
+        keyword_search = [];
+        fetchData();
+      }
+
+      console.log("ðŸ” Keyword search:", keyword_search);
+      fetchData();
+    }, 500); // wait 500ms after user stops typing
+  });
+
+  let inversigatorData
+  async function fetchInvestigator() {
+    $('#investigatorSelect').select2({
+      placeholder: "Loading inversigators...",
+      disabled: true,
+
+      data: [] // Start with empty data
+    });
+    try {
+         const response = await fetch("{{ base_url }}/aidatabase/list_of_investigators/"); // Replace with your API URL
+       //const response = await fetch("http://127.0.0.1:8000/aidatabase/list_of_investigators/");
+        const data = await response.json();
+
+        investigators=data.investigators
+
+         inversigatorData = investigators.map((item, index) => ({
+          id: index,
+          text: item
+        }));
+        $('#investigatorSelect').select2('destroy');
+        $('#investigatorSelect').select2({
+          data: inversigatorData,
+          placeholder: "Search here...",
+          width: '100%' // Ensure full width
+        });
+
+        // Enable the select
+        $('#investigatorSelect').prop('disabled', false);
+
+      // Assuming response is an array of company names
+    } catch (error) {
+        console.error("Error fetching investigators", error);
+        $('#investigatorSelect').select2('destroy');
+        $('#investigatorSelect').select2({
+          placeholder: "Failed to load investigators",
+          disabled: true,
+          data: []
+        });
+    }
+  }
+
+  $('#investigatorSelect').on('change', function () {
+    const selectedIds = $(this).val(); // Get selected IDs
+     selectedInvestigators = inversigatorData.filter(item => selectedIds.includes(item.id.toString()));
+
+    // Filter out selected from the original list
+    const unselected = inversigatorData.filter(
+      item => !selectedIds.includes(item.id.toString())
+    );
+
+    // Combine: selected at top, unselected below
+    const updatedData = [...selectedInvestigators, ...unselected];
+
+    // Rebuild the select2 dropdown
+    $('#investigatorSelect').empty().select2({
+      data: updatedData,
+      placeholder: "Select an Investigator"
+    });
+
+    // Set selected again
+    $('#investigatorSelect').val(selectedIds).trigger('change.select2');
+
+    console.log('Selected Investigators:', selectedInvestigators.map(i => i.text));
+    fetchData();
+  });
+
+
+
+{% comment %}
+  investigatorSearchInput.addEventListener("focus", () => {
+        const selectedSystemMenu=document.getElementById("selectedSystemMenu")
+        selectedSystemMenu.style.display="none"
+
+      if (investigators.length === 0) {
+        fetchInvestigator().then(() => displayInvestigators(investigators));
+    } else {
+      displayInvestigators(investigators);
+    }
+
+
+  }); {% endcomment %}
+  {% comment %} investigatorSearchInput.addEventListener("focusout",()=>{
+      const selectedSystemMenu=document.getElementById("selectedSystemMenu")
+      selectedSystemMenu.style.display="flex"
+  })
+
+    // Filter inversigator on Input.......................
+    investigatorSearchInput.addEventListener("input", () => {
+      const searchTerm = investigatorSearchInput.value.toLowerCase();
+      const filteredInvestigators = investigators.filter(investigator =>
+          investigator.toLowerCase().includes(searchTerm)
+      );
+      displayInvestigators(filteredInvestigators);
+  }); {% endcomment %}
+
+  // Function to Display inversigator
+  {% comment %} function displayInvestigators(investigators) {
+
+    investigatorSuggestionsList.innerHTML = ""; // Clear previous suggestions
+    if (investigators.length === 0) {
+        investigatorSuggestionsList.style.display = "none";
+        return;
+    }
+    investigatorSuggestionsList.style.display = "block";
+
+    investigators.forEach(investigator => {
+        const div = document.createElement("div");
+        div.className = "suggestion-item";
+        div.textContent = investigator;
+        div.onclick = () => selectInvestigator(investigator);
+        investigatorSuggestionsList.appendChild(div);
+    });
+  } {% endcomment %}
+
+  // Select a inversigator from the List
+  {% comment %} function selectInvestigator(investigator) {
+    investigatorSearchInput.value = investigator;
+    investigatorSuggestionsList.style.display = "none";
+    if (!selectedInvestigators.includes(investigator)) {
+      selectedInvestigators.push(investigator);
+        updateSelectedInvestigatorsTags();
+    } else {
+        alert("Investigator already selected");
+    }
+    document.getElementById('investigatorSearchInput').value = '';
+  } {% endcomment %}
+
+  // remover inversigator........
+  {% comment %} function removeInvestigator(investigator) {
+    console.log("Removing", investigator);
+    selectedInvestigators = selectedInvestigators.filter(s => s !== investigator);
+    updateSelectedInvestigatorsTags();
+  }
+  // update the inversigator list........
+  function updateSelectedInvestigatorsTags() {
+    const container = document.getElementById('selectedInvestigators');
+    container.innerHTML = ""; // Clear previous content
+
+    selectedInvestigators.forEach(investigator => {
+        const tagDiv = document.createElement("div");
+        tagDiv.className = "system-tag";
+        tagDiv.textContent = investigator;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "remove-tag";
+        removeBtn.innerHTML = "&times;";
+        removeBtn.addEventListener("click", () => removeInvestigator(investigator));
+
+        tagDiv.appendChild(removeBtn);
+        container.appendChild(tagDiv);
+    });
+    fetchData()
+    console.log(selectedInvestigators);
+  } {% endcomment %}
+
+  // Hide Dropdown if Clicked Outside
+  {% comment %} document.addEventListener("click", (event) => {
+    if (!investigatorSearchInput.contains(event.target) && !investigatorSuggestionsList.contains(event.target)) {
+        investigatorSuggestionsList.style.display = "none";
+    }
+  }); {% endcomment %}
+
+  //for system
+  {% comment %} const systems = [
+    'Quality System', 'Laboratory Control System', 'Material System',
+    'Packaging and Labelling System', 'Facilities and Equipment System', 'Production System'
+  ]; {% endcomment %}
+
+  {% comment %} initializeSysSelector(); // Call the function AFTER defining 'systems' {% endcomment %}
+
+  {% comment %} function initializeSysSelector() {
+    const selector = document.getElementById('system-selector');
+    let opt = document.createElement("option");
+    opt.innerText = "Select System";
+    opt.disabled = true;  // Option cannot be selected
+    opt.selected = true;  // This makes it the default selected option
+    selector.appendChild(opt);
+
+    systems.forEach(system => {
+      let opt = document.createElement("option");
+      opt.value = system;  // Setting the value of the option
+      opt.innerText = system;  // Display year as option text
+      selector.appendChild(opt);
+  });  selector.addEventListener('change', function() {
+    const selectedSystem = selector.value;  // Get the selected year
+
+    if (selectedSystem) {
+        if (selectedSystems.includes(selectedSystem)) {
+            // Show popup if the year is already selected
+            alert("This year has already been selected!");  // Popup alert
+        } else {
+            // Add the selected year to the array if not already present
+            selectedSystems.push(selectedSystem);
+            console.log('Selected Years:', selectedSystems);
+            updateSelectedSystem() // Log the selected years array
+        }
+    }
+});
+
+  } {% endcomment %}
+
+  {% comment %} function updateSelectedSystem() {
+    const container = document.getElementById('selectedSystemMenu');
+     container.innerHTML = ""; // Clear previous content
+
+    selectedSystems.forEach(system => {
+        const tagDiv = document.createElement("div");
+        tagDiv.className = "system-tag";
+
+        tagDiv.textContent = system;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "remove-tag";
+        removeBtn.innerHTML = "&times;";
+        removeBtn.addEventListener("click", () => removeSystem(system));
+
+        tagDiv.appendChild(removeBtn);
+        container.appendChild(tagDiv);
+    });
+    fetchData()
+    console.log(selectedSystems);
+  }
+  function removeSystem(system) {
+    console.log("Removing", system);
+    selectedSystems = selectedSystems.filter(s => s !== system);
+    updateSelectedSystem();
+  } {% endcomment %}
+
+ /* function toggleSystem(chip, system) {
+    chip.classList.toggle('active');
+
+    if (chip.classList.contains('active')) {
+      if (!selectedSystems.includes(system)) {
+        selectedSystems.push(system);
+      }
+    } else {
+      selectedSystems = selectedSystems.filter(s => s !== system);
+    }
+
+    fetchData()
+
+  }*/
+
+  {% comment %} const type_of_establishment_list = [
+  'Prescription (Rx) Drug Manufacturer',
+  'API Manufacturer',
+  'OTC Drug Manufacturer',
+  'Contract Drug Manufacturer',
+  ] {% endcomment %}
+  {% comment %} initializetypeEstablisment(); // Call the function AFTER defining 'systems' {% endcomment %}
+
+  {% comment %} function initializetypeEstablisment() {
+      const esta_selector = document.getElementById('type_of_establishment-selector');
+
+      let opt = document.createElement("option");
+    opt.innerText = "Select Type of Establishment";
+    opt.disabled = true;  // Option cannot be selected
+    opt.selected = true;  // This makes it the default selected option
+    esta_selector.appendChild(opt);
+
+    type_of_establishment_list.forEach(el => {
+        let opt = document.createElement("option");
+        opt.value = el;  // Setting the value of the option
+        opt.innerText = el;  // Display year as option text
+        esta_selector.appendChild(opt);
+    });
+
+// Add event listener for change event
+esta_selector.addEventListener('change', function() {
+  const selectedEl = esta_selector.value;  // Get the selected year
+
+  if (selectedEl) {
+      if (selectedTypeEstablishment.includes(selectedEl)) {
+          // Show popup if the year is already selected
+          alert("This year has already been selected!");  // Popup alert
+      } else {
+          // Add the selected year to the array if not already present
+          selectedTypeEstablishment.push(selectedEl);
+          console.log('Selected Years:', selectedTypeEstablishment);
+          updateSelectedEL()  // Log the selected years array
+      }
+  }
+});
+
+  } {% endcomment %}
+
+  {% comment %} function updateSelectedEL() {
+    const container = document.getElementById('selectedELMenu');
+     container.innerHTML = ""; // Clear previous content
+
+    selectedTypeEstablishment.forEach(el => {
+        const tagDiv = document.createElement("div");
+        tagDiv.className = "system-tag";
+
+        tagDiv.textContent = el;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "remove-tag";
+        removeBtn.innerHTML = "&times;";
+        removeBtn.addEventListener("click", () => removeEl(el));
+
+        tagDiv.appendChild(removeBtn);
+        container.appendChild(tagDiv);
+    });
+    fetchData()
+    console.log(selectedSysteselectedTypeEstablishmentms);
+  } {% endcomment %}
+  {% comment %} function removeEl(el) {
+    console.log("Removing", el);
+    selectedTypeEstablishment = selectedTypeEstablishment.filter(s => s !== el);
+    updateSelectedEL();
+  } {% endcomment %}
+
+ /*  function toggle_type_establishment(chip, system) {
+    chip.classList.toggle('active');
+
+    if (chip.classList.contains('active')) {
+      if (!selectedTypeEstablishment.includes(system)) {
+        selectedTypeEstablishment.push(system);
+      }
+    } else {
+      selectedTypeEstablishment = selectedTypeEstablishment.filter(s => s !== system);
+    }
+
+    fetchData()
+
+  }*/
+
+
+
+// fetch card data........
+
+
+function getCSRFToken() {
+  const cookies = document.cookie.split(';');
+  for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.startsWith("csrftoken=")) {
+            return cookie.split("=")[1];
+        }
+    }
+    return "";
+}
+
+
+//
+
+ let generalData=[]
+
+
+
+
+
+ async function fetchData() {
+  // Validate: At least one filter selected
+  const isCompanySelected = selectedCompanies && selectedCompanies.length > 0;
+  const isSystemSelected = selectedSystems && selectedSystems.length > 0;
+  const isInvestigatorSelected = selectedInvestigators && selectedInvestigators.length > 0;
+  const isTypeEstablishmentSelected = selectedTypeEstablishment && selectedTypeEstablishment.length > 0;
+  const is_keyword_search=keyword_search && keyword_search.length>0
+  const isAnyFilterSelected = isCompanySelected || isSystemSelected || isInvestigatorSelected || isTypeEstablishmentSelected || is_keyword_search;
+
+  // Validate: Date range (both start and end should be selected if any one is selected)
+  const isStartMonthSelected = startMonthYear && startMonthYear.trim() !== "";
+  const isEndMonthSelected = endMonthYear && endMonthYear.trim() !== "";
+
+  if (!isAnyFilterSelected && (!isStartMonthSelected || !isEndMonthSelected)) {
+    console.warn("No valid filters or valid date range selected. Aborting fetch.");
+    return;
+  }
+
+  if ((isStartMonthSelected && !isEndMonthSelected) || (!isStartMonthSelected && isEndMonthSelected)) {
+    console.warn("Incomplete date range selected. Aborting fetch.");
+    return;
+  }
+
+  const loadingContainer = document.getElementById('loading-container');
+  const loadingText = document.getElementById('loading-text');
+  const cardContainer = document.getElementById('card-container');
+
+  cardContainer.innerHTML = "";
+  loadingContainer.style.display = "block";
+  loadingText.textContent = "";
+
+  let fetchSuccess = false;
+  let typeInstance = null;
+  let isResponseReceived = false;
+
+  // Reset counters/UI
+  totalSystem.innerText = 0;
+  totalInvestigator.innerText = 0;
+  totalCompanies.innerText = 0;
+  totalEstablishments.innerText = 0;
+  staticContainer.style.display = "none";
+ staticContainerkey.style.display="none"
+
+  const csrfToken = getCSRFToken();
+
+  const loadingMessages = async () => {
+    try {
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      typeInstance = new TypeIt("#loading-text", {
+        speed: 60,
+        waitUntilVisible: true,
+        lifeLike: true
+      });
+
+      await typeInstance.type("Fetching Your Data...").go();
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (isResponseReceived) return;
+
+      await typeInstance.delete().go();
+      await typeInstance.type("Configuring Your Data...").go();
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (isResponseReceived) return;
+
+      await typeInstance.delete().type("Almost There...").go();
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (isResponseReceived) return;
+
+      await typeInstance.delete().type("It seems it's taking longer than usual. Thanks for your patience.").go();
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      if (isResponseReceived) return;
+
+    } catch (e) {
+      console.error("TypeIt animation error:", e);
+    }
+  };
+
+  loadingMessages(); // Start typing animation
+
+  try {
+    const requestBody = {};
+
+    if (isCompanySelected) {
+      requestBody.company_name = selectedCompanies.map(item => item.text);
+    }
+    if (isSystemSelected) {
+      requestBody.system_name = selectedSystems.map(item => item.text);
+    }
+    if (isInvestigatorSelected) {
+      requestBody.investigator_name = selectedInvestigators.map(item => item.text);
+    }
+    if (isTypeEstablishmentSelected) {
+      requestBody.type_of_establishment = selectedTypeEstablishment.map(item => item.text);
+    }
+    if(is_keyword_search){
+      requestBody.keyword_search = keyword_search;
+    }
+
+    if (isStartMonthSelected && isEndMonthSelected) {
+      requestBody.start_month_year = startMonthYear;
+      requestBody.end_month_year = endMonthYear;
+    }
+
+    const fetchPromise = fetch('{{BASE_URL}}/aidatabase/company_object/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        "X-CSRFToken": csrfToken
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    const response = await fetchPromise;
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    summary = data.summary || {};
+    generalData = data.data || [];
+    fetchSuccess = true;
+// companiesData = data.data || [];
+
+  if(keyword_search.length > 0 && generalData.length > 0) {
+  calculation();
+      cardContainer.classList.remove("card-container");
+      cardContainer.innerHTML = `<div class="text-center mt-5"><p class="text-center text-danger">No data found for the selected filters.</p></div>`;
+      renderTable(generalData);
+      isResponseReceived = true;
+
+      if (typeInstance) typeInstance.destroy();
+      loadingContainer.style.display = "none";
+    } else {
+      cardContainer.classList.remove("card-container");
+      cardContainer.innerHTML = `<div class="text-center mt-5"><p class="text-center text-danger">No data found for the selected filters.</p></div>`;
+      calculation();
+      renderCards();
+      isResponseReceived = true;
+
+      setTimeout(() => {
+        if (typeInstance) typeInstance.destroy();
+      }, 1);
+      loadingContainer.style.display = "none";
+    }
+
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    if (!fetchSuccess) {
+      cardContainer.innerHTML =
+        '<p class="text-center text-danger">Error loading data. Please try again.</p>';
+      if (typeInstance) typeInstance.destroy();
+      loadingContainer.style.display = "none";
+    }
+  }
+}
+
+function printFullTable(tableRows) {
+
+
+  const tableContainer = document.getElementById('table-data');
+
+  if (!tableContainer || tableContainer.innerHTML.trim() === "") {
+    alert("No data to print.");
+    return;
+  }
+
+  const printWindow = window.open('', '_blank');
+
+  const printContent = `
+  <html>
+  <style>
+        @page {
+          size: A4 portrait;
+          margin: 20mm;
+        }
+        body {
+          font-family: Arial, sans-serif;
+          font-size: 12px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: auto;
+        }
+        thead {
+          background-color: #f0f0f0;
+        }
+           img {
+            max-width: 100%;
+            height: auto;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+        td, th {
+          border: 1px solid #ccc;
+          padding: 8px;
+          word-wrap: break-word;
+          max-width: 200px;
+        }
+        .table_head_table {
+          font-weight: bold;
+          text-align: center;
+        }
+          table tr th:first-child,
+table tr td:first-child {
+  text-align: center;
+}
+  .srno_col {
+  width: 10%;
+  text-align: center;
+}
+
+.company_col {
+  width: 25%;
+  text-align: center;
+}
+
+.obs_col {
+  width: 65%;
+  text-align: center; /* or center, as you prefer */
+}
+  table tr th.obs_col {
+  text-align: center;
+}
+  table tr td.obs_col {
+  text-align: justify;
+}
+     .print-btn {
+                      display: block;
+                      margin: 20px ;
+                      padding: 10px 20px;
+                      background: #3b82f6;
+                      color: white;
+                      border: none;
+                      border-radius: 5px;
+                      cursor: pointer;
+                      text-align: center;
+                  }
+                  .print-btn:hover {
+                      background: #2563eb;
+                  }
+      </style>
+      <head>
+          <title>Inspection Details - </title>
+
+      </head>
+      <body>
+      <div>
+        <button class="print-btn" onclick="window.print()">Print</button>
+      <table>
+        <thead>
+          <tr>
+            <td class='table_head_table srno_col'><b>Sr. No.</b></td>
+            <td class='table_head_table company_col'><b>Company Name/ Year</b></td>
+            <td class='table_head_table obs_col' style="text-align: center;"><b>Observation</b></td>
+          </tr>
+        </thead>
+        <tbody>
+         ${tableContainer.innerHTML}
+        </tbody>
+      </table>
+    </div>
+      </body>
+  </html>
+`;
+
+ // const originalContents = document.body.innerHTML;
+
+ document.title = "Keyword Search - " + document.getElementById("KeywordSearchInput").value;
+
+  // Add the keyword heading into the body (above the table maybe)
+ const updatedPrintContent = printContent.replace(
+    '<body>',
+    `<body><h2 style="text-align:center;">Keyword Search - ${document.getElementById("KeywordSearchInput").value}</h2>`
+  ).replace(
+    /<title>.*?<\/title>/,
+    `<title>Keyword Search - ${document.getElementById("KeywordSearchInput").value}</title>`
+  );
+ // document.body.innerHTML = updatedPrintContent;
+
+//icretools.com/aidatabase/company_object/
+
+
+  printWindow.document.write(updatedPrintContent);
+  printWindow.document.close();
+
+  // Restore original page after printing
+  // reload to restore event handlers, etc.
+}
+
+
+function renderTable(data) {
+  const container = document.getElementById("card-container");
+  container.style.display = 'block';
+  container.innerHTML = "";
+
+  if (!data || data.length === 0) {
+    container.innerHTML = "<p class='text-center'>No results found.</p>";
+    return;
+  }
+
+  let srNo = 1;
+  let tableRows = "";
+
+  data.forEach(company => {
+    const [rowsHTML, rowCount] = createRow(company, srNo);
+    tableRows += rowsHTML;
+    srNo += rowCount;
+  });
+
+  const tableHTML = `
+   <div style="text-align: right; margin-bottom: 10px;margin-right: 10px;">
+    <button class="btn btn-outline-primary" onclick="printFullTable()">Print All</button>
+  </div>
+    <div class="table-responsive" >
+      <table>
+
+
+        <thead class="table-dark" style="position: sticky; top: 0; background: white; z-index: 2;">
+          <tr>
+            <th class='table_head_table' style="position: sticky; top: 0; z-index: 2;">Sr No</th>
+            <th class='table_head_table' style="position: sticky; top: 0; z-index: 2;">Company Name/ Year</th>
+            <th class='table_head_table' style="position: sticky; top: 0; z-index: 2;">Observation</th>
+          </tr>
+        </thead>
+        <tbody id="table-data">
+          ${tableRows}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = tableHTML;
+  diplayStaticsTable()
+}
+
+
+
+function createRow(company, srStart) {
+  let rows = "";
+  let srNo = srStart;
+  const companyName = company.company_name || "N/A";
+  const typeOfEstablishment = company.type_of_establishment || "N/A";
+  const location = company.location || "N/A";
+  const inspections = company.year_of_inspection || {};
+  let allObservations = [];
+
+  // Collect observations
+  for (let year in inspections) {
+    for (let period in inspections[year]) {
+      const investigators = inspections[year][period]?.metadata.fda_investigators || 'None';
+      const date = period;  // This contains the month name (e.g., "August")
+      const systems = inspections[year][period]?.systems || {};
+      const systemNames = Object.keys(systems);
+      const allSystemNames = systemNames.join(", ") || "N/A"; // Join system names for display
+
+      for (let system in systems) {
+        const observations = systems[system]?.observations || {};
+
+        for (let obsKey in observations) {
+          const contents = observations[obsKey]?.contents || [];
+
+          contents.forEach(item => {
+            let contentText = item.content || "";
+            allObservations.push({
+              year,
+              date,
+              investigators,
+              content: contentText,
+              system: system,
+              obsTitle: obsKey,
+              systemNames: allSystemNames,
+            });
+          });
+        }
+      }
+    }
+  }
+
+  // Generate a valid unique ID for the company row
+  const validCompanyId = companyName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + srNo;
+
+  // Render rows with rowspan
+  allObservations.forEach((obs, index) => {
+    let contentText = obs.content;
+
+    if (Array.isArray(keyword_search) && keyword_search.length > 0) {
+      keyword_search.forEach(keyword => {
+        if (keyword && keyword.trim() !== "") {
+          const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`(${escapedKeyword})`, "gi");
+          contentText = contentText.replace(regex, `<span style="padding:2px 4px; border-radius:4px; font-weight: 800">$1</span>`);
+        }
+      });
+    }
+
+    contentText = contentText.replace(
+      /(\/[A-Za-z0-9_\-.,%()\/]+?\.(png|jpg|jpeg|gif))/gi,
+      (match) => {
+        let normalizedPath = match;
+        if (normalizedPath.startsWith("/aidatabase/")) {
+          normalizedPath = normalizedPath.replace("/aidatabase", "");
+        }
+        if (!normalizedPath.startsWith("/media/")) {
+          normalizedPath = `/media${normalizedPath}`;
+        }
+        return `<br/><img src="{{ base_url }}${normalizedPath}" class="observation-image" alt="Observation Image" style="display:block; margin:10px 0;" /> <br/>`;
+      }
+    )
+    .replace(/XX/g, '<span style="color:red; font-weight:bold">XX</span>')
+    .replace(/\n{2,}/g,'<br/>')
+    .replace(/\n/g,'<br/>')
+    .replace(/(<br\s*\/?>){3,}/g,'<br/>')
+    .replace(/â€¢\s*([\s\S]*?)(?=<br\s*\/?>|<p>|$)/g, "<ul style='margin-bottom:0px !important'><li>$1</li></ul>")
+    .replace(/<\/ul>\s*<br\s*\/?>/g, "</ul>")
+    .replace(/\b([A-Z])\.\s(?![A-Z])/g, '<br />$1. ')
+
+
+
+    const uniqueId = `${validCompanyId}-row-${index}`;
+    rows += `<tr class="${uniqueId}" data-company="${companyName}" data-year="${obs.year}" data-date="${obs.date}" data-system="${obs.system}" data-obs-title="${obs.obsTitle}" data-investigators="${obs.investigators}">`;
+
+    if (index === 0) {
+      rows += `<td rowspan="${allObservations.length}">${srNo}</td>`;
+      rows += `
+        <td rowspan="${allObservations.length}">
+          <span class="company-name-tr">${companyName}</span><br>
+          <strong>Year ${obs.year}</strong><br>
+
+          <div class="additional-details" style="display: none;">
+          <span>${obs.date}</span>
+            <span class="type-of-establishment">${typeOfEstablishment}</span>
+            <span class="location">${location}</span>
+          </div>
+        </td>`;
+    }
+
+    rows += `<td class="content-tr">${contentText}</td>`;
+
+    /*if (index === 0) {
+      rows += `
+        <td rowspan="${allObservations.length}">
+          <button class="btn btn-outline-primary"
+            onclick="printRow('${validCompanyId}', '${allObservations.length}')">
+            Print
+          </button>
+        </td>`;
+    }*/
+
+    rows += `</tr>`;
+  });
+
+  return [rows, 1]; // 1 Sr No entry per company
+}
+
+
+// fetch calucagtion
+
+// rendercard .......
+function renderCards() {
+  const container = document.getElementById('card-container');
+  container.classList.add("card-container")
+  container.style.display="grid"
+
+  container.innerHTML = '';
+
+
+
+  generalData.forEach(company => {
+      const card = createCard(company);
+      container.appendChild(card);
+  });
+  diplayStatics()
+}
+
+function diplayStatics(){
+  staticContainer.style.display="flex"
+  staticContainerkey.style.display='none'
+
+}
+function diplayStaticsTable(){
+  staticContainer.style.display = "none"
+  staticContainerkey.style.display='flex'
+}
+
+
+function createCard(company) {
+
+  const card = document.createElement('div');
+  card.className = 'data-card';
+
+  const cardId = `card-${createValidId(company.location,company.company_name,company.type_of_establishment[0])}`;
+
+
+  card.id = cardId;
+
+
+  const years = Object.keys(company.year_of_inspection);
+
+
+  let totalObservations = 0;
+
+  // Loop through each year
+  for (let year in company.year_of_inspection) {
+      // Loop through each inspection period (e.g., "2024 February")
+      for (let period in company.year_of_inspection[year]) {
+          const systems = company.year_of_inspection[year][period]?.systems;
+
+          if (systems) {
+              for (let system in systems) {
+                  totalObservations += Object.keys(systems[system].observations).length || 0;
+              }
+          }
+      }
+  }
+
+  card.innerHTML = `
+      <div class="card-header">
+          <div class="company-name">${company.company_name}</div>
+      </div>
+      <div class="info-grid">
+          <div class="info-item">
+              <span>Type:</span>
+              <span>${company.type_of_establishment}</span>
+          </div>
+          <div class="info-item">
+              <span>Location:</span>
+              <span>${company.location}</span>
+          </div>
+          <div class="info-item">
+              <span>FDA Observations:</span>
+              <span>${totalObservations}</span>
+          </div>
+      </div>
+      <div>
+          <label>Select Years:</label>
+          <div class="year-selector" id="year-selector-${createValidId(company.location,company.company_name,company.type_of_establishment[0])}">
+              ${years.map(year => `
+                  <div class="year-chip " data-year="${year}">
+                      ${year}
+                  </div>
+              `).join('')}
+          </div>
+      </div>
+      <div class="year-details" id="${cardId}-details"></div>
+     <div class="button-wrapper" id="btn-wrapper-${cardId}"></div>
+  `;
+
+
+  const yearSelector = card.querySelector(`.year-selector`);
+  yearSelector.addEventListener('click', (e) => {
+    const yearChip = e.target.closest('.year-chip');
+    if (yearChip) {
+      yearChip.classList.toggle('active');
+      updateYearDetails(cardId);
+      updateButton(cardId, yearSelector);
+    }
+  });
+
+
+
+  // Initial call to updateYearDetails to display all years by default
+
+setTimeout(() => {
+  updateYearDetails(cardId)
+  updateButton(cardId, yearSelector)
+  // <- Initial setup
+}, 0);
+  return card;
+}
+function updateButton(cardId, yearSelector) {
+  const wrapper = document.querySelector(`#btn-wrapper-${cardId}`);
+  if (!wrapper) {
+    console.error(`âŒ Button wrapper not found for cardId: ${cardId}`);
+    return;
+  }
+
+  const activeYears = yearSelector.querySelectorAll('.year-chip.active');
+  if (activeYears.length > 0) {
+    wrapper.innerHTML = `<button class="print-button" onclick="printCard('${cardId}')">Print Selected Entry</button>`;
+  } else {
+    wrapper.innerHTML = `<button class="print-button" id="btn-${cardId}">Show Card Details</button>`;
+
+    const newBtn = document.getElementById(`btn-${cardId}`);
+    if (newBtn) {
+      newBtn.addEventListener('click', () => {
+        yearSelector.querySelectorAll('.year-chip').forEach(chip => chip.classList.add('active'));
+        const yearDetailsDiv = document.getElementById(`${cardId}-details`);
+        if (yearDetailsDiv) yearDetailsDiv.style.display = 'block';
+        updateYearDetails(cardId);
+        updateButton(cardId, yearSelector);
+      });
+    }
+  }
+}
+
+
+
+function updateYearDetails(cardId) {
+
+  const card = document.getElementById(cardId);
+  //console.log(card)
+  const detailsContainer = document.getElementById(`${cardId}-details`);
+  const selectedYears = Array.from(card.querySelectorAll('.year-chip.active')).map(chip => chip.dataset.year);
+  //console.log(selectedYears)
+  if (selectedYears.length === 0) {
+      detailsContainer.innerHTML = '';
+      return;
+  }
+
+  const company = generalData.find(c => `card-${createValidId(c.location,c.company_name,c.type_of_establishment[0])}` === cardId);
+  if (!company || !company.year_of_inspection) {
+      detailsContainer.innerHTML = '<p>No data available for selected years.</p>';
+      return;
+  }
+
+  // Declare arrays to store unique investigators and systems
+
+
+
+  detailsContainer.innerHTML = selectedYears.map(year => {
+    const yearData = company.year_of_inspection[year];
+    if (!yearData) return `<p>No inspection data for ${year}</p>`;
+
+    return `
+    <div class="year-section">
+        <h5>Year ${year}</h5>
+        ${Object.entries(yearData).map(([date, data]) => {
+            // Get investigators and split into an array if it's a comma-separated string
+            let investigators = data.metadata.fda_investigators.split(",");
+
+            // Remove newlines and trim spaces from each investigator name
+            let filterinv = investigators.map(inv => inv.replace(/\n/g, "").trim());
+
+           // console.log("sis",filterinv)
+
+          //  console.log("si",selectedInvestigators)
+            // Highlight matching investigators
+            investigators = filterinv.map(name =>
+
+            selectedInvestigators.includes(name)
+                    ? `<span style=" font-size:18px; font-weight: bold; text-decoration:underline">${name}</span>`
+                    : name
+            );
+
+            return `
+                <div class="inspection-date">
+                    <h6>Date: ${date}</h6>
+                    <div class="investigator-info">
+                        Investigator: ${investigators.join(", ")}
+                    </div>
+                    ${Object.entries(data.systems).map(([systemKey, details]) => {
+                      console.log(Object.keys(details.observations));
+                        return `
+                            <div class="system-details selected" onclick="toggleSystemSelection(this)">
+                                <div class="system-name "   >${systemKey}</div>
+
+                                <div class="observation-count">
+
+                                    Total Observations: ${Object.keys(details.observations).length}
+                                </div>
+                                <div class="observations-list" style="display:none">
+                                    ${Object.entries(details.observations).map(([obsTitle, obsData]) => `
+                                        <div class="observation">
+                                            <h6><strong>${obsTitle}</strong></h6>
+                                            ${obsData.contents.map(con => `
+                                               <div class="content-item">
+                                          <p class="content" style="text-align:justify">
+                                            ${con.content
+  .replace(
+    /(\/[A-Za-z0-9_\-.,%()\/]+?\.(png|jpg|jpeg|gif))/gi,
+    (match) => {
+      let normalizedPath = match;
+      if (normalizedPath.startsWith("/aidatabase/")) {
+        normalizedPath = normalizedPath.replace("/aidatabase", "");
+      }
+      if (!normalizedPath.startsWith("/media/")) {
+        normalizedPath = `/media${normalizedPath}`;
+      }
+      return `<br/><img src="{{ base_url }}${normalizedPath}" class="observation-image" alt="Observation Image" style="display:block; margin:10px 0;" /> <br/>`;
+    }
+  )
+  .replace(/XX/g, '<span style="color:red; font-weight:bold">XX</span>')
+  .replace(/(\b[A-Za-z0-9])\.\s/g, '<br />$1. ')
+  .replace(/(\b[A-Za-z0-9])\)\s/g, '<br />$1) ')
+}
+
+                                          </p>
+                                      </div>
+                                            `).join('')}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }).join('')}
+    </div>
+    `;
+}).join('');
+
+
+
+}
+
+{% comment %} function calculation() {
+  const data = generalData; // Replace with your actual JSON data
+
+  // Fixed system categories with proper normalization
+  const fixedSystems = {
+      "Quality System": "Quality System",
+      "Laboratory Control System": "Laboratory Control System",
+      "Material System": "Material System",
+      "Packaging and Labeling System": "Packaging and Labeling System",
+      "Facilities and Equipment System": "Facilities and Equipment System",
+      "Production System": "Production System"
+  };
+
+  // Initialize counters
+  const systemFrequency = {};
+  const systemObservationCount = {};
+
+  if (Array.isArray(data)) {
+      data.forEach(company => {
+          if (company.year_of_inspection) {
+              Object.values(company.year_of_inspection).forEach(inspectionsByDate => {
+                  Object.values(inspectionsByDate).forEach(inspection => {
+                      if (inspection.systems) {
+                          Object.entries(inspection.systems).forEach(([system, details]) => {
+                              const normalizedSystem = system.trim(); // Trim spaces
+
+                              // Ensure the system exists in fixedSystems
+                              if (Object.keys(fixedSystems).some(key => key === normalizedSystem)) {
+                                  systemFrequency[normalizedSystem] = (systemFrequency[normalizedSystem] || 0) + 1;
+                                  systemObservationCount[normalizedSystem] = (systemObservationCount[normalizedSystem] || 0) + (details.observation_count || 0);
+                              }
+                          });
+                      }
+                  });
+              });
+          }
+      });
+  }
+
+  console.log("System Frequency:", systemFrequency);
+  console.log("Total Observations per System:", systemObservationCount);
+  const totalSum = Object.values(systemObservationCount).reduce((sum, num) => sum + num, 0);
+  generatePieChart(systemFrequency)
+  const totalKeys = Object.keys(systemFrequency).length;
+  totalSystem.innerText=totalKeys
+  totalObservation.innerText=totalSum
+
+
+} {% endcomment %}
+function calculation() {
+  const hasKeyword = KeywordSearchInput.value.trim().length > 0;
+  console.log("into call",hasKeyword);
+
+  // Always hide both first
+  staticContainer.style.display = "none";
+  staticContainerkey.style.display = "none";
+
+  if (hasKeyword) {
+    // Show keyword-related stats
+    totalObservationKey.innerText = `${summary.post_keyword_total_observations} out of ${summary.pre_keyword_total_observations}`;
+    staticContainerkey.style.display = "flex";
+  } else {
+    // Show overall stats
+    staticContainer.style.display = "flex";
+    totalSystem.innerText = summary.total_systems;
+    totalObservation.innerText = summary.total_observations;
+    totalCompanies.innerText = summary.total_companies;
+    totalInvestigator.innerText = summary.total_investigators;
+    totalEstablishments.innerText = summary.total_establishments;
+  }
+}
+
+
+
+{% comment %} function generatePieChart(systemFrequency) {
+  console.log(systemFrequency);
+
+  // Count occurrences of each system
+
+
+  const labels = Object.keys(systemFrequency); // System names
+
+  const values = Object.values(systemFrequency); // Count of each system
+  console.log(labels)
+  console.log(values)
+
+  // Ensure colors match the number of labels
+  const colors = [
+      "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"
+  ];
+
+  // Get canvas context
+  const ctx = document.getElementById('myPieChart').getContext('2d');
+
+  // Destroy existing chart instance if it exists (to prevent overlapping)
+  if (window.myPieChart instanceof Chart) {
+    window.myPieChart.destroy(); // Destroy previous chart instance
+}
+
+  // Create new Chart.js pie chart
+  window.myPieChart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: labels,// Show all system names
+          datasets: [{
+              data: values,
+              backgroundColor: colors.slice(0, labels.length), // Assign colors dynamically
+              borderWidth: 1
+          }]
+      },
+      options: {
+          responsive: true,
+          maintainAspectRatio: false, // Ensures the chart adjusts properly
+          plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                  enabled: true // Enable tooltips for better user experience
+              }
+          }
+      }
+  });
+} {% endcomment %}
+
+// Function to toggle selection of system-details divs
+function toggleSystemSelection(element) {
+  element.classList.toggle('selected'); // Toggle selection
+}
+
+document.querySelectorAll(".observation-image").forEach(img => {
+  img.onload = function() {
+      if (this.naturalWidth > this.naturalHeight) {
+          this.style.width = "500px";
+          this.style.height = "auto";
+      } else {
+          this.style.height = "400px";
+          this.style.width = "auto";
+      }
+  };
+});
+// print card
+function printCard(cardId) {
+  const card = document.getElementById(cardId);
+  const selectedYears = Array.from(card.querySelectorAll('.year-chip.active')).map(chip => chip.dataset.year);
+
+  if (selectedYears.length === 0) {
+      alert('Please select at least one year to print');
+      return;
+  }
+
+  const printWindow = window.open('', '_blank');
+  const companyName = card.querySelector('.company-name').textContent;
+
+  // Clone the details container for printing
+  const detailsContainer = document.getElementById(`${cardId}-details`).cloneNode(true);
+
+  // Only keep systems that have the 'selected' class
+  detailsContainer.querySelectorAll('.system-details').forEach(system => {
+      if (!system.classList.contains('selected')) {
+          system.remove(); // Remove non-selected systems
+      } else {
+          const observationsList = system.querySelector('.observations-list');
+          if (observationsList.innerHTML.trim() !== '') {
+              observationsList.style.display = 'block'; // Ensure observations are visible
+          }
+      }
+  });
+
+  const printContent = `
+      <html>
+          <head>
+              <title>Inspection Details - ${companyName}</title>
+              <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+              <style>
+                  body { font-family: 'Poppins', sans-serif; padding: 20px; }
+                  .company-header { margin-bottom: 20px; }
+                  .year-section {
+                      margin-bottom: 30px;
+                      background: #f8fafc;
+                      padding: 20px;
+                      border-radius: 8px;
+                  }
+                  .system-name{
+                  font-weight:bold;
+                  font-size:18px;
+
+                  margin-bottom:2px;
+                  }
+                  .inspection-date {
+                      margin: 15px 0;
+                      padding: 15px;
+                      background: white;
+                      border-radius: 8px;
+                      border: 1px solid #e2e8f0;
+                  }
+               .observation-count{
+               font-size:17px;
+                text-decoration:underline;
+                margin-bottom:7px;
+               }
+                  .system-details {
+                      margin-left: 20px;
+                      padding-left: 15px;
+                      border-left: 2px solid #3b82f6;
+                  }
+
+                  .investigator-info {
+                      font-style: italic;
+                      color: #475569;
+                      margin: 10px 0;
+                      padding: 8px;
+                      background: #f1f5f9;
+                      border-radius: 4px;
+                  }
+                  .observations-list {
+                      display: block !important;
+                  }
+                  .print-btn {
+                      display: block;
+                      margin: 20px ;
+                      padding: 10px 20px;
+                      background: #3b82f6;
+                      color: white;
+                      border: none;
+                      border-radius: 5px;
+                      cursor: pointer;
+                      text-align: center;
+                  }
+                  .print-btn:hover {
+                      background: #2563eb;
+                  }
+              </style>
+          </head>
+          <body>
+              <button class="print-btn" onclick="window.print()">Print</button>
+
+              <div class="company-header">
+                  <h2>${companyName}</h2>
+                  <p>Type: ${card.querySelector('.info-item:nth-child(1) span:last-child').textContent}</p>
+                  <p>Location: ${card.querySelector('.info-item:nth-child(2) span:last-child').textContent}</p>
+              </div>
+
+              ${detailsContainer.innerHTML}
+          </body>
+      </html>
+  `;
+
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+}
+
+
+
+//creat id for each card.....
+
+function createValidId(location, companyName, typeOfEstablishment) {
+  const sanitize = (str) =>
+    str.toLowerCase()
+       .replace(/\s+/g, '-')        // Replace spaces with dashes
+       .replace(/[^a-z0-9-_]/g, '') // Remove all non-alphanumeric characters except - and _
+       .slice(0, 10);               // Trim to max 10 chars for uniqueness and brevity
+
+  const loc = sanitize(location);
+  const comp = sanitize(companyName);
+  const type = sanitize(typeOfEstablishment);
+
+  const id = `${loc}-${comp}-${type}`;
+  return id || 'default-id';
+}
+$(document).ready(function() {
+  $('#yearselector-select').select2({
+    placeholder: placeholder,
+    allowClear:true
+  });
+});
+
+$('#yearselector-select').on('change', function () {
+  const allSelected = $(this).select2('data'); // returns array of selected
+  selectedYears.length = 0; // Clear old selections
+  selectedYears.push(...allSelected.map(item=>Number(item.text))); // Push all selected into the array
+  console.log('Selected Companies:', selectedYears);
+  fetchData()
+});
+
+let systemData = [
+  { id: 'Quality System', text: 'Quality System' },
+  { id: 'Laboratory Control System', text: 'Laboratory Control System' },
+  { id: 'Material System', text: 'Material System' },
+  { id: 'Packaging and Labelling System', text: 'Packaging and Labelling System' },
+  { id: 'Facilities and Equipment System', text: 'Facilities and Equipment System' },
+  { id: 'Production System', text: 'Production System' }
+];
+
+
+$(document).ready(function() {
+  $('#System-select').select2({
+    placeholder: placeholder,
+    data:systemData,
+    allowClear:true
+  });
+});
+
+$('#System-select').on('change', function () {
+  const selectedData = $(this).select2('data');
+  selectedSystems = [...selectedData]; // Save current selected systems
+
+  // Remove selected items from the main list
+  const unselected = systemData.filter(
+    item => !selectedSystems.find(sel => sel.id === item.id)
+  );
+
+  const updatedData = [...selectedSystems, ...unselected];
+
+  // Re-initialize select2 with updated order
+  $('#System-select').empty().select2({
+    data: updatedData,
+    placeholder: "Select a System"
+  });
+
+  // Re-apply selected values
+  $('#System-select').val(selectedSystems.map(i => i.id)).trigger('change.select2');
+
+  console.log('Selected Systems:', selectedSystems.map(i => i.text));
+  fetchData();
+});
+
+
+
+
+
+let typeOfEstablishmentData = [
+  { id: 'Prescription (Rx) Drug Manufacturer', text: 'Prescription (Rx) Drug Manufacturer' },
+  { id: 'API Manufacturer', text: 'API Manufacturer' },
+  { id: 'OTC Drug Manufacturer', text: 'OTC Drug Manufacturer' },
+  { id: 'Contract Drug Manufacturer', text: 'Contract Drug Manufacturer' }
+]; // Populate this with your original full list
+
+$(document).ready(function() {
+  $('#typeOfEstablishment-select').select2({
+    placeholder: placeholder,
+    data:typeOfEstablishmentData,
+    allowClear:true
+  });
+});
+
+$('#typeOfEstablishment-select').on('change', function () {
+  const selectedData = $(this).select2('data');
+  selectedTypeEstablishment = [...selectedData]; // Save selected ones
+
+  // Filter out selected items from original list
+  const unselected = typeOfEstablishmentData.filter(
+    item => !selectedTypeEstablishment.find(sel => sel.id === item.id)
+  );
+
+  // Combine selected at the top and rest below
+  const updatedData = [...selectedTypeEstablishment, ...unselected];
+
+  // Rebuild Select2 with reordered list
+  $('#typeOfEstablishment-select').empty().select2({
+    data: updatedData,
+    placeholder: "Select Type of Establishment"
+  });
+
+  // Re-select selected items
+  $('#typeOfEstablishment-select')
+    .val(selectedTypeEstablishment.map(i => i.id))
+    .trigger('change.select2');
+
+  console.log('Selected Type of Establishment:', selectedTypeEstablishment.map(i => i.text));
+  fetchData();
+});
+
+
+
+
+
+</script>
+
+  </body>
+</html>

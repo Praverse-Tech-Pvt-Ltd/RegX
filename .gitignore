@@ -36,6 +36,15 @@ REGULATORY_TOOLS_CODEBASE_INSPECTION_REPORT.md
 db*.sqlite3
 db*.sqlite3.bak*
 
+# ...but the integrated company site ships its own real database. The company
+# homepage, Audit IQ and all 217 gated legacy tools render FDA-483 content out
+# of this file, so the application is inert without it. Re-included explicitly
+# because the legacy patterns above are deliberately unanchored.
+# The four stale backups beside it (db.sqlite3.bak, db_17_1_2, db_corrupted,
+# db_old) are copied to disk for exactness but stay untracked — they are dead
+# weight in version control and nothing reads them.
+!/company_site/db.sqlite3
+
 # Legacy root-level requirements (REGX requirements live in backend/requirements/)
 requirements.txt
 
@@ -89,3 +98,23 @@ Thumbs.db
 
 # Docker volumes
 .docker/
+
+# ---------------------------------------------------------------------------
+# Company runtime assets — present on disk, deliberately not versioned.
+# Rationale and restore instructions: docs/COMPANY_RUNTIME_ASSETS.md
+# Restore with: scripts/sync_company_runtime_assets.sh
+# ---------------------------------------------------------------------------
+
+# Runtime media (196 MB): FDA-483 observation images reached through
+# AIDatabase ImageField rows. Mutable, user-generated, per-deployment state;
+# bind-mounted into the containers by compose.yaml.
+/company_site/media/
+
+# Dead marketing videos (82 MB): the only reference anywhere in the codebase
+# is a commented-out line in templates/RATools/RAToolsBase.html:1638.
+/company_site/static/videos/
+
+# Data-import spreadsheets (14 MB): inputs to one-off management commands
+# whose results already live in db.sqlite3. Never read while serving a
+# request, and client-named, so better kept out of a shared repository.
+/company_site/AIDatabase/management/commands/*.xlsx

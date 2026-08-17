@@ -1,0 +1,724 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact Us | RA-AI Tools</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
+
+  <!-- Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;700&display=swap"
+    rel="stylesheet" />
+
+  <!-- Three JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+  <style>
+    :root {
+      --blue: #26acf5;
+      --blue-dark: #02283d;
+      --blue-mid: #0272ae;
+      --blue-lite: #35b1f6;
+      --orange: #fe9409;
+      --orange2: #ff6700;
+      --white: #ffffff;
+      --off: #f4f8fc;
+      --text: #1a2a3a;
+      --muted: #5a7a94;
+      --ff-d: "Syne", sans-serif;
+      --ff-b: "DM Sans", sans-serif;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--ff-b);
+      color: var(--text);
+      background: #fff;
+      overflow-x: hidden;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* FOOTER */
+    footer {
+      background: var(--blue-dark);
+      padding: 60px 0 0;
+      font-family: var(--ff-b);
+    }
+
+    .fi {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 20px;
+      margin: 0 40px;
+      padding: 50px 40px;
+    }
+
+    .flogo {
+      height: 44px;
+      margin-bottom: 16px;
+      filter: brightness(0) invert(1);
+      object-fit: contain;
+    }
+
+    .fbdesc {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+      line-height: 1.78;
+      text-align: justify;
+    }
+
+    .fl {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 14px;
+    }
+
+    .fl li {
+      margin-bottom: 7px;
+    }
+
+    .fl a {
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.54);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: color 0.2s, padding-left 0.2s;
+    }
+
+    .fl a:hover {
+      color: var(--blue-lite);
+      padding-left: 4px;
+    }
+
+    .far {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 14px;
+      line-height: 1.7;
+      font-weight: 500;
+      font-family: var(--ff-b);
+    }
+
+    .far i {
+      color: #35b1f6;
+      font-size: 13px;
+      margin-top: 5px;
+      min-width: 14px;
+    }
+
+    .far a {
+      color: rgba(255, 255, 255, 0.82);
+      text-decoration: none;
+      transition: 0.3s ease;
+    }
+
+    .far a:hover {
+      color: #35b1f6;
+    }
+
+    .socs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-bottom: 22px;
+    }
+
+    .soc {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s, transform 0.2s;
+      overflow: hidden;
+    }
+
+    .soc:hover {
+      background: var(--blue-lite);
+      transform: translateY(-3px);
+    }
+
+    .soc img {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+    }
+
+    .fdiv {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.07);
+      margin: 0 40px;
+    }
+
+    .fcopy {
+      background: rgba(255, 255, 255, 0.04);
+      margin: 0 40px;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      padding: 18px 40px;
+      text-align: center;
+      font-size: 12.5px;
+      color: rgba(255, 255, 255, 0.38);
+    }
+
+    .fcopy a {
+      color: rgba(255, 255, 255, 0.62);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    .eyebrow {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: white;
+    }
+
+    .footer-platform {
+      text-align: left;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-20px); }
+      100% { transform: translateY(0px); }
+    }
+
+    /* ===== Contact Us — single-panel form (deliberately distinct from the
+       booking wizard: no steps, no calendar, generous spacing, icon fields) */
+    .cu-card {
+      background: #fff;
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .15);
+      border: 1px solid rgba(255, 255, 255, .1);
+    }
+
+    .cu-card-top {
+      padding: 44px 44px 8px;
+      text-align: center;
+    }
+
+    .cu-card-top .cu-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #26acf5, #0272ae);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      margin: 0 auto 18px;
+      box-shadow: 0 10px 24px rgba(38, 172, 245, .35);
+    }
+
+    .cu-card-top h2 {
+      font-family: 'inter', sans-serif;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: .5px;
+      margin-bottom: 10px;
+    }
+
+    .cu-card-top p {
+      font-size: 14.5px;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 380px;
+      margin: 0 auto;
+    }
+
+    .cu-form {
+      padding: 30px 44px 40px;
+    }
+
+    .cu-field {
+      margin-bottom: 20px;
+    }
+
+    .cu-field label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 7px;
+      letter-spacing: .2px;
+    }
+
+    .cu-input-wrap {
+      position: relative;
+    }
+
+    .cu-input-wrap i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-size: 14px;
+      pointer-events: none;
+      transition: color .15s ease;
+    }
+
+    .cu-input-wrap textarea ~ i {
+      top: 18px;
+      transform: none;
+    }
+
+    .cu-input {
+      width: 100%;
+      height: 50px;
+      padding: 0 16px 0 44px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      font-size: 14px;
+      font-family: inherit;
+      color: var(--text);
+      transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+
+    textarea.cu-input {
+      height: auto;
+      min-height: 130px;
+      padding-top: 14px;
+      resize: none;
+      line-height: 1.6;
+    }
+
+    .cu-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .cu-input:focus {
+      outline: none;
+      border-color: var(--blue);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(38, 172, 245, .1);
+    }
+
+    .cu-input:focus ~ i {
+      color: var(--blue);
+    }
+
+    .cu-submit {
+      width: 100%;
+      height: 52px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #26acf5, #0272ae);
+      color: #fff;
+      font-size: 15.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+
+    .cu-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(38, 172, 245, .35);
+    }
+
+    .cu-submit:active {
+      transform: translateY(0) scale(.98);
+    }
+
+    .cu-quick-contact {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 26px;
+      padding-top: 22px;
+      border-top: 1px solid #edf2f7;
+    }
+
+    .cu-quick-contact a {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: none;
+      background: #f4f8fc;
+      border: 1px solid #e2e8f0;
+      border-radius: 99px;
+      padding: 8px 14px;
+      transition: color .15s ease, border-color .15s ease;
+    }
+
+    .cu-quick-contact a i {
+      color: var(--blue);
+      font-size: 12px;
+    }
+
+    .cu-quick-contact a:hover {
+      color: var(--blue-mid);
+      border-color: var(--blue);
+    }
+
+    @media (max-width: 991px) {
+      .hero-title {
+        font-size: 42px !important;
+      }
+
+      .hero-desc {
+        margin-left: 0 !important;
+        text-align: left;
+      }
+
+      .fi {
+        margin: 0 16px;
+        padding: 30px 20px;
+      }
+
+      .fdiv,
+      .fcopy {
+        margin: 0 16px;
+      }
+
+      .text-lg-start {
+        text-align: center !important;
+      }
+
+      .fl {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .fl a {
+        justify-content: center;
+      }
+
+      .cu-card-top,
+      .cu-form {
+        padding-left: 26px;
+        padding-right: 26px;
+      }
+    }
+
+    @media (min-width: 1500px) {
+      .hero-desc {
+        margin-left: 0 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  {% include 'navbar.html' %}
+
+  <!-- HERO -->
+  <section id="hero"
+    style="min-height: 100vh; background: #012a48; padding-top: 100px; padding-bottom: 60px; display: flex; align-items: center; position: relative; overflow: hidden;">
+
+    <canvas id="bgCanvas" style="position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0;"></canvas>
+
+    <div class="container position-relative" style="z-index: 2;">
+      <div class="row align-items-center">
+
+        <!-- Left Content -->
+        <div class="col-lg-6 text-center text-lg-start mb-5 mb-lg-0 text-white">
+          <h1 class="hero-title"
+            style="font-family: 'inter'; font-size: clamp(2rem, 3.8vw, 3.4rem); font-weight: 700; line-height: 1.15; color: #fff; margin-bottom: 16px;">
+            Intelligence That Powers<br />
+            <em style="font-style: normal; color: #35b1f6;">Better Regulatory Decisions.</em>
+          </h1>
+          <p class="hero-desc"
+            style="font-size: 0.97rem; line-height: 1.82; color: rgba(255, 255, 255, 0.65); max-width: 540px; margin-bottom: 36px; margin-left: auto; margin-right: auto;">
+            Discover how our AI-driven regulatory tools simplify compliance,
+            accelerate submissions, reduce deficiencies and transform your
+            workflow with intelligent automation
+          </p>
+          <div class="hero-image d-flex justify-content-center justify-content-lg-start">
+            <img src="{% static 'img/demorequest.jfif' %}" alt="Demo"
+              style="width: 100%; max-width: 480px; animation: float 5s ease-in-out infinite; filter: drop-shadow(0 30px 80px rgba(12,108,242,0.2)); border-radius: 15px;" />
+          </div>
+          <div class="contact-details-box mt-4 text-start"
+            style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 20px; max-width: 480px;">
+            <h5
+              style="font-family: var(--ff-d); font-size: 16px; color: #35b1f6; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">
+              Contact Information</h5>
+            <div style="font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.6;">
+              <p class="mb-2"><i class="fas fa-envelope me-2" style="color: #35b1f6;"></i>
+                <strong>Email: </strong>icretools@icretegy.com</p>
+              <p class="mb-2"><i class="fas fa-phone me-2" style="color: #35b1f6;"></i> <strong>Phone:</strong> <img src="{% static 'assets/icretegy/india_flag.svg' %}" alt="India flag" style="width: 20px; height: 15px; object-fit: cover; vertical-align: -1px; margin-right: 4px; border-radius: 2px;" /> +91 98982 89121</p>
+              <p class="mb-2"><i class="fas fa-phone me-2" style="color: #35b1f6;"></i> <strong>Phone:</strong> <img src="{% static 'assets/icretegy/Flag_of_the_United_States.webp' %}" alt="USA flag" style="width: 20px; height: 15px; object-fit: cover; vertical-align: -1px; margin-right: 4px; border-radius: 2px;" /> +1 201-916-2870</p>
+              <p class="mb-2"><i class="fas fa-globe me-2" style="color: #35b1f6;"></i> <strong>Website:</strong> <a
+                  href="https://ipharmaai.com/" target="_blank"
+                  style="color: inherit; text-decoration: none;">www.ipharmaai.com</a></p>
+              <p class="mb-0"><i class="fas fa-location-dot me-2" style="color: #35b1f6;"></i>
+                <strong>Location:</strong> A-1301, The Capital, Science City Road, Sola, Ahmedabad-380060, Gujarat,
+                India</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Form -->
+        <div class="col-lg-6">
+          <div class="cu-card">
+            <div class="cu-card-top">
+              <div class="cu-icon"><i class="fa-solid fa-comment-dots"></i></div>
+              <h2>Get in Touch</h2>
+              <p>Have a question about our products or need help with something specific? Send us a message and we'll reply as soon as we can.</p>
+            </div>
+
+            <div class="cu-form">
+              <form method="post" novalidate>
+                {% csrf_token %}
+
+                {% if error_message %}
+                <div class="alert alert-danger" style="font-size: 14px; padding: 10px; margin-bottom: 15px;">
+                  {{ error_message }}
+                </div>
+                {% endif %}
+
+                {% if success_message %}
+                <div class="alert alert-success" style="font-size: 14px; padding: 10px; margin-bottom: 15px;">
+                  {{ success_message }}
+                </div>
+                {% endif %}
+
+                <div class="cu-field">
+                  <label for="cuFullName">Full Name *</label>
+                  <div class="cu-input-wrap">
+                    <i class="fa-solid fa-user"></i>
+                    <input type="text" class="cu-input" id="cuFullName" name="fullName"
+                      value="{{ form_data.fullName|default:'' }}" placeholder="Enter your full name" required />
+                  </div>
+                </div>
+
+                <div class="cu-field">
+                  <label for="cuEmail">Email *</label>
+                  <div class="cu-input-wrap">
+                    <i class="fa-solid fa-envelope"></i>
+                    <input type="email" class="cu-input" id="cuEmail" name="email"
+                      value="{{ form_data.email|default:'' }}" placeholder="Enter your email" required />
+                  </div>
+                </div>
+
+                <div class="cu-field">
+                  <label for="cuCompany">Company Name</label>
+                  <div class="cu-input-wrap">
+                    <i class="fa-solid fa-building"></i>
+                    <input type="text" class="cu-input" id="cuCompany" name="companyName"
+                      value="{{ form_data.companyName|default:'' }}" placeholder="Enter your company name (optional)" />
+                  </div>
+                </div>
+
+                <div class="cu-field">
+                  <label for="cuMessage">Message *</label>
+                  <div class="cu-input-wrap">
+                    <i class="fa-solid fa-message"></i>
+                    <textarea class="cu-input" id="cuMessage" name="message" placeholder="How can we help?"
+                      required>{{ form_data.message|default:'' }}</textarea>
+                  </div>
+                </div>
+
+                <button type="submit" class="cu-submit">
+                  <i class="fa-solid fa-paper-plane"></i> Send Message
+                </button>
+              </form>
+
+              <div class="cu-quick-contact">
+                <a href="mailto:icretools@icretegy.com"><i class="fa-solid fa-envelope"></i> icretools@icretegy.com</a>
+                <a href="tel:+919898289121"><i class="fa-solid fa-phone"></i> +91 98982 89121</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="fi">
+      <div class="row g-4">
+        <div class="col-lg-4 text-center text-lg-start">
+          <img
+              src="{% static 'assets/icretegy/iPharmaAI_white.png' %}"
+              class="flogo"
+              alt="iPharmaAI"
+              style=" height: 90px;"
+            />
+          <p class="fbdesc text-left mx-auto mt-3" style="max-width: 800px;">
+            iPharmaAI Reserved by <a href="https://icretegy.com" target="_blank"
+              style="color: inherit; text-decoration: underline;">iCretegy Solutions</a>. <br> regulatory intelligence
+            platform built for FDA inspection readiness, ANDA workflows, audit intelligence, and modern pharma
+            compliance operations.
+          </p>
+          <div class="far justify-content-center justify-content-lg-start mt-3">
+            <i class="fas fa-envelope"></i><a href="mailto:icretools@icretegy.com">icretools@icretegy.com</a>
+          </div>
+          <div class="socs justify-content-center justify-content-lg-start mt-4">
+            <a href="https://www.linkedin.com/company/ipharmaai" class="soc"><img
+                src="{% static 'assets/icretegy/linkedin.png' %}" alt="LinkedIn" /></a>
+            <a href="https://wa.me/+919898289121" class="soc"><img src="{% static 'assets/icretegy/whatsapp.png' %}"
+                alt="WhatsApp" /></a>
+          </div>
+        </div>
+
+        <div class="col-lg-4 text-center footer-platform">
+          <span class="eyebrow mb-3" style="margin-right:90px;">Platform</span>
+          <ul class="fl text-start d-inline-block">
+            <li>
+              <a href="/aidatabase/form483/">
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Audit IQ
+              </a>
+            </li>
+            <li>
+              <a href="/ratools/modulehome/">
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> ANDA CTD
+                SmartTemplate
+              </a>
+            </li>
+            <li>
+              <a href="/ratools/">
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> RegX
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div class="col-lg-4 text-center text-lg-start">
+          <span class="eyebrow mb-3">Company</span>
+          <ul class="fl">
+            <li><a href="/about-alpesh/"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> About Us</a></li>
+            <li><a href="/ratools/contactus"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> Contact Us</a></li>
+            <li><a href="/privacy-policy/"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> Privacy Policy</a></li>
+            <li><a href="/termsofuse/"><i class="fas fa-chevron-right"
+                  style="font-size: 10px; color: var(--blue-lite);"></i> Terms of Use</a></li>
+            <li>
+              <a href="/ratools/requestdemo" style="">
+                <i class="fas fa-chevron-right" style="font-size: 10px; color: var(--blue-lite);"></i> Schedule Consultation
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="fdiv"></div>
+    <div class="fcopy">
+      © 2026 iPharmaAI.
+    </div>
+  </footer>
+
+  <!-- THREE JS BACKGROUND -->
+  <script>
+
+    const canvas = document.getElementById("bgCanvas");
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true
+    });
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    camera.position.z = 5;
+
+    const particlesGeometry = new THREE.BufferGeometry();
+
+    const particlesCount = 2500;
+
+    const posArray = new Float32Array(particlesCount * 3);
+
+    for (let i = 0; i < particlesCount * 3; i++) {
+      posArray[i] = (Math.random() - 0.5) * 12;
+    }
+
+    particlesGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(posArray, 3)
+    );
+
+    const particlesMaterial = new THREE.PointsMaterial({
+      size: 0.015,
+      color: "#35b1f6"
+    });
+
+    const particlesMesh = new THREE.Points(
+      particlesGeometry,
+      particlesMaterial
+    );
+
+    scene.add(particlesMesh);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      particlesMesh.rotation.y += 0.0008;
+      particlesMesh.rotation.x += 0.0003;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+
+      renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+      );
+
+      camera.aspect =
+        window.innerWidth / window.innerHeight;
+
+      camera.updateProjectionMatrix();
+
+    });
+
+  </script>
+
+</body>
+
+</html>

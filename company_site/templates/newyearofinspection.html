@@ -1,0 +1,3336 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Year inspection</title>
+
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+    <style>
+      .country-btn {
+        display: inline-block;
+        padding: 8px 18px;
+        margin: 5px;
+        border-radius: 20px;
+        border: 1px solid #448ebd;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+        color: #044a70;
+        background: #fff;
+        transition: 0.2s;
+      }
+
+      .country-btn:hover {
+        color: #fff;
+        background: linear-gradient(90deg, #0b5cab, #3d8ec9);
+        border-color: transparent;
+      }
+
+      .active-country {
+        background: linear-gradient(90deg, #0b5cab, #173f72);
+        color: #fff !important;
+        border-color: transparent;
+      }
+
+      :root {
+        --p: #055d8d;
+        --p2: #044a70;
+        --bd: #c7ddeb;
+        --mut: #6b7280;
+        --tx: #111827;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #f7f8fc, #f1f2f7);
+        font-family:
+          Segoe UI,
+          Tahoma,
+          sans-serif;
+        color: var(--tx);
+      }
+
+      .wrap {
+        max-width: 100%;
+        margin: 0 auto 24px;
+        padding: 0 12px;
+      }
+
+      #undoBtn {
+        display: none;
+      }
+
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        text-align: left !important;
+      }
+
+      .navbar-menu-wrapper {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+
+      .nav-header-link {
+        font-size: 14px !important;
+        font-weight: 700;
+        text-decoration: none;
+        border-radius: 5px;
+        color: black !important;
+      }
+
+      @media (max-width: 1490px) {
+        .nav-header-link {
+          font-size: 12px !important;
+        }
+      }
+
+      .nav-header-link-hover:hover {
+        color: #045c8d !important;
+      }
+
+      .active-header-link {
+        color: rgba(255, 255, 255, 1) !important;
+        background: linear-gradient(to right, #045c8d, #1276a2) !important;
+      }
+
+      .panel {
+        background: #fff;
+        border: 1px solid var(--bd);
+        border-radius: 12px;
+        box-shadow: 0 10px 26px rgba(34, 31, 60, 0.12);
+        padding: 14px;
+        min-height: calc(100vh - 126px);
+      }
+
+      .title {
+        text-align: center;
+        margin: 2px 0 35px;
+        font-size: 30px;
+        color: #044a70;
+      }
+
+      .filters {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 22px 40px;
+        position: relative;
+        overflow: visible;
+        align-items: start;
+      }
+
+      .field {
+        position: relative;
+        z-index: 1;
+      }
+
+      .field.open {
+        z-index: 80;
+      }
+
+      .trigger,
+      .input {
+        width: 100%;
+        height: 40px;
+        border: 1px solid #448ebd;
+        border-radius: 7px;
+        background: #fff;
+        font-size: 14px;
+      }
+
+      .trigger {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 10px;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .trigger:hover,
+      .input:hover {
+        border-color: #8bbbd4;
+      }
+
+      .trigger:focus-visible,
+      .input:focus {
+        outline: none;
+        border-color: #033a58;
+        box-shadow: 0 0 0 3px rgba(5, 93, 141, 0.2);
+      }
+
+      .ico {
+        color: var(--p);
+        font-size: 18px;
+      }
+
+      .txt {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .car {
+        color: #9ca3af;
+      }
+
+      .inw {
+        position: relative;
+      }
+
+      .inw .ico {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .inw .input {
+        padding: 0 10px 0 32px;
+      }
+
+      .menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        display: none;
+        z-index: 90;
+        background: #fff;
+        border: 1px solid var(--bd);
+        border-radius: 8px;
+        max-height: 300px;
+        box-shadow: 0 12px 20px rgba(17, 24, 39, 0.14);
+      }
+
+      .menu.active {
+        display: block;
+      }
+
+      .msearch {
+        width: calc(100% - 14px);
+        height: 33px;
+        margin: 7px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 0 10px;
+        font-size: 12px;
+      }
+
+      .msearch:focus {
+        outline: none;
+        border-color: var(--p);
+        box-shadow: 0 0 0 2px rgba(5, 93, 141, 0.1);
+      }
+
+      .mlist {
+        max-height: 220px;
+        overflow: auto;
+        padding-bottom: 6px;
+      }
+
+      .mitem {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      .mitem:hover {
+        background: #eef7fb;
+      }
+
+      .mitem input {
+        accent-color: var(--p);
+      }
+
+      .actions {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .actions-inline {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: stretch;
+        align-self: stretch;
+        width: 100%;
+        gap: 10px;
+      }
+
+      .btn {
+        cursor: pointer;
+        min-width: 0;
+        width: 100%;
+        height: 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        line-height: 1;
+        padding: 0 18px;
+        border-radius: 7px;
+        border: 1px solid transparent;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .bsearch {
+        background: linear-gradient(90deg, var(--p), var(--p2));
+        color: #fff;
+        transition: opacity 0.2s ease;
+      }
+
+      .bsearch:hover {
+        opacity: 0.9;
+        color: #fff;
+        background-color: blue;
+      }
+
+      .bclear {
+        background: #fff;
+
+        color: var(--p2);
+        border-color: #b8d3e3;
+      }
+
+      .bclear:hover {
+        background: #eef7fb;
+      }
+
+      .chips {
+        margin: 20px 0px 20px 0px;
+        min-height: 36px;
+        border: 1px solid #d9eaf3;
+        border-radius: 8px;
+        padding: 12px;
+        display: none;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .filter-divider {
+        height: 1px;
+        background: #c7ddeb;
+        margin: 25px 0 16px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        position: relative;
+        background: linear-gradient(90deg, var(--p), var(--p2));
+        color: #fff;
+        font-size: 11px;
+        border-radius: 6px;
+        padding: 6px 18px 6px 10px;
+        margin-right: 4px;
+        margin-top: 4px;
+      }
+
+      .chip button {
+        width: 16px;
+        height: 16px;
+        position: absolute;
+        top: 0;
+        right: 0;
+        transform: translate(40%, -40%);
+        border: none;
+        border-radius: 50%;
+        background: #ef4444;
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        line-height: 1;
+        padding: 0;
+        cursor: pointer;
+      }
+
+      .sumwrap {
+        position: relative;
+        margin-top: 10px;
+      }
+
+      .sum {
+        display: grid;
+        margin: 20px 0px 20px 0px;
+        padding-bottom: 10px;
+
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+      }
+
+      .s {
+        font-size: 14px;
+        text-align: center;
+        border-bottom: 2px solid #d8dce7;
+        padding-bottom: 3px;
+      }
+
+      .s strong {
+        font-size: 20px;
+      }
+
+      .s.click {
+        cursor: pointer;
+      }
+
+      .s.active {
+        color: var(--p2);
+        border-bottom-color: var(--p2);
+      }
+
+      .s.active strong {
+        color: var(--p2);
+      }
+
+      .stat {
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 0;
+        width: 320px;
+        z-index: 20;
+        display: none;
+        border: 1px solid var(--bd);
+        border-radius: 8px;
+        background: #f6f6f7;
+        box-shadow: 0 12px 24px rgba(17, 24, 39, 0.12);
+      }
+
+      .stat.active {
+        display: block;
+      }
+
+      .stitle {
+        padding: 8px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #044a70;
+        border-bottom: 1px solid #d9eaf3;
+      }
+
+      .ssearch {
+        width: calc(100% - 16px);
+        margin: 8px;
+        height: 32px;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 0 9px;
+        font-size: 12px;
+      }
+
+      .slist {
+        max-height: 220px;
+        overflow: auto;
+        padding: 0 8px 8px;
+      }
+
+      .sfoot {
+        padding: 12px 14px;
+        border-top: 1px dashed #d9eaf3;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 700;
+        color: #044a70;
+        background: #fff;
+        border-radius: 0 0 8px 8px;
+      }
+
+      .sfoot strong {
+        font-size: 18px;
+        line-height: 1;
+        color: #111827;
+        /* margin: 0 6px; */
+      }
+
+      .sitem {
+        padding: 6px 8px;
+        font-size: 12px;
+        border: 1px solid #f1f1f1;
+        border-radius: 6px;
+        background: #fff;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        color: #333;
+      }
+
+      .sitem b {
+        color: #000;
+        font-weight: 600;
+      }
+
+      .cards {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+        gap: 16px;
+        align-items: stretch;
+      }
+
+      .empty {
+        border: 1px dashed #d8dce7;
+        background: #fff;
+        border-radius: 10px;
+        color: var(--mut);
+        padding: 20px;
+        text-align: center;
+        font-size: 13px;
+      }
+
+      .empty.error {
+        border: 1px solid #fecaca;
+        background: #fff1f2;
+        color: #b91c1c;
+      }
+
+      .card {
+        background: linear-gradient(180deg, #fff, #f6fbfe);
+        border: 1px solid #c7ddeb;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 8px 20px rgba(5, 93, 141, 0.14);
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      .chead {
+        border-bottom: 1px solid #d9eaf3;
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+        background-color: rgba(0, 0, 0, 0.03);
+      }
+
+      .cname {
+        font-size: 19px;
+        font-weight: 700;
+        color: #044a70;
+      }
+
+      .igrid {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .i {
+        display: flex;
+        gap: 6px;
+        font-size: 13px;
+        color: #374151;
+        align-items: flex-start;
+      }
+
+      .i span:first-child {
+        font-weight: 700;
+        color: #4b5563;
+      }
+
+      .type-counts {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+
+      .type-count {
+        background: #eef4ff;
+        color: #4b5563;
+        font-weight: 600;
+        border: 1px solid #c9dbff;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-size: 12px;
+        line-height: 1.4;
+        max-width: 100%;
+        word-break: break-word;
+        cursor: pointer;
+        transition:
+          background 0.18s,
+          color 0.18s,
+          border-color 0.18s,
+          box-shadow 0.18s;
+        user-select: none;
+      }
+
+      .type-count:hover {
+        background: linear-gradient(90deg, #055d8d, #044a70);
+        color: #fff !important;
+        border-color: transparent;
+        box-shadow: 0 2px 8px rgba(5, 93, 141, 0.18);
+      }
+
+      .type-count.type-active {
+        background: linear-gradient(90deg, #055d8d, #044a70);
+        color: #fff !important;
+        border-color: transparent;
+        box-shadow: 0 2px 8px rgba(5, 93, 141, 0.22);
+      }
+
+      .ylabel {
+        font-size: 13px;
+        font-weight: 700;
+        color: #4b5563;
+        margin-bottom: 6px;
+      }
+
+      .years {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 9px;
+      }
+
+      .y {
+        border: 1px solid #8bbbd4;
+        background: #eef7fb;
+        color: #044a70;
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .y.active {
+        background: linear-gradient(90deg, var(--p), var(--p2));
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .details {
+        display: none;
+      }
+
+      .button-wrapper {
+        margin-top: auto;
+        padding-top: 10px;
+      }
+
+      .ys {
+        background: #f3f9fc;
+        border: 1px solid #d9eaf3;
+        border-radius: 9px;
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+
+      .ys h5 {
+        margin: 0 0 8px;
+        font-size: 22px;
+        color: #044a70;
+      }
+
+      .date {
+        background: #fff;
+        border: 1px solid #d9eaf3;
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 8px;
+      }
+
+      .date h6 {
+        margin: 0;
+        color: #055d8d;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .inv {
+        margin-top: 5px;
+        font-size: 12px;
+        color: #4b5563;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 6px;
+      }
+
+      .inv .hit {
+        color: #055d8d;
+        font-weight: 700;
+        text-decoration: underline;
+      }
+
+      .sys {
+        margin-top: 7px;
+        border-radius: 7px;
+        border: 1px solid #c7ddeb;
+        background: #f6fbfe;
+        padding: 7px 8px;
+        cursor: pointer;
+      }
+
+      .sys.sel {
+        background: linear-gradient(90deg, #0a78b4, #055d8d);
+        color: #fff;
+        border-color: transparent;
+      }
+
+      .sysn {
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .oc {
+        margin-top: 2px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .olist {
+        display: none;
+        margin-top: 8px;
+      }
+
+      .sys.sel .olist {
+        display: block;
+      }
+
+      .ob {
+        margin-bottom: 10px;
+        padding: 8px;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.96);
+        color: #111827;
+      }
+
+      .ob h6 {
+        margin: 0 0 6px;
+        color: #044a70;
+        font-size: 13px;
+      }
+
+      .otype {
+        margin: 0 0 8px;
+        color: #475569;
+        font-size: 12px;
+      }
+
+      .ob p {
+        margin: 0 0 8px;
+        font-size: 12px;
+        text-align: justify;
+      }
+
+      .summary-box {
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 7px;
+        border: 1px solid #d9eaf3;
+        background: #eef7fb;
+        color: #111827;
+      }
+
+      .summary-box h6 {
+        margin: 0 0 6px;
+        color: #044a70;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .summary-box p {
+        margin: 0 0 8px;
+        font-size: 12px;
+        text-align: justify;
+      }
+
+      .mark {
+        background: #fde68a;
+        color: #111827;
+        font-weight: 700;
+        padding: 2px 4px;
+        margin: 0 4px;
+        border-radius: 3px;
+      }
+
+      .img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 8px 0;
+        border-radius: 6px;
+      }
+
+      .pbtn {
+        width: 100%;
+        height: 34px;
+        border: none;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(90deg, var(--p), var(--p2));
+        margin-top: 8px;
+      }
+
+      .loader {
+        display: none;
+        text-align: center;
+        margin-top: 12px;
+        font-size: 12px;
+      }
+
+      .loader span {
+        display: inline-block;
+        border-radius: 8px;
+        border: 1px solid #c7ddeb;
+        background: #f6fbfe;
+        color: #055d8d;
+        padding: 8px 14px;
+        font-weight: 700;
+      }
+
+      .err {
+        display: none;
+        text-align: center;
+        margin-top: 8px;
+      }
+
+      .rbtn {
+        border: 1px solid #b8d3e3;
+        background: #fff;
+        color: #055d8d;
+        border-radius: 6px;
+        font-size: 12px;
+        padding: 7px 12px;
+        font-weight: 700;
+      }
+
+      .table-tools {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 8px;
+      }
+
+      .tprint {
+        border: 1px solid #b8d3e3;
+        background: #fff;
+        color: #055d8d;
+        border-radius: 6px;
+        font-size: 12px;
+        padding: 7px 12px;
+        font-weight: 700;
+      }
+
+      .table-wrap {
+        max-height: 680px;
+        overflow: auto;
+        border: 1px solid #d9eaf3;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .res-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .res-table thead th {
+        position: sticky;
+        top: 0;
+        background: linear-gradient(90deg, var(--p), var(--p2));
+        color: #fff;
+        z-index: 2;
+      }
+
+      .res-table th,
+      .res-table td {
+        border: 1px solid #d9eaf3;
+        padding: 10px;
+        font-size: 12px;
+        vertical-align: top;
+      }
+
+      .res-table tr:nth-child(even) {
+        background: #f6fbfe;
+      }
+
+      .company-name-tr {
+        font-weight: 700;
+        color: #044a70;
+      }
+
+      .watermark {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('{% static "assets/icretegy/itechnical logo.png" %}');
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: 60%;
+        opacity: 0;
+        z-index: -2;
+        pointer-events: none;
+        transform: rotate(-30deg);
+      }
+
+      @media (max-width: 1280px) {
+        .filters {
+          grid-template-columns: repeat(3, minmax(180px, 1fr));
+        }
+
+        .actions-inline {
+          grid-column: 1 / -1;
+          align-self: auto;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .title {
+          font-size: 28px;
+        }
+
+        .filters {
+          grid-template-columns: 1fr;
+        }
+
+        .actions-inline {
+          grid-column: 1 / -1;
+          grid-template-columns: 1fr;
+        }
+
+        .sum {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .stat {
+          width: 100%;
+          left: 0 !important;
+        }
+      }
+
+      /* ── Dashboard sidebar layout ── */
+      .dashboard-page-body {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        padding-top: 70px;
+        min-height: 100vh;
+      }
+
+      .dashboard-main-panel {
+        flex: 1 1 auto;
+        margin-left: 260px;
+        width: calc(100% - 260px);
+        padding-left: 10px;
+        transition: all 0.3s ease;
+        transition: margin-left 0.25s ease;
+      }
+
+      /* When sidebar collapsed */
+      .dashboard-layout.sidebar-collapsed .main-panel {
+        margin-left: 80px;
+        width: calc(100% - 80px);
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 96px;
+        min-width: 96px;
+        max-width: 96px;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+        display: none;
+      }
+
+      .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+        justify-content: center;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+        display: flex;
+        justify-content: center;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+        width: 56px;
+        margin: 0 auto;
+      }
+
+      .wrap {
+        max-width: 100%;
+        margin: 24px auto;
+        padding: 0 12px;
+      }
+
+      @media (max-width: 991px) {
+        .dashboard-page-body {
+          flex-direction: column;
+        }
+
+        .dashboard-sidebar {
+          position: relative;
+          top: 0;
+          width: 100%;
+          min-width: 100%;
+          max-width: 100%;
+          height: auto;
+          border-radius: 0 0 16px 16px;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+          width: 100%;
+          min-width: 100%;
+          max-width: 100%;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    {% include './navbar.html' %}
+    <div
+      class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout"
+      id="dashboardLayout"
+    >
+      <!-- Sidebar -->
+      {% include './sidebar.html' %}
+      <!-- Main panel -->
+      <div class="main-panel dashboard-main-panel">
+        <div
+          class="content-wrapper"
+          style="padding: 0px !important; background-color: white !important"
+        >
+          <div class="wrap mt-0">
+            <div class="watermark"></div>
+            <div class="panel">
+              <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                <a href="/aidatabase/form483/" class="btn" style="background: linear-gradient(135deg, #0b5cab, #3d8ec9); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 13px; width: auto; height: auto; display: inline-flex; align-items: center; justify-content: center;">
+                  <i class="mdi mdi-arrow-left me-1"></i> Back
+                </a>
+              </div>
+
+              <h1 class="title">What do you want to search with ?</h1>
+              <div class="filters">
+                <div class="field" data-filter="organization">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-domain ico"></i>
+                    <span class="txt">Select Organization</span>
+                    <i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search organization" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="field" data-filter="company">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-office-building ico"></i
+                    ><span class="txt">Select Company</span
+                    ><i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search company" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="field" data-filter="fdaNumber">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-barcode-scan ico"></i>
+                    <span class="txt">Select FEI Number</span>
+                    <i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search FEI number" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="field" data-filter="type">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-domain-switch ico"></i
+                    ><span class="txt">Select Type of Establishment</span
+                    ><i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search type" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="field">
+                  <div class="inw">
+                    <i class="mdi mdi-magnify ico"></i
+                    ><input
+                      id="keywordInput"
+                      class="input"
+                      placeholder="Search for Observation Keyword"
+                    />
+                  </div>
+                </div>
+                <div class="field" data-filter="system">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-view-grid-plus ico"></i
+                    ><span class="txt">Select System</span
+                    ><i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search system" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="field" data-filter="investigator">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-account-search ico"></i
+                    ><span class="txt">Select Investigator</span
+                    ><i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search investigator" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="field" data-filter="year">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-calendar ico"></i
+                    ><span class="txt">Select Year</span
+                    ><i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search year" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="field" data-filter="country">
+                  <button class="trigger" type="button">
+                    <i class="mdi mdi-earth ico"></i
+                    ><span class="txt">Select Country</span
+                    ><i class="mdi mdi-chevron-down car"></i>
+                  </button>
+                  <div class="menu">
+                    <input class="msearch" placeholder="Search country" />
+                    <div class="mlist"></div>
+                  </div>
+                </div>
+                <div class="actions actions-inline">
+                  <button id="searchBtn" class="btn bsearch" type="button">
+                    Search
+                  </button>
+                  <button
+                    id="undoBtn"
+                    class="btn bclear"
+                    type="button"
+                    disabled
+                    title="Revert to previous search"
+                  >
+                    Undo
+                  </button>
+                  <button id="clearBtn" class="btn bclear" type="button">
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div class="filter-divider"></div>
+              <div id="chips" class="chips"></div>
+              <div id="sumWrap" class="sumwrap" style="display: none">
+                <div class="sum">
+                  <div class="s" data-mode="observation">
+                    Total Observation: <strong id="tObs">0</strong>
+                  </div>
+                  <div class="s click" data-mode="system">
+                    Total System: <strong id="tSys">0</strong>
+                  </div>
+                  <div class="s click" data-mode="investigator">
+                    Total Investigator: <strong id="tInv">0</strong>
+                  </div>
+                  <div class="s click" data-mode="establishment">
+                    Types of Establishment: <strong id="tEst">0</strong>
+                  </div>
+                  <div class="s" data-mode="company">
+                    Total Companies: <strong id="tCom">0</strong>
+                  </div>
+                </div>
+                <div id="statPanel" class="stat">
+                  <div id="statTitle" class="stitle">List</div>
+                  <input
+                    id="statSearch"
+                    class="ssearch"
+                    placeholder="Search..."
+                  />
+                  <div id="statList" class="slist"></div>
+                  <div id="statFooter" class="sfoot">
+                    Total: <strong>0</strong> Items
+                  </div>
+                </div>
+              </div>
+              <div id="resultState" class="empty" style="display: none"></div>
+              <div id="cardContainer" class="cards"></div>
+              <div id="infinite-loader" class="loader">
+                <span>Loading...</span>
+              </div>
+              <div id="infinite-error" class="err">
+                <button id="infinite-retry" class="rbtn">Retry</button>
+              </div>
+            </div>
+          </div>
+
+          <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+          <script>
+            const listStatic = {
+              system: [
+                "Quality System",
+                "Facilities and Equipment System",
+                "Laboratory Control System",
+                "Material System",
+                "Production System",
+                "Packaging and Labeling System",
+              ],
+              type: [
+
+                "API Manufacturer",
+                "Prescription (Rx) Drug Manufacturer",
+              ],
+              year: Array.from({ length: 2030 - 2018 + 1 }, (_, i) => 2018 + i),
+            };
+
+            const SYSTEM_NORMALIZATION_MAP = {
+              "quality system": "Quality System",
+              "laboratory control system": "Laboratory Control System",
+              "material system": "Material System",
+              "packaging and labeling system": "Packaging and Labeling System",
+              "packaging and labelling system": "Packaging and Labeling System",
+              "production system": "Production System",
+              "facilities and equipment system":
+                "Facilities and Equipment System",
+              "facilities & equipment system":
+                "Facilities and Equipment System",
+              "facility & equipment system": "Facilities and Equipment System",
+              "facilites & equipment system": "Facilities and Equipment System",
+            };
+
+            const normalizeText = (value) =>
+              String(value || "")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            const normalizeKey = (value) => normalizeText(value).toLowerCase();
+
+            const normalizeSystem = (value) => {
+              const normalized = normalizeKey(value);
+              if (!normalized) return "";
+              return (
+                SYSTEM_NORMALIZATION_MAP[normalized] ||
+                normalizeText(normalized).replace(/\b\w/g, (ch) =>
+                  ch.toUpperCase(),
+                )
+              );
+            };
+
+            const normalizeInvestigator = (value) => normalizeText(value);
+
+            const normalizeEstablishment = (value) => normalizeText(value);
+
+            const FILTER_SET_KEYS = [
+              "organization",
+              "company",
+              "investigator",
+              "system",
+              "type",
+              "year",
+              "country",
+              "fdaNumber",
+            ];
+
+            const selected = {
+              organization: new Set(),
+              company: new Set(),
+              investigator: new Set(),
+              system: new Set(),
+              type: new Set(),
+              year: new Set(),
+              country: new Set(),
+              fdaNumber: new Set(),
+              keyword: "",
+            };
+            const listData = {
+              organization: [],
+              company: [],
+              investigator: [],
+              system: [...listStatic.system],
+              type: [...listStatic.type],
+              year: [...listStatic.year],
+              country: [],
+              fdaNumber: [],
+            };
+            let keywordTokens = [],
+              summary = {},
+              dataRows = [],
+              activeStatMode = null,
+              activeStatItems = [],
+              currentPage = 1,
+              totalPages = 1,
+              isLoading = false,
+              userHasScrolled = false,
+              hasSearched = false,
+              searchError = null,
+              cardMap = new Map(),
+              statTimeout = null;
+
+            const $ = (id) => document.getElementById(id);
+            const by = (s, p = document) => p.querySelector(s);
+            const all = (s, p = document) => Array.from(p.querySelectorAll(s));
+            const readStoredState = (key) => {
+              try {
+                const raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : null;
+              } catch (e) {
+                console.warn(`Failed to parse ${key}:`, e);
+                return null;
+              }
+            };
+            const writeStoredState = (key, value) =>
+              localStorage.setItem(key, JSON.stringify(value));
+            const syncUndoButton = () => {
+              const undoBtn = $("undoBtn");
+              if (undoBtn) {
+                undoBtn.disabled = !readStoredState("prevFilterState");
+              }
+            };
+            const captureCurrentState = () => {
+              const snapshot = {
+                keyword: $("keywordInput")?.value.trim() || "",
+              };
+              FILTER_SET_KEYS.forEach((k) => {
+                snapshot[k] = Array.from(selected[k] || [])
+                  .map((value) => String(value))
+                  .sort((a, b) => a.localeCompare(b));
+              });
+              return snapshot;
+            };
+            const createEmptyState = () => {
+              const snapshot = { keyword: "" };
+              FILTER_SET_KEYS.forEach((k) => {
+                snapshot[k] = [];
+              });
+              return snapshot;
+            };
+            const statesEqual = (left, right) =>
+              JSON.stringify(left || {}) === JSON.stringify(right || {});
+            function restoreState(state) {
+              if (!state) return;
+              FILTER_SET_KEYS.forEach((k) => {
+                selected[k].clear();
+                (state[k] || []).forEach((value) =>
+                  selected[k].add(String(value)),
+                );
+              });
+              $("keywordInput").value = state.keyword || "";
+              selected.keyword = $("keywordInput").value;
+
+              FILTER_SET_KEYS.forEach((k) => {
+                renderDrop(k);
+                refreshLabel(k);
+              });
+              renderChips();
+            }
+            function performUndo() {
+              const prevState = readStoredState("prevFilterState");
+              if (!prevState) {
+                console.warn("No previous state found in localStorage.");
+                syncUndoButton();
+                return;
+              }
+
+              restoreState(prevState);
+              localStorage.removeItem("prevFilterState");
+              syncUndoButton();
+              doSearch(true);
+            }
+            const csrf = () => {
+              const k = "csrftoken=";
+              for (const p of document.cookie.split(";")) {
+                const c = p.trim();
+                if (c.startsWith(k)) return c.substring(k.length);
+              }
+              return "";
+            };
+            const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const obsCount = (c) => {
+              let n = 0;
+              Object.values(c.year_of_inspection || {}).forEach((y) =>
+                Object.values(y || {}).forEach((i) =>
+                  Object.values(i?.systems || {}).forEach(
+                    (s) => (n += Object.keys(s?.observations || {}).length),
+                  ),
+                ),
+              );
+              return n;
+            };
+            const key = (l, c, t) =>
+              `card-${String(l || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "")}${String(c || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "")}${String(t || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "")
+                .slice(0, 8)}`;
+
+            const getCardId = (company) => {
+              const fei = String(company.fei_number || "").trim();
+              if (fei && fei !== "N/A" && fei !== "nan" && fei !== "None") {
+                return `card-fei-${fei}`;
+              }
+              const sanitizedComp = String(company.company_name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              const sanitizedLoc = String(company.location || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+              return `card-fallback-${sanitizedComp}-${sanitizedLoc}`;
+            };
+
+            function closeMenus() {
+              all(".menu").forEach((x) => x.classList.remove("active"));
+              all(".field.open").forEach((x) => x.classList.remove("open"));
+            }
+            function refreshLabel(k) {
+              const f = by(`[data-filter="${k}"]`);
+              if (!f) return;
+              const t = by(".txt", f);
+              const m = {
+                company: "Select Company",
+                investigator: "Select Investigator",
+                system: "Select System",
+                type: "Select Type of Establishment",
+                year: "Select Year",
+                country: "Select Country",
+                organization: "Select Organization",
+                fdaNumber: "Select FEI Number",
+              };
+              t.textContent = selected[k].size
+                ? `${selected[k].size} selected`
+                : m[k];
+            }
+            function renderDrop(k, q = "") {
+              // console.log("Rendering dropdown for", k, "with query", q);
+              const f = by(`[data-filter="${k}"]`);
+              if (!f) return;
+              const l = by(".mlist", f);
+              const currentYear = new Date().getFullYear();
+              // console.log("Current year is", currentYear);
+              const v = listData[k]
+                .filter((x) =>
+                  String(x).toLowerCase().includes(q.toLowerCase()),
+                )
+                .filter((x) => k !== "year" || Number(x) <= currentYear)
+                .sort((a, b) => String(a).localeCompare(String(b)));
+              l.innerHTML = v
+                .map(
+                  (x) =>
+                    `<label class="mitem"><input type="checkbox" data-filter="${k}" data-value="${String(x).replace(/"/g, "&quot;")}" ${selected[k].has(String(x)) ? "checked" : ""}><span>${x}</span></label>`,
+                )
+                .join("");
+            }
+            function renderChips() {
+              const c = [];
+              [
+                "organization",
+                "company",
+                "investigator",
+                "system",
+                "type",
+                "year",
+                "country",
+                "fdaNumber",
+              ].forEach((k) => selected[k].forEach((v) => c.push({ k, v })));
+              const chips = $("chips");
+              if (!chips) return;
+              if (!c.length) {
+                chips.innerHTML = "";
+                chips.style.display = "none";
+                return;
+              }
+              chips.style.display = "flex";
+              chips.innerHTML = c
+                .map(
+                  (x) =>
+                    `<span class="chip">${x.v}<button type="button" data-key="${x.k}" data-val="${String(x.v).replace(/"/g, "&quot;")}">x</button></span>`,
+                )
+                .join("");
+            }
+            function showResultState(message, isError = false) {
+              const state = $("resultState");
+              if (!state) return;
+              state.textContent = message;
+              state.classList.toggle("error", isError);
+              state.style.display = "block";
+            }
+            function hideResultState() {
+              const state = $("resultState");
+              if (!state) return;
+              state.style.display = "none";
+              state.classList.remove("error");
+              state.textContent = "";
+            }
+            function summaryFallback() {
+              const c = new Set(),
+                s = new Set(),
+                i = new Set(),
+                e = new Set();
+              let o = 0;
+              dataRows.forEach((r) => {
+                if (r.company_name) c.add(normalizeText(r.company_name));
+                const types = r.type_of_establishment;
+                if (Array.isArray(types)) {
+                  types
+                    .map((t) => normalizeEstablishment(t))
+                    .filter(Boolean)
+                    .forEach((t) => e.add(t.toLowerCase()));
+                } else if (types) {
+                  const t = normalizeEstablishment(types);
+                  if (t) e.add(t.toLowerCase());
+                }
+                Object.values(r.year_of_inspection || {}).forEach((y) =>
+                  Object.values(y || {}).forEach((v) => {
+                    String(v?.metadata?.fda_investigators || "")
+                      .split(",")
+                      .map((n) => normalizeInvestigator(n))
+                      .filter(Boolean)
+                      .forEach((n) => i.add(n.toLowerCase()));
+                    Object.entries(v?.systems || {}).forEach(([k, d]) => {
+                      const normalized = normalizeSystem(k);
+                      if (normalized) s.add(normalized.toLowerCase());
+                      o += Object.keys(d?.observations || {}).length;
+                    });
+                  }),
+                );
+              });
+              return {
+                total_observations: o,
+                total_systems: s.size,
+                total_investigators: i.size,
+                total_establishments: e.size,
+                total_companies: c.size,
+              };
+            }
+            function setSummary(raw = {}) {
+              const fallback = summaryFallback();
+              console.log("fall",fallback)
+              const f = Object.keys(raw).length ? raw : {};
+
+              $("tObs").textContent = Number(
+                f.total_observations ?? fallback.total_observations ?? 0,
+              );
+              $("tSys").textContent = Number(
+                f.total_systems ?? fallback.total_systems ?? 0,
+              );
+              $("tInv").textContent = Number(
+                f.total_investigators ?? fallback.total_investigators ?? 0,
+              );
+              $("tEst").textContent = Number(
+                f.total_establishments ?? fallback.total_establishments ?? 0,
+              );
+              $("tCom").textContent = Number(
+                f.total_companies ?? fallback.total_companies ?? 0,
+              );
+            }
+            function updateSummaryVisibility() {
+              const wrap = $("sumWrap");
+              if (!wrap) return;
+              const hasResults = Array.isArray(dataRows) && dataRows.length > 0;
+              wrap.style.display =
+                hasSearched && hasResults && !searchError ? "block" : "none";
+            }
+
+            function statItems(mode) {
+              if (summary && typeof summary === "object") {
+                if (mode === "investigator" && summary.investigator_details) {
+                  return Object.entries(summary.investigator_details)
+                    .map(([label, count]) => ({
+                      label: normalizeText(label),
+                      count: Number(count) || 0,
+                    }))
+                    .sort(
+                      (a, b) =>
+                        b.count - a.count || a.label.localeCompare(b.label),
+                    );
+                }
+                if (mode === "investigator") {
+                  return [];
+                }
+                if (mode === "system" && summary.system_details) {
+                  return Object.entries(summary.system_details)
+                    .map(([label, count]) => ({
+                      label: normalizeText(label),
+                      count: Number(count) || 0,
+                    }))
+                    .sort(
+                      (a, b) =>
+                        b.count - a.count || a.label.localeCompare(b.label),
+                    );
+                }
+                if (mode === "establishment" && summary.establishment_details) {
+                  return Object.entries(summary.establishment_details)
+                    .map(([label, count]) => ({
+                      label: normalizeText(label),
+                      count: Number(count) || 0,
+                    }))
+                    .sort(
+                      (a, b) =>
+                        b.count - a.count || a.label.localeCompare(b.label),
+                    );
+                }
+              }
+
+              const counts = new Map();
+              const labels = new Map();
+
+              const addItem = (rawLabel, value = 1) => {
+                const normalizedKey = normalizeKey(rawLabel);
+                if (!normalizedKey) return;
+                if (!labels.has(normalizedKey)) {
+                  labels.set(normalizedKey, normalizeText(rawLabel));
+                }
+                counts.set(
+                  normalizedKey,
+                  (counts.get(normalizedKey) || 0) + value,
+                );
+              };
+
+              if (mode === "company") {
+                dataRows.forEach((r) =>
+                  addItem(r.company_name || "N/A", obsCount(r)),
+                );
+              } else if (mode === "system") {
+                dataRows.forEach((r) =>
+                  Object.values(r.year_of_inspection || {}).forEach((y) =>
+                    Object.values(y || {}).forEach((v) =>
+                      Object.entries(v?.systems || {}).forEach(([k, d]) => {
+                        const normalizedSystem = normalizeSystem(k) || "";
+                        addItem(
+                          normalizedSystem,
+                          Object.keys(d?.observations || {}).length,
+                        );
+                      }),
+                    ),
+                  ),
+                );
+              } else if (mode === "investigator") {
+                dataRows.forEach((r) =>
+                  Object.values(r.year_of_inspection || {}).forEach((y) =>
+                    Object.values(y || {}).forEach((v) =>
+                      String(v?.metadata?.fda_investigators || "")
+                        .split(",")
+                        .map((n) => normalizeInvestigator(n))
+                        .filter(Boolean)
+                        .forEach((n) => addItem(n, 1)),
+                    ),
+                  ),
+                );
+              } else if (mode === "establishment") {
+                dataRows.forEach((r) => {
+                  const types = r.type_of_establishment;
+                  if (Array.isArray(types)) {
+                    types
+                      .map((t) => normalizeEstablishment(t))
+                      .filter(Boolean)
+                      .forEach((t) => addItem(t, 1));
+                  } else if (types) {
+                    const t = normalizeEstablishment(types);
+                    if (t) addItem(t, 1);
+                  }
+                });
+              } else {
+                dataRows.forEach((r) =>
+                  Object.entries(r.year_of_inspection || {}).forEach(([y, b]) =>
+                    Object.entries(b || {}).forEach(([d, v]) =>
+                      Object.entries(v?.systems || {}).forEach(([s, sd]) =>
+                        Object.keys(sd?.observations || {}).forEach((o) => {
+                          const label = `${o} | ${s} | ${r.company_name} | ${y} ${d}`;
+                          addItem(label, 1);
+                        }),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return Array.from(counts.entries())
+                .map(([key, count]) => ({
+                  label: labels.get(key) || key,
+                  count,
+                }))
+                .sort(
+                  (a, b) => b.count - a.count || a.label.localeCompare(b.label),
+                );
+            }
+            function setStatList(items, q = "") {
+              const f = items.filter((x) =>
+                x.label.toLowerCase().includes(q.toLowerCase()),
+              );
+              const footerLabels = {
+                observation: ["Observation", "Observations"],
+                system: ["System", "Systems"],
+                investigator: ["Investigator", "Investigators"],
+                establishment: [
+                  "Type of Establishment",
+                  "Types of Establishment",
+                ],
+                company: ["Company", "Companies"],
+              };
+              const summaryIds = {
+                observation: "tObs",
+                system: "tSys",
+                investigator: "tInv",
+                establishment: "tEst",
+                company: "tCom",
+              };
+              const [singleLabel, pluralLabel] = footerLabels[
+                activeStatMode
+              ] || ["Item", "Items"];
+              const totalLabel = f.length === 1 ? singleLabel : pluralLabel;
+
+              $("statList").innerHTML = f.length
+                ? f
+                    .map(
+                      (x) =>
+                        `<div class="sitem"><span>${x.label}</span><b>${x.count}</b></div>`,
+                    )
+                    .join("")
+                : `<div class="sitem"><span>No matching data</span><b>0</b></div>`;
+
+              const summaryId = summaryIds[activeStatMode];
+              let totalCount = summaryId ? $(summaryId)?.textContent : null;
+              if (totalCount == null || totalCount === "") {
+                totalCount =
+                  activeStatMode === "observation"
+                    ? f.reduce((acc, curr) => acc + (curr.count || 0), 0)
+                    : new Set(f.map((x) => x.label.toLowerCase())).size;
+              }
+
+              $("statFooter").innerHTML =
+                `Total: <strong>${totalCount}</strong> ${totalLabel}`;
+            }
+            function openStat(mode, el) {
+              activeStatMode = mode;
+              activeStatItems = statItems(mode);
+              const title =
+                {
+                  observation: "Observations List",
+                  system: "Systems List",
+                  investigator: "Investigators List",
+                  establishment: "Types of Establishment",
+                  company: "Companies List",
+                }[mode] || "List";
+
+              const summaryIds = {
+                observation: "tObs",
+                system: "tSys",
+                investigator: "tInv",
+                establishment: "tEst",
+                company: "tCom",
+              };
+              const totalCount = summaryIds[mode]
+                ? $(summaryIds[mode]).textContent
+                : activeStatItems.length;
+              $("statTitle").textContent = `${title} (${totalCount})`;
+              $("statSearch").value = "";
+              setStatList(activeStatItems);
+              all(".s.click").forEach((x) => x.classList.remove("active"));
+              el.classList.add("active");
+              const p = $("statPanel"),
+                w = $("sumWrap").getBoundingClientRect(),
+                r = el.getBoundingClientRect();
+              p.classList.add("active");
+              const l = Math.min(
+                Math.max(0, r.left - w.left),
+                Math.max(0, w.width - p.offsetWidth),
+              );
+              p.style.left = `${l}px`;
+            }
+            function closeStat() {
+              activeStatMode = null;
+              activeStatItems = [];
+              all(".s.click").forEach((x) => x.classList.remove("active"));
+              $("statPanel").classList.remove("active");
+            }
+            function refreshStat() {
+              if (!activeStatMode) return;
+              activeStatItems = statItems(activeStatMode);
+              setStatList(activeStatItems, $("statSearch").value || "");
+            }
+
+            function fmt(v) {
+              let o = (v ?? "").toString();
+              o = o.replace(
+                /(\/[A-Za-z0-9_\-.,'%&()\/]+?\.(png|jpg|jpeg|gif))/gi,
+                (m) => {
+                  let p = m;
+                  if (p.startsWith("/aidatabase/"))
+                    p = p.replace("/aidatabase", "");
+                  if (!p.startsWith("/media/")) p = `/media${p}`;
+                  return `<br><img src="{{ base_url }}${p}" class="img" alt="Observation Image"><br>`;
+                },
+              );
+              o = o
+                .replace(/\n{2,}/g, "<br><br>")
+                .replace(/\n/g, "<br>")
+                .replace(
+                  /(?<![\w_])XX(?![\w])/g,
+                  '<span style="color:#dc2626;font-weight:700">XX</span>',
+                );
+              keywordTokens.forEach((k) => {
+                if (k)
+                  o = o.replace(
+                    new RegExp(`(${esc(k)})`, "gi"),
+                    "<span class='mark'>$1</span>",
+                  );
+              });
+              return o;
+            }
+
+            function formatObservationDetailHtml(
+              value,
+              imageClass = "observation-image",
+            ) {
+              return (value ?? "")
+                .toString()
+                .replace(
+                  /(\/[A-Za-z0-9_\-.,'%&()\/]+?\.(png|jpg|jpeg|gif))/gi,
+                  (match) => {
+                    let normalizedPath = match;
+                    if (normalizedPath.startsWith("/aidatabase/")) {
+                      normalizedPath = normalizedPath.replace(
+                        "/aidatabase",
+                        "",
+                      );
+                    }
+                    if (!normalizedPath.startsWith("/media/")) {
+                      normalizedPath = `/media${normalizedPath}`;
+                    }
+                    return `<br/><img src="{{ base_url }}${normalizedPath}" class="${imageClass}" alt="Observation Image" style="display:block; margin:10px 0;" /><br/>`;
+                  },
+                )
+                .replace(
+                  /(?<![\w_])XX(?![\w])/g,
+                  '<span style="color:red; font-weight:bold">XX</span>',
+                )
+                .replace(/\n{3,}/g, "<br/><br/>")
+                .replace(/\n{2}/g, "<br/><br/>")
+                .replace(/\n/g, "<br/>")
+                .replace(/(<br\s*\/?>\s*){3,}/g, "<br/><br/>")
+                .replace(
+                  /â€¢\s*([\s\S]*?)(?=(<br\s*\/?>|<p>|<\/p>|$))/g,
+                  "<ul style='margin-bottom:0 !important'><li>$1</li></ul>",
+                )
+                .replace(/<\/ul>\s*<br\s*\/?>/g, "</ul>");
+            }
+
+            function renderTable(rows) {
+              const container = $("cardContainer");
+              container.style.display = "block";
+              container.innerHTML = "";
+              if (!rows || !rows.length) {
+                if (hasSearched) {
+                  if (searchError) {
+                    showResultState(
+                      "Something went wrong while searching. Please try again.",
+                      true,
+                    );
+                  } else {
+                    showResultState("No records found for selected filters.");
+                  }
+                } else {
+                  hideResultState();
+                }
+                return;
+              }
+              hideResultState();
+
+              let srNo = 1;
+              let tableRows = "";
+              rows.forEach((company) => {
+                const [rowsHtml, rowCount] = createRow(company, srNo);
+                tableRows += rowsHtml;
+                srNo += rowCount;
+              });
+
+              container.innerHTML = `
+          <div class="table-tools">
+            {% comment %} <button class="tprint" onclick="printFullTable()">Print All</button> {% endcomment %}
+          </div>
+          <div class="table-wrap">
+            <table class="res-table">
+              <thead>
+                <tr>
+                  <th>Sr No</th>
+                  <th>Company Name / Year</th>
+                  <th>Observation</th>
+                </tr>
+              </thead>
+              <tbody id="table-data">${tableRows}</tbody>
+            </table>
+          </div>
+        `;
+            }
+
+            function createRow(company, srStart) {
+              let rows = "";
+              const companyName = company.company_name || "N/A";
+              const organizationName = company.organization_name || "N/A";
+              const feiNumber = company.fei_number || "N/A";
+              const typeOfEstablishment =
+                getFilteredTypes(company).join(", ") || "N/A";
+              const location = company.location || "N/A";
+
+              const cardId = getCardId(company);
+              const cardEl = $(cardId);
+              const activeTypeBadges = cardEl
+                ? all(".type-count.type-active", cardEl)
+                : [];
+              const activeTypeNames = activeTypeBadges.map((b) =>
+                b.dataset.type.toLowerCase(),
+              );
+
+              const inspections =
+                company.year_of_inspection ||
+                company.data?.year_of_inspection ||
+                {};
+              const companyTypes = (company.type_of_establishment || []).map(
+                (t) => t.toLowerCase(),
+              );
+              const allObservations = [];
+
+              for (const year in inspections) {
+                for (const period in inspections[year]) {
+                  // Filter by Type: If specific type badges are active, only show if company matches those types
+                  if (
+                    activeTypeNames.length > 0 &&
+                    !activeTypeNames.some((t) => companyTypes.includes(t))
+                  ) {
+                    continue;
+                  }
+                  const investigators =
+                    inspections[year][period]?.metadata?.fda_investigators ||
+                    "None";
+                  const systems = inspections[year][period]?.systems || {};
+
+                  for (const system in systems) {
+                    const observations = systems[system]?.observations || {};
+                    for (const obsKey in observations) {
+                      const contents = Array.isArray(
+                        observations[obsKey]?.contents,
+                      )
+                        ? observations[obsKey].contents
+                        : [];
+                      const combinedContent = contents
+                        .map((item) => item?.content || "")
+                        .filter(Boolean)
+                        .join("<br/><br/>");
+                      allObservations.push({
+                        year,
+                        date: period,
+                        type: observationContentType(
+                          observations[obsKey]?.contents?.[0],
+                          observations[obsKey],
+                        ),
+                        obsNumber: parseInt(obsKey.match(/\d+/)) || 999,
+                        investigators,
+                        content: combinedContent,
+                        system,
+                        obsTitle: obsKey,
+                      });
+                    }
+                  }
+                }
+              }
+
+              allObservations.sort((a, b) => {
+                // Sort by Year descending (2026 -> 2018)
+                if (b.year !== a.year) return parseInt(b.year) - parseInt(a.year);
+                // Then by Type Rank
+                const rankA = observationTypeRank(a.type);
+                const rankB = observationTypeRank(b.type);
+                if (rankA !== rankB) return rankA - rankB;
+                // Then by Observation Number
+                return a.obsNumber - b.obsNumber;
+              });
+
+              const validCompanyId =
+                companyName.toLowerCase().replace(/[^a-z0-9]/g, "-") +
+                "-" +
+                srStart;
+
+              allObservations.forEach((obs, index) => {
+                const contentText = fmt(obs.content);
+                const uniqueId = `${validCompanyId}-row-${index}`;
+                rows += `<tr class="${uniqueId}" data-company="${companyName}" data-year="${obs.year}" data-date="${obs.date}" data-system="${obs.system}" data-obs-title="${obs.obsTitle}" data-investigators="${obs.investigators}">`;
+
+                if (index === 0) {
+                  rows += `<td rowspan="${allObservations.length}">${srStart}</td>`;
+                  rows += `
+              <td rowspan="${allObservations.length}">
+                <span class="company-name-tr">${companyName}</span><br>
+                <small>Organization: ${organizationName}</small><br>
+                <small>FEI: ${feiNumber}</small><br>
+                <strong>Year ${obs.year}</strong><br>
+                <div class="additional-details" style="display:none">
+                  <span>${obs.date}</span>
+                  <span class="type-of-establishment">${typeOfEstablishment}</span>
+                  <span class="location">${location}</span>
+                </div>
+              </td>`;
+                }
+                rows += `<td class="content-tr">${contentText}</td>`;
+                rows += `</tr>`;
+              });
+
+              return [rows, 1];
+            }
+
+
+            function printFullTable() {
+              const tableBody = $("table-data");
+              if (!tableBody || !tableBody.innerHTML.trim()) {
+                alert("No data to print.");
+                return;
+              }
+              const printWindow = window.open("", "_blank");
+              if (!printWindow) return;
+              const watermarkUrl = new URL(
+                '{% static "assets/icretegy/itechnical logo.png" %}',
+                window.location.href,
+              ).href;
+              printWindow.document.write(`
+          <html>
+            <head>
+              <title>Inspection Details</title>
+              <style type="text/css" media="all">
+                body{font-family:Segoe UI,Arial,sans-serif;padding:20px;position:relative;background:#fff}
+                .print-watermark{display:none}
+                .print-watermark img{width:118%;max-width:1450px;height:auto;opacity:0.2;transform:rotate(-30deg);object-fit:contain}
+                .print-wrap{position:relative;z-index:1;background:transparent}
+                table{width:100%;border-collapse:collapse}
+                th,td{border:1px solid #ddd;padding:8px;vertical-align:top;background:transparent}
+                th{background:rgba(243,244,246,0.72)}
+                img{max-width:100%;height:auto}
+                .print-watermark img{max-width:1450px;height:auto}
+                .pb{position:relative;z-index:10000;border:none;border-radius:6px;background:#055D8D;color:#fff;padding:8px 12px;margin-bottom:12px}
+                @media print{
+                  html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+                  .print-watermark{position:fixed !important;inset:0 !important;display:flex !important;align-items:center !important;justify-content:center !important;pointer-events:none !important;z-index:9999 !important}
+                  .print-wrap{position:relative;z-index:1}
+                  .pb{display:none}
+                }
+              </style>
+            </head>
+            <body>
+              <div class="print-watermark">
+                <img src="${watermarkUrl}" alt="Watermark">
+              </div>
+              <div class="print-wrap">
+                <button class="pb" onclick="window.print()">Print</button>
+                <table>
+                  <thead>
+                    <tr><th>Sr No</th><th>Company Name / Year</th><th>Observation</th></tr>
+                  </thead>
+                  <tbody>${tableBody.innerHTML}</tbody>
+                </table>
+              </div>
+            </body>
+          </html>
+        `);
+              printWindow.document.close();
+            }
+            window.printFullTable = printFullTable;
+
+            function renderCards(rows, append = false) {
+              $("cardContainer").style.display = "grid";
+              if (!append) {
+                $("cardContainer").innerHTML = "";
+                cardMap = new Map();
+              }
+              if (!rows.length && !append) {
+                if (hasSearched) {
+                  if (searchError) {
+                    showResultState(
+                      "Something went wrong while searching. Please try again.",
+                      true,
+                    );
+                  } else {
+                    showResultState("No records found for selected filters.");
+                  }
+                } else {
+                  hideResultState();
+                }
+                return;
+              }
+              if (!append) hideResultState();
+              rows.forEach((r) =>
+                $("cardContainer").appendChild(createCard(r)),
+              );
+            }
+
+            function escapeAttr(value) {
+              return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/"/g, "&quot;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+            }
+
+            function escapeHtml(value) {
+              return String(value || "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+            }
+
+            function getFilteredTypes(company) {
+              let types = Object.keys(
+                company.type_observation_counts || {},
+              ).filter(Boolean);
+              if (!types.length && company.type_of_establishment) {
+                types = Array.isArray(company.type_of_establishment)
+                  ? company.type_of_establishment
+                  : [company.type_of_establishment];
+              }
+              if (selected.type && selected.type.size > 0) {
+                const selectedTypesArray = Array.from(selected.type).map((t) =>
+                  t.toLowerCase(),
+                );
+                const matchedTypes = types.filter((t) =>
+                  selectedTypesArray.includes(t.toLowerCase()),
+                );
+                if (matchedTypes.length > 0) {
+                  types = matchedTypes;
+                }
+              }
+              return types;
+            }
+
+            function getLatestClassification(company) {
+              if (
+                !company.year_classification ||
+                typeof company.year_classification !== "object"
+              ) {
+                return "N/A";
+              }
+              const years = Object.keys(company.year_classification)
+                .map((y) => parseInt(y))
+                .sort((a, b) => b - a);
+              if (years.length > 0) {
+                return company.year_classification[years[0]] || "N/A";
+              }
+              return "N/A";
+            }
+
+            function getClassificationForYear(company, year) {
+              if (
+                company.year_classification &&
+                company.year_classification[year]
+              ) {
+                return company.year_classification[year];
+              }
+              return company.classification || "N/A";
+            }
+
+            function getTypeDisplay(company) {
+              const types = getFilteredTypes(company);
+              if (!types.length)
+                return { label: "N/A", html: "N/A", full: "N/A" };
+
+              const label = types
+                .map(
+                  (type) =>
+                    `${type} (${(company.type_observation_counts || {})[type] || 0})`,
+                )
+                .join(", ");
+              const html = types
+                .map(
+                  (type) =>
+                    `<span class="type-count" data-type="${escapeAttr(type)}" title="Click to select all years for this type">${escapeHtml(type)} (${(company.type_observation_counts || {})[type] || 0})</span>`,
+                )
+                .join("");
+              return {
+                label,
+                html,
+                full: label,
+              };
+            }
+
+            function createCard(company) {
+              const card = document.createElement("div");
+              card.className = "card";
+              const cardId = getCardId(company);
+              const organizationName = company.organization_name || "N/A";
+              const feiNumber = company.fei_number || "N/A";
+              card.id = cardId;
+              cardMap.set(cardId, company);
+
+              const years = Object.keys(company.year_of_inspection || {}).sort(
+                (a, b) => Number(b) - Number(a),
+              );
+              const typeInfo = getTypeDisplay(company);
+
+              // Build Address Section (Current & History)
+              const addressHistory = company.address_history || [];
+              const latestAddress = company.location || "N/A";
+              const latestAddressYear = addressHistory.length > 0 ? addressHistory[0].year : "";
+
+              let addressHtml = "";
+              if (addressHistory.length > 1) {
+                addressHtml = `
+                  <div class="address-section" style="margin-top: 10px; margin-bottom: 12px; width: 100%;">
+                    <div class="current-address-box" style="
+                      background: #eef7fb;
+                      border: 1px solid #c7ddeb;
+                      border-radius: 8px;
+                      padding: 10px 12px;
+                      margin-bottom: 8px;
+                    ">
+                      <div style="font-size: 11px; font-weight: 700; color: #055d8d; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                        <i class="mdi mdi-map-marker-radius"></i> CURRENT ADDRESS
+                      </div>
+                      <div style="font-size: 13px; font-weight: 500; color: #111827; line-height: 1.4; text-align: left;">
+                        ${latestAddress}
+                      </div>
+                      <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                        Inspected in ${latestAddressYear} · Current location
+                      </div>
+                    </div>
+                    <div class="address-history-box" style="
+                      background: #faf6f0;
+                      border: 1px solid #e9dfd0;
+                      border-radius: 8px;
+                      padding: 10px 12px;
+                    ">
+                      <div style="font-size: 11px; font-weight: 700; color: #856404; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+                        ADDRESS HISTORY
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${addressHistory.map(item => `
+                          <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span style="
+                              font-size: 11px;
+                              font-weight: 700;
+                              padding: 2px 6px;
+                              border-radius: 4px;
+                              white-space: nowrap;
+                              ${item.label.includes('Latest') ? 'background-color: #d1e7dd; color: #0f5132;' : 'background-color: #f8f9fa; border: 1px solid #dee2e6; color: #495057;'}
+                            ">${item.label}</span>
+                            <span style="font-size: 12px; color: #333; line-height: 1.3;">${item.address}</span>
+                          </div>
+                        `).join("")}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              } else {
+                addressHtml = `
+                  <div class="address-section" style="margin-top: 10px; margin-bottom: 12px; width: 100%;">
+                    <div class="current-address-box" style="
+                      background: #eef7fb;
+                      border: 1px solid #c7ddeb;
+                      border-radius: 8px;
+                      padding: 10px 12px;
+                    ">
+                      <div style="font-size: 11px; font-weight: 700; color: #055d8d; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                        <i class="mdi mdi-map-marker-radius"></i> CURRENT ADDRESS
+                      </div>
+                      <div style="font-size: 13px; font-weight: 500; color: #111827; line-height: 1.4; text-align: left;">
+                        ${latestAddress}
+                      </div>
+                      <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                        ${latestAddressYear ? `Inspected in ${latestAddressYear} · ` : ""}Current location
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+
+              // Build Company History Section (if multiple company names exist)
+              const companyHistory = company.company_history || [];
+              let companyHistoryHtml = "";
+              if (companyHistory.length > 1) {
+                companyHistoryHtml = `
+                  <div class="company-history-section" style="margin-top: 8px; margin-bottom: 12px; width: 100%;">
+                    <div class="company-history-box" style="
+                      background: #fdfdfd;
+                      border: 1px dashed #ced4da;
+                      border-radius: 8px;
+                      padding: 10px 12px;
+                    ">
+                      <div style="font-size: 11px; font-weight: 700; color: #495057; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: flex; align-items: center; gap: 4px;">
+                        <i class="mdi mdi-history"></i> COMPANY NAME HISTORY
+                      </div>
+                      <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${companyHistory.map(item => `
+                          <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <span style="
+                              font-size: 11px;
+                              font-weight: 700;
+                              padding: 2px 6px;
+                              border-radius: 4px;
+                              white-space: nowrap;
+                              ${item.label.includes('Current') ? 'background-color: #cfe2ff; color: #084298;' : 'background-color: #f8f9fa; border: 1px solid #dee2e6; color: #495057;'}
+                            ">${item.label}</span>
+                            <span style="font-size: 12px; color: #333; font-weight: 600;">${item.company_name}</span>
+                          </div>
+                        `).join("")}
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }
+
+              card.innerHTML = `
+          <div class="chead">
+            <div class="cname">${company.company_name || "N/A"}</div>
+            <div style="font-size: 12px; color: #6b7280;">Organization: ${organizationName}</div>
+          </div>
+          <div class="igrid">
+            <div class="i">
+              <span>FEI Number:</span>
+              <span>${feiNumber}</span>
+            </div>
+            <div class="i">
+              <span>Latest Classification:</span>
+              <span id="classification-${cardId}">  ${getLatestClassification(company) || "N/A"}</span>
+            </div>
+            <div class="i">
+              <span>FDA Observations:</span>
+              <span>${company.total_fda_observation || 0}</span>
+            </div>
+            <div class="i">
+              <span>Type:</span>
+              <span class="type-counts" title="${escapeAttr(typeInfo.full)}">${typeInfo.html}</span>
+            </div>
+          </div>
+
+          <!-- Address Section -->
+          ${addressHtml}
+
+          <!-- Company Name History Section -->
+          ${companyHistoryHtml}
+          <div class="ylabel">Select Years:</div>
+          <div class="years" id="year-selector-${cardId}">
+            ${years
+              .map(
+                (year) => `<span class="y" data-year="${year}">${year}</span>`,
+              )
+              .join("")}
+          </div>
+          <div class="details" id="${cardId}-details"></div>
+          <div class="button-wrapper" id="btn-wrapper-${cardId}"></div>
+        `;
+
+              const yearSelector = by(".years", card);
+              if (yearSelector) {
+                yearSelector.addEventListener("click", (e) => {
+                  const yearChip = e.target.closest(".y");
+                  if (!yearChip) return;
+                  yearChip.classList.toggle("active");
+                  updateYearDetails(cardId);
+                  updateButton(cardId, yearSelector);
+                });
+              }
+
+              // Type badge click → multi-select: each badge toggles independently
+              const typeCounts = card.querySelectorAll(
+                ".type-count[data-type]",
+              );
+              typeCounts.forEach((badge) => {
+                badge.addEventListener("click", () => {
+                  // Toggle just this badge (multi-select)
+                  badge.classList.toggle("type-active");
+
+                  // If any badge is active → select all years; if none → deselect all years
+                  const anyActive = Array.from(typeCounts).some((b) =>
+                    b.classList.contains("type-active"),
+                  );
+                  if (yearSelector) {
+                    all(".y", yearSelector).forEach((chip) => {
+                      if (anyActive) {
+                        chip.classList.add("active");
+                      } else {
+                        chip.classList.remove("active");
+                      }
+                    });
+                  }
+
+                  updateYearDetails(cardId);
+                  updateButton(cardId, yearSelector);
+                });
+              });
+
+              setTimeout(() => {
+                updateYearDetails(cardId);
+                updateButton(cardId, yearSelector);
+              }, 0);
+              return card;
+            }
+            function updateButton(cardId, yearSelector) {
+              const wrapper = $(`btn-wrapper-${cardId}`);
+              if (!wrapper || !yearSelector) return;
+              const activeYears = all(".y.active", yearSelector);
+
+              if (activeYears.length > 0) {
+                wrapper.innerHTML = `<button class="pbtn" onclick="printCard('${cardId}')">Print Selected Entry</button>`;
+                return;
+              }
+
+              wrapper.innerHTML = `<button class="pbtn" id="btn-${cardId}">Show Card Details</button>`;
+              const showButton = $(`btn-${cardId}`);
+              if (!showButton) return;
+              showButton.addEventListener("click", () => {
+                all(".y", yearSelector).forEach((chip) =>
+                  chip.classList.add("active"),
+                );
+                const yearDetailsDiv = $(`${cardId}-details`);
+                if (yearDetailsDiv) yearDetailsDiv.style.display = "block";
+                updateYearDetails(cardId);
+                updateButton(cardId, yearSelector);
+              });
+            }
+            function escapeHtmlText(value) {
+              return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+            }
+            function observationTypeRank(type) {
+              const normalized = String(type || "")
+                .trim()
+                .toLowerCase();
+              if (normalized.includes("api")) return 0;
+              if (
+                normalized.includes("prescription") ||
+                normalized.includes("(rx)") ||
+                normalized.includes("fdf") ||
+                normalized.includes("finished dosage")
+              )
+                return 1;
+              if (normalized.includes("contract")) return 2;
+              return 3;
+            }
+            function observationContentType(contentItem, obsData) {
+              const contentType = contentItem?.type_of_establishment;
+              if (contentType && String(contentType).trim())
+                return String(contentType).trim();
+              const observationTypes = obsData?.type_of_establishment;
+              if (
+                Array.isArray(observationTypes) &&
+                observationTypes.length === 1
+              ) {
+                return String(observationTypes[0]).trim();
+              }
+              return "Not Specified";
+            }
+            function formatObservationContentHtml(content) {
+              return (content ?? "")
+                .toString()
+                .replace(
+                  /(\/[A-Za-z0-9_\-.,'%&()\/]+?\.(png|jpg|jpeg|gif))/gi,
+                  (match) => {
+                    let normalizedPath = match;
+                    if (normalizedPath.startsWith("/aidatabase/")) {
+                      normalizedPath = normalizedPath.replace(
+                        "/aidatabase",
+                        "",
+                      );
+                    }
+                    if (!normalizedPath.startsWith("/media/")) {
+                      normalizedPath = `/media${normalizedPath}`;
+                    }
+                    return `<br/><img src="{{ base_url }}${normalizedPath}" class="observation-image" alt="Observation Image" style="display:block; margin:10px 0;" /><br/>`;
+                  },
+                )
+                .replace(
+                  /(?<![\w_])XX(?![\w])/g,
+                  '<span style="color:red; font-weight:bold">XX</span>',
+                )
+                .replace(/\n{3,}/g, "<br/><br/>")
+                .replace(/\n{2}/g, "<br/><br/>")
+                .replace(/\n/g, "<br/>")
+                .replace(/(<br\s*\/?>\s*){3,}/g, "<br/><br/>")
+                .replace(
+                  /â€¢\s*([\s\S]*?)(?=(<br\s*\/?>|<p>|<\/p>|$))/g,
+                  "<ul style='margin-bottom:0 !important'><li>$1</li></ul>",
+                )
+                .replace(/<\/ul>\s*<br\s*\/?>/g, "</ul>");
+            }
+            function getObservationTypeGroups(
+              observations,
+              activeTypeNames = [],
+            ) {
+              const grouped = {};
+              observations.forEach(([obsTitle, obsData]) => {
+                const contents = Array.isArray(obsData?.contents)
+                  ? obsData.contents
+                  : [];
+                contents.forEach((contentItem) => {
+                  const type = observationContentType(contentItem, obsData);
+                  const normalizedType = type.toLowerCase();
+                  if (
+                    activeTypeNames.length > 0 &&
+                    !activeTypeNames.some(
+                      (activeType) =>
+                        normalizedType === activeType ||
+                        normalizedType.includes(activeType) ||
+                        activeType.includes(normalizedType),
+                    )
+                  ) {
+                    return;
+                  }
+                  if (!grouped[type]) grouped[type] = [];
+                  grouped[type].push({ obsTitle, obsData, contentItem });
+                });
+              });
+              return Object.entries(grouped)
+                .sort(([typeA], [typeB]) => {
+                  const rankDiff =
+                    observationTypeRank(typeA) - observationTypeRank(typeB);
+                  return rankDiff || typeA.localeCompare(typeB);
+                })
+                .map(([type, typeObservations]) => ({
+                  type,
+                  observations: typeObservations,
+                }));
+            }
+            function renderObservationItems(typeObservations) {
+              const obsMap = new Map();
+              typeObservations.forEach(({ obsTitle, obsData, contentItem }) => {
+                if (!obsMap.has(obsTitle)) {
+                  obsMap.set(obsTitle, { obsData, contents: [] });
+                }
+                obsMap.get(obsTitle).contents.push(contentItem?.content);
+              });
+
+              return Array.from(obsMap.entries())
+                .sort(([titleA], [titleB]) => {
+                  const numA = parseInt(titleA.match(/\d+/)) || 0;
+                  const numB = parseInt(titleB.match(/\d+/)) || 0;
+                  return numA - numB;
+                })
+                .map(
+                  ([obsTitle, { obsData, contents }]) => `
+                <div class="ob">
+                  <h6><strong style="font-size :16px!important;">${obsTitle}</strong></h6>
+                  ${contents
+                    .map(
+                      (content, idx) => `
+                    <div class="content-item" style="
+                      margin-bottom:20px;
+                    ">
+                      <p class="content" style="text-align:justify; margin-bottom:0 !important font-family: Verdana, IBM Plex Sans, sans-serif;;
+     line-height: 1.9;
+    font-weight: 400;
+    font-size: 15px;
+    ">
+                        ${formatObservationContentHtml(content)}
+                      </p>
+                    </div>
+                  `,
+                    )
+                    .join("")}
+                  ${
+                    Array.isArray(obsData?.summaries) &&
+                    obsData.summaries
+                      .map((item) => String(item || "").trim())
+                      .filter(Boolean).length
+                      ? `
+                      <div class="summary-box" style="  background:#EBF6FB;
+                      padding: 5px 4px;
+                      border: 2px dotted #055d8d;
+                      border-radius: 12px;
+                      margin-bottom: 15px;">
+                        <h6><u><strong style="
+                              font-weight: 700 !important;
+                              font-style: italic;
+                              font-size: 17px !important;
+                          ">AI Summary</strong></u></h6>
+                        ${obsData.summaries
+                          .map((item) => String(item || "").trim())
+                          .filter(Boolean)
+                          .map(
+                            (
+                              summaryItem,
+                            ) => `<p style="font-family: Tahoma, Verdana, sans-serif;
+              font-size: 15px;
+              line-height: 1.8;
+              font-weight: 500;">${formatObservationDetailHtml(summaryItem, "summary-image")}</p>`,
+                          )
+                          .join("")}
+                      </div>`
+                      : ""
+                  }
+                </div>
+              `,
+                )
+                .join("");
+            }
+            function updateYearDetails(cardId) {
+              const card = $(cardId);
+              const detailsContainer = $(`${cardId}-details`);
+              const company = cardMap.get(cardId);
+              if (!card || !detailsContainer || !company) return;
+
+              const selectedYears = all(".y.active", card).map(
+                (chip) => chip.dataset.year,
+              );
+              if (!selectedYears.length) {
+                detailsContainer.innerHTML = "";
+                detailsContainer.style.display = "none";
+                return;
+              }
+
+              if (!company.year_of_inspection) {
+                detailsContainer.innerHTML =
+                  '<div class="empty">No data available for selected years.</div>';
+                detailsContainer.style.display = "block";
+                return;
+              }
+
+              const selectedInvestigators = Array.from(selected.investigator);
+              const activeTypeBadges = all(".type-count.type-active", card);
+              const activeTypeNames = activeTypeBadges.map((b) =>
+                b.dataset.type.toLowerCase(),
+              );
+              const companyTypes = (company.type_of_establishment || []).map(
+                (t) => t.toLowerCase(),
+              );
+
+              detailsContainer.style.display = "block";
+              detailsContainer.innerHTML = selectedYears
+                .map((year) => {
+                  const yearData = company.year_of_inspection[year];
+                  if (!yearData) return `<p>No inspection data for ${year}</p>`;
+
+                  const dateHtml = Object.entries(yearData)
+                    .map(([date, data]) => {
+                      let investigators = String(
+                        data?.metadata?.fda_investigators || "N/A",
+                      )
+                        .split(",")
+                        .map((inv) => inv.replace(/\n/g, "").trim())
+                        .filter(Boolean);
+                      if (!investigators.length) investigators = ["N/A"];
+
+                      investigators = investigators.map((name) =>
+                        selectedInvestigators.includes(name)
+                          ? `<span style="font-size:18px;font-weight:bold;text-decoration:underline">${name}</span>`
+                          : name,
+                      );
+
+                      const systemsByType = {};
+                      Object.entries(data?.systems || {}).forEach(
+                        ([systemKey, details]) => {
+                          const observations = Object.entries(
+                            details?.observations || {},
+                          );
+                          getObservationTypeGroups(
+                            observations,
+                            activeTypeNames,
+                          ).forEach((group) => {
+                            if (!systemsByType[group.type])
+                              systemsByType[group.type] = [];
+                            const observationCount = new Set(
+                              group.observations.map((item) => item.obsTitle),
+                            ).size;
+                            systemsByType[group.type].push(`
+                            <div class="sys sel" onclick="toggleSystemSelection(this)">
+                              <div class="sysn">${systemKey}</div>
+                              <div class="oc">Total Observations: ${observationCount}</div>
+                              <div class="olist" style="display:none">
+                                ${renderObservationItems(group.observations)}
+                              </div>
+                            </div>`);
+                          });
+                        },
+                      );
+
+                      const typeSections = Object.entries(systemsByType)
+                        .sort(([typeA], [typeB]) => {
+                          const rankDiff =
+                            observationTypeRank(typeA) -
+                            observationTypeRank(typeB);
+                          return rankDiff || typeA.localeCompare(typeB);
+                        })
+                        .map(
+                          ([type, systemBlocks]) => `
+                          <div class="type-section">
+                            <div class="inv">Type: ${escapeHtmlText(type)}</div>
+                            <div class ="inv">
+                           Classification for ${year}: ${escapeHtmlText(getClassificationForYear(company, year))}
+
+                          </div>
+                            ${systemBlocks.join("")}
+                          </div>`,
+                        )
+                        .join("");
+
+                      if (!typeSections) return "";
+
+                      return `
+                      <div class="date">
+                        <h6>Date: ${date}</h6>
+
+                        <div class="inv">Investigator: ${investigators.join(", ")}</div>
+                        ${typeSections}
+
+                      </div>`;
+                    })
+                    .join("");
+
+                  if (!dateHtml) return "";
+
+                  return `
+              <div class="ys">
+                <h5>Year ${year}</h5>
+                ${dateHtml}
+              </div>`;
+                })
+                .join("");
+            }
+            function toggleSystemSelection(element) {
+              element.classList.toggle("sel");
+            }
+            window.toggleSystemSelection = toggleSystemSelection;
+            function printCard(cardId) {
+              const card = $(cardId);
+              if (!card) return;
+              const selectedYears = all(".y.active", card).map(
+                (chip) => chip.dataset.year,
+              );
+              if (!selectedYears.length) {
+                alert("Please select at least one year to print");
+                return;
+              }
+
+              const printWindow = window.open("", "_blank");
+              if (!printWindow) return;
+              const companyName = by(".cname", card)?.textContent || "Company";
+
+              const detailsSource = $(`${cardId}-details`);
+              if (!detailsSource) return;
+              const detailsContainer = detailsSource.cloneNode(true);
+
+              all(".sys", detailsContainer).forEach((system) => {
+                if (!system.classList.contains("sel")) {
+                  system.remove();
+                  return;
+                }
+                const observationsList = by(".olist", system);
+                if (
+                  observationsList &&
+                  observationsList.innerHTML.trim() !== ""
+                ) {
+                  observationsList.style.display = "block";
+                }
+              });
+
+              all("p", detailsContainer).forEach((p) => {
+                p.innerHTML = p.innerHTML.replace(
+                  /(^|\s)(g\.)/g,
+                  '$1<span class="print-only-breakes"><br></span>$2',
+                );
+              });
+
+              const activeTypeBadges = all(".type-count.type-active", card);
+              const typeHtml =
+                activeTypeBadges.length > 0
+                  ? activeTypeBadges
+                      .map((b) => b.textContent.trim())
+                      .filter(Boolean)
+                      .join(", ")
+                  : Array.from(all(".type-count", card))
+                      .map((b) => b.textContent.trim())
+                      .filter(Boolean)
+                      .join(", ") ||
+                    by(".type-counts", card)?.textContent.trim() ||
+                    "N/A";
+              const company = cardMap.get(cardId);
+              const location = company ? (company.location || "N/A") : "N/A";
+
+              // Helper: get address for a specific year from address_history
+              function getAddressForYear(yr) {
+                const history = (company && company.address_history) || [];
+                if (!history.length) return null;
+                // Find exact year match first
+                const exactMatch = history.find(item => String(item.year) === String(yr));
+                if (exactMatch) return exactMatch.address;
+                // Otherwise find the most recent entry <= yr
+                const sorted = history
+                  .filter(item => item.year)
+                  .sort((a, b) => Number(b.year) - Number(a.year));
+                const found = sorted.find(item => Number(item.year) <= Number(yr));
+                return found ? found.address : (sorted.length ? sorted[sorted.length - 1].address : null);
+              }
+
+              // Helper: get company name for a specific year from company_history
+              function getCompanyNameForYear(yr) {
+                const history = (company && company.company_history) || [];
+                if (!history.length) return null;
+                const exactMatch = history.find(item => String(item.year) === String(yr));
+                if (exactMatch) return exactMatch.company_name;
+                const sorted = history
+                  .filter(item => item.year)
+                  .sort((a, b) => Number(b.year) - Number(a.year));
+                const found = sorted.find(item => Number(item.year) <= Number(yr));
+                return found ? found.company_name : (sorted.length ? sorted[sorted.length - 1].company_name : null);
+              }
+
+              // Helper: count observations for a specific type in a specific year
+              function getYearTypeObsCount(yr, typeName) {
+                const yearData = company && company.year_of_inspection && company.year_of_inspection[yr];
+                if (!yearData || !typeName) return 0;
+                const normalizedType = typeName.trim().toLowerCase();
+                const obsSet = new Set();
+                Object.values(yearData).forEach(dateData => {
+                  Object.values(dateData?.systems || {}).forEach(systemDetails => {
+                    Object.entries(systemDetails?.observations || {}).forEach(([obsTitle, obsData]) => {
+                      const contents = Array.isArray(obsData?.contents) ? obsData.contents : [];
+                      if (!contents.length) return;
+                      contents.forEach(contentItem => {
+                        let type = '';
+                        const ct = contentItem?.type_of_establishment;
+                        if (ct && String(ct).trim()) {
+                          type = String(ct).trim();
+                        } else {
+                          const obsTypes = obsData?.type_of_establishment;
+                          if (Array.isArray(obsTypes) && obsTypes.length === 1)
+                            type = String(obsTypes[0]).trim();
+                        }
+                        const nt = type.toLowerCase();
+                        if (nt && (nt === normalizedType || nt.includes(normalizedType) || normalizedType.includes(nt)))
+                          obsSet.add(obsTitle);
+                      });
+                    });
+                  });
+                });
+                return obsSet.size;
+              }
+              // Build year-wise info box for each .ys block & remove old .inv rows from date block
+              Array.from(detailsContainer.querySelectorAll('.ys')).forEach(ysEl => {
+                const h5 = ysEl.querySelector('h5');
+                if (!h5) return;
+                const yearText = h5.textContent.replace('Year', '').trim();
+                const yrAddr = getAddressForYear(yearText);
+                const yrCompany = getCompanyNameForYear(yearText);
+
+                // Only show company name if it differs from the current/latest
+                const latestCompanyName = (company && company.company_name) || '';
+                const showCompany = yrCompany && yrCompany.trim() !== latestCompanyName.trim();
+
+                // Only show address if it differs from the current/latest
+                const latestAddr = (company && company.location) || '';
+                const showAddr = yrAddr && yrAddr.trim() !== latestAddr.trim();
+
+                // Extract investigator, type, classification from .inv elements inside .date blocks
+                let yrInvestigator = '';
+                let yrType = '';
+                let yrClassification = '';
+                const allInvEls = Array.from(ysEl.querySelectorAll('.date .inv'));
+                allInvEls.forEach(invEl => {
+                  const txt = invEl.textContent.trim();
+                  if (txt.startsWith('Investigator:') && !yrInvestigator)
+                    yrInvestigator = txt.replace('Investigator:', '').trim();
+                  else if (txt.startsWith('Type:') && !yrType)
+                    yrType = txt.replace('Type:', '').trim();
+                  else if (txt.toLowerCase().startsWith('classification') && !yrClassification)
+                    yrClassification = txt.replace(/classification for \d+:/i, '').trim();
+                });
+
+                // Remove old .inv rows from all .date blocks (they move into the new box)
+                ysEl.querySelectorAll('.date .inv').forEach(el => el.remove());
+
+                const hasData = showCompany || showAddr || yrInvestigator || yrType || yrClassification;
+                if (!hasData) return;
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'year-meta-info';
+                infoDiv.style.cssText = 'background:#eef7fb;border:1px solid #c7ddeb;border-radius:8px;padding:10px 14px;margin:8px 0 12px 0;display:flex;flex-direction:column;gap:6px;';
+
+                if (showCompany) {
+                  const nameRow = document.createElement('div');
+                  nameRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+                  nameRow.innerHTML = `<span style="font-size:11px;font-weight:700;color:#055d8d;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Company</span><span style="font-size:13px;font-weight:600;color:#111827;">${yrCompany}</span>`;
+                  infoDiv.appendChild(nameRow);
+                }
+
+                if (showAddr) {
+                  const addrRow = document.createElement('div');
+                  addrRow.style.cssText = 'display:flex;align-items:flex-start;gap:8px;';
+                  addrRow.innerHTML = `<span style="font-size:11px;font-weight:700;color:#055d8d;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Address</span><span style="font-size:13px;color:#374151;line-height:1.4;">${yrAddr}</span>`;
+                  infoDiv.appendChild(addrRow);
+                }
+
+                if (yrInvestigator) {
+                  const invRow = document.createElement('div');
+                  invRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+                  invRow.innerHTML = `<span style="font-size:11px;font-weight:700;color:#055d8d;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Investigator</span><span style="font-size:13px;color:#374151;">${yrInvestigator}</span>`;
+                  infoDiv.appendChild(invRow);
+                }
+
+                if (yrType) {
+                  const typeRow = document.createElement('div');
+                  typeRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+                  const yrTypeCount = getYearTypeObsCount(yearText, yrType);
+                  const typeCountStr = yrTypeCount > 0 ? ` (${yrTypeCount})` : '';
+                  typeRow.innerHTML = `<span style="font-size:11px;font-weight:700;color:#055d8d;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Type</span><span style="font-size:13px;color:#374151;">${yrType}${typeCountStr}</span>`;
+                  infoDiv.appendChild(typeRow);
+                }
+
+                if (yrClassification) {
+                  const classRow = document.createElement('div');
+                  classRow.style.cssText = 'display:flex;align-items:center;gap:8px;';
+                  classRow.innerHTML = `<span style="font-size:11px;font-weight:700;color:#055d8d;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;">Classification</span><span style="font-size:13px;font-weight:600;color:#0f5132;background:#d1e7dd;border-radius:4px;padding:1px 8px;">${yrClassification}</span>`;
+                  infoDiv.appendChild(classRow);
+                }
+
+                // Insert after the Date h6 inside the .date block (not after the Year h5)
+                const firstDateEl = ysEl.querySelector('.date');
+                const dateH6 = firstDateEl && firstDateEl.querySelector('h6');
+                if (dateH6) {
+                  dateH6.insertAdjacentElement('afterend', infoDiv);
+                } else if (firstDateEl) {
+                  firstDateEl.prepend(infoDiv);
+                } else {
+                  h5.insertAdjacentElement('afterend', infoDiv);
+                }
+              });
+              const watermarkUrl = new URL(
+                '{% static "assets/icretegy/itechnical logo.png" %}',
+                window.location.href,
+              ).href;
+
+              const printContent = `
+          <html>
+            <head>
+              <title>Inspection Details - ${companyName}</title>
+              <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+              <style type="text/css" media="all">
+                body{font-family:'Poppins',sans-serif;padding:20px;page-break-inside:avoid;break-inside:avoid;background:#fff}
+                .print-watermark{display:none}
+                .print-watermark img{width:118% !important;max-width:1450px !important;height:1200px !important;opacity:0.4;transform:rotate(-55deg);object-fit:contain}
+                .print-wrap{position:relative;z-index:1;background:transparent}
+                h6{margin-top:20px}
+                .company-header{margin-bottom:10px}
+                .print-only-breakes{display:none}
+                @media print{.print-only-breakes{display:block !important}}
+                .ys{margin-bottom:30px;background:rgba(248,250,252,0.52);padding:20px;border-radius:8px}
+                .year-meta-info{background:#eef7fb;border:1px solid #c7ddeb;border-radius:8px;padding:10px 14px;margin:8px 0 12px 0;}
+                .sysn{font-weight:bold;font-size:18px;margin-bottom:2px}
+                .date{margin:15px 0;padding:15px;background:rgba(255,255,255,0.35);border-radius:8px;border:1px solid #e2e8f0}
+                .oc{font-size:17px;text-decoration:underline;margin-bottom:7px}
+                .sys{margin-left:20px;padding-left:15px;border-left:2px solid #055D8D}
+                .inv{font-style:italic;color:#475569;margin:10px 0;padding:8px;background:rgba(241,245,249,0.4);border-radius:4px}
+                .olist{display:block !important}
+                .otype{margin:0 0 10px;color:#475569;font-size:15px}
+                img{max-width:100%;height:auto;page-break-inside:avoid;break-inside:avoid}
+                .print-watermark img{max-width:1450px;height:auto}
+                p{margin-bottom:1rem !important}
+
+                .print-btn{position:relative;z-index:10000;display:block;margin:20px;padding:10px 20px;background:linear-gradient(90deg, #0a78b4, #055D8D);color:#fff;border:none;border-radius:5px;cursor:pointer;text-align:center;font-weight:700}
+                .print-btn:hover{opacity:0.9}
+                @media print{
+                  html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+                  .print-watermark{position:fixed !important;inset:0 !important;display:flex !important;align-items:center !important;justify-content:center !important;pointer-events:none !important;z-index:9999 !important}
+                  .print-wrap{position:relative;z-index:1}
+                  .print-btn{display:none}
+                }
+              </style>
+            </head>
+            <body>
+              <div class="print-watermark">
+                <img src="${watermarkUrl}" alt="Watermark">
+              </div>
+              <div class="print-wrap">
+                <button class="print-btn" onclick="window.print()">Print</button>
+                <div class="company-header">
+                  <h2>${companyName}</h2>
+                  <div style="margin-bottom: 10px;">
+                    <strong>Type:</strong>
+                    <span>${typeHtml}</span>
+                  </div>
+                  <p><strong>Location:</strong> ${location}</p>
+                </div>
+                ${detailsContainer.innerHTML}
+              </div>
+            </body>
+          </html>
+        `;
+              printWindow.document.write(printContent);
+              printWindow.document.close();
+            }
+            window.printCard = printCard;
+
+            function payload(page) {
+              return {
+                organization_name: Array.from(selected.organization).map((x) =>
+                  x.trim(),
+                ),
+                company_name: Array.from(selected.company),
+                system_name: Array.from(selected.system),
+                investigator_name: Array.from(selected.investigator),
+                year_of_inspection: Array.from(selected.year).map(Number),
+                type_of_establishment: Array.from(selected.type),
+                country: Array.from(selected.country),
+                keyword_search: keywordTokens,
+                fei_number: Array.from(selected.fdaNumber),
+                page: page,
+                page_size: 12,
+              };
+            }
+            async function fetchPage(page = 1, append = false) {
+              if (isLoading) return;
+              isLoading = true;
+              if (!append) searchError = null;
+              $("infinite-loader").style.display = "block";
+              $("infinite-error").style.display = "none";
+              try {
+                const r = await fetch(
+                  "{{BASE_URL}}/aidatabase/company_object/",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Accept: "application/json",
+                      "X-CSRFToken": csrf(),
+                    },
+                    body: JSON.stringify(payload(page)),
+                  },
+                );
+                document.title = `Search Results - Page ${page}`;
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const j = await r.json();
+                summary = j.summary || {};
+                const rows = Array.isArray(j.data) ? j.data : [];
+                currentPage = j.pagination?.current_page || page;
+                totalPages = j.pagination?.total_pages || 1 || j.pagination;
+
+                if (!append) {
+                  dataRows = rows;
+                } else {
+                  dataRows = dataRows.concat(rows);
+                }
+
+                if (keywordTokens.length > 0) {
+                  renderTable(dataRows);
+                } else {
+                  if (!append) renderCards(dataRows, false);
+                  else renderCards(rows, true);
+                }
+                setSummary(summary);
+                updateSummaryVisibility();
+                refreshStat();
+              } catch (e) {
+                console.error("Search error:", e);
+                if (!append) {
+                  searchError = e;
+                  summary = {};
+                  dataRows = [];
+                  setSummary({});
+                  updateSummaryVisibility();
+                  if (keywordTokens.length > 0) renderTable([]);
+                  else renderCards([], false);
+                  refreshStat();
+                }
+                $("infinite-error").style.display = "block";
+              } finally {
+                isLoading = false;
+                $("infinite-loader").style.display = "none";
+              }
+            }
+            async function doSearch(isUndo = false) {
+              const nextState = captureCurrentState();
+              if (!isUndo) {
+                const currentState =
+                  readStoredState("currentFilterState") || createEmptyState();
+                if (!statesEqual(currentState, nextState)) {
+                  writeStoredState("prevFilterState", currentState);
+                }
+                syncUndoButton();
+              }
+
+              selected.keyword = nextState.keyword;
+              keywordTokens = selected.keyword
+                .split(",")
+                .map((v) => v.trim())
+                .filter(Boolean);
+              const hasFilter = FILTER_SET_KEYS.some(
+                (k) => selected[k] instanceof Set && selected[k].size > 0,
+              );
+              // if (!hasFilter && keywordTokens.length === 0) {
+              //   alert("Please select at least one filter or enter an observation keyword.");
+              //   return;
+              // }
+              hasSearched = true;
+              searchError = null;
+              document.title = "Searching...";
+
+              hideResultState();
+              renderChips();
+              userHasScrolled = false;
+              currentPage = 1;
+              totalPages = 1;
+              await fetchPage(1, false);
+              writeStoredState("currentFilterState", captureCurrentState());
+              syncUndoButton();
+            }
+            function clearAll() {
+              Object.keys(selected).forEach((k) => {
+                if (selected[k] instanceof Set) selected[k].clear();
+              });
+              localStorage.removeItem("prevFilterState");
+              localStorage.removeItem("currentFilterState");
+              selected.keyword = "";
+              keywordTokens = [];
+              hasSearched = false;
+              searchError = null;
+              summary = {};
+              dataRows = [];
+              currentPage = 1;
+              totalPages = 1;
+              userHasScrolled = false;
+              $("keywordInput").value = "";
+              all(".msearch").forEach((x) => (x.value = ""));
+              FILTER_SET_KEYS.forEach((k) => {
+                renderDrop(k);
+                refreshLabel(k);
+              });
+              renderChips();
+              setSummary({});
+              updateSummaryVisibility();
+              closeStat();
+              hideResultState();
+              renderCards([], false);
+              document.title = "Year inspection";
+              syncUndoButton();
+            }
+            async function loadLists() {
+              try {
+                const c = await fetch(
+                  "{{ base_url }}/aidatabase/list_of_company/",
+                );
+                const cj = await c.json();
+                listData.company = Array.isArray(cj.companies)
+                  ? cj.companies
+                  : [];
+                const co = await fetch(
+                  "{{ base_url }}/aidatabase/list_of_country/",
+                );
+                const coj = await co.json();
+                listData.country = Array.isArray(coj.countries)
+                  ? coj.countries
+                  : [];
+                const i = await fetch(
+                  "{{ base_url }}/aidatabase/list_of_investigators/",
+                );
+                const ij = await i.json();
+                listData.investigator = Array.isArray(ij.investigators)
+                  ? ij.investigators
+                  : [];
+                const f = await fetch(
+                  "{{ base_url }}/aidatabase/list_of_fei_numbers/",
+                );
+                const fj = await f.json();
+                listData.fdaNumber = Array.isArray(fj.fei_numbers)
+                  ? fj.fei_numbers.map((x) => x.fei_number || x)
+                  : [];
+                const o = await fetch(
+                  "{{ base_url }}/aidatabase/list_of_organization_names/",
+                );
+                const oj = await o.json();
+                listData.organization = Array.isArray(oj.organization_names)
+                  ? oj.organization_names.map((x) => x.organization_name || x)
+                  : [];
+                listData.system = [...listStatic.system];
+                listData.type = [...listStatic.type];
+                const y = await fetch(
+                  "{{ base_url }}/aidatabase/list_of_years/",
+                );
+                const yj = await y.json();
+                listData.year = Array.isArray(yj.years)
+                  ? yj.years.map((x) => x.year || x)
+                  : [];
+              } catch (e) {
+                console.error("List fetch error:", e);
+
+                listData.company = [];
+                listData.country = [];
+                listData.investigator = [];
+                listData.fdaNumber = [];
+                listData.organization = [];
+                listData.system = [...listStatic.system];
+                listData.type = [...listStatic.type];
+                listData.year = [];
+              }
+
+              FILTER_SET_KEYS.forEach((k) => {
+                renderDrop(k);
+                refreshLabel(k);
+              });
+            }
+
+            document.addEventListener("click", (e) => {
+              const t = e.target.closest(".trigger");
+              if (t) {
+                const f = t.closest(".field"),
+                  m = by(".menu", f),
+                  o = m.classList.contains("active");
+                closeMenus();
+                if (!o) {
+                  m.classList.add("active");
+                  f.classList.add("open");
+                }
+                return;
+              }
+              if (e.target.matches(".msearch")) return;
+              const cb = e.target.closest(
+                "input[type='checkbox'][data-filter]",
+              );
+              if (cb) {
+                const k = cb.dataset.filter,
+                  v = cb.dataset.value;
+                cb.checked ? selected[k].add(v) : selected[k].delete(v);
+                refreshLabel(k);
+                renderChips();
+                return;
+              }
+              const rm = e.target.closest("#chips button");
+              if (rm) {
+                const k = rm.dataset.key,
+                  v = rm.dataset.val;
+                if (selected[k] instanceof Set) selected[k].delete(v);
+                if (k === "keyword") {
+                  selected.keyword = "";
+                  keywordTokens = [];
+                  $("keywordInput").value = "";
+                }
+                FILTER_SET_KEYS.forEach((x) => {
+                  renderDrop(x);
+                  refreshLabel(x);
+                });
+                renderChips();
+                if (hasSearched) doSearch();
+                return;
+              }
+              if (!e.target.closest(".field")) closeMenus();
+              const statClick =
+                e.target.closest(".s.click") || e.target.closest("#statPanel");
+              if (!statClick && $("statPanel").classList.contains("active"))
+                closeStat();
+            });
+            all(".msearch").forEach((inp) =>
+              inp.addEventListener("input", () => {
+                const k = inp.closest(".field").dataset.filter;
+                renderDrop(k, inp.value || "");
+              }),
+            );
+            $("searchBtn").addEventListener("click", () => doSearch());
+            $("undoBtn").addEventListener("click", performUndo);
+            $("clearBtn").addEventListener("click", clearAll);
+            $("infinite-retry").addEventListener("click", () =>
+              fetchPage(currentPage + 1, true),
+            );
+            all(".s.click").forEach((n) => {
+              n.addEventListener("mouseenter", () => {
+                if (statTimeout) clearTimeout(statTimeout);
+                const mode = n.dataset.mode;
+                openStat(mode, n);
+              });
+              n.addEventListener("mouseleave", () => {
+                statTimeout = setTimeout(() => closeStat(), 200);
+              });
+            });
+            const statPanel = $("statPanel");
+            statPanel.addEventListener("mouseenter", () => {
+              if (statTimeout) clearTimeout(statTimeout);
+            });
+            statPanel.addEventListener("mouseleave", () => {
+              statTimeout = setTimeout(() => closeStat(), 200);
+            });
+            $("statSearch").addEventListener("input", (e) =>
+              setStatList(activeStatItems, e.target.value || ""),
+            );
+            let scrollTimer = null;
+            window.addEventListener("scroll", () => {
+              const pos = window.innerHeight + window.scrollY,
+                h = document.body.offsetHeight;
+              if (window.scrollY > 120) userHasScrolled = true;
+              if (
+                userHasScrolled &&
+                pos >= h - 220 &&
+                !isLoading &&
+                currentPage < totalPages
+              ) {
+                clearTimeout(scrollTimer);
+                scrollTimer = setTimeout(
+                  () => fetchPage(currentPage + 1, true),
+                  120,
+                );
+              }
+            });
+
+            loadLists();
+            renderChips();
+            setSummary({});
+            updateSummaryVisibility();
+            renderCards([], false);
+            syncUndoButton();
+          </script>
+          <script>
+            // Sidebar toggle
+            const sidebarToggle = document.getElementById("sidebarToggle");
+            const dashboardLayout = document.getElementById("dashboardLayout");
+            if (sidebarToggle && dashboardLayout) {
+              sidebarToggle.addEventListener("click", function () {
+                const collapsed =
+                  dashboardLayout.classList.toggle("sidebar-collapsed");
+                sidebarToggle.setAttribute("aria-expanded", String(!collapsed));
+                sidebarToggle.innerHTML = collapsed
+                  ? '<i class="mdi mdi-dock-right"></i>'
+                  : '<i class="mdi mdi-dock-left"></i>';
+              });
+            }
+          </script>
+        </div>
+        <!-- end content-wrapper -->
+      </div>
+      <!-- end dashboard-main-panel -->
+    </div>
+    <!-- end dashboard-layout -->
+  </body>
+</html>

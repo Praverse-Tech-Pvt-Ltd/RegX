@@ -1,0 +1,1454 @@
+{% load static %}
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+<link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+  <!-- endinject -->
+  <!-- Plugin css for this page -->
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+  <!-- End plugin css for this page -->
+  <!-- Layout styles -->
+  <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+  <!-- End layout styles -->
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+        * {
+          margin: 0px;
+          padding: 0px;
+        }
+        body {
+          background: linear-gradient(to right, #ffffff, #f4a3ff);
+        }
+        .btn {
+          padding: 1px 0.375rem !important;
+        }
+        .seachbar {
+          border-width: 1.5px;
+          border-color: #fb0206;
+          font-size: 20px;
+          border-radius: 10px !important;
+          background-color: #dbd7d4;
+        }
+        .suggestions-dropdown {
+          position: absolute;
+          border: 1px solid #ccc;
+          background-color: white;
+          width: 50%;
+          max-height: 200px;
+          overflow-y: auto;
+          z-index: 1;
+          display: none;
+        }
+
+        .suggestions-dropdown div {
+          padding: 8px;
+          cursor: pointer;
+        }
+
+        .suggestions-dropdown div:hover {
+          background-color: #f0f0f0;
+        }
+
+        .selected-companies {
+          margin-left: 5px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+        }
+
+        .nav-link {
+          white-space: normal !important;
+          word-wrap: break-word !important;
+          overflow-wrap: break-word !important;
+          text-align: left !important;
+        }
+        .navbar-menu-wrapper{
+          padding-left: 0px !important;
+          padding-right: 0px !important;
+        }
+
+        .nav-header-link {
+          font-size: 14px !important;
+          font-weight: bold;
+          text-decoration: none;
+          border-radius: 5px;
+          color: black !important;
+        }
+        @media (max-width: 1490px) {
+          .nav-header-link {
+
+            font-size: 12px !important;
+          }
+        }
+        .nav-header-link-hover:hover {
+      color: #045c8d !important;
+    }
+
+    .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+    }
+
+
+        .nav-item-dr {
+          background: #90dad7;
+          padding: 0 !important;
+        }
+
+        .nav-item-dr-li {
+          padding: 0 1.25rem !important;
+        }
+
+        .hover-link {
+          color: rgb(0, 0, 0) !important;
+          font-weight: 600;
+          padding: 1.125rem 2.25rem !important;
+        }
+
+        .hover-link:hover {
+         background: linear-gradient(to right, #045c8d, #3485b3) !important;
+        }
+
+        .nav-item-list {
+          padding: 0.5rem 2.25rem !important;
+          color: rgb(0, 0, 0) !important;
+          font-weight: 600;
+          background: #90dad7;
+        }
+
+        .nav-item-list:hover {
+         background: linear-gradient(to right, #045c8d, #3485b3) !important;
+          color: rgb(0, 0, 0) !important;
+        }
+
+        .hover-link-list {
+          color: black !important;
+        }
+
+        .nav-profile-text p {
+          margin-bottom: 0;
+          color: black !important;
+        }
+        .selected-companies span {
+          margin-right: 10px;
+          background-color: #007bff;
+          color: white;
+          padding: 5px 10px;
+          border-radius: 20px;
+          cursor: pointer;
+        }
+
+        .selected-companies span:hover {
+          background-color: #0056b3;
+        }
+
+
+
+        /* Table header sticky */
+        thead th {
+          position: sticky;
+          top: 0;
+          background-color: var(--primary-color);
+          color: white;
+          z-index: 2;
+          text-align: center;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          padding: 12px 15px;
+          border: 1px solid #085e8e;
+        }
+
+      .card {
+          background: rgba(233,93,0,0.1);
+          border: 2px solid #E95D00;
+          border-radius: 15px;
+          padding: 20px;
+          max-width: 450px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+
+      .info-row {
+          display: flex;
+          align-items: center;
+          margin-bottom: 10px;
+          gap: 8px;
+      }
+
+      .icon {
+          font-size: 1.2em;
+      }
+
+      .label {
+          font-weight: bold;
+          color: #333;
+      }
+
+      .inspection-table {
+
+          border-collapse: collapse;
+          margin: 10px 0;
+          background: white;
+          border-radius: 8px;
+          overflow: hidden;
+      }
+
+      .inspection-table th, .inspection-table td {
+          padding: 8px;
+          text-align: left;
+          border: 1px solid #ddd;
+      }
+
+      .inspection-table th {
+          background-color: #f8f8f8;
+      }
+
+      .system-boxes {
+          display: flex;
+          position: relative;
+      }
+
+      .system-box {
+
+          background-color: #e6f3ff;
+          border-radius: 8px;
+          padding: 10px;
+      }
+
+      .system-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 5px;
+      }
+
+      .year-tag {
+          background-color: #ff9999;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 0.8em;
+          color: white;
+      }
+
+      .system-details {
+          font-size: 0.9em;
+          color: #666;
+      }
+
+      .investigator-section {
+          margin: 20px 0;
+          color: #ff0000;
+      }
+
+      .print-button {
+          width: 100%;
+          padding: 12px;
+          background-color: #4a67e8;
+          color: white;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 1em;
+          transition: background-color 0.3s;
+      }
+
+      .print-button:hover {
+          background-color: #3951b9;
+      }
+
+      .future-date {
+          color: blue;
+          text-decoration: underline;
+      }
+      .cardContainer{
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(3,1fr);
+      }
+
+      .year-boxes-container,
+  .date-boxes-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .year-box,
+  .date-box {
+    padding: 8px 16px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+  }
+
+  .year-box:hover,
+  .date-box:hover {
+    border-color: #4CAF50;
+    background: #f0f9f0;
+  }
+
+  .year-box.active,
+  .date-box.active {
+    background: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+  }
+
+  .system-box {
+    border: 1px solid #ccc;
+    padding: 10px;
+    display: grid;
+
+    margin: 5px;
+    cursor: pointer;
+  }
+
+  .system-box.selected {
+    background-color: lightblue; /* Highlight selected */
+    border-color: blue;
+  }
+  .details-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 1rem;
+  }
+
+  .column {
+    width: 33.33%;
+    background-color: #f0f0f0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .header {
+    padding: 1rem;
+    color: white;
+    font-weight: normal;
+  }
+
+  .content {
+    height: 300px;
+    background-color: #f0f0f0;
+  }
+
+  .footer {
+    height: 1rem;
+  }
+
+  /* Column specific colors */
+  .date .header, .date .footer {
+    background-color: #5850c9;
+  }
+
+  .investigator .header, .investigator .footer {
+    background-color: #82c91e;
+  }
+
+  .system .header, .system .footer {
+    background-color: #cd9661;
+  }
+  @media (min-width: 576px) {
+    .modal-dialog {
+        max-width: 800px;
+        margin: 1.75rem auto;
+    }
+  }
+      :root {
+          --primary-color: #085e8e;
+          --secondary-color: #3b82f6;
+          --accent-color: #60a5fa;
+          --background-color: #f8fafc;
+          --card-background: #ffffff;
+          --text-primary: #1e293b;
+          --text-secondary: #475569;
+      }
+
+      body {
+          font-family: 'Poppins', sans-serif;
+          background: var(--background-color);
+          color: var(--text-primary);
+      }
+
+      .dashboard-header {
+          background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+          color: white;
+          padding: 2rem;
+          border-radius: 0 0 1rem 1rem;
+          margin-bottom: 2rem;
+      }
+
+      .system-selector {
+          display: flex;
+          gap: 1rem;
+          justify-content: center;
+          flex-wrap: wrap;
+          margin-bottom: 2rem;
+          font-size: 17px;
+
+      }
+
+      .system-chip {
+          background: var(--card-background);
+          border: 2px solid var(--accent-color);
+          padding: 0.5rem 1rem;
+          border-radius: 2rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+      }
+      .system-chip:hover {
+        background:var(--accent-color);;
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+      }
+
+      .system-chip.active {
+          background: var(--primary-color);
+          color: white;
+      }
+     .btn-container {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin-top: 20px;
+      }
+
+      .search-btn {
+        padding: 10px 30px !important;
+        font-size: 16px;
+        font-weight: 500;
+        background-color: #085e8e;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        height: fit-content;
+        align-self: flex-end;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+      }
+
+      .search-btn:hover {
+        background-color: #0056b3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .search-btn:active {
+        transform: translateY(0);
+      }
+
+      .card-container {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+          gap: 1.5rem;
+          padding: 1rem;
+      }
+
+      .data-card {
+          background: var(--card-background);
+          border-radius: 1rem;
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+          padding: 1.5rem;
+          transition: transform 0.3s ease;
+          border: 1px solid blue !important;
+      }
+
+      .data-card:hover {
+          transform: translateY(-5px);
+      }
+
+      .card-header {
+          border-bottom: 2px solid var(--accent-color);
+          padding-bottom: 1rem;
+          margin-bottom: 1rem;
+      }
+
+      .company-name {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: var(--primary-color);
+      }
+      .selected-Compni{
+        display: flex;
+      width: 500px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+
+      .info-grid {
+          display: grid;
+          gap: 0.75rem;
+          margin-bottom: 1rem;
+      }
+
+      .info-item {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: var(--text-secondary);
+      }
+
+      .year-selector {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          /*margin: 1rem 0;*/
+          padding: 0.5rem;
+          border-radius: 0.5rem;
+          justify-content: center;
+      }
+
+      .year-chip {
+          background: var(--card-background);
+          padding: 0.25rem 0.75rem;
+          border-radius: 1rem;
+          cursor: pointer;
+          font-size: 0.875rem;
+          border: 1px solid #085e8e;
+          transition: all 0.2s ease;
+          font-size: 17px;
+          height: 30px;
+      }
+
+      .year-chip:hover {
+        background:var(--accent-color);;
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+      }
+
+
+      .year-chip.active {
+        background: #085e8e;
+
+          color: white;
+      }
+
+      .year-details {
+          margin-top: 1rem;
+      }
+
+      .year-section {
+          background: #f8fafc;
+          border-radius: 0.5rem;
+          padding: 1rem;
+          margin: 1rem 0;
+      }
+      .navbar-brand-wrapper{
+        width: fit-content !important;
+      }
+      .navbar-menu-wrapper{
+        width: fit-content !important;
+
+      }
+
+      .inspection-date {
+          background: white;
+          border-radius: 0.5rem;
+          padding: 1rem;
+          margin: 0.5rem 0;
+          border: 1px solid #e2e8f0;
+      }
+
+      .inspection-date h6 {
+          color: var(--primary-color);
+          margin-bottom: 0.5rem;
+      }
+
+      .system-details {
+          margin-left: 1rem;
+          padding: 0.5rem 0;
+          border-left: 2px solid var(--accent-color);
+          padding-left: 1rem;
+          margin-top: 0.5rem;
+      }
+
+      .system-name {
+          font-weight: 500;
+
+      }
+
+      .observation-count {
+
+          font-size: 0.875rem;
+          margin-top: 0.25rem;
+      }
+
+      .investigator-info {
+          font-style: italic;
+          color: var(--text-secondary);
+          margin-top: 0.5rem;
+          font-size: 0.875rem;
+          padding: 0.5rem;
+          background: #f1f5f9;
+          border-radius: 0.25rem;
+      }
+      {% comment %} Types Of Establishment Css  type_of_establishment-selector - esta_system-chip{% endcomment %}
+      .type_of_establishment-selector {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+        font-size: 17px;
+
+    }
+
+    .esta_system-chip {
+        background: var(--card-background);
+        border: 2px solid var(--accent-color);
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .esta_system-chip:hover {
+      background:var(--accent-color);;
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .esta_system-chip.active {
+        background: var(--primary-color);
+        color: white;
+    }
+      .print-button {
+          margin-top: 1rem;
+          width: 100%;
+          background: var(--primary-color);
+          color: white;
+          border: none;
+          padding: 0.75rem;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          transition: background 0.2s ease;
+          font-weight: 500;
+      }
+
+      .print-button:hover {
+          background: var(--secondary-color);
+      }
+
+      @media print {
+          .year-details {
+              display: block !important;
+          }
+          .dashboard-header,
+          .system-selector,
+          .print-button {
+              display: none;
+          }
+      }
+      .system-details {
+          padding: 10px;
+          border: 1px solid #ccc;
+          border-radius: 10px;
+          margin: 5px 0;
+          cursor: pointer;
+          transition: background-color 0.3s ease;
+      }
+
+      .system-details:hover {
+          background-color: #f0f0f0;
+      }
+
+      .system-details.selected {
+          background-color: #007bff;
+          color: white !important;
+          border: 2px solid #0056b3;
+      }
+      .content{
+          text-align: justify !important;
+      }
+      .search-container {
+        position: relative;
+        {% comment %} margin: 0 auto 2rem; {% endcomment %}
+        z-index: 1;
+         display: flex;
+         flex-direction: column;
+        text-align: justify !important;
+        gap: 15px;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 1rem;
+        border: 2px solid #085e8e;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.3s ease;
+        background: white;
+    }
+
+    .search-input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    .com_suggestions-list {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid var(--accent-color);
+        border-radius: 0.5rem;
+        margin-top: 0.5rem;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        display: none;
+    }
+
+
+    .com_suggestions-list.active {
+        display: block;
+    }
+
+    .suggestion-item {
+
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+
+    .suggestion-item:hover {
+        background: var(--background-color);
+    }
+
+    .selected-systems {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 1rem 0;
+    }
+
+    .system-tag {
+        background: var(--primary-color);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .remove-tag {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        padding: 0;
+        font-size: 1.2rem;
+        line-height: 1;
+        opacity: 0.8;
+        transition: opacity 0.2s ease;
+    }
+
+    .remove-tag:hover {
+        opacity: 1;
+    }
+    .header{
+      display: flex !important;
+      justify-content: space-between;
+    }
+
+
+    .s-content{
+      border: 1px solid gray;
+      padding: 20px;
+      color: black;
+    }
+    .observation-image {
+      max-width: 100%; /* Ensures it doesn't exceed container width */
+      height: auto; /* Maintains aspect ratio */
+      display: block;
+      margin: 10px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: separate; /* Changed from collapse to allow border spacing */
+      border-spacing: 0; /* Keeps cells tight but allows border styling */
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      background-color: #fff;
+      border-radius: 8px;
+      border: 1px solid var(--accent-color);
+  }
+
+  th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border: 1px solid #d0d0d0; /* Border for all cells */
+  }
+
+  th {
+    background-color: var(--primary-color);
+    color: white;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: 1px solid var(--accent-color); /* Darker border below header */
+      text-align: center;
+  }
+
+  td {
+      color: #333;
+  }
+
+  tr:nth-child(even) {
+      background-color: #f9f9f9;
+  }
+
+  tr:hover {
+      background-color: #f1f1f1;
+      transition: background-color 0.3s ease;
+  }
+
+  td:empty::before {
+      content: "N/A";
+      color: #888;
+      font-style: italic;
+  }
+
+  /* Responsive design */
+  @media (max-width: 600px) {
+      table, thead, tbody, th, td, tr {
+          display: block;
+      }
+
+      th {
+          display: none; /* Hide headers on small screens */
+      }
+
+      tr {
+          margin-bottom: 15px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+      }
+
+      td {
+          border: none; /* Remove cell borders in responsive mode */
+          position: relative;
+          padding-left: 50%;
+      }
+
+      td:before {
+          content: attr(data-label);
+          position: absolute;
+          left: 10px;
+          width: 45%;
+          padding-right: 10px;
+          font-weight: bold;
+          color: #4CAF50;
+      }
+  }
+
+    /* --- Sidebar CSS --- */
+    .dashboard-page-body {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      padding-top: 70px;
+      min-height: 100vh;
+    }
+
+
+
+      .dashboard-main-panel {
+      flex: 1 1 auto;
+    margin-left: 260px;
+      width: calc(100% - 260px);
+      padding-left: 10px;
+    transition: all 0.3s ease;
+      transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .main-panel {
+        margin-left: 80px;
+        width: calc(100% - 80px);
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+      width: 96px;
+      min-width: 96px;
+      max-width: 96px;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+      display: none;
+    }
+
+    .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+      justify-content: center;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+      display: flex;
+       flex-direction: column;
+      justify-content: center;
+    }
+
+    .dashboard-layout.sidebar-collapsed .sidebar-submenu-list,
+    .dashboard-layout.sidebar-collapsed .dropdown-caret {
+      display: none !important;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      width: 56px;
+      margin: 0 auto;
+      justify-content: center;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    .submenu-link {
+      padding-left: 3.5rem !important;
+    }
+
+    .dashboard-layout.sidebar-collapsed .submenu-link {
+      padding-left: 0 !important;
+    }
+
+    .dashboard-layout {
+      display: flex;
+      align-items: stretch;
+    }
+
+    @media (max-width: 991px) {
+      .dashboard-page-body {
+        flex-direction: column;
+        padding-top: 70px;
+      }
+
+      .dashboard-sidebar {
+        position: relative;
+        top: 0;
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 0 0 16px 16px;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+      }
+
+      .dashboard-main-panel {
+        width: 100% !important;
+      }
+    }
+
+    .page-title-icon.active-header-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+    }
+    .title {
+        text-align: center;
+        margin: 2px 0 35px;
+        font-size: 30px;
+        color: #044a70;
+      }
+  </style>
+  </head>
+  <body>
+     {% include './navbar.html' %}
+    <!-- partial -->
+    <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout px-0" id="dashboardLayout">
+      <!-- sidebar -->
+     {% include './sidebar.html' %}
+      <!-- partial -->
+      <div class="main-panel dashboard-main-panel mt-1">
+        <div class="content-wrapper py-3" style="background-color:white;">
+          {% comment %} <div class="page-header">
+            <h3 class="page-title">
+              <span class="page-title-icon active-header-link text-white me-2">
+                <i class="mdi mdi-alert-outline "></i>
+              </span>Warning Letter Search
+            </h3>
+          </div> {% endcomment %}
+          <div class="">
+
+          <div style="display: flex; justify-content: center; margin-bottom: 15px;">
+            <h1 class="title">What do you want to search with?</h1>
+            {% comment %} <button class="search-btn btn btn-outline-secondary" id="clearData">Clear</button> {% endcomment %}
+          </div>
+
+          <div class="d-flex flex-wrap gap-4 mb-3 align-items-end">
+        <div class="search-container">
+            <input
+            type="text"
+            class="search-input"
+            placeholder="Search for companies..."
+            id="companiesSearch"
+            autocomplete="off" />
+                <div class="com_suggestions-list" id="com_suggestionsList"></div>
+                <div class="selected-Compni" id="selectedCompnies"></div>
+          </div>
+          <div>
+            <h5 style="margin-bottom: 10px; text-align: center;">Search by Year</h5>
+            <div id="year-selector" class="year-selector"></div>
+          </div>
+          <button class="search-btn" id="clearData">Clear</button>
+
+      <div class="search-container">
+    {% comment %} <input
+          type="text"
+          class="search-input"
+          placeholder="Search for Issuing Office..."
+          id="investigatorSearchInput"
+         />
+          <div class="com_suggestions-list" id="investigatorSuggestionsList"></div>
+          <div class="selected-Compni" id="selectedInvestigators"></div>  {% endcomment %}
+      </div>
+
+      </div>
+      <div style="display: flex; justify-content: space-between; margin: 0px 150px 25px 150px;">
+        <div id="resultsContainer" style="width: 100%;"></div>
+      </div>
+
+    </div>
+    <div>
+
+    </div>
+    <script>
+        let selectedYears = [];
+        let allCompanies=[]
+        let selectedCompnies=[]
+        let investigators = [];
+        let selectedInvestigators=[]
+
+        const searchInput = document.getElementById("companiesSearch");
+        const suggestionsList = document.getElementById("com_suggestionsList");
+        const investigatorSearchInput = document.getElementById("investigatorSearchInput");
+        const investigatorSuggestionsList = document.getElementById("investigatorSuggestionsList");
+        const selectedInvestigatorsContainer = document.getElementById("selectedInvestigators");
+        const clearData=document.getElementById("clearData")
+        clearData.addEventListener("click",()=>{
+            window.location.reload()
+        })
+
+        async function fetchCompanies() {
+            try {
+                const response = await fetch("{{ base_url }}/aidatabase/warning_letter_company/");
+                const data = await response.json();
+                console.log(data)
+                allCompanies=data.companies // Assuming response is an array of company names
+            } catch (error) {
+                console.error("Error fetching companies:", error);
+            }
+        }
+        searchInput.addEventListener("focus", () => {
+            if (allCompanies.length === 0) {
+                fetchCompanies().then(() => displayCompanies(allCompanies));
+            } else {
+                displayCompanies(allCompanies);
+            }
+            //selectedCompnies.style.display="none"
+        });
+
+        // Filter Companies on Input
+        searchInput.addEventListener("input", () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredCompanies = allCompanies.filter(company =>
+                company.toLowerCase().includes(searchTerm)
+            );
+            displayCompanies(filteredCompanies);
+        });
+
+        // Function to Display Companies
+        function displayCompanies(companies) {
+            suggestionsList.innerHTML = ""; // Clear previous suggestions
+            if (companies.length === 0) {
+
+                return;
+            }
+            suggestionsList.style.display = "block";
+
+            companies.forEach(company => {
+                const div = document.createElement("div");
+                div.className = "suggestion-item";
+                div.textContent = company;
+                div.onclick = () => selectCompany(company);
+                suggestionsList.appendChild(div);
+            });
+        }
+
+        // Select a Company from the List
+        function selectCompany(company) {
+
+            searchInput.value = company;
+            suggestionsList.style.display = "none";
+            if (!selectedCompnies.includes(company)) {
+              selectedCompnies.push(company);
+              updateSelectedSystemsTags()
+          }
+          else{
+            alert("already Selected")
+          }
+          document.getElementById('companiesSearch').value = '';
+
+        }
+
+      // remover company........
+              function removeCompany(company) {
+                console.log("for delting",company )
+                selectedCompnies = selectedCompnies.filter(s => s !== company);
+                  updateSelectedSystemsTags();
+
+              }
+              // update the company list........
+              function updateSelectedSystemsTags() {
+                const container = document.getElementById('selectedCompnies');
+                container.innerHTML = ""; // Clear previous content
+
+                selectedCompnies.forEach(company => {
+                    const tagDiv = document.createElement("div");
+                    tagDiv.className = "system-tag";
+                    tagDiv.textContent = company;
+
+                    const removeBtn = document.createElement("button");
+                    removeBtn.className = "remove-tag";
+                    removeBtn.innerHTML = "&times;";
+
+                    removeBtn.addEventListener("click", () => removeCompany(company)); // Properly attach event
+
+                    tagDiv.appendChild(removeBtn);
+                    container.appendChild(tagDiv);
+                });
+                console.log(selectedCompnies)
+                fetchData()
+              }
+
+        // Hide Dropdown if Clicked Outside
+            document.addEventListener("click", (event) => {
+                if (!searchInput.contains(event.target) && !suggestionsList.contains(event.target)) {
+                    suggestionsList.style.display = "none";
+                }
+            });
+
+
+            const yearList = [
+            2020,
+            2021,
+            2022,
+            2023,
+            2024,2025 ,
+          2026            ];
+
+          initializeSystemSelector();
+
+          function initializeSystemSelector() {
+            const selector = document.getElementById('year-selector');
+            yearList.forEach(year => {
+
+                const chip = document.createElement('div');
+                chip.className = 'year-chip';
+
+                chip.textContent = year;
+                chip.onclick = () => toggleYear(chip, year);
+                selector.appendChild(chip);
+            });
+          }
+
+          function toggleYear(chip, year) {
+            chip.classList.toggle('active');
+
+            if (chip.classList.contains('active')) {
+              if (!selectedYears.includes(year)) {
+                selectedYears.push(year);
+              }
+            } else {
+              selectedYears = selectedYears.filter(s => s !== year);
+            }
+
+            console.log('Selected years:', selectedYears);
+            fetchData()
+          }
+
+          async function fetchInvestigator() {
+            try {
+                 const response = await fetch("{{ base_url }}/aidatabase/issuing_office_list/");
+                const data = await response.json();
+                console.log("API Response>>>:", data);
+
+                investigators=data.issuing_offices // Assuming response is an array of company names
+            } catch (error) {
+                console.error("Error fetching companies:", error);
+            }
+        }
+
+          investigatorSearchInput.addEventListener("focus", () => {
+
+              if (investigators.length === 0) {
+                fetchInvestigator().then(() => displayInvestigators(investigators));
+            } else {
+              displayInvestigators(investigators);
+            }
+
+
+          });
+
+            // Filter inversigator on Input.......................
+            investigatorSearchInput.addEventListener("input", () => {
+              const searchTerm = investigatorSearchInput.value.toLowerCase();
+              const filteredInvestigators = investigators.filter(investigator =>
+                  investigator.toLowerCase().includes(searchTerm)
+              );
+              console.log("filteredInvestigators",filteredInvestigators)
+              displayInvestigators(filteredInvestigators);
+          });
+
+          // Function to Display inversigator
+          function displayInvestigators(investi) {
+
+            investigatorSuggestionsList.innerHTML = ""; // Clear previous suggestions
+            if (investi.length === 0) {
+                investigatorSuggestionsList.style.display = "none";
+                return;
+            }
+            investigatorSuggestionsList.style.display = "block";
+
+            investi.forEach(investigator => {
+                const div = document.createElement("div");
+                div.className = "suggestion-item";
+                div.textContent = investigator;
+                div.onclick = () => selectInvestigator(investigator);
+                investigatorSuggestionsList.appendChild(div);
+            });
+          }
+
+          // Select a inversigator from the List
+          function selectInvestigator(investigator) {
+            investigatorSuggestionsList.style.display = "none";
+
+            if (!selectedInvestigators.includes(investigator)) {
+                selectedInvestigators.push(investigator);
+                updateSelectedInvestigatorsTags();
+            } else {
+                alert("Investigator already selected");
+                console.log("Already Selected Investigator ", investigator);
+            }
+
+            // Ensure the input field is cleared
+            investigatorSearchInput.value = '';
+        }
+          // remover inversigator........
+          function removeInvestigator(investigator) {
+            console.log("Removing", investigator);
+            selectedInvestigators = selectedInvestigators.filter(s => s !== investigator);
+            updateSelectedInvestigatorsTags();
+          }
+          // update the inversigator list........
+          function updateSelectedInvestigatorsTags() {
+            const container = document.getElementById('selectedInvestigators');
+            container.innerHTML = ""; // Clear previous content
+
+            selectedInvestigators.forEach(investigator => {
+                const tagDiv = document.createElement("div");
+                tagDiv.className = "system-tag";
+                tagDiv.textContent = investigator;
+
+                const removeBtn = document.createElement("button");
+                removeBtn.className = "remove-tag";
+                removeBtn.innerHTML = "&times;";
+                removeBtn.addEventListener("click", () => removeInvestigator(investigator));
+
+                tagDiv.appendChild(removeBtn);
+                container.appendChild(tagDiv);
+            });
+            fetchData()
+            console.log(selectedInvestigators);
+          }
+
+          // Hide Dropdown if Clicked Outside
+          document.addEventListener("click", (event) => {
+            if (!investigatorSearchInput.contains(event.target) && !investigatorSuggestionsList.contains(event.target)) {
+                investigatorSuggestionsList.style.display = "none";
+            }
+          });
+
+          async function fetchData() {
+            console.log("Fetching data...");
+            try {
+                const csrfToken = getCSRFToken();
+                const response = await fetch('{{ base_url }}/aidatabase/warning_letter_data/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        "X-CSRFToken": csrfToken
+                    },
+                    body: JSON.stringify({
+                        company_name: selectedCompnies,
+                        issuing_office: selectedInvestigators,
+                        posted_year: selectedYears
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayDataInTable(data.data || []);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('resultsContainer').innerHTML =
+                    '<p class="text-center text-danger">Error loading data. Please try again.</p>';
+            }
+        }
+
+        {% comment %} function displayDataInTable(data) {
+            const container = document.getElementById('resultsContainer');
+            if (data.length === 0) {
+                container.innerHTML = '<p class="text-center">No data available.</p>';
+                return;
+            }
+
+            let tableHTML = `<table border="1">
+                <thead>
+                    <tr>
+                        <th>Company Name</th>
+                        <th>Year</th>
+                        <th>Letter Issue Date</th>
+                        <th>Issuing Office</th>
+                        <th>Subject</th>
+                        <th>Download</th>
+
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            data.forEach(item => {
+                tableHTML += `<tr>
+                    <td data-label="Company Name">${item.company_name || ''}</td>
+                    <td data-label="Year">${item.posted_date || ''}</td>
+                    <td data-label="Letter Issue Date">${item.letter_issue_date || ''}</td>
+                    <td data-label="Issuing Office">${item.issuing_office || ''}</td>
+                    <td data-label="Subject">${item.subject || ''}</td>
+                    <td data-label="Download">
+                        ${item.pdf_path
+                            ? `<a href="${item.pdf_path}" download class="btn btn-sm btn-primary">Download</a>`
+                            : '<span class="text-muted">No file</span>'}
+                    </td>
+
+
+
+                </tr>`;
+            });
+
+            tableHTML += `</tbody></table>`;
+            container.innerHTML = tableHTML;
+        } {% endcomment %}
+        function displayDataInTable(data) {
+  const container = document.getElementById('resultsContainer');
+  if (data.length === 0) {
+      container.innerHTML = '<p class="text-center">No data available.</p>';
+      return;
+  }
+
+  let tableHTML = `<div style="max-height: 500px;overflow-y: auto;"><table border="1" style="width: 100%; border-collapse: collapse;">
+      <thead style="position: sticky; top: 0; z-index: 2;">
+          <tr style="position: sticky; top: 0; z-index: 2;">
+              <th style="width: 20%; text-align: center; position: sticky; top: 0; z-index: 2;">Sr. No.</th>
+              <th style="width: 40%; text-align: left; position: sticky; top: 0; z-index: 2;">Company Name</th>
+              {% comment %} <th style="text-align: center;position: sticky; top: 0; z-index: 2;">Year</th> {% endcomment %}
+              <th style="width: 20%; text-align: center; position: sticky; top: 0; z-index: 2;">Letter Issue Date</th>
+              {% comment %} <th style="text-align: center;position: sticky; top: 0; z-index: 2;">Issuing Office</th> {% endcomment %}
+              {% comment %} <th style="text-align: center;position: sticky; top: 0; z-index: 2;">Subject</th> {% endcomment %}
+              <th style="width: 20%; text-align: center; position: sticky; top: 0; z-index: 2;">Download</th>
+          </tr>
+      </thead>
+      <tbody>`;
+
+  data.forEach((item, index) => {
+      tableHTML += `<tr>
+          <td style="text-align: center;">${index + 1}</td>
+          <td style="text-align: left;">${item.company_name || ''}</td>
+          {% comment %} <td style="text-align: center;">${item.posted_date || ''}</td> {% endcomment %}
+          <td style="text-align: center;">${item.letter_issue_date || ''}</td>
+          {% comment %} <td style="text-align: center;">${item.issuing_office || ''}</td> {% endcomment %}
+          {% comment %} <td style="text-align: center;">${item.subject || ''}</td> {% endcomment %}
+          <td style="text-align: center;">
+              ${item.pdf_path
+                  ? `<a href="${item.pdf_path}" download style="padding: 4px 8px; background-color: #085e8e; color: white; text-decoration: none; border-radius: 4px; font-size: 0.875rem;">Download</a>`
+                  : '<span style="color: gray;">No file</span>'}
+          </td>
+      </tr>`;
+  });
+
+  tableHTML += `</tbody></table></div>`;
+  container.innerHTML = tableHTML;
+}
+
+
+
+
+          function getCSRFToken() {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                  const cookie = cookies[i].trim();
+                  if (cookie.startsWith("csrftoken=")) {
+                      return cookie.split("=")[1];
+                  }
+              }
+              return "";
+          }
+    </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+  // Sidebar toggle
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const dashboardSidebar = document.getElementById('dashboardSidebar');
+  const dashboardLayout = document.getElementById('dashboardLayout');
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', function () {
+      const isCollapsed = dashboardSidebar.classList.toggle('sidebar-collapsed');
+      dashboardLayout.classList.toggle('sidebar-collapsed', isCollapsed);
+      sidebarToggle.setAttribute('aria-expanded', !isCollapsed);
+    });
+  }
+  // The custom JS dropdown toggle was removed, we use Bootstrap collapse now
+</script>
+
+        </div><!-- end content-wrapper -->
+      </div><!-- end main-panel -->
+    </div><!-- end page-body-wrapper -->
+
+  </body>
+</html>

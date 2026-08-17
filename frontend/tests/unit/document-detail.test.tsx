@@ -52,7 +52,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import DocumentDetailPage from "@/app/documents/[publicId]/page";
+import DocumentDetailPage from "@/app/(regx)/documents/[publicId]/page";
 
 beforeEach(() => {
   Object.values(nav).forEach((v) => typeof v === "object" && v);

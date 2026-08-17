@@ -1,0 +1,304 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Your Booking | iPharmaAI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;700&display=swap"
+    rel="stylesheet" />
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+  <style>
+    :root {
+      --blue: #26acf5;
+      --blue-dark: #02283d;
+      --blue-mid: #0272ae;
+      --text: #1a2a3a;
+      --muted: #5a7a94;
+      --ff-d: "Syne", sans-serif;
+      --ff-b: "DM Sans", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--ff-b);
+      color: var(--text);
+      background: #f4f8fc;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    .mb-wrap {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 60px 20px 80px;
+    }
+
+    .mb-logo {
+      display: block;
+      height: 40px;
+      margin: 0 auto 32px;
+    }
+
+    .mb-card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(2, 40, 61, .1);
+      overflow: hidden;
+    }
+
+    .mb-card-header {
+      padding: 32px 32px 20px;
+      text-align: center;
+    }
+
+    .mb-card-header h1 {
+      font-family: var(--ff-d);
+      font-size: 24px;
+      font-weight: 800;
+      margin: 0 0 6px;
+    }
+
+    .mb-card-header p {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .mb-alert {
+      margin: 0 32px 20px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 600;
+    }
+
+    .mb-alert.success {
+      background: #e8f8ee;
+      color: #1a7a45;
+      border: 1px solid #b9e8c9;
+    }
+
+    .mb-alert.warn {
+      background: #fff6e8;
+      color: #92600b;
+      border: 1px solid #f3d99a;
+    }
+
+    .mb-summary {
+      margin: 0 32px 24px;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 20px 22px;
+    }
+
+    .mb-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 14px;
+      border-bottom: 1px solid #f0f4f8;
+    }
+
+    .mb-summary-row:last-child {
+      border-bottom: none;
+    }
+
+    .mb-summary-label {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .mb-summary-value {
+      color: var(--text);
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .mb-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .mb-badge.confirmed {
+      background: rgba(38, 172, 245, .12);
+      color: var(--blue-mid);
+    }
+
+    .mb-badge.cancelled {
+      background: #fdeaea;
+      color: #c23636;
+    }
+
+    .mb-actions {
+      padding: 0 32px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mb-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 48px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .mb-btn-primary {
+      background: linear-gradient(135deg, #26acf5, #0272ae);
+      color: #fff;
+    }
+
+    .mb-btn-danger {
+      background: #fff;
+      color: #c23636;
+      border: 1px solid #f3c8c8;
+    }
+
+    .mb-btn-danger:hover {
+      background: #fef4f4;
+    }
+
+    .mb-btn:disabled,
+    .mb-btn.disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    .mb-note {
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin: -4px 0 4px;
+    }
+
+    .mb-footer-link {
+      display: block;
+      text-align: center;
+      margin-top: 24px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .mb-footer-link:hover {
+      color: var(--blue-mid);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="mb-wrap">
+    <img src="{% static 'assets/icretegy/iPharmaAI_white.png' %}" class="mb-logo"
+      style="filter: brightness(0) saturate(100%) invert(20%) sepia(80%) saturate(1500%) hue-rotate(180deg);"
+      alt="iPharmaAI" />
+
+    <div class="mb-card">
+      <div class="mb-card-header">
+        <h1>Manage Your Booking</h1>
+        <p>Reschedule or cancel your iPharmaAI demo below.</p>
+      </div>
+
+      {% if message == "cancelled" %}
+      <div class="mb-alert success"><i class="fa-solid fa-circle-check me-1"></i> Your booking has been cancelled.</div>
+      {% elif message == "rescheduled" %}
+      <div class="mb-alert success"><i class="fa-solid fa-circle-check me-1"></i> Your booking has been rescheduled.</div>
+      {% elif message == "cutoff" %}
+      <div class="mb-alert warn"><i class="fa-solid fa-triangle-exclamation me-1"></i> Changes are no longer allowed
+        within {{ cutoff_hours }} hours of your meeting. Please contact us directly.</div>
+      {% elif message == "max-reschedules" %}
+      <div class="mb-alert warn"><i class="fa-solid fa-triangle-exclamation me-1"></i> This booking has already been
+        rescheduled the maximum {{ max_reschedules }} times. Please contact us directly to make further changes.</div>
+      {% elif message == "already-cancelled" %}
+      <div class="mb-alert warn"><i class="fa-solid fa-circle-info me-1"></i> This booking is no longer active.</div>
+      {% endif %}
+
+      <div class="mb-summary">
+        <div class="mb-summary-row">
+          <span class="mb-summary-label">Name</span>
+          <span class="mb-summary-value">{{ booking.full_name }}</span>
+        </div>
+        <div class="mb-summary-row">
+          <span class="mb-summary-label">Service</span>
+          <span class="mb-summary-value">{{ booking.service }}</span>
+        </div>
+        {% if booking.slot_date %}
+        <div class="mb-summary-row">
+          <span class="mb-summary-label">Date</span>
+          <span class="mb-summary-value">{{ booking.slot_date|date:"l, F j, Y" }}</span>
+        </div>
+        <div class="mb-summary-row">
+          <span class="mb-summary-label">Time (IST)</span>
+          <span class="mb-summary-value">{{ booking.slot_time|time:"g:i A" }}</span>
+        </div>
+        {% endif %}
+        <div class="mb-summary-row">
+          <span class="mb-summary-label">Status</span>
+          <span class="mb-summary-value">
+            <span class="mb-badge {{ booking.status }}">{{ booking.get_status_display }}</span>
+          </span>
+        </div>
+      </div>
+
+      {% if booking.status == "confirmed" %}
+      <div class="mb-actions">
+        {% if past_cutoff %}
+        <button type="button" class="mb-btn mb-btn-primary disabled" disabled>
+          <i class="fa-solid fa-calendar-days"></i> Reschedule
+        </button>
+        <p class="mb-note">Reschedule window has closed ({{ cutoff_hours }}h cutoff).</p>
+        {% elif booking.reschedule_count >= max_reschedules %}
+        <button type="button" class="mb-btn mb-btn-primary disabled" disabled>
+          <i class="fa-solid fa-calendar-days"></i> Reschedule
+        </button>
+        <p class="mb-note">Maximum reschedules ({{ max_reschedules }}) reached.</p>
+        {% else %}
+        <a href="{% url 'requestdemo_manage_reschedule' booking.manage_token %}" class="mb-btn mb-btn-primary">
+          <i class="fa-solid fa-calendar-days"></i> Reschedule
+        </a>
+        {% endif %}
+
+        {% if past_cutoff %}
+        <button type="button" class="mb-btn mb-btn-danger disabled" disabled>
+          <i class="fa-solid fa-xmark"></i> Cancel Booking
+        </button>
+        {% else %}
+        <form method="post" action="{% url 'requestdemo_manage_cancel' booking.manage_token %}"
+          onsubmit="return confirm('Cancel this demo booking? This can\'t be undone.');">
+          {% csrf_token %}
+          <button type="submit" class="mb-btn mb-btn-danger">
+            <i class="fa-solid fa-xmark"></i> Cancel Booking
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <a href="/ratools/requestdemo" class="mb-footer-link">&larr; Back to iPharmaAI</a>
+  </div>
+</body>
+
+</html>

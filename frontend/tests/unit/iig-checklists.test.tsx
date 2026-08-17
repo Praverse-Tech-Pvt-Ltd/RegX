@@ -84,10 +84,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
   };
 });
 
-import DefinitionsPage from "@/app/iig-checklists/page";
-import NewDefinitionPage from "@/app/iig-checklists/new/page";
-import DefinitionDetailPage from "@/app/iig-checklists/[publicId]/page";
-import VersionDetailPage from "@/app/iig-checklists/versions/[versionPublicId]/page";
+import DefinitionsPage from "@/app/(regx)/iig-checklists/page";
+import NewDefinitionPage from "@/app/(regx)/iig-checklists/new/page";
+import DefinitionDetailPage from "@/app/(regx)/iig-checklists/[publicId]/page";
+import VersionDetailPage from "@/app/(regx)/iig-checklists/versions/[versionPublicId]/page";
 
 beforeEach(() => {
   nav.push.mockReset();
@@ -124,7 +124,7 @@ describe("DefinitionsPage — list", () => {
   it("redirects to signin on 401/403", async () => {
     api.definitionsList.mockRejectedValue(new ApiError(403, "Forbidden"));
     render(<DefinitionsPage />);
-    await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith("/signin"));
+    await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith(expect.stringMatching(/^\/signin(\?|$)/)));
   });
 });
 
@@ -175,7 +175,7 @@ describe("NewDefinitionPage — create", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /requires a separate, explicit platform-level authorization/i
     );
-    expect(nav.push).not.toHaveBeenCalledWith("/signin");
+    expect(nav.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/signin(\?|$)/));
   });
 
   it("redirects to signin on 401 (unauthenticated), not on 403 (unauthorized)", async () => {
@@ -187,7 +187,7 @@ describe("NewDefinitionPage — create", () => {
     await user.type(screen.getByLabelText(/^Title$/i), "X");
     await user.click(screen.getByRole("button", { name: /create/i }));
 
-    await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith("/signin"));
+    await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith(expect.stringMatching(/^\/signin(\?|$)/)));
   });
 });
 
@@ -311,6 +311,6 @@ describe("VersionDetailPage — lifecycle actions", () => {
     render(<VersionDetailPage />);
     await user.click(await screen.findByRole("button", { name: /submit for review/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/failed|permission|forbidden/i);
-    expect(nav.push).not.toHaveBeenCalledWith("/signin");
+    expect(nav.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/signin(\?|$)/));
   });
 });

@@ -1,0 +1,311 @@
+{% extends 'AdminMaster/AdminMasterBase.html' %}
+{% load static %}
+
+{% block content %}
+<script src="{% static 'ckeditor/ckeditor/ckeditor.js' %}"></script>
+<script src="{% static 'ckeditor/ckeditor-init.js' %}"></script>
+
+
+<div class="page-header">
+    <h3 class="page-title">
+        <span class="page-title-icon bg-gradient-primary text-white me-2">
+            <i class="mdi mdi-home"></i>
+        </span> {{ page_heading }}
+    </h3>
+    <nav aria-label="breadcrumb">
+        <ul class="breadcrumb">
+            <li class="breadcrumb-item active" aria-current="page">
+                <button type="button" class="overView" data-bs-toggle="modal" data-bs-target="#overViewModal">
+                    Overview <i class="mdi mdi-alert-circle-outline icon-sm text-primary align-middle"></i>
+                </button>
+            </li>
+        </ul>
+    </nav>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="row">
+    <div class="col-md-6">
+        <button class="btn btn-gradient-danger btn-fw" data-bs-toggle="modal" data-bs-target="#addreportmodal">Add ANDA Question</button>
+    </div>
+    <div class="col-md-6 text-end">
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Search..."
+            class="form-control"
+            style="width: auto; display: inline-block;"
+        />
+    </div>
+</div>
+
+<br>
+
+<div class="modal" tabindex="-1" id="addreportmodal">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add ANDA Question</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="{{ action }}" id="addForm">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-gradient-success" id="saveAddForm">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="overViewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ modal_title }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {{ modal_body_content }}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% comment %} table for anda {% endcomment %}
+<div class="container bg-light shadow rounded p-4"style="overflow: scroll;">
+    <div class="row" style="overflow: scroll;">
+        <div class="col-md-12">
+            <table id="customTable" class="table table-hover">
+                <thead>
+                    <tr>
+                        {% for header in table_headers %}
+                            <th>{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in reports %}
+                        <tr>
+
+                            <td>{{ report.module_name }}</td>
+                            <td>{{ report.chapter_name }}</td>
+                            <td>{{ report.category_name|default:'N/A' }}</td>
+                            <td style="white-space: normal !important; word-break: break-all;  min-width: 500px !important;">{{ report.question|safe }}</td>
+                            <td>
+                                <button class="btn btn-gradient-success btn-rounded btn-icon edit-link" data-bs-toggle="modal" data-bs-target="#editReportModal_{{ report.id }}" >
+                                    <p style="margin-top: 11px;"><i class="fa fa-pencil"></i></p>
+                                </button>
+                                <a href="{{ delete_url }}/{{ report.id }}" id="DeleteBtn" class="btn btn-gradient-danger btn-rounded btn-icon">
+                                    <p style="margin-top: 11px;"><i class="fa fa-trash"></i></p>
+                                </a>
+                                <div class="modal" tabindex="-1" id="editReportModal_{{ report.id }}">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Edit Report</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <form method="post" id="editForm_{{ report.id }}" action="{{ edit_url }}/{{ report.id }}">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="report_id" id="edit_report_id">
+                                                    <div class="form-group">
+                                                        <label for="edit_module_name_{{ report.id }}">Module Name</label>
+                                                        <input type="text" class="form-control" id="edit_module_name_{{ report.id }}" name="module_name" value="{{ report.module_name }}">
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="edit_chapter_name_{{ report.id }}">Chapter Name</label>
+                                                        <input type="text" class="form-control" id="edit_chapter_name_{{ report.id }}" name="chapter_name" value="{{ report.chapter_name }}">
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label for="edit_category_name_{{ report.id }}">Category Name</label>
+                                                        <input type="text" class="form-control" id="edit_category_name_{{ report.id }}" name="category_name" value="{{ report.category_name }}">
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Question</label>
+                                                        <textarea class="form-control" id="edit_question_{{ report.id }}" name="question">{{ report.question }}</textarea>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                        <button type="submit" class="btn btn-gradient-success saveEditFormBtn" data-report-id="{{ report.id }}">Save Changes</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">No reports available</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="col-md-12 text-start mt-3 text-end">
+            <button id="prevPage" class="badge badge-danger">Previous</button>
+            <span id="currentPage">1</span>
+            <button id="nextPage" class="badge badge-danger">Next</button>
+        </div>
+    </div>
+</div>
+<style>
+    td{
+        vertical-align: top !important;
+    }
+    .modalContent {
+        background-color: white;
+    }
+    .save {
+        background: linear-gradient(120deg, #d89be5, #dd21dd);
+        color: white;
+        border: none !important;
+    }
+    .overView {
+        border: none !important;
+        background: none;
+        color: inherit;
+        padding: 0;
+    }
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        font-weight: 500;
+    }
+    .modal-lg {
+        max-width: 800px;
+    }
+    .cke_notifications_area{
+        display: none;
+    }
+</style>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        // Initialize CKEditor for add form
+        if (CKEDITOR.instances['id_question']) {
+            CKEDITOR.instances['id_question'].destroy();
+        }
+        CKEDITOR.replace('id_question');
+
+        // Initialize CKEditor for each edit form
+        {% for report in reports %}
+            if (CKEDITOR.instances['edit_question_{{ report.id }}']) {
+                CKEDITOR.instances['edit_question_{{ report.id }}'].destroy();
+            }
+            CKEDITOR.replace('edit_question_{{ report.id }}');
+        {% endfor %}
+
+        const rowsPerPage = 10;
+        let currentPage = 1;
+
+        const table = document.getElementById("customTable");
+        const rows = Array.from(table.getElementsByTagName("tbody")[0].rows);
+        const searchInput = document.getElementById("searchInput");
+
+        const updateTable = () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredRows = rows.filter((row) =>
+                Array.from(row.cells).some((cell) =>
+                    cell.textContent.toLowerCase().includes(searchTerm)
+                )
+            );
+
+            const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+
+            // Ensure currentPage does not exceed totalPages after filtering/updates
+            if (currentPage > totalPages && totalPages > 0) {
+                currentPage = totalPages;
+            } else if (totalPages === 0) { // If no results, reset to page 1 (or handle as preferred)
+                currentPage = 1;
+            }
+
+            document.getElementById("currentPage").textContent = currentPage;
+
+            rows.forEach((row) => (row.style.display = "none"));
+
+            filteredRows
+                .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+                .forEach((row) => (row.style.display = ""));
+
+            // Store current page in localStorage
+            localStorage.setItem('currentPage', currentPage);
+        };
+
+        // Load current page from localStorage and then update the table
+        const storedPage = localStorage.getItem('currentPage');
+        if (storedPage) {
+            currentPage = parseInt(storedPage);
+        }
+        updateTable(); // Initial call to display the correct page and save it
+
+        document.getElementById("prevPage").addEventListener("click", () => {
+            if (currentPage > 1) {
+                currentPage--;
+                updateTable();
+            }
+        });
+
+        document.getElementById("nextPage").addEventListener("click", () => {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredRows = rows.filter((row) =>
+                Array.from(row.cells).some((cell) =>
+                    cell.textContent.toLowerCase().includes(searchTerm)
+                )
+            );
+
+            const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                updateTable();
+            }
+        });
+
+        searchInput.addEventListener("input", () => {
+            currentPage = 1; // Reset to first page on new search
+            updateTable();
+        });
+
+        // Confirm delete
+        document.querySelectorAll('#DeleteBtn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                if (!confirm('Are you sure you want to delete this report?')) {
+                    e.preventDefault();
+                } else {
+                    localStorage.setItem('currentPage', currentPage); // Store current page before deletion
+                }
+            });
+        });
+
+        // Store current page before submitting the add form
+        document.getElementById('saveAddForm').addEventListener('click', function() {
+            localStorage.setItem('currentPage', currentPage);
+        });
+
+        // Store current page before submitting an edit form
+        document.querySelectorAll('.saveEditFormBtn').forEach(button => {
+            button.addEventListener('click', function() {
+                localStorage.setItem('currentPage', currentPage);
+            });
+        });
+    });
+</script>
+{% endblock %}

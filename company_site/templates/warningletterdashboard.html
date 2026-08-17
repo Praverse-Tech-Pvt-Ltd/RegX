@@ -1,0 +1,829 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- Required meta tags -->
+  <!-- Required meta tags -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>RA-AI Tools</title>
+  <!-- plugins:css -->
+  <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+  <!-- endinject -->
+  <!-- Plugin css for this page -->
+  <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}" />
+  <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}">
+  <!-- End plugin css for this page -->
+  <!-- Layout styles -->
+  <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+  <!-- End layout styles -->
+  <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+  <style>
+    .nav-link {
+
+
+      white-space: normal !important;
+      word-wrap: break-word !important;
+      /* Ensure long words break to the next line */
+      overflow-wrap: break-word !important;
+      /* Ensures compatibility with modern browsers */
+      text-align: left !important;
+      /* Optional: Adjust text alignment */
+    }
+
+    @media screen and (max-width:1366px) {
+
+
+      .nav-item.nav-settings {
+
+        margin-left: 0px !important;
+      }
+    }
+
+    .main-panel {
+      width: 100%;
+
+
+      border-radius: 16px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(2px);
+      /* Standard property */
+
+
+    }
+
+    .content-wrapper {
+      background: none;
+    }
+
+    .tt-footer {
+      padding: 24px 34px;
+      background: #005477;
+      margin-top: auto;
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .tt-copy {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      color: rgba(255, 255, 255, 0.58);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .nav-item-dr {
+      background: #90dad7;
+
+      padding: 0 !important;
+    }
+
+    .nav-item-dr-li {
+      padding: 0 1.25rem !important;
+    }
+
+    .hover-link {
+      color: rgb(0, 0, 0) !important;
+      font-weight: 600;
+
+      padding: 1.125rem 2.25rem !important;
+
+      i {
+        color: rgb(0, 0, 0) !important;
+      }
+    }
+
+    .hover-link:hover {
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+      i {
+        color: rgb(0, 0, 0) !important;
+      }
+    }
+
+
+
+
+    .nav-link:before {
+      color: white !important;
+    }
+
+    .nav-item-list {
+      padding: 0.50rem 2.25rem !important;
+      color: rgb(0, 0, 0) !important;
+      font-weight: 600;
+      background: #90dad7;
+
+
+      .nav-link:before {
+        color: rgb(0, 0, 0) !important;
+      }
+
+
+      a {
+        background: none !important;
+      }
+    }
+
+
+
+    .active {
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+
+
+      .hover-link-list {
+
+        color: rgb(0, 0, 0) !important;
+      }
+
+      .menu-title {
+
+
+        color: rgb(0, 0, 0) !important;
+      }
+
+
+    }
+
+    td {
+      color: black !important;
+    }
+
+
+
+
+    .nav-item-list:hover {
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+
+
+
+      .nav-link:before {
+        color: white !important;
+
+      }
+
+      color: rgb(0, 0, 0) !important;
+
+      a {
+
+        color: rgb(0, 0, 0) !important;
+      }
+    }
+
+    .navbar-menu-wrapper {
+      padding-left: 0px !important;
+      padding-right: 0px !important;
+    }
+
+    .nav-header-link {
+      font-size: 14px !important;
+      font-weight: bold;
+      text-decoration: none;
+
+      border-radius: 5px;
+      color: black !important;
+
+    }
+
+    @media (max-width: 1490px) {
+      .nav-header-link {
+
+        font-size: 12px !important;
+      }
+    }
+
+
+    .nav-header-link-hover:hover {
+      color: #045c8d !important
+    }
+
+    @media (min-width: 992px) {
+      .sidebar-icon-only .sidebar {
+        width: 70px;
+      }
+    }
+
+    .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #045c8d, #1276a2) !important;
+    }
+
+    .hover-link-list {
+
+      color: black !important;
+    }
+
+    ::placeholder {
+      color: rgb(0, 0, 0) !important;
+      opacity: 1 !important;
+      /* Firefox */
+    }
+
+    ::-ms-input-placeholder {
+      /* Edge 12-18 */
+      color: red !important;
+    }
+
+    #customTable {
+      --bs-table-bg: none;
+    }
+
+    .headingRow {
+
+      background: linear-gradient(to right, #65b9ff, #047edf 99%);
+    }
+
+    .count-container {
+      height: 895px;
+      overflow-y: scroll;
+
+    }
+
+    ::-webkit-scrollbar {
+      -webkit-appearance: none;
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      border-radius: 4px;
+      background-color: rgba(0, 0, 0, .5);
+      -webkit-box-shadow: 0 0 1px rgba(255, 255, 255, .5);
+    }
+
+    .hover-div {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      border-radius: 10px;
+
+      margin-bottom: 10px;
+
+      p {
+        margin-bottom: 0px !important;
+      }
+    }
+
+    .hover-div:hover {
+      background-color: lightgray;
+    }
+
+
+
+    /* Basic legend styling */
+    .rounded-legend {
+      padding: 20px 0;
+      margin-top: 20px;
+    }
+
+    .rounded-legend ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .rounded-legend ul li {
+      display: flex;
+      align-items: center;
+
+    }
+
+    /* Important: This is the crucial styling for the color spans */
+    .rounded-legend ul li span {
+      width: 12px;
+      height: 12px;
+      margin-right: 10px;
+      display: inline-block;
+      border-radius: 50%;
+    }
+
+    /* Specific styles for each chart's legend if needed */
+
+    /* Legend position classes */
+    .legend-bottom-left {
+      text-align: left;
+    }
+
+    .legend-vertical {
+      display: flex;
+      flex-direction: column;
+    }
+
+    h4 {
+      font-size: 22px !important;
+    }
+
+    .rectangle {
+      background-color: #fe9409;
+    }
+
+    .rectangle-container {
+      display: flex;
+      justify-content: center;
+
+      @media screen and (min-width: 468px) {
+        justify-content: end;
+      }
+    }
+
+    .reactangle-text {
+      font-family: "Poppins-Regular", Helvetica;
+      font-weight: 400;
+      color: #000000;
+      font-size: 24px;
+      letter-spacing: 0;
+      line-height: True;
+    }
+
+    .navbar-brand-wrapper {
+      width: fit-content !important;
+    }
+
+    .navbar-menu-wrapper {
+      width: fit-content !important;
+
+    }
+
+    .dropdown-item:hover {
+      background-color: white;
+    }
+
+    /* --- Sidebar CSS --- */
+    .dashboard-page-body {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      padding-top: 60px;
+      min-height: 100vh;
+    }
+
+
+
+    .dashboard-main-panel {
+      flex: 1 1 auto;
+      margin-left: 270px;
+      width: calc(100% - 270px);
+      transition: all 0.3s ease;
+      transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+      margin-left: 96px !important;
+      width: calc(100% - 96px) !important;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+      display: none;
+    }
+
+    .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+      justify-content: center;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .dashboard-layout.sidebar-collapsed .sidebar-submenu-list,
+    .dashboard-layout.sidebar-collapsed .dropdown-caret {
+      display: none !important;
+    }
+
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      width: 56px;
+      margin: 0 auto;
+      justify-content: center;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    .submenu-link {
+      padding-left: 3.5rem !important;
+    }
+
+    .dashboard-layout.sidebar-collapsed .submenu-link {
+      padding-left: 0 !important;
+    }
+
+    @media (max-width: 991px) {
+      .dashboard-page-body {
+        flex-direction: column;
+        padding-top: 70px;
+      }
+
+      .dashboard-sidebar {
+        position: relative;
+        top: 0;
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+        height: auto;
+        border-radius: 0 0 16px 16px;
+      }
+
+      .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-width: 100%;
+      }
+
+      .dashboard-main-panel {
+        width: 100% !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container-scroller">
+    <!-- partial:partials/_navbar.html -->
+    {% include './navbar.html' %}
+    <!-- partial -->
+    <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+      <!-- partial:partials/_sidebar.html -->
+      {% include './sidebar.html' %}
+
+      <!-- partial -->
+      <div class="main-panel dashboard-main-panel">
+        <div class="content-wrapper">
+          <div class="page-header">
+            <h3 class="page-title">
+              {% comment %} <span class="page-title-icon active-header-link text-white me-2">
+                <i class="mdi mdi-home"></i>
+              </span> {% endcomment %}
+              Warning Letter Database Dashboard
+
+              <a href="/aidatabase/render_warning_letter/" class=" ms-4 btn active-header-link">Click Here to Search</a>
+            </h3>
+
+          </div>
+          {% comment %} <div class="row">
+            <!-- Left Column (8 Grid Units) -->
+            <div class="col-8">
+              <div class="row">
+                <div class="col-6 grid-margin stretch-card">
+                  <div class="card bg-gradient-danger card-img-holder text-white">
+                    <div class="card-body" style="max-height:159px;">
+                      <!-- <img src="{% static 'assets/images/dashboard/circle.svg' %}" class="card-img-absolute" alt="circle-image" /> -->
+                      <h4 class="font-weight-normal mb-2">Total Companies Inspected</h4>
+                      <h2 class="mb-5">668</h2>
+                    </div>
+                  </div>
+                  <div class="card">
+                    <div class="card-body diff" style="border: 2px solid #76d4efdb;border-radius:4px;">
+                      <div class="clearfix">
+                        <h6 class="card-title float-start"
+                          style=" font-size:22px; margin-top:-10px; text-transform: none !important;">Top Observations
+                          by cGMP Systems</h6>
+                      </div>
+                      <canvas id="barChartCMCSection" height="300"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body">
+
+                <!-- <div id="visit-sale-chart-legend" class="rounded-legend legend-horizontal legend-top-right float-end"></div> -->
+                <div id="visit-sale-chart-legend" class="rounded-legend legend-horizontal legend-top-right float-end">
+                </div>
+                <canvas id="visit-sale-chart" style="width: 100%; height:inherit; "></canvas>
+              </div>
+            </div> {% endcomment %}
+            <div class="container-fluid mt-4"
+              style="background-color: #f8f9fc; padding: 20px 40px; border-radius: 12px; font-family: 'Inter', sans-serif;">
+              <!-- Top Filter Area -->
+              {% comment %} <div class="dashboard-header-actions"
+                style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+                <button class="filter-btn"
+                  style="background: white; border: 1px solid #e0e6ed; padding: 10px 18px; border-radius: 8px; display: flex; align-items: center; gap: 10px; font-weight: 500; color: #475569; font-size: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                  <i class="mdi mdi-calendar-blank-outline" style="font-size: 18px;"></i> 2020 - 2026 <i
+                    class="mdi mdi-chevron-down" style="margin-left: 5px;"></i>
+                </button>
+                <button onclick="window.location.reload()" class="reset-btn"
+                  style="background: white; border: 1px solid #e0e6ed; padding: 10px 18px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-weight: 500; color: #64748b; font-size: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; transition: background 0.2s;">
+                  <i class="mdi mdi-refresh" style="font-size: 18px;"></i> Reset Filters
+                </button>
+              </div> {% endcomment %}
+
+              <!-- KPI Cards -->
+              <div class="kpi-cards-row" style="display: flex; gap: 25px; margin-bottom: 30px;">
+                <div class="kpi-card"
+                  style="background: white; border-radius: 12px; padding: 25px; display: flex; align-items: center; gap: 20px; flex: 1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 1px solid #f1f5f9;">
+                  <div class="kpi-icon"
+                    style="background: #e0f2fe; color: #0284c7; width: 65px; height: 65px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px;">
+                    <i class="mdi mdi-domain"></i>
+                  </div>
+                  <div class="kpi-details">
+                    <p style="color: #64748b; margin: 0; font-size: 14px; font-weight: 500;">Total Companies</p>
+                    <h3 style="margin: 8px 0; font-size: 32px; font-weight: 700; color: #0f172a;">{{total_companies|default:0 }}</h3>
+                    {% comment %} <p style="margin: 0; font-size: 13px; color: #10b981; font-weight: 600;"><i
+                        class="mdi mdi-arrow-up"></i> 8.3% <span style="color: #94a3b8; font-weight: 400;">vs last
+                        year</span></p> {% endcomment %}
+                  </div>
+                </div>
+                <div class="kpi-card"
+                  style="background: white; border-radius: 12px; padding: 25px; display: flex; align-items: center; gap: 20px; flex: 1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 1px solid #f1f5f9;">
+                  <div class="kpi-icon"
+                    style="background: #e0f2fe; color: #0284c7; width: 65px; height: 65px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 30px;">
+                    <i class="mdi mdi-file-document-outline"></i>
+                  </div>
+                  <div class="kpi-details">
+                    <p style="color: #64748b; margin: 0; font-size: 14px; font-weight: 500;">Total Warning Letters</p>
+                    <h3 style="margin: 8px 0; font-size: 32px; font-weight: 700; color: #0f172a;">{{total_letters|default:0 }}</h3>
+                    {% comment %} <p style="margin: 0; font-size: 13px; color: #10b981; font-weight: 600;"><i
+                        class="mdi mdi-arrow-up"></i> 12.6% <span style="color: #94a3b8; font-weight: 400;">vs last
+                        year</span></p> {% endcomment %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chart Section -->
+              <div class="chart-card"
+                style="background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; margin-bottom: 20px;">
+                <h4
+                  style="margin-top: 0; margin-bottom: 30px; color: #0f172a; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                  FDA Warning Letters: Yearly Company Count
+                  <i class="mdi mdi-information-outline" style="color: #94a3b8; font-size: 18px; cursor: pointer;"></i>
+                </h4>
+                <div style="height: 400px; width: 100%;">
+                  <canvas id="visit-sale-chart"></canvas>
+                </div>
+              </div>
+            </div>
+
+
+          </div>
+
+          <!-- ALL Your Content Here -->
+          <!-- content-wrapper ends -->
+          <!-- partial:partials/_footer.html -->
+          {% comment %} <footer class="tt-footer">
+            <div class="tt-copy">&copy; 2026 iPharmaAI.</div>
+          </footer> {% endcomment %}
+          <!-- partial -->
+        </div>
+        <!-- main-panel ends -->
+      </div>
+      <!-- page-body-wrapper ends -->
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+    {{ yearwise_labels|json_script:"warning-letter-year-labels" }}
+    {{ yearwise_values|json_script:"warning-letter-year-values" }}
+
+    <script>
+      function readJsonScript(id, fallbackValue) {
+        const el = document.getElementById(id);
+        if (!el) return fallbackValue;
+        try {
+          return JSON.parse(el.textContent);
+        } catch (e) {
+          console.error(`Invalid JSON in ${id}`, e);
+          return fallbackValue;
+        }
+      }
+
+      function createChartPieOGs() {
+        const ctx = document.getElementById('barChartCMCSection');
+        if (!ctx) return;
+
+        // Static labels and data
+        const labels = [
+
+          "Center for Drug Evaluation and Research (CDER)",
+          "Division of Pharmaceutical Quality Operations",
+          " Office of Pharmaceutical Quality",
+          "Office of Prescription Drug Promotion (OPDP)",
+        ];
+
+        const data = [595, 193, 43, 7];
+
+
+        // Common chart options
+        const commonOptions = {
+          responsive: false,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false,
+              // Show legends
+            },
+
+            tooltip: {
+              backgroundColor: 'rgba(0,0,0,0.8)',
+
+              titleFont: {
+                size: 12
+              },
+              bodyFont: {
+                size: 10
+              },
+            },
+            datalabels: {
+              color: '#000',
+              anchor: 'end',
+              align: 'start',
+              font: {
+                size: 14,
+                weight: 'bold'
+              }
+            }
+            ,
+            animation: {
+              duration: 0
+            },
+            hover: {
+              mode: null // disable hover behavior
+            },
+          },
+
+          elements: {
+            arc: {
+              hoverOffset: 0 // 👈 This line disables the pop-out effect
+            }
+          }
+        };
+
+        // Color palette for pie chart
+        const colors = [
+          'rgba(255, 99, 132, 0.8)',
+          'rgba(76, 175, 80, 1)',
+          'rgba(255, 206, 86, 0.8)',
+          'rgba(239, 83, 80, 1)',
+          'rgba(54, 162, 235, 0.8)',
+          'rgba(153, 102, 255, 0.8)',
+          'rgba(156, 39, 176, 1)',
+          'rgba(75, 192, 192, 0.8)'
+        ];
+
+
+        new Chart(ctx, {
+          type: 'pie',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Companies',
+              data: data,
+              backgroundColor: colors,
+              borderColor: colors.map(color => color.replace('0.8', '1')),
+              borderWidth: 1,
+              hoverOffset: 4
+            }]
+          },
+          options: commonOptions
+        });
+      }
+      function createChartBarOGs() {
+        const canvas = document.getElementById('visit-sale-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        const labels = readJsonScript('warning-letter-year-labels', []);
+        const rawValues = readJsonScript('warning-letter-year-values', []);
+
+        const length = Math.min(labels.length, rawValues.length);
+        const years = labels.slice(0, length);
+        const values = rawValues.slice(0, length);
+
+        Chart.register(ChartDataLabels);
+        let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, '#1e52a8');
+        gradient.addColorStop(1, '#6ba0e6');
+
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: years,
+            datasets: [{
+              label: 'Company Count',
+              data: values,
+              backgroundColor: gradient,
+              borderRadius: 6,
+              barPercentage: 0.45,
+              borderSkipped: false
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              title: { display: false },
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#0f172a',
+                padding: 10,
+                titleFont: { size: 13, family: 'Inter' },
+                bodyFont: { size: 14, weight: 'bold', family: 'Inter' },
+                displayColors: false
+              },
+              datalabels: {
+                anchor: 'end',
+                align: 'top',
+                color: '#1e52a8',
+                font: {
+                  weight: 'bold',
+                  size: 14,
+                  family: 'Inter'
+                },
+                offset: 4
+              }
+            },
+            scales: {
+              x: {
+                ticks: {
+                  color: '#64748b',
+                  font: { size: 13, family: 'Inter', weight: '500' }
+                },
+                grid: { display: false, drawBorder: false },
+                border: { display: true, color: '#e2e8f0' }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  color: '#94a3b8',
+                  font: { size: 12, family: 'Inter' },
+                  precision: 0
+                },
+                border: { display: false },
+                grid: { color: '#f1f5f9', drawBorder: false }
+              }
+            }
+          }
+        });
+      }
+
+      function initSidebarToggle() {
+        const layout = document.getElementById('dashboardLayout');
+        const toggleButton = document.getElementById('sidebarToggle');
+        if (!layout || !toggleButton) return;
+
+        const storageKey = 'dashboard483SidebarCollapsed';
+        const savedState = localStorage.getItem(storageKey);
+        const isCollapsed = savedState === 'true';
+
+        function applyState(collapsed) {
+          layout.classList.toggle('sidebar-collapsed', collapsed);
+          toggleButton.setAttribute('aria-expanded', String(!collapsed));
+          toggleButton.querySelector('i').className = 'mdi mdi-dock-left';
+        }
+
+        applyState(isCollapsed);
+
+        toggleButton.addEventListener('click', () => {
+          const nextState = !layout.classList.contains('sidebar-collapsed');
+          localStorage.setItem(storageKey, String(nextState));
+          applyState(nextState);
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        initSidebarToggle();
+        //  fetchDataAndCreateChart('../../aidatabase/bar-chart-cmc-section/', 'barChartCMCSection', 'pie');
+        createChartPieOGs()
+        createChartBarOGs()
+        // fetchDataAndCreateChart('../../aidatabase/bar-chart-category-vs-deficiency/', 'barChartCategoryVsDeficiency', 'bar');
+        //createBarChart('barChartCMCSection','pie')
+      });
+
+      // Manual dropdown toggle removed in favor of Bootstrap collapse
+    </script>
+    <!-- container-scroller -->
+    <!-- plugins:js -->
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <!-- endinject -->
+    <!-- Plugin js for this page -->
+    <!-- <script src="{% static 'assets/vendors/chart.js/chart.umd.js' %}"></script> -->
+    <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+    <!-- End plugin js for this page -->
+    <!-- inject:js -->
+    <!-- <script src="{% static 'assets/js/off-canvas.js' %}"></script> -->
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+
+    <!-- endinject -->
+    <!-- Custom js for this page -->
+    <!-- <script src="{% static 'assets/js/dashboard.js' %}"></script> -->
+    <!-- End custom js for this page -->
+
+</body>
+
+</html>

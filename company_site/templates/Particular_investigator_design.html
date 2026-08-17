@@ -1,0 +1,873 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Investigator Detail | iPharmaAI</title>
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}"
+    />
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+    <style>
+      :root {
+        --primary-blue: #123672;
+        --accent-teal: #13c6bc;
+        --bg-light: #f7f9fd;
+        --card-shadow: 0 10px 30px rgba(18, 58, 96, 0.05);
+        --bg-1: #f7f9fd;
+        --bg-2: #edf4ff;
+        --ink: #17324d;
+        --muted: #6f84a2;
+        --accent: #25729D;
+        --accent-2: #0f3f94;
+        --accent-3: #13c6bc;
+        --card: rgba(255, 255, 255, 0.96);
+        --line: rgba(18, 58, 96, 0.12);
+        --shadow: 0 18px 36px rgba(18, 58, 96, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--ink);
+        background-color: var(--bg-light);
+      }
+
+      a {
+        text-decoration: none;
+      }
+
+      .nav-link {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        text-align: left !important;
+      }
+
+      .nav-header-link {
+        font-size: 14px !important;
+        font-weight: bold;
+        text-decoration: none;
+        border-radius: 5px;
+        color: black !important;
+      }
+
+      .nav-header-link-hover:hover {
+      color: #045c8d !important
+    }
+
+      .active-header-link {
+      color: rgba(255, 255, 255, 1) !important;
+      background: linear-gradient(to right, #045c8d, #3485b3) !important;
+    }
+
+      .navbar-menu-wrapper {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        flex-grow: 1;
+        width: fit-content !important;
+      }
+
+      .navbar-brand-wrapper {
+        width: fit-content !important;
+      }
+
+      .dropdown-item:active {
+        background-color: white;
+      }
+
+      .dropdown-menu[data-bs-popper] {
+        top: 70%;
+      }
+
+      @media (max-width: 1490px) {
+        .nav-header-link {
+          font-size: 12px !important;
+        }
+      }
+
+
+    /* ── Dashboard sidebar layout ── */
+    .dashboard-page-body {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      padding-top: 70px;
+      min-height: 100vh;
+    }
+
+
+.dashboard-main-panel {
+      flex: 1 1 auto;
+      margin-left: 270px;
+      width: calc(100% - 270px);
+      transition: all 0.3s ease;
+      transition: margin-left 0.25s ease;
+    }
+
+    /* When sidebar collapsed */
+    .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+        margin-left: 96px !important;
+        width: calc(100% - 96px) !important;
+    }
+
+    /* Collapsed sidebar */
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+      width: 96px;
+      min-width: 96px;
+      max-width: 96px;
+    }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+    }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label { display: none; }
+    .dashboard-layout.sidebar-collapsed .sidebar-toggle-row { justify-content: center; }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+      display: flex;
+       flex-direction: column;
+      justify-content: center;
+    }
+    .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+      width: 56px;
+      margin: 0 auto;
+    }
+
+    .content-area {
+      flex: 1;
+      width: 100%;
+      padding: 28px 28px 42px;
+    }
+
+      /* Top Stats Header */
+      .investigator-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 40px;
+      }
+
+      .stat-pill-container {
+        display: flex;
+        gap: 15px;
+      }
+
+      .stat-pill {
+        background: white;
+        padding: 15px 25px;
+        border-radius: 15px;
+        box-shadow: var(--card-shadow);
+        text-align: center;
+      }
+
+      .stat-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        color: #6f84a2;
+        font-weight: bold;
+      }
+      .stat-value {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--primary-blue);
+        display: block;
+      }
+
+      .stat-pill.success-pill {
+        background: #f0fff4;
+        border: 1px solid #c6f6d5;
+      }
+      .stat-pill.success-pill .stat-value {
+        color: #2f855a;
+      }
+
+      .classification-badge {
+        background: #e0f9f8;
+        color: #0b8a80;
+        padding: 8px 15px;
+        border-radius: 10px;
+        font-weight: bold;
+        display: inline-block;
+        margin-top: 10px;
+      }
+
+      /* Grid Layout for Panels */
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 25px;
+        margin-bottom: 25px;
+      }
+
+      .info-panel {
+        background: white;
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: var(--card-shadow);
+      }
+
+      .chart-panel {
+        background: white;
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 25px;
+
+      }
+
+      .panel-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--primary-blue);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      /* List styling for Geo & Establishment */
+      .data-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 15px;
+      }
+
+      .progress-bar-container {
+        flex: 1;
+        height: 8px;
+        background: #eee;
+        border-radius: 4px;
+        margin: 0 15px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #2750a0, #08b1d1);
+      }
+
+      /* Recent Inspections Table */
+      .table-panel {
+        background: white;
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: var(--card-shadow);
+      }
+
+      .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .custom-table th {
+        text-align: left;
+        font-size: 12px;
+        color: #91a3ba;
+        padding: 15px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+
+      .custom-table td {
+        padding: 15px;
+        font-size: 14px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+
+      .status-tag {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: bold;
+      }
+      .status-oai {
+        background: #ffebeb;
+        color: #d9534f;
+      }
+
+      /* Custom Timeline Bars */
+      .timeline-container {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        height: 200px;
+        padding: 20px 10px;
+        background: #fcfdfe;
+        border-radius: 15px;
+      }
+      .timeline-column {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .timeline-bar {
+        width: 50%;
+        border-radius: 8px 8px 4px 4px;
+        transition: height 0.6s ease;
+        position: relative;
+      }
+      .bar-empty {
+        background: linear-gradient(180deg, #13c6bc 0%, #123672 100%);
+        opacity: 0.15;
+        height: 20px !important;
+      }
+      .bar-filled {
+        background: linear-gradient(180deg, #13c6bc 0%, #123672 100%);
+      }
+      .bar-latest-active {
+        background: linear-gradient(
+          180deg,
+          #5cb85c 0%,
+          #2f855a 100%
+        ) !important;
+      }
+      .bar-value-label {
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--primary-blue);
+        margin-bottom: 4px;
+      }
+      .year-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #6f84a2;
+      }
+      .establishment-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        font-weight: 700;
+      }
+
+      .est-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #f1f3f6;
+        padding: 14px 18px;
+        border-radius: 30px;
+        transition: all 0.25s ease;
+        cursor: pointer;
+      }
+
+      .est-card:hover {
+        transform: translateY(-2px);
+        background: #e7ecf3;
+      }
+
+      .est-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .est-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #e0e7ff;
+        color: #123672;
+        font-size: 18px;
+      }
+
+      .est-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: #1e293b;
+      }
+
+      .est-count {
+        font-weight: 800;
+        font-size: 16px;
+        color: #123672;
+      }
+
+      .keyword-panel {
+        background: white;
+        border-radius: 20px;
+        padding: 25px;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 25px;
+        flex: 1;
+        max-height: 335px;
+        overflow-y: auto;
+      }
+
+      .keyword-badge {
+        display: inline-flex;
+        align-items: center;
+        background: #f0f4f8;
+        color: #475569;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 600;
+        margin: 0 8px 8px 0;
+        border: 1px solid #e2e8f0;
+      }
+      .keyword-count {
+        background: #123672;
+        color: white;
+        border-radius: 4px;
+        padding: 1px 5px;
+        margin-left: 8px;
+        font-size: 10px;
+      }
+
+      .keyword-system-group {
+        margin-bottom: 15px;
+      }
+      .keyword-system-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent-2);
+        margin-bottom: 8px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 4px;
+      }
+
+      .system-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 8px;
+        overflow-x: auto;
+        scroll-behavior: smooth;
+      }
+      .system-tabs::-webkit-scrollbar {
+       display: none;
+      }
+      .system-tab {
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        border-radius: 6px;
+        color: #6f84a2;
+        white-space: nowrap;
+      }
+      .system-tab.active {
+        background: var(--primary-blue);
+        color: white;
+      }
+      .keyword-content-pane {
+        display: none;
+      }
+      .keyword-content-pane.active {
+        display: block;
+      }
+
+      /* System Focus Area Tags */
+      .system-tag-cloud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .system-focus-tag {
+        background: #f0f7ff;
+        border: 1px solid #d0e4ff;
+        color: #123672;
+        padding: 8px 16px;
+        border-radius: 50px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+      }
+    </style>
+  </head>
+  <body>
+     {% include './navbar.html' %}
+    <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+      {% include './sidebar.html' %}
+      <div class="dashboard-main-panel">
+      <main class="content-area">
+        <section class="investigator-header">
+          <div>
+            <h1 class="hero-title" id="investigatorNameDisplay">Loading...</h1>
+            <!-- <p class="hero-subtitle">Office of Regulatory Affairs (ORA) • Division of Pharmaceutical Quality</p> -->
+            <!-- <div id="latestClassBadge" class="classification-badge">LATEST: --</div> -->
+          </div>
+
+          <div class="stat-pill-container">
+            <div class="stat-pill">
+              <span class="stat-label">Total Inspections</span>
+              <span class="stat-value" id="totalInspections">0</span>
+            </div>
+            <div class="stat-pill">
+              <span class="stat-label">Observations</span>
+              <span class="stat-value" id="totalObs">0</span>
+            </div>
+            <div class="stat-pill success-pill">
+              <span class="stat-label">Latest Classification</span>
+              <span class="stat-value" id="latestClassValue">--</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="dashboard-grid">
+          <div class="info-panel">
+            <h3 class="panel-title">
+              <i class="mdi mdi-chart-pie"></i> Classification Breakdown -Resolved Inspections Only
+            </h3>
+            <div id="classificationList"></div>
+          </div>
+          <div class="info-panel">
+            <h3 class="panel-title">
+              <i class="mdi mdi-memory"></i> cGMP System Focus Area
+            </h3>
+            <div id="systemList"></div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="info-panel">
+            <h3 class="panel-title">
+              <i class="mdi mdi-chart-timeline-variant"></i> Inspection Timeline
+              (2018 - Present)
+            </h3>
+            <div id="customTimeline" class="timeline-container"></div>
+          </div>
+
+          <div class="info-panel" style="max-height: 335px; overflow-y: auto;">
+            <h3 class="panel-title"><i class="mdi mdi-tag-multiple"></i> Frequent 483 Themes </h3>
+            <div id="keywordCloud"></div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="info-panel">
+            <h3 class="panel-title">
+              <i class="mdi mdi-earth"></i> Geographic Coverage
+            </h3>
+            <div id="geoList"></div>
+          </div>
+          <div class="info-panel">
+            <h3 class="panel-title">
+              <i class="mdi mdi-domain"></i> Establishment Types
+            </h3>
+            <div id="establishmentList"></div>
+          </div>
+        </div>
+
+        <div class="table-panel">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="panel-title m-0">Recent Inspections</h3>
+            <!-- <a href="#" class="text-primary fw-bold" style="font-size:13px;">View All History →</a> -->
+          </div>
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>FEI NUMBER</th>
+                <th>ESTABLISHMENT NAME</th>
+                <th>COUNTRY</th>
+                <th>CLASSIFICATION</th>
+              </tr>
+            </thead>
+            <tbody id="inspectionsTableBody"></tbody>
+          </table>
+        </div>
+      </main>
+      </div>
+    </div>
+
+    <script>
+      function initSidebarToggle() {
+        const layout = document.getElementById("dashboardLayout");
+        const btn = document.getElementById("sidebarToggle");
+        if (!layout || !btn) return;
+
+        const storageKey = "systemsSidebarCollapsed";
+        const saved = localStorage.getItem(storageKey) === null ? false : localStorage.getItem(storageKey) === "true";
+
+        function applyState(collapsed) {
+          layout.classList.toggle("sidebar-collapsed", collapsed);
+          btn.setAttribute("aria-expanded", String(!collapsed));
+          btn.innerHTML = '<i class="mdi mdi-dock-left"></i>';
+        }
+
+        applyState(saved);
+        btn.addEventListener("click", () => {
+          const next = !layout.classList.contains("sidebar-collapsed");
+          localStorage.setItem(storageKey, String(next));
+          applyState(next);
+        });
+      }
+      async function loadData() {
+        const params = new URLSearchParams(window.location.search);
+        const name = params.get("investigator") || "Ileana Barreto-Pettit";
+
+        try {
+          const res = await fetch(
+            `${window.location.origin}/aidatabase/investigator-detail-insights/?investigator=${encodeURIComponent(name)}`,
+          );
+          const data = await res.json();
+
+          // 1. Header
+          document.getElementById("investigatorNameDisplay").innerText =
+            data.investigator;
+          document.getElementById("totalInspections").innerText = Object.values(
+            data.yearly_inspections,
+          ).reduce((a, b) => a + b, 0);
+          document.getElementById("totalObs").innerText =
+            data.total_observations;
+
+          if (data.recent_inspections && data.recent_inspections.length > 0) {
+            document.getElementById("latestClassValue").innerText =
+              data.recent_inspections[0].Classification;
+          }
+
+          const classColors = {
+            "OAI (Official Action)": "#d9534f", // Red
+            "VAI (Voluntary Action)": "#f0ad4e", // Yellow/Orange
+            "NAI (No Action)": "#5cb85c", // Green
+          };
+
+          const totalInspCount = Object.values(data.classification_breakdown)
+            .reduce((sum, v) => sum + (v.count || 0), 0);
+
+          document.getElementById("classificationList").innerHTML = [
+            "OAI (Official Action)",
+            "VAI (Voluntary Action)",
+            "NAI (No Action)",
+          ]
+            .map((classification) => {
+              const info = data.classification_breakdown[classification] || {
+                count: 0,
+                percentage: 0,
+              };
+              const total = totalInspCount || parseInt(document.getElementById("totalInspections").innerText) || 0;
+              return `
+          <div class="data-list-item">
+            <span style="font-size:13px; font-weight: 700; width:150px; color: ${classColors[classification]}">${classification}</span>
+            <div class="progress-bar-container">
+              <div class="progress-fill" style="width: ${info.percentage}%; background: ${classColors[classification]}"></div>
+            </div>
+            <span class="fw-bold" style="min-width:180px; text-align:right; font-size:12px;">
+              <span style="color:#6f84a2;">( ${info.percentage}% ) - ${info.count} inspections</span>
+            </span>
+          </div>
+        `;
+            })
+            .join("");
+
+          // 2. Systems
+         const systemContainer = document.getElementById("systemList");
+          const sortedSystems = Object.entries(data.system_breakdown).sort(
+            (a, b) => b[1] - a[1],
+          );
+          const leftSystems = sortedSystems.slice(0, 3);
+          const rightSystems = sortedSystems.slice(3, 6);
+
+          systemContainer.innerHTML = `
+          <div style="display: flex; gap: 40px;">
+            <div style="flex: 1;">
+              ${leftSystems
+                .map(
+                  ([name, count]) => `
+          <div class="data-list-item">
+            <span style="font-size:13px; width:150px; font-weight: 700;">${name}</span>
+            <div class="progress-bar-container">
+              <div class="progress-fill" style="width: ${data.total_observations > 0 ? (count / data.total_observations) * 100 : 0}%"></div>
+            </div>
+            <span class="fw-bold" style="min-width: 30px; text-align: right; ">${count}</span>
+          </div>
+              `,
+                )
+                .join("")}
+            </div>
+            <div style="flex: 1;">
+              ${rightSystems
+                .map(
+                  ([name, count]) => `
+          <div class="data-list-item">
+            <span style="font-size:13px; width:150px; font-weight: 700;">${name}</span>
+            <div class="progress-bar-container">
+              <div class="progress-fill" style="width: ${data.total_observations > 0 ? (count / data.total_observations) * 100 : 0}%"></div>
+            </div>
+            <span class="fw-bold" style="min-width: 30px; text-align: right;">${count}</span>
+          </div>
+              `,
+                )
+                .join("")}
+            </div>
+          </div>`;
+
+
+          // 3. Inspections Table
+          const tableBody = document.getElementById("inspectionsTableBody");
+          tableBody.innerHTML = data.recent_inspections
+            .map(
+              (ins) => `
+          <tr>
+            <td>${ins.Date}</td>
+            <td class="text-primary fw-bold">${ins["FEI Number"]}</td>
+            <td>${ins["Company Name"]}</td>
+            <td>${ins.Country}</td>
+            <td><span class="status-tag status-oai">${ins.Classification}</span></td>
+          </tr>
+        `,
+            )
+            .join("");
+
+          // 4. Geo Coverage
+          const geoContainer = document.getElementById("geoList");
+          const totalGeoInspections = Object.values(
+            data.country_inspections,
+          ).reduce((a, b) => a + b, 0);
+
+          geoContainer.innerHTML = Object.entries(data.country_inspections)
+            .map(([country, count]) => {
+              const geoPercentage =
+                totalGeoInspections > 0
+                  ? (count / totalGeoInspections) * 100
+                  : 0;
+              return `
+          <div class="data-list-item">
+            <span style="font-size:13px; flex: 1; font-weight: 700;">${country}</span>
+            <div class="progress-bar-container" style="flex: 1;">
+              <div class="progress-fill" style="width: ${geoPercentage}%"></div>
+            </div>
+            <span class="fw-bold" style="min-width: 30px; text-align: right;">${count}</span>
+          </div>`;
+            })
+            .join("");
+
+          // 5. Establishment Types
+          const establishmentContainer =
+            document.getElementById("establishmentList");
+          const totalEstInspections = Object.values(
+            data.type_of_establishment,
+          ).reduce((a, b) => a + b, 0);
+
+          const iconMap = {
+            "Prescription (Rx) Drug Manufacturer": "mdi-microscope",
+            "Prescription (Rx) Drug Manufacturer & Api Manufacturer": "mdi-flask-outline",
+            "Api Manufacturer": "mdi-package-variant",
+            "Contract Laboratory": "mdi-microscope",
+          };
+
+                      establishmentContainer.innerHTML = `
+              <div class="establishment-grid">
+                ${Object.entries(data.type_of_establishment)
+                  .map(([type, count]) => {
+                    const icon = iconMap[type] || "mdi-domain";
+
+                    return `
+                    <div class="est-card">
+                      <div class="est-left">
+                        <div class="est-icon">
+                          <i class="mdi ${icon}"></i>
+                        </div>
+                        <div class="est-name">${type.replace(/\bApi\b/g, 'API')}</div>
+                      </div>
+                      <div class="est-count">${count}</div>
+                    </div>
+                  `;
+                  })
+                  .join("")}
+              </div>
+            `;
+
+          // 6. Timeline Chart
+          const timelineContainer = document.getElementById("customTimeline");
+          const startYear = 2018;
+          const endYear = 2026;
+          let timelineHtml = "";
+
+          const maxVal = Math.max(...Object.values(data.yearly_inspections), 1);
+
+          for (let y = startYear; y <= endYear; y++) {
+            const val = data.yearly_inspections[y.toString()] || 0;
+            const heightPercent = val > 0 ? (val / maxVal) * 100 : 10;
+            const isLatest = y === 2026;
+            const heightpixcel = (120 * heightPercent) / 100;
+
+            let barClass = val > 0 ? "bar-filled" : "bar-empty";
+            if (isLatest && val > 0) barClass = "bar-latest-active";
+
+            timelineHtml += `
+            <div class="timeline-column">
+              ${val > 0 ? `<span class="bar-value-label">${val}</span>` : ""}
+              <div class="timeline-bar ${barClass}" style="height: ${heightpixcel}px;"></div>
+              <span class="year-label">${y}</span>
+            </div>
+          `;
+          }
+          timelineContainer.innerHTML = timelineHtml;
+
+          // 7. Keywords
+          const keywordCloud = document.getElementById("keywordCloud");
+          if (data.frequent_observation_themes && Object.keys(data.frequent_observation_themes).length > 0) {
+            let tabsHtml = '<div class="system-tabs">';
+            let panesHtml = '<div class="keyword-panes">';
+
+            Object.entries(data.frequent_observation_themes).forEach(([system, themes], index) => {
+              const isActive = index === 0 ? 'active' : '';
+              const systemId = `system-pane-${index}`;
+
+              tabsHtml += `<div class="system-tab ${isActive}" data-target="${systemId}">${system}</div>`;
+
+              panesHtml += `<div class="keyword-content-pane ${isActive}" id="${systemId}">`;
+              themes.forEach(themeObj => {
+                const [label, count] = Object.entries(themeObj)[0];
+                panesHtml += `<div class="keyword-badge">${label} <span class="keyword-count">${count}</span></div>`;
+              });
+              panesHtml += `</div>`;
+            });
+
+            tabsHtml += '</div>';
+            keywordCloud.innerHTML = tabsHtml + panesHtml;
+
+            // Bind Tab Clicks
+            keywordCloud.querySelectorAll('.system-tab').forEach(tab => {
+              tab.addEventListener('click', (e) => {
+                keywordCloud.querySelectorAll('.system-tab, .keyword-content-pane').forEach(el => el.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.target).classList.add('active');
+
+                // Scroll logic to show next tabs
+                tab.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+              });
+            });
+          } else {
+            keywordCloud.innerHTML = '<p class="text-muted">No specific keywords identified.</p>';
+          }
+        } catch (e) {
+          console.error("Error loading investigator details", e);
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        loadData();
+        initSidebarToggle();
+      });
+    </script>
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </body>
+</html>

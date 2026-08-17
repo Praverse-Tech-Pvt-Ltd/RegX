@@ -1,0 +1,687 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>RA-AI Tools</title>
+    <!-- plugins:css -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <!-- endinject -->
+    <!-- Plugin css for this page -->
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}"
+    />
+    <link
+      rel="stylesheet"
+      href="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.css' %}"
+    />
+    <!-- End plugin css for this page -->
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}" />
+    <!-- End layout styles -->
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+    <style>
+      .table-scroll {
+        overflow-x: scroll !important; /* Enable vertical scrolling */
+        transform: rotateX(180deg)
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .filter-div{
+
+        input[type="date"]::-webkit-calendar-picker-indicator {
+
+          padding: 0.4375rem 0.75rem !important;
+          border: 0 !important;
+          outline: 1px solid #ebedf2 !important;
+          color: #c9c8c8 !important;
+
+      }
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        vertical-align: top;
+        text-align: left;
+      }
+
+      td img {
+        max-width: 50px;
+        height: auto;
+        display: block;
+        margin-top: 5px;
+      }
+      .navbar-menu-wrapper{
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+      }
+      .nav-header-link{
+        font-size: 17px !important;
+        font-weight: bold;
+        text-decoration: none;
+
+        border-radius: 5px;
+        color: black !important;
+
+       }
+       @media (max-width: 1490px) {
+        .nav-header-link {
+
+          font-size: 12px !important;
+        }
+      }
+       .nav-header-link-hover:hover{
+        color:#045c8d !important
+
+    }
+    .dropdown-menu[data-bs-popper]{
+      top:70%
+    }
+
+       .active-header-link{
+        color:  rgba(255, 255, 255, 1) !important;
+        background: linear-gradient(to right, #045c8d, #3485b3) !important;;
+      }
+
+      .hover-link-list{
+
+        color: black !important;
+      }
+
+      .main-panel{
+
+
+        background: linear-gradient(to right, #ffffff,rgb(228, 205, 244)) !important;
+          border-radius: 16px;
+          box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+          backdrop-filter: blur(2px); /* Standard property */
+
+
+     }
+     .content-wrapper{
+       background: none;
+     }
+     .footer{
+       background: white;
+     }
+    </style>
+  </head>
+  <body>
+    <div class="container-scroller">
+
+      <!-- partial:partials/_navbar.html -->
+      <nav
+        class="navbar default-layout-navbar col-lg-12 col-12 p-0 fixed-top position-fixed d-flex flex-row"
+      >
+        <div
+          class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start"
+        >
+        <a class="navbar-brand brand-logo" href="../../../"
+        ><img src="{% static 'assets/icretegy/itechnical logo.png' %}" alt="logo "
+        style="width: 132px !important;height: 31px !important;"
+      /></a>
+          <a class="navbar-brand brand-logo-mini" href="../../../"
+            ><img src="{% static 'assets/images/logo-mini.svg' %}" alt="logo"
+          /></a>
+        </div>
+        <div class="navbar-menu-wrapper d-flex align-items-stretch">
+          {% comment %} <button
+            class="navbar-toggler navbar-toggler align-self-center"
+            type="button"
+            data-toggle="minimize"
+          >
+            <span class="mdi mdi-menu"></span>
+          </button> {% endcomment %}
+          <ul class="navbar-nav navbar-nav-right">
+            <li class="nav-item d-none d-lg-block nav-header-link nav-header-link-hover">
+              <a class="nav-link" {% if request.user.role == "admin" %} href="../../../adminmaster/adminbase" {% else %} href="../../../ratools/" {% endif %}> Regulatory Tools </a>
+            </li>
+            <li class="nav-item d-none d-lg-block nav-header-link">
+              <a class=" px-4 py-3 rounded-2  nav-header-link   active-header-link" href="../form483/"> 483 Observations AI Database </a>
+            </li>
+            <li class="nav-item d-none d-lg-block nav-header-link nav-header-link-hover">
+              <a class="nav-link" href="../ai_master_base/"> ANDA Deficiency AI </a>
+            </li>
+            <li class="nav-item d-none d-lg-block nav-header-link nav-header-link-hover">
+              <a class="nav-link" href="../major_cr_base/"> Major CR Deficiency  </a>
+            </li>
+            <li class="nav-item nav-profile dropdown">
+              <a
+                class="nav-link dropdown-toggle"
+                id="profileDropdown"
+                href="#"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                <div class="nav-profile-img">
+                  <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="image"
+                  />
+                  <span class="availability-status online"></span>
+                </div>
+                <div class="nav-profile-text">
+                  <p class="mb-1 text-black nav-header-link nav-header-link-hover">{{ request.user.first_name }}</p>
+                </div>
+              </a>
+              <div
+                class="dropdown-menu navbar-dropdown"
+                aria-labelledby="profileDropdown"
+              >
+                <a class="dropdown-item nav-header-link" href="#">
+                  <i class="mdi mdi-cached me-2 text-success"></i> Profile
+                </a>
+                <div class="dropdown-divider"></div>
+              </div>
+            </li>
+            <li class="nav-item dropdown">
+              <a
+                class="nav-link count-indicator dropdown-toggle"
+                id="notificationDropdown"
+                href="#"
+                data-bs-toggle="dropdown"
+              >
+                <i class="mdi mdi-bell-outline text-dark"></i>
+                <span class="count-symbol bg-danger"></span>
+              </a>
+              <div
+                class="dropdown-menu dropdown-menu-end navbar-dropdown preview-list"
+                aria-labelledby="notificationDropdown"
+              >
+                <h6 class="p-3 mb-0">Notifications</h6>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item preview-item">
+                  <div class="preview-thumbnail">
+                    <div class="preview-icon bg-success">
+                      <i class="mdi mdi-calendar"></i>
+                    </div>
+                  </div>
+                  <div
+                    class="preview-item-content d-flex align-items-start flex-column justify-content-center"
+                  >
+                    <h6 class="preview-subject font-weight-normal mb-1">
+                      Event today
+                    </h6>
+                    <p class="text-gray ellipsis mb-0">
+                      Just a reminder that you have an event today
+                    </p>
+                  </div>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item preview-item">
+                  <div class="preview-thumbnail">
+                    <div class="preview-icon bg-warning">
+                      <i class="mdi mdi-cog"></i>
+                    </div>
+                  </div>
+                  <div
+                    class="preview-item-content d-flex align-items-start flex-column justify-content-center"
+                  >
+                    <h6 class="preview-subject font-weight-normal mb-1">
+                      Settings
+                    </h6>
+                    <p class="text-gray ellipsis mb-0">Update dashboard</p>
+                  </div>
+                </a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item preview-item">
+                  <div class="preview-thumbnail">
+                    <div class="preview-icon bg-info">
+                      <i class="mdi mdi-link-variant"></i>
+                    </div>
+                  </div>
+                  <div
+                    class="preview-item-content d-flex align-items-start flex-column justify-content-center"
+                  >
+                    <h6 class="preview-subject font-weight-normal mb-1">
+                      Launch Admin
+                    </h6>
+                    <p class="text-gray ellipsis mb-0">New admin wow!</p>
+                  </div>
+                </a>
+                <div class="dropdown-divider"></div>
+                <h6 class="p-3 mb-0 text-center">See all notifications</h6>
+              </div>
+            </li>
+            <li class="nav-item nav-logout d-none d-lg-block">
+              <a class="nav-link" href="/adminmaster/logout/">
+                <i class="mdi mdi-power text-dark"></i>
+              </a>
+            </li>
+            <li class="nav-item nav-settings d-none d-lg-block">
+              <a class="nav-link" href="#">
+                <i class="mdi mdi-format-line-spacing text-dark"></i>
+              </a>
+            </li>
+          </ul>
+          <button
+            class="navbar-toggler navbar-toggler-right d-lg-none align-self-center"
+            type="button"
+            data-toggle="offcanvas"
+          >
+            <span class="mdi mdi-menu"></span>
+          </button>
+        </div>
+      </nav>
+      <!-- partial -->
+      <div class="container-fluid page-body-wrapper">
+        <!-- partial:partials/_sidebar.html -->
+        <nav class="sidebar sidebar-offcanvas" id="sidebar">
+          <ul class="nav">
+            <li class="nav-item nav-profile">
+              <a href="#" class="nav-link">
+                <div class="nav-profile-image">
+                  <img
+                    src="{% static 'assets/images/faces/face1.jpg' %}"
+                    alt="profile"
+                  />
+                  <span class="login-status online"></span>
+                  <!--change to offline or busy as needed-->
+                </div>
+                <div class="nav-profile-text d-flex flex-column">
+                  <span class="font-weight-bold mb-2">{{ request.user.first_name }}</span>
+                  <span class="text-secondary text-small">
+                    {% if request.user.designation %}
+                      {{ request.user.designation }}
+                    {% else %}
+                      Project Manager
+                    {% endif %}
+                  </span>
+                </div>
+                <i
+                  class="mdi mdi-bookmark-check text-success nav-profile-badge"
+                ></i>
+              </a>
+            </li>
+            {% comment %} <li class="nav-item active">
+              <a class="nav-link" href="../form483/">
+              <span class="menu-title">ANDA Facility Template</span>
+              <i class="mdi mdi-home menu-icon"></i>
+            </a>
+          </li> {% endcomment %}
+          </ul>
+        </nav>
+        <!-- partial -->
+        <div class="main-panel">
+          <div class="content-wrapper">
+            <div class="page-header">
+              <h3 class="page-title">
+                <span
+                  class="page-title-icon bg-gradient-primary text-white me-2"
+                >
+                  <i class="mdi mdi-home"></i>
+                </span>
+                {{ page_heading}}
+              </h3>
+              <nav aria-label="breadcrumb">
+                <ul class="breadcrumb">
+                  <li class="breadcrumb-item active" aria-current="page">
+                    <span></span>Overview
+                    <i
+                      class="mdi mdi-alert-circle-outline icon-sm text-primary align-middle"
+                    ></i>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+            <!-- ALL Your Content Here -->
+
+
+            <div class="row">
+              <div class="container bg-light shadow rounded p-4 col-md-8">
+                <!-- <div class="table-bottom-scroll"> -->
+                <div class="row table-scroll">
+                  {% comment %} {% if show_flag %} {% endcomment %}
+                  <div class="col-md-12" style="height: 600px;">
+                    <table id="customTable" class="table table-hover">
+                      <thead>
+                        <tr class="headingRow">
+                          <th>Company Name</th>
+                          <th>City</th>
+                          <th>State</th>
+                          <th>Type of Establishment</th>
+                          <th>Date of Inspection</th>
+                          <th>Year of Inspection</th>
+                          <th>System</th>
+                        </tr>
+                      </thead>
+                      {% comment %} {{ data }} {% endcomment %}
+                      <tbody>
+                        {% for master in data %}
+                        <tr>
+                          <!-- Master row columns -->
+                          <td>{{ master.company_name }}</td>
+                          <td>{{ master.city }}</td>
+                          <td>{{ master.state }}</td>
+                          <td>{{ master.type_of_establishment }}</td>
+                          <td>{{ master.date_of_inspection }}</td>
+                          <td>{{ master.year_of_inspection }}</td>
+
+                          <!-- Iterate through systems -->
+                          <td colspan="3" style="padding: 0px">
+                            {% for system in master.form483system_set.all %}
+                            <ul class="tree">
+                              <li>
+                                <details>
+                                  <summary style="padding-right: 11px">
+                                    {{ system.system }}
+                                  </summary>
+                                  <ul>
+                                    {% for observation in system.form483observation_set.all %}
+                                    <li>
+                                      <details>
+                                        <summary>
+                                          Observation number: {{ observation.observation_number }}
+                                        </summary>
+                                        <ul style="width: 500px !important;">
+                                          {% for content in observation.form483obeservationcontent_set.all %}
+                                          <li style="white-space:normal; text-align: justify; margin-right: 10px !important;">
+                                            Description: {{ content.content|safe }}
+                                          </li>
+                                          {% if content.image %}
+                                          <li>
+                                            Image:<img
+                                              src="{{ content.image.url }}"
+                                              alt="Content Image"
+                                              width="100"
+                                            />
+                                          </li>
+                                          {% endif %} {% endfor %}
+                                        </ul>
+                                      </details>
+                                    </li>
+                                    {% endfor %}
+                                  </ul>
+                                </details>
+                              </li>
+                            </ul>
+                            {% endfor %}
+                          </td>
+                        </tr>
+                        {% endfor %}
+                      </tbody>
+
+                    </table>
+                  </div>
+                  {% comment %} {% else %}
+                  <div class="table-scroll d-flex justify-content-center p-4">You do not have access to this page.</div> {% endcomment %}
+                  {% comment %} {% endif %} {% endcomment %}
+                </div>
+              <!-- </div> -->
+
+                <div class="col-md-12 text-start mt-3 text-end">
+                  {% if page_obj.has_previous %}
+                      <a style="text-decoration: none;" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                         id="prevPage"
+                         class="badge badge-danger">
+                          Previous
+                      </a>
+                  {% else %}
+                      <span class="badge badge-secondary">Previous</span>
+                  {% endif %}
+
+                  <!-- Numbered pages -->
+                  {% for i in page_obj.paginator.page_range %}
+                      {% if page_obj.number == i %}
+                          <span >{{ i }}</span>
+                      {% elif i > page_obj.number|add:'-4' and i < page_obj.number|add:'4' %}
+                          <a style="text-decoration: none;color: #9a55ff;" href="?page={{ i }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                             >
+                              {{ i }}
+                          </a>
+                      {% endif %}
+                  {% endfor %}
+
+                  {% if page_obj.has_next %}
+                      <a style="text-decoration: none;" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                         id="nextPage"
+                         class="badge badge-danger">
+                          Next
+                      </a>
+                  {% else %}
+                      <span class="badge badge-secondary">Next</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="container bg-light shadow rounded p-4 col-md-3">
+                <div class="row">
+                    <div class="col-md-12">
+                        <h4>Adv. Filters</h4>
+                        <hr>
+                        <form method="GET" class="mb-4">
+                          <div class="form-row">
+                          <div class="form-group">
+                              <label for="company_name">Company Name:</label>
+
+                              {{ filter.form.company_name }}
+                          </div>
+                          <div class="form-group">
+                              <label for="city">City:</label>
+                              {{ filter.form.city }}
+                          </div>
+                          <div class="form-group">
+                              <label for="country">Country:</label>
+                              {{ filter.form.state }}
+                          </div>
+                          <div class="form-group">
+                              <label for="type_of_establishment">Type of Establishment:</label>
+                              {{ filter.form.type_of_establishment }}
+                          </div>
+                          <div class="filter-div form-group">
+                              <label for="start_date">Start Inspection Date:</label>
+                              {{ filter.form.start_date }}
+                              {% if filter.form.start_date.errors %}
+                                  <div class="error">
+                                      {% for error in filter.form.start_date.errors %}
+                                          <p>{{ error }}</p>
+                                      {% endfor %}
+                                  </div>
+                              {% endif %}
+                          </div>
+                          <div class="form-group">
+                              <label for="end_date">End Inspection Date:</label>
+                              {{ filter.form.end_date }}
+                              {% if filter.form.end_date.errors %}
+                                  <div class="error">
+                                      {% for error in filter.form.end_date.errors %}
+                                          <p>{{ error }}</p>
+                                      {% endfor %}
+                                  </div>
+                              {% endif %}
+                          </div>
+                          <div class="form-group">
+                              <label for="year_of_inspection">Year of Inspection:</label>
+                              {{ filter.form.year_of_inspection }}
+                          </div>
+                          <div class="form-group">
+                              <label for="fda_investigators">FDA Investigators:</label>
+                              {{ filter.form.investigator_name }}
+                          </div>
+                          <div class="form-group">
+                              <label for="system_name">System Name:</label>
+                              {{ filter.form.system }}
+                          </div>
+                          <div class="form-group">
+                            <label for="search">Search Observations:</label>
+                            {{ filter.form.search }}
+                        </div>
+                      </div>
+                          {% comment %} <button type="submit">Search</button> {% endcomment %}
+                          <button type="submit" class="btn btn-success btn-fw">Search</button>
+                        </form>
+                    </div>
+                  </div>
+            </div>
+
+            </div>
+          </div>
+          <!-- content-wrapper ends -->
+          <!-- partial:partials/_footer.html -->
+          <footer class="footer">
+            <div
+              class="d-sm-flex justify-content-center justify-content-sm-between"
+            >
+            <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">© Copyright ©2025 iPharmaAI. All Rights Reserved by <a href="https://icretegy.com" target="_blank">iCretegy Solutions</a>.</span>
+              <!-- <span
+                class="text-muted text-center text-sm-left d-block d-sm-inline-block"
+                >Copyright © 2025
+                <a href="#" target="_blank"
+                  >iPharmaAI</a
+                >. All rights reserved.</span
+              > -->
+              <!-- <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Hand-crafted & made with <i class="mdi mdi-heart text-danger"></i></span> -->
+            </div>
+          </footer>
+          <!-- partial -->
+        </div>
+        <!-- main-panel ends -->
+      </div>
+      <!-- page-body-wrapper ends -->
+    </div>
+    <!-- container-scroller -->
+    <!-- plugins:js -->
+    <script src="{% static 'assets/vendors/js/vendor.bundle.base.js' %}"></script>
+    <!-- endinject -->
+    <!-- Plugin js for this page -->
+    <script src="{% static 'assets/vendors/chart.js/chart.umd.js' %}"></script>
+    <script src="{% static 'assets/vendors/bootstrap-datepicker/bootstrap-datepicker.min.js' %}"></script>
+    <!-- End plugin js for this page -->
+    <!-- inject:js -->
+    <script src="{% static 'assets/js/off-canvas.js' %}"></script>
+    <script src="{% static 'assets/js/misc.js' %}"></script>
+    <script src="{% static 'assets/js/settings.js' %}"></script>
+    <script src="{% static 'assets/js/todolist.js' %}"></script>
+    <script src="{% static 'assets/js/jquery.cookie.js' %}"></script>
+    <!-- endinject -->
+    <!-- Custom js for this page -->
+    <script src="{% static 'assets/js/dashboard.js' %}"></script>
+    <!-- End custom js for this page -->
+  </body>
+
+  <style>
+
+    ::placeholder {
+      color: rgb(0, 0, 0) !important;
+      opacity: 1 !important; /* Firefox */
+    }
+    ::-ms-input-placeholder { /* Edge 12-18 */
+      color: red !important;
+    }
+
+    #customTable{
+      --bs-table-bg: none;
+      transform: rotateX(180deg);
+  }
+  td{
+    color: black !important;
+  }
+
+  .headingRow{
+
+    background: linear-gradient(to right, #65b9ff, #047edf 99%);
+}
+
+    .tree {
+      --spacing: 1.5rem;
+      --radius: 10px;
+    }
+
+    .tree li {
+      display: block;
+      position: relative;
+
+      padding-left: calc(2 * var(--spacing) - var(--radius) - 2px);
+    }
+
+    .tree ul {
+      margin-left: calc(var(--radius) - var(--spacing));
+      padding-left: 0;
+    }
+
+    .tree ul li {
+      border-left: 2px solid #ddd;
+    }
+
+    .tree ul li:last-child {
+      border-color: transparent;
+    }
+
+    .tree ul li::before {
+      content: "";
+      display: block;
+      position: absolute;
+      top: calc(var(--spacing) / -2);
+      left: -2px;
+      width: calc(var(--spacing) + 2px);
+      height: calc(var(--spacing) + 1px);
+      border: solid #ddd;
+      border-width: 0 0 2px 2px;
+    }
+
+    .tree summary {
+      display: block;
+      cursor: pointer;
+    }
+
+    .tree summary::marker,
+    .tree summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .tree summary:focus {
+      outline: none;
+    }
+
+    .tree summary:focus-visible {
+      outline: 1px dotted #000;
+    }
+
+    .tree li::after,
+    .tree summary::before {
+      content: "";
+      display: block;
+      position: absolute;
+      top: calc(var(--spacing) / 2 - var(--radius));
+      left: calc(var(--spacing) - var(--radius) - 1px);
+      width: calc(2 * var(--radius));
+      height: calc(2 * var(--radius));
+      border-radius: 50%;
+      background: #ddd;
+    }
+
+    .tree summary::before {
+      z-index: 1;
+      background: #696 url({%static "assets/icretegy/expand-collapse.svg"%}) 0 0;
+    }
+
+    .tree details[open] > summary::before {
+      background-position: calc(-2 * var(--radius)) 0;
+    }
+  </style>
+</html>

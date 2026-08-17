@@ -1,0 +1,365 @@
+/*
+ * Company navbar styles — extracted VERBATIM from the <style> block of
+ *   company_site/templates/navbar.html  (lines 196-550)
+ *
+ * navbar.html is the navbar RAToolsBase.html actually includes and renders,
+ * so this is what /ratools/ really looks like. Matching it exactly is what
+ * keeps the Next.js operational pages visually continuous with the
+ * Django-rendered company pages either side of them.
+ */
+
+
+body{
+    font-family: 'Inter', sans-serif;
+}
+
+/* NAVBAR */
+navbar ul,
+.navbar li{
+    list-style: none !important;
+}
+
+.notification-dropdown,
+.notification-dropdown li{
+    list-style: none !important;
+}
+
+.notification-dropdown::marker,
+.notification-dropdown li::marker{
+    display: none !important;
+    content: "" !important;
+}
+.custom-navbar {
+    height: 60px;
+
+    background: rgba(255,255,255,0.95);
+
+    backdrop-filter: blur(12px);
+
+    border-bottom: 1px solid #e5e7eb;
+
+    z-index: 999;
+}
+
+/* LOGO */
+
+.navbar-logo {
+    width: 145px;
+    height: auto;
+}
+
+/* NAVIGATION */
+/* MEDIUM LAPTOP RESPONSIVE FIX */
+
+@media (min-width: 992px) and (max-width: 1366px){
+
+    /* NAV LINKS */
+
+    .custom-nav-link{
+
+
+
+        white-space: nowrap !important;
+    }
+
+    /* NAVBAR GAP */
+
+    .custom-navbar .navbar-nav{
+
+        gap: 4px !important;
+    }
+
+    /* LOGO */
+
+    .navbar-logo{
+
+        width: 120px !important;
+    }
+
+    /* REQUEST DEMO BUTTON */
+
+    .demo-btn{
+
+        padding: 10px 14px !important;
+    }
+
+    /* PROFILE */
+
+    .profile-toggle{
+
+        padding: 4px 6px !important;
+    }
+
+    .profile-name{
+
+        display: none !important;
+    }
+
+    /* RIGHT SIDE SPACING */
+
+    .custom-navbar .ms-lg-auto{
+
+        gap: 10px !important;
+    }
+
+}
+.custom-navbar .navbar-nav{
+    flex-wrap: nowrap !important;
+
+    overflow: hidden;
+
+    gap: 4px;
+}
+@media (min-width: 992px) {
+    .custom-navbar .navbar-nav {
+        position: absolute;
+        left: 48%;
+        transform: translateX(-50%);
+    }
+}
+
+.custom-nav-link {
+    color: #374151 !important;
+
+    font-size: 12px;
+    font-weight: 600;
+     white-space: nowrap !important;
+
+    padding: 10px 18px !important;
+
+
+
+    border-radius: 10px;
+}
+@media (min-width: 992px) and (max-width: 1500px){
+
+    .custom-nav-link{
+
+        padding: 10px 18px !important;
+    }
+
+    .navbar-logo{
+
+        width: 120px !important;
+    }
+
+    .demo-btn{
+
+        padding: 10px 14px !important;
+
+        font-size: 11px !important;
+    }
+
+    .profile-name{
+        display: none !important;
+    }
+
+}
+/* HOVER */
+
+.custom-nav-link:hover {
+    background: #eff6ff;
+
+    color: #0b3b8c !important;
+}
+
+/* ACTIVE */
+
+.active-nav {
+    background: #eef4ff;
+
+    color: #0b3b8c !important;
+
+    border-radius: 10px;
+
+    padding: 10px 18px !important;
+
+    font-weight: 600;
+}
+
+/* DATABASE */
+
+.database-link {
+    background: #eef4ff;
+
+    color: #0b3b8c !important;
+
+    border-radius: 10px;
+
+    padding: 10px 18px !important;
+
+    font-weight: 600;
+}
+
+.database-link:hover {
+    background: #dbeafe;
+
+    color: #0b3b8c !important;
+}
+
+/* LOGIN BUTTON */
+
+.login-btn {
+    text-decoration: none;
+
+    padding: 11px 22px;
+
+    border: 1px solid #d1d5db;
+
+    border-radius: 12px;
+
+    color: #111827;
+
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.login-btn:hover {
+    background: #f3f4f6;
+
+    color: #0b3b8c;
+}
+
+/* REQUEST DEMO */
+
+.demo-btn {
+    text-decoration: none;
+
+    padding: 12px 24px;
+
+    border-radius: 12px;
+
+    background: linear-gradient(135deg, #0b5cab, #3d8ec9);
+
+    color: white;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    box-shadow: 0 4px 14px rgba(37,99,235,0.25);
+}
+
+.demo-btn:hover {
+    transform: translateY(-2px);
+
+    box-shadow: 0 8px 20px rgba(37,99,235,0.35);
+
+    color: white;
+}
+
+/* MOBILE */
+
+@media (max-width: 991px) {
+
+    .custom-navbar {
+        height: auto;
+
+        padding: 12px 0;
+    }
+
+    .navbar-collapse {
+        padding-top: 20px;
+    }
+
+    .navbar-nav {
+        gap: 10px;
+    }
+
+    .d-flex.gap-3 {
+        flex-direction: column;
+
+        align-items: stretch !important;
+    }
+
+    .login-btn,
+    .demo-btn {
+        width: 100%;
+
+        text-align: center;
+    }
+}
+/* PROFILE */
+
+.profile-toggle{
+    text-decoration: none;
+
+    padding: 6px 10px;
+
+    border-radius: 14px;
+}
+
+.profile-toggle:hover{
+    background: #f3f4f6;
+}
+
+.profile-img-wrapper{
+    position: relative;
+}
+
+.profile-img{
+    width: 42px;
+    height: 42px;
+
+    border-radius: 50%;
+
+    object-fit: cover;
+
+    border: 2px solid #e5e7eb;
+}
+
+.online-dot{
+    position: absolute;
+
+    right: 1px;
+    bottom: 1px;
+
+    width: 10px;
+    height: 10px;
+
+    background: #22c55e;
+
+    border-radius: 50%;
+
+    border: 2px solid white;
+}
+
+.profile-name{
+    color: #111827;
+
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.profile-menu{
+    border: none;
+
+    border-radius: 14px;
+
+    padding: 10px;
+
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+
+.profile-menu .dropdown-item{
+    border-radius: 10px;
+
+    padding: 10px 14px;
+
+    font-size: 14px;
+}
+
+.profile-menu .dropdown-item:hover{
+    background: #f3f4f6;
+}
+
+/* MOBILE */
+
+@media (max-width: 991px){
+
+    .profile-toggle{
+        width: 100%;
+
+        justify-content: center;
+    }
+
+}

@@ -1,0 +1,657 @@
+{% load static %}
+<!DOCTYPE html>
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>FDA Pharmaceutical Inspection Readiness Guide</title>
+    <!-- plugins:css -->
+    <link rel="stylesheet" href="{% static 'assets/vendors/mdi/css/materialdesignicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/ti-icons/css/themify-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/css/vendor.bundle.base.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/font-awesome/css/font-awesome.min.css' %}">
+    <!-- Layout styles -->
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,FILL@0..1&amp;display=swap"
+        rel="stylesheet">
+    <link rel="shortcut icon" href="{% static 'assets/images/favicon.png' %}" />
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#e5eeff",
+                        "on-secondary-fixed-variant": "#005049",
+                        "on-background": "#0b1c30",
+                        "primary": "#000206",
+                        "inverse-surface": "#213145",
+                        "surface-dim": "#cbdbf5",
+                        "secondary-container": "#86f2e4",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-fixed": "#d8e2ff",
+                        "surface-container-low": "#eff4ff",
+                        "primary-container": "#011e36",
+                        "outline-variant": "#c3c6ce",
+                        "outline": "#74777e",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#004395",
+                        "on-secondary-fixed": "#00201d",
+                        "error-container": "#ffdad6",
+                        "background": "#f8f9ff",
+                        "surface-tint": "#48607b",
+                        "on-surface": "#0b1c30",
+                        "on-primary-fixed-variant": "#304963",
+                        "primary-fixed": "#d0e4ff",
+                        "tertiary-container": "#001b44",
+                        "surface": "#f8f9ff",
+                        "on-secondary": "#ffffff",
+                        "error": "#ba1a1a",
+                        "tertiary": "#00020a",
+                        "surface-bright": "#f8f9ff",
+                        "surface-variant": "#d3e4fe",
+                        "inverse-primary": "#b0c9e8",
+                        "on-tertiary-fixed": "#001a42",
+                        "on-primary-fixed": "#001d35",
+                        "inverse-on-surface": "#eaf1ff",
+                        "primary-fixed-dim": "#b0c9e8",
+                        "on-tertiary": "#ffffff",
+                        "secondary": "#006a61",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#3a81f5",
+                        "tertiary-fixed-dim": "#adc6ff",
+                        "on-surface-variant": "#43474d",
+                        "on-primary": "#ffffff",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "surface-container-high": "#dce9ff",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed": "#89f5e7",
+                        "on-secondary-container": "#006f66",
+                        "on-primary-container": "#6f87a4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin": "32px",
+                        "xs": "4px",
+                        "md": "24px",
+                        "lg": "40px",
+                        "sm": "12px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "xl": "64px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "display-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "code-md": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "headline-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "display-sm": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "code-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg": ["30px", { "lineHeight": "38px", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8f9ff;
+            color: #0b1c30;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .swiss-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 24px;
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .bg-navy-brand {
+            background-color: #011E36;
+        }
+
+        .text-navy-brand {
+            color: #011E36;
+        }
+
+        .border-navy-brand {
+            border-color: #011E36;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid #E2E8F0;
+        }
+
+        /* --- Sidebar CSS --- */
+        .dashboard-page-body {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            padding-top: 60px;
+            min-height: 100vh;
+        }
+
+        .dashboard-main-panel {
+            flex: 1 1 auto;
+            margin-left: 270px;
+            width: calc(100% - 270px);
+            transition: all 0.3s ease;
+            transition: margin-left 0.25s ease;
+        }
+
+        /* When sidebar collapsed */
+        .dashboard-layout.sidebar-collapsed .dashboard-main-panel {
+            margin-left: 96px !important;
+            width: calc(100% - 96px) !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+            justify-content: center;
+            padding-left: 0;
+            padding-right: 0;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-label {
+            display: none;
+        }
+
+        .dashboard-layout.sidebar-collapsed .sidebar-toggle-row {
+            justify-content: center;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-item {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .dashboard-layout.sidebar-collapsed .sidebar-submenu-list,
+        .dashboard-layout.sidebar-collapsed .dropdown-caret {
+            display: none !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .dashboard-sidebar-link {
+            width: 56px;
+            margin: 0 auto;
+            justify-content: center;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .submenu-link {
+            padding-left: 3.5rem !important;
+        }
+
+        .dashboard-layout.sidebar-collapsed .submenu-link {
+            padding-left: 0 !important;
+        }
+
+        @media (max-width: 991px) {
+            .dashboard-page-body {
+                flex-direction: column;
+                padding-top: 70px;
+            }
+
+            .dashboard-sidebar {
+                position: relative;
+                top: 0;
+                width: 100%;
+                min-width: 100%;
+                max-width: 100%;
+                height: auto;
+                border-radius: 0 0 16px 16px;
+            }
+
+            .dashboard-layout.sidebar-collapsed .dashboard-sidebar {
+                width: 100%;
+                min-width: 100%;
+                max-width: 100%;
+            }
+
+            .dashboard-main-panel {
+                width: 100% !important;
+            }
+        }
+
+        /* Fix Tailwind CSS conflict with Bootstrap collapse */
+        .navbar .collapse {
+            visibility: visible !important;
+        }
+
+        .navbar .nav-link {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px;
+            flex-direction: row !important;
+        }
+
+        .navbar .nav-link img {
+            display: inline-block !important;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body class="font-body-md text-on-surface">
+    <div class="container-scroller">
+        <!-- Include navbar -->
+        {% include './navbar.html' %}
+
+        <!-- Wrapper div for sidebar + content -->
+        <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+            <!-- Include sidebar -->
+            {% include './sidebar.html' %}
+
+            <!-- Main panel content wrapper -->
+            <div class="main-panel dashboard-main-panel">
+                <div class="content-wrapper p-0 bg-white">
+                    <main class="max-w-[1440px] mx-auto px-margin py-xl">
+                        <!-- Header Hero Section -->
+                        <header class="mb-xl border-l-8 border-navy-brand pl-md bg-navy-brand text-white p-md">
+                            <h1 class="font-display-lg text-display-lg leading-none uppercase mb-sm text-white">
+                                USFDA PHARMACEUTICAL <br>
+                                <span class="text-secondary-fixed">INSPECTION READINESS GUIDE</span>
+                            </h1>
+                              <p
+                                class="font-headline-sm text-headline-sm border-t border-outline-variant pt-base text-white border-white/20 italic">
+                                Do's &amp; Don'ts — Verified FDA Regulatory Language
+                            </p>
+                            <p class="font-body-lg text-body-lg max-w-4xl mb-base text-white italic">
+                                FDA does not inspect your facility — <span
+                                    class="font-bold italic text-secondary-fixed">they inspect
+                                    your systems, your data, and your culture.</span>
+                            </p>
+                            <p class="font-body-lg text-body-lg  mb-base text-white">
+
+                                Critical → Major → Minor → IBP (Industry Best Practice)<br />
+                                IOM 2025 (Feb 2026) · 21 CFR 210/211/Part 11 · FDA Data Integrity Guidance Dec 2018 · FDA 483 Response Guidance Mar 2026
+                            </p>
+
+                        </header>
+                        <!-- Status Bar/Metadata -->
+                        <div
+                            class="flex flex-col md:flex-row justify-between items-center bg-navy-brand text-white px-md py-sm mb-lg">
+                            <div class="flex items-center gap-md">
+                                <span class="font-label-md text-label-md uppercase opacity-80">Version: April
+                                    2026</span>
+                                <div class="h-4 w-px bg-white/20"></div>
+                                <span class="font-label-md text-label-md uppercase">Critical → Major → Minor → IBP
+                                    (Industry Best
+                                    Practice)</span>
+                            </div>
+                            <div class="font-code-md text-xs opacity-60 mt-xs md:mt-0">SYSTEMS | DATA | CULTURE</div>
+                        </div>
+                        <div class="swiss-grid">
+                            <!-- Section 1: Regulatory Reference Block -->
+                           <section class="col-span-12 lg:col-span-4 flex flex-col gap-md">
+    <div class="glass-panel p-md h-full">
+        <div class="flex items-center gap-xs mb-md text-navy-brand">
+            <h2 class="font-headline-sm text-headline-sm uppercase tracking-wider">
+                Regulatory Reference
+            </h2>
+        </div>
+
+        <div class="space-y-md">
+
+            <!-- Regulatory Sources -->
+            <div class="pt-md ">
+                <h3 class="font-label-md text-label-md text-outline uppercase mb-xs">
+                    Regulatory Sources
+                </h3>
+                <ul class="space-y-base">
+                    <li class="flex items-center gap-sm">
+                        <span class="w-1.5 h-1.5 bg-navy-brand"></span>
+                        <span class="font-code-md text-code-md">
+                            IOM 2025 Chapter 5 (fda.gov,updated Feb 17,2026)
+                        </span>
+                    </li>
+                    <li class="flex items-center gap-sm">
+                        <span class="w-1.5 h-1.5 bg-navy-brand"></span>
+                        <span class="font-code-md text-code-md">
+                            21 CFR 210/211/Part 11
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Statutory Authority -->
+            <div class="pt-md border-t border-outline-variant">
+                <h3 class="font-label-md text-label-md text-outline uppercase mb-xs">
+                    Supporting Guidance
+                </h3>
+                <ul class="space-y-base">
+                    <li class="flex items-start gap-sm">
+                        <span class="w-1.5 h-1.5 bg-navy-brand mt-1.5 flex-shrink-0"></span>
+                        <span class="font-body-sm text-body-sm">
+                            FDA Data Integrity Q & A (Dec 2018)
+                        </span>
+                    </li>
+                    <li class="flex items-start gap-sm">
+                        <span class="w-1.5 h-1.5 bg-navy-brand mt-1.5 flex-shrink-0"></span>
+                        <span class="font-body-sm text-body-sm">
+                            FDA Draft Guidance on 483 Responses (Mar 9, 2026, Docket FDA-2025-D-1504)
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Supporting Guidance -->
+            <div class="pt-md border-t border-outline-variant">
+                <h3 class="font-label-md text-label-md text-outline uppercase mb-xs">
+                    Statutory Authority
+                </h3>
+                <ul class="space-y-base">
+                    <li class="flex items-start gap-sm">
+                        <span class="w-1.5 h-1.5 bg-navy-brand mt-1.5 flex-shrink-0"></span>
+                        <span class="font-code-md text-code-md">
+                            FD&amp;C Act §704(a) (Inspection Authority)
+                        </span>
+                    </li>
+                    <li class="flex items-start gap-sm">
+                        <span class="w-1.5 h-1.5 bg-navy-brand mt-1.5 flex-shrink-0"></span>
+                        <span class="font-code-md text-code-md">
+                            §301(f) (Prohibited Acts)
+                        </span>
+                    </li>
+                    <li class="flex items-start gap-sm">
+                        <span class="w-1.5 h-1.5 bg-navy-brand mt-1.5 flex-shrink-0"></span>
+                        <span class="font-code-md text-code-md">
+                            18 U.S.C. §1519
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Visual for Section 1 -->
+    <div class="relative h-40 overflow-hidden rounded-lg">
+        <img
+            class="w-full h-full object-cover"
+            data-alt="High-tech lab environment"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDC9bImgRNhmAUxSMoTq0hL8OBKXTLL7VNmF7j7dzy36o-pahzWpPvhOwJhgA1_z-oo53A-iY9lOHx2jvkEbUluWizDMhFO73ee_aTtA7njBMcTWCe4hd-QhzBrdWvXelTS1AfnZq1DjiAwsNvw4fYfY2F-NiTil0LbT11BhEq-ST2x6H5D5wGKRcaF0fqq0pb9iQfv4jrAU6B0rKM4TZtDdvUeFM6PG-QNJRBFnI2IS5bcKcpvoMGGlDNxE0uzUrMjIn3FGXsPeQ"
+        >
+        <div class="absolute inset-0 bg-navy-brand/20"></div>
+    </div>
+</section>
+                            <!-- Section 2: Terminology Table -->
+                            <section class="col-span-12 lg:col-span-8">
+                                <div class="bg-white border border-outline-variant p-md h-full">
+                                    <div class="flex justify-between items-end mb-lg">
+                                        <div class="flex items-center gap-xs text-navy-brand">
+
+                                            <h2 class="font-headline-sm text-headline-sm uppercase tracking-wider">FDA
+                                                Terminology —
+                                                What the FDA Actually Says</h2>
+                                        </div>
+                                        <div class="text-right">
+
+                                        </div>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr class="border-b-2 border-navy-brand"
+                                                    style="transform: translateX(0px); transition: transform 0.2s ease-out;">
+                                                    <th
+                                                        class="py-sm px-base font-label-md text-label-md uppercase text-outline">
+                                                        Common
+                                                        Term</th>
+                                                    <th
+                                                        class="py-sm px-base font-label-md text-label-md uppercase text-navy-brand">
+                                                        FDA
+                                                        Official Term</th>
+                                                    <th
+                                                        class="py-sm px-base font-label-md text-label-md uppercase text-outline">
+                                                        FDA
+                                                        Source</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="font-body-sm text-body-sm">
+                                                <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors"
+                                                    style="transform: translateX(0px); transition: transform 0.2s ease-out;">
+                                                    <td class="py-md px-base text-on-surface-variant italic" style="background: #fdf5f5; COLOR: #a23030;">Escort
+                                                    </td>
+                                                    <td class="py-md px-base font-bold text-navy-brand" style="BACKGROUND: #f2faf5; color: #377c54;">Firm's
+                                                    Representative
+                                                    </td>
+                                                    <td class="py-md px-base font-code-md text-code-md">IOM 2025,
+                                                        §5.5.9.3</td>
+                                                </tr>
+                                                <tr class="bg-surface-container-low/30 border-b border-outline-variant hover:bg-surface-container-low transition-colors"
+                                                    style="transform: translateX(0px); transition: transform 0.2s ease-out;">
+                                                    <td class="py-md px-base text-on-surface-variant italic"  style="background: #fdf5f5; COLOR: #a23030;">Scribe
+                                                    </td>
+                                                    <td class="py-md px-base font-bold text-navy-brand "  style="BACKGROUND: #f2faf5; color: #377c54;">Not in
+                                                        FDA Documents —
+                                                        IBP Only</td>
+                                                    <td class="py-md px-base font-code-md text-code-md">No FDA source
+                                                    </td>
+                                                </tr>
+                                                <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors"
+                                                    style="transform: translateX(0px); transition: transform 0.2s ease-out;">
+                                                    <td class="py-md px-base text-on-surface-variant italic"  style="background: #fdf5f5; COLOR: #a23030;">Front
+                                                        Room</td>
+                                                    <td class="py-md px-base font-bold text-navy-brand "  style="BACKGROUND: #f2faf5; color: #377c54;">Firm
+                                                        Management /
+                                                        Quality Unit Representatives</td>
+                                                    <td class="py-md px-base font-code-md text-code-md">IOM 2025,
+                                                        §5.5.12; 21 CFR 211.22
+                                                    </td>
+                                                </tr>
+                                                <tr class="bg-surface-container-low/30 border-b border-outline-variant hover:bg-surface-container-low transition-colors"
+                                                    style="transform: translateX(0px); transition: transform 0.2s ease-out;">
+                                                    <td class="py-md px-base text-on-surface-variant italic"  style="background: #fdf5f5; COLOR: #a23030;">Back Room
+                                                        / War Room</td>
+                                                    <td class="py-md px-base font-bold text-navy-brand"  style="BACKGROUND: #f2faf5; color: #377c54;">
+                                                        Quality Control Unit
+                                                    </td>
+                                                    <td class="py-md px-base font-code-md text-code-md">21 CFR 211.22(a)
+                                                    </td>
+                                                </tr>
+                                                <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-colors"
+                                                    style="transform: translateX(0px); transition: transform 0.2s ease-out;">
+                                                    <td class="py-md px-base text-on-surface-variant italic"  style="background: #fdf5f5; COLOR: #a23030;">Closing
+                                                        Conference</td>
+                                                    <td class="py-md px-base font-bold text-navy-brand "  style="BACKGROUND: #f2faf5; color: #377c54;">
+                                                        Closing Meeting</td>
+                                                    <td class="py-md px-base font-code-md text-code-md">IOM 2025,
+                                                        §5.5.12.2</td>
+                                                </tr>
+                                                <tr class="bg-surface-container-low/30 border-b border-outline-variant hover:bg-surface-container-low transition-colors"
+                                                    style="transform: translateX(0px); transition: transform 0.2s ease-out;">
+                                                    <td class="py-md px-base text-on-surface-variant italic"  style="background: #fdf5f5; COLOR: #a23030;">SME
+                                                        (Subject Matter
+                                                        Expert)</td>
+                                                    <td class="py-md px-base font-bold text-navy-brand "  style="BACKGROUND: #f2faf5; color: #377c54;">
+                                                        Qualified Person /Personnel Per 21 CFR 211.25</td>
+                                                    <td class="py-md px-base font-code-md text-code-md">21 CFR 211.25
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </section>
+                            <!-- Section 3: Severity Legend -->
+                            <section class="col-span-12 mt-md">
+                                <div class="bg-surface-container-low border border-outline-variant p-md">
+                                    <h2 class="font-headline-sm text-headline-sm uppercase text-navy-brand mb-md">
+                                        Severity
+                                        Classification Legend</h2>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-md">
+                                        <!-- Critical -->
+                                        <div class="flex flex-col gap-sm border-t-4 border-[#edb8b4] pt-sm">
+                                            <div class="flex items-center gap-xs">
+
+                                                <span
+                                                    class="font-label-md text-label-md text-[#7e2b2b] uppercase">CRITICAL</span>
+                                            </div>
+                                            <p class="font-body-sm text-body-sm text-on-surface">Directly grounded in an explicit regulatory requirement. Failure constitutes a CGMP violation observable on Form FDA 483. May contribute to OAI classification.</p>
+                                        </div>
+                                        <!-- Major -->
+                                        <div class="flex flex-col gap-sm border-t-4 border-[#FCE8CC] pt-sm">
+                                            <div class="flex items-center gap-xs">
+
+                                                <span
+                                                    class="font-label-md text-label-md text-[#773400] uppercase">MAJOR</span>
+                                            </div>
+                                            <p class="font-body-sm text-body-sm text-on-surface">Based on a regulatory requirement, it commonly generates a Form FDA 483 observation. May contribute to VAI or OAI classification.</p>
+                                        </div>
+                                        <!-- Minor -->
+                                        <div class="flex flex-col gap-sm border-t-4 border-[#D4EDDE] pt-sm">
+                                            <div class="flex items-center gap-xs">
+
+                                                <span
+                                                    class="font-label-md text-label-md text-[#21613c] uppercase">MINOR</span>
+                                            </div>
+                                            <p class="font-body-sm text-body-sm text-on-surface">Based on a regulatory requirement, it represents a less severe documentation or procedural gap. May generate an informal comment or softer observation.</p>
+                                        </div>
+                                        <!-- IBP -->
+                                        <div class="flex flex-col gap-sm border-t-4 border-[#E8E4F8] pt-sm">
+                                            <div class="flex items-center gap-xs">
+
+                                                <span class="font-label-md text-label-md text-[#604794] uppercase">IBP
+                                                    (Industry Best
+                                                    Practice)</span>
+                                            </div>
+                                            <p class="font-body-sm text-body-sm text-on-surface">Industry Best Practice — professional consensus that is NOT found in FDA regulatory documents. Explicitly labeled so readers can distinguish it from regulatory requirements.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                        <!-- Navigation Buttons -->
+                        <nav class="mt-xl grid grid-cols-1 md:grid-cols-3 gap-md">
+                            <a href="/aidatabase/section_inspection/#section-1" style="text-decoration: none;"
+                                class="group relative flex flex-col items-start p-md bg-navy-brand text-white hover:bg-primary transition-all overflow-hidden border border-white/10"><span
+                                    class="font-label-md text-label-md opacity-70 mb-base uppercase tracking-widest">Section
+                                    01</span><span
+                                    class="font-headline-sm text-headline-sm text-left leading-tight uppercase font-bold mb-lg"  style="font-size:24px;">Firm Management & Quality Unit Representatives (during inspection)
+                                   </span>
+                                <div
+                                    class="mt-auto self-end flex items-center gap-xs px-sm py-xs border border-white/20 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+                                    <span class="font-label-md text-label-md uppercase">OPEN SECTION</span>
+                                </div>
+                            </a>
+                            <a href="/aidatabase/section_inspection/#section-2" style="text-decoration: none;"
+                                class="group relative flex flex-col items-start p-md bg-navy-brand text-white hover:bg-primary transition-all overflow-hidden border border-white/10"><span
+                                    class="font-label-md text-label-md opacity-70 mb-base uppercase tracking-widest">Section
+                                    02</span><span
+                                    class="font-headline-sm text-headline-sm text-left leading-tight uppercase font-bold mb-lg" style="font-size:24px;">Quality Control Unit — Document Review & Data Integrity</span>
+                                <div
+                                    class="mt-auto self-end flex items-center gap-xs px-sm py-xs border border-white/20 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+                                    <span class="font-label-md text-label-md uppercase">Open Section</span>
+                                </div>
+                            </a>
+                            <a href="/aidatabase/section_inspection/#section-3" style="text-decoration: none;"
+                                class="group relative flex flex-col items-start p-md bg-navy-brand text-white hover:bg-primary transition-all overflow-hidden border border-white/10"><span
+                                    class="font-label-md text-label-md opacity-70 mb-base uppercase tracking-widest">Section
+                                    03</span><span
+                                    class="font-headline-sm text-headline-sm text-left leading-tight uppercase font-bold mb-lg" style="font-size:24px;">Production
+                                    &amp; Laboratory Personnel</span>
+                                <div
+                                    class="mt-auto self-end flex items-center gap-xs px-sm py-xs border border-white/20 rounded-lg bg-white/10 hover:bg-white/20 transition-colors">
+                                    <span class="font-label-md text-label-md uppercase">Open Section</span>
+                                </div>
+                            </a>
+                        </nav>
+                    </main>
+                    <!-- Footer -->
+                    <footer class="bg-surface-container border-t border-outline-variant mt-xl">
+
+                    </footer>
+                    <script>
+                        document.querySelectorAll('tr').forEach(row => {
+                            row.addEventListener('mouseenter', () => {
+                                row.style.transform = 'translateX(4px)';
+                                row.style.transition = 'transform 0.2s ease-out';
+                            });
+                            row.addEventListener('mouseleave', () => {
+                                row.style.transform = 'translateX(0)';
+                            });
+                        });
+                    </script>
+
+                    <!-- Close wrappers -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function initSidebarToggle() {
+            const layout = document.getElementById('dashboardLayout');
+            const toggleButton = document.getElementById('sidebarToggle');
+            if (!layout || !toggleButton) return;
+
+            const storageKey = 'dashboard483SidebarCollapsed';
+            const savedState = localStorage.getItem(storageKey);
+            const isCollapsed = savedState === 'true';
+
+            function applyState(collapsed) {
+                layout.classList.toggle('sidebar-collapsed', collapsed);
+                toggleButton.setAttribute('aria-expanded', String(!collapsed));
+                const toggleIcon = toggleButton.querySelector('i');
+                if (toggleIcon) {
+                    toggleIcon.className = 'mdi mdi-dock-left';
+                }
+            }
+
+            applyState(isCollapsed);
+
+            toggleButton.addEventListener('click', () => {
+                const nextState = !layout.classList.contains('sidebar-collapsed');
+                localStorage.setItem(storageKey, String(nextState));
+                applyState(nextState);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            initSidebarToggle();
+        });
+    </script>
+    <!-- Back to top -->
+
+{% include 'back_to_top.html' %}
+</body>
+
+</html>
