@@ -1,10 +1,49 @@
-# Milestone 5A — OQ-8 Resolution (Discovery)
+# Milestone 5A — OQ-8 Resolution
 
-**Status: BLOCKED ON HUMAN REGULATORY DECISION.** No code changed. Production
-regulatory content remains 0/20. Fail-closed behaviour is untouched.
+**Status: CLOSED.** The regulatory decision has been made and implemented.
+Production regulatory content remains **0/20** — closing OQ-8 approves no
+regulatory question and makes no Part 11 claim.
 
-Branch: `regx/discovery/milestone-5a-oq8-resolution`, cut from `regx-main`
-`deb146083730334d7ce281618921384147eecfee`.
+Discovery branch: `regx/discovery/milestone-5a-oq8-resolution`.
+Implementation branch: `regx/feat/milestone-5a-oq8-resolution`, cut from
+`regx-main` `deb146083730334d7ce281618921384147eecfee`.
+
+---
+
+## 0. REGULATORY DECISION (recorded verbatim in effect)
+
+**An IID/IIG checklist execution is component-scoped.** A single execution is
+scoped to exactly **one** formulation component / inactive ingredient, and its
+subject component is identified and governed at execution creation. All
+execution-level `iid.*` behaviour refers to that same subject component: FDA-derived
+values, applicability, `AssessmentSnapshot` provenance, component-specific
+calculations, overrides, reviewer conclusions, controlled export and historical
+reconstruction.
+
+**The execution-level subject component is authoritative.** A calculation inside
+the execution may **not** independently select a different component. Where a
+`Q_SUBJECT_COMPONENT` response or calculation input conflicts with the
+execution's governed subject, the resolution **fails closed**. There is no
+silent switch, no first/last/latest, no inference by name, UNII or database
+ordering, and no averaging across components.
+
+**The invariant:**
+
+> **ONE CHECKLIST EXECUTION = ONE FORMULATION VERSION + ONE GOVERNED SUBJECT
+> COMPONENT**
+
+A formulation may have several components and therefore several
+component-specific executions where required.
+
+**Why whole-formulation aggregation was rejected.** FDA IID evaluation is
+fundamentally excipient-specific: the IID is structured around inactive
+ingredient + route of administration + dosage form, with potency and maximum
+daily exposure carried on the individual excipient record. No approved general
+aggregation rule exists, and inventing one would have been engineering asserting
+regulatory meaning. §5 Option D is therefore closed, not deferred.
+
+Regulatory basis and decision owner: the regulatory owner, recorded on the task
+that authorised this implementation.
 
 ---
 
@@ -277,39 +316,26 @@ approval workflow (items 11 and 12; the OQ-8 warnings at lines 27, 32, 257, 294)
 
 ---
 
-## 8. Preferred resolution (engineering recommendation, conditional)
+## 8. Chosen resolution — Option A, as decided
 
-**Option A**, conditional on the regulatory answer in §9, because it is the only
-candidate that is available at creation time, deterministic, well-defined
-per-execution, and requires no new regulatory science beyond a scoping
-statement. It also composes with everything already approved: calculations keep
-their per-calculation `Q_SUBJECT_COMPONENT`, and the snapshot rule
-(create-never-select) is reused unchanged.
-
-**If the answer to §9 is "whole formulation" rather than "one component", Option
-A is wrong** and the correct resolution is a specified aggregate — which is
-Option D and needs its own regulatory specification of the aggregation rule per
-`iid.*` field. Engineering should not start that until it is written.
+**Option A: the execution explicitly binds one subject component.** Selected by
+the regulatory decision in §0, and implemented. It is available at creation time,
+deterministic, well-defined per execution, and reuses everything already
+approved — the snapshot rule (create-never-select), the server-side release
+resolution and the Part 14.1 worst-case daily-units helper are all unchanged.
 
 ---
 
-## 9. HUMAN REGULATORY DECISION REQUIRED
+## 9. HUMAN REGULATORY DECISION — ANSWERED
 
-The smallest question that unblocks this:
+The question put to the owner was whether an execution is scoped to one
+formulation component or to the whole formulation version.
 
-> **Is a single IIG checklist execution scoped to exactly one formulation
-> component — so that one subject component can be named when the execution is
-> created and used for every execution-level `iid.*` value — or is it scoped to
-> the whole formulation version, in which case each execution-level `iid.*`
-> field needs an approved aggregation rule across components?**
-
-A one-word answer (*component* / *formulation*) selects the resolution path.
-If *component*, one follow-up is needed: **may an execution's subject component
-differ from a calculation's `Q_SUBJECT_COMPONENT`, and if so which governs the
-`iid.*` default?** (Engineering recommendation: allow divergence, record both,
-and let the execution-level subject govern execution-level bindings only.)
-
-Owner per the register: Regulatory + Engineering lead.
+**Answer: component.** And on the follow-up — whether an execution's subject may
+differ from a calculation's `Q_SUBJECT_COMPONENT` — the owner went further than
+the engineering recommendation: divergence is **not** permitted. The
+execution-level subject is authoritative and a conflict fails closed. That is
+implemented as stated; the recommendation to allow divergence was not adopted.
 
 ---
 
@@ -350,13 +376,155 @@ materially; frontend typecheck/lint/unit/E2E if the API contract changes.
 
 ---
 
-## 17. Status
+## 17. What was implemented
+
+### Model
+
+`ChecklistExecution.subject_component` — FK to `formulations.FormulationComponent`,
+`on_delete=PROTECT`, `null=True`. A live FK rather than a frozen UUID because an
+execution is operational state (unlike `AssessmentSnapshot`, which freezes
+identity deliberately), and PROTECT is what stops a component being deleted out
+from under a governed execution — matching how `formulation_version` is already
+held.
+
+`clean()` enforces two invariants at the model layer, so no code path can bypass
+them: the component must belong to the execution's own formulation version
+(which also closes the cross-tenant case, since a foreign component necessarily
+belongs to a foreign version), and once set it is immutable — a correction
+requires a new execution.
+
+**Uniqueness had to change.** The old constraint was one active execution per
+`(tenant, checklist_version, formulation_version)`, which made per-component
+executions impossible. It is now two constraints: one active execution per
+`(…, subject_component)` where the subject is set, and — because SQL treats NULLs
+as distinct — the original constraint retained for subject-less rows, so the
+pre-OQ-8 guarantee is not silently weakened.
+
+Migration `0006_execution_subject_component`: additive nullable column, index,
+and the constraint split. Reversible.
+
+### Creation contract — the ordering fix
+
+The subject component is resolved and validated **before** the transaction, so it
+is already known when the two consumers run inside it. That is the fix to the root
+cause in §1.1(c); nothing is deferred to a later "recompute" pass, and
+`M4D3-PST-009`'s frozen applicability outcome is untouched.
+
+Inside the transaction, in order: create the execution → create the governed
+component-specific `AssessmentSnapshot` → resolve FDA-derived defaults against it
+→ evaluate applicability against it.
+
+Exactly one snapshot is created per creation pass and shared by every `iid.*`
+binding in it. This is **not** the forbidden kind of reuse (`M4D3-SNO-006/008`
+bans `.first()`, `.latest()`, dedup and reuse of pre-existing rows): the row is
+new, made in this transaction, for this execution's one subject component.
+Sharing it is what makes the bindings mutually consistent — minting one per
+question could straddle a release change and leave a single execution answering
+from two different sources.
+
+### FDA-derived resolver
+
+`_resolve_fda_derived_default(question, precedent)` now receives the governed
+`IIDPrecedentRecord` reached through the snapshot, instead of `None`. The resolver
+contract is unchanged and still pure: it receives an already-selected source and
+queries nothing. `None` remains legitimate and still records an explicit
+`source_unavailable` with no value — for a legacy execution, a subject component
+that matched no precedent, or no active FDA release.
+
+Provenance per resolved binding additionally records
+`subject_component_public_id`, `formulation_version_public_id` and
+`assessment_snapshot_public_id`; release identity was already covered by
+`source_version` (release UUID plus source checksum).
+
+### Applicability
+
+`build_context(execution, iid_snapshot)` resolves `iid.match_status`,
+`iid.has_potency` and `iid.has_mde` from the passed snapshot. The snapshot is
+passed in rather than looked up: this function is in-memory only and must not
+create a regulated record. With no snapshot the `iid` group stays unresolved and a
+rule reading it still fails closed to `review_required`.
+
+### Calculation consistency
+
+The execution's subject joins the candidate set in
+`calculation_inputs._resolve_subject_component`, reconciled by the same
+order-independent machinery as the selector and upstream outcomes
+(`M4D3-PRV-009`). Disagreement fails closed through the existing mismatch path —
+there is deliberately no branch letting the execution's value silently overwrite
+the selector's. A new provenance source, `execution_subject`, records that the
+execution asserted the identity.
+
+### `Q_SUBJECT_COMPONENT` — treatment **A** (retained, subordinate)
+
+Retained unchanged as the calculation-level selector, now **subordinate** to the
+execution subject: it cannot select a different component because any divergence
+fails closed. Not deprecated (B) and not server-derived (C), because both would
+mean rewriting response-population semantics for an approved mechanism that
+already works — and the invariant already guarantees the consistency the decision
+requires. This is the minimum-risk path for the current architecture.
+
+### API and frontend
+
+`POST …/executions/` accepts an optional `subject_component_public_id`; the
+service refuses creation without it when the content reads `iid.*`. A well-formed
+UUID asserts nothing — eligibility is proven server-side. Two governed errors:
+`subject_component_required` and `subject_component_not_eligible`, the latter
+deliberately not distinguishing "no such component" from "belongs to another
+formulation or tenant".
+
+Execution reads expose `subject_component_public_id` and
+`subject_component_ingredient_name`. The executions table shows the governed
+excipient beside the formulation version, with an em dash for a legacy execution
+that has none. No UI redesign; the existing company/RegX shell is unchanged.
+
+### Controlled export and audit
+
+The export's `execution` block carries `subject_component_public_id` and
+`subject_component_ingredient_name` — inside the checksum-covered payload,
+omitted rather than nulled for a legacy execution, and mirrored in the CSV
+flattening. `EXECUTION_CREATED` audit gains the subject component and snapshot
+UUIDs, recording `None` truthfully rather than omitting it. UUIDs only.
+
+## 18. One mechanical judgement, flagged for confirmation
+
+The requirement to supply a subject component is triggered by content that
+**reads execution-level `iid.*`** — an `iid.*` FDA-derived binding, or an
+applicability rule reading the `iid` group. A component-scoped *calculation* does
+not trigger it, because it already has its own approved selector and the
+decision's constraint on it is one of consistency, enforced whenever a subject
+exists.
+
+This matters because a formulation version may legitimately have **no components
+at all**, and demanding a subject regardless would make such executions
+impossible while a component-scoped calculation simply fails closed as before.
+
+If the owner intends *every* execution to carry a governed subject irrespective of
+content, `services.version_requires_subject_component()` is the single place to
+widen; no downstream invariant changes.
+
+## 19. Historical data
+
+No backfill, and no guessing. Existing executions keep `subject_component = NULL`
+and retain pre-OQ-8 behaviour exactly: `iid.*` stays unresolved, no snapshot is
+created for them, and a component-scoped calculation continues to be governed by
+its own selector. An already-approved execution therefore keeps reproducing what
+it was assessed against, which the decision requires.
+
+Classified per the brief: no historical execution falls in class **A**
+(unambiguously reconstructable), because nothing persisted on a pre-OQ-8
+execution identifies a subject component — `Q_SUBJECT_COMPONENT` responses are
+per-calculation and need not agree across an execution. All existing rows are
+therefore class **B/C**, and the nullable transitional state is the correct
+handling.
+
+## 20. Status
 
 | | |
 |---|---|
-| OQ-8 | **BLOCKED ON HUMAN REGULATORY DECISION** (§9) |
-| Existing approved specification resolves it | **NO** — it resolves the analogous problem for calculations only |
-| Code changed | **NO** |
-| Fail-closed behaviour | **PRESERVED** |
-| Production regulatory content | **0 / 20** |
-| Milestone 5A | **READY FOR REGULATORY AUTHORING / BLOCKED ON HUMAN REGULATORY APPROVAL** — unchanged |
+| OQ-8 | **CLOSED** |
+| Regulatory decision | **Component-scoped; execution subject authoritative** (§0) |
+| Existing approved specification resolved it | **NO** — the decision was required, then implemented |
+| Fail-closed behaviour | **PRESERVED** — every unresolved case remains `review_required` / `source_unavailable` |
+| Production regulatory content | **0 / 20** — unchanged; no question authored or approved |
+| Part 11 | **No claim** |
+| Milestone 5A | **READY FOR REGULATORY CONTENT AUTHORING / APPROVAL** — the last engine ambiguity is closed; approval remains a human act |

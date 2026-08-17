@@ -15,6 +15,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import json
+
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
 
@@ -119,15 +121,34 @@ def _question(section, code, **kwargs):
     return ChecklistQuestion.objects.create(section=section, code=code, **defaults)
 
 
-def _execute(tenant, version, user):
+def _subject_component(formulation_version, name="SYNTHETIC-EXCIPIENT"):
+    """One inactive component to act as the execution's governed OQ-8 subject."""
+    from formulations.models import FormulationComponent
+
+    component = FormulationComponent(
+        formulation_version=formulation_version,
+        component_type="inactive",
+        ingredient_name=name,
+        quantity_per_dosage_unit="10.000000",
+        quantity_unit="milligram",
+        display_order=1,
+    )
+    component.full_clean()
+    component.save()
+    return component
+
+
+def _execute(tenant, version, user, *, with_subject_component=False):
     from iig_checklist.services import create_execution
 
     product = _product(tenant, user, code=f"PROD-{version.public_id.hex[:8]}")
     fv = _formulation(product, user)
+    subject = _subject_component(fv) if with_subject_component else None
     return create_execution(
         tenant=tenant,
         checklist_version_public_id=str(version.public_id),
         formulation_version_public_id=str(fv.public_id),
+        subject_component_public_id=(str(subject.public_id) if subject else None),
         actor=user,
     )
 
@@ -683,7 +704,13 @@ class TestApplicabilityIsActuallyEvaluated:
         question = _question(section, "Q-RULED", applicability_rule=rule)
         version.status = "active"
         version.save(update_fields=["status"])
-        execution = _execute(tenant, version, user)
+        # A rule reading `iid.*` needs a governed subject component to be
+        # executable at all now (OQ-8); supplying one for every case keeps the
+        # helper uniform. No active FDA IID release exists in these tests, so an
+        # `iid.*` rule still has no governed source and still fails closed --
+        # which is exactly what the unresolved-source case asserts.
+        needs_subject = "iid." in json.dumps(condition)
+        execution = _execute(tenant, version, user, with_subject_component=needs_subject)
         from iig_checklist.models import ChecklistResponse
 
         return execution, ChecklistResponse.objects.get(execution=execution, question=question)
@@ -1013,7 +1040,7 @@ class TestPopulationAtExecutionCreation:
         )
         version.status = "active"
         version.save(update_fields=["status"])
-        execution = _execute(tenant, version, user)
+        execution = _execute(tenant, version, user, with_subject_component=True)
         from iig_checklist.models import ChecklistResponse
 
         return ChecklistResponse.objects.get(execution=execution, question=question)
