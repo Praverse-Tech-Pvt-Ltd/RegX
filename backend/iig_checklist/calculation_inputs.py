@@ -128,6 +128,10 @@ SOURCE_KIND_CONSTANT = "constant"
 #: Where a component identity came from, for reconciliation and provenance.
 COMPONENT_SOURCE_SELECTOR = "selector"
 COMPONENT_SOURCE_INHERITED = "inherited"
+#: OQ-8 (`5A-DEC-OQ8`) -- the execution's governed subject component. Recorded as
+#: a source so provenance shows that the execution itself asserted the identity,
+#: not only the selector response.
+COMPONENT_SOURCE_EXECUTION = "execution_subject"
 
 
 class CalculationInputContractError(RuntimeError):
@@ -1057,6 +1061,22 @@ def _resolve_subject_component(
         return _ComponentResolution(state=STATE_FAILED)
     if not candidates:
         return _ComponentResolution(state=STATE_NOT_REQUIRED)
+
+    # OQ-8 (`5A-DEC-OQ8`): the execution's governed subject component is
+    # authoritative. A calculation may not independently select a different one,
+    # so the execution's identity joins the candidate set and any disagreement
+    # fails closed through the same reconciliation as every other source -- there
+    # is deliberately no branch that lets the execution's value silently win by
+    # overwriting the selector's.
+    #
+    # A legacy execution with no governed subject contributes nothing and the
+    # pre-OQ-8 behaviour stands, so an already-approved execution keeps
+    # reproducing what it was assessed against.
+    execution_subject_id = getattr(execution, "subject_component_id", None)
+    if execution_subject_id is not None:
+        subject_public_id = str(execution.subject_component.public_id)
+        candidates.setdefault(subject_public_id, set()).add(COMPONENT_SOURCE_EXECUTION)
+
     if len(candidates) > 1:
         # Every relevant source must agree; there is no precedence order that
         # could make one of two different components the right answer.
@@ -1066,8 +1086,9 @@ def _resolve_subject_component(
             code=F_UPSTREAM_COMPONENT_MISMATCH,
             source_kind=SOURCE_KIND_FORMULATION_COMPONENT,
             message=(
-                "The subject component identities implied by this calculation's "
-                "selector and its upstream outcomes disagree."
+                "The subject component identities implied by this execution's "
+                "governed subject component, this calculation's selector and its "
+                "upstream outcomes disagree."
             ),
         )
         return _ComponentResolution(state=STATE_FAILED)

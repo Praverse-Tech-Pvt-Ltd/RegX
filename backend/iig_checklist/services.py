@@ -239,6 +239,19 @@ class InvalidQuantityUnitConfig(Exception):
     pass
 
 
+class SubjectComponentRequired(Exception):
+    """OQ-8 -- component-specific content cannot be executed without a subject."""
+
+
+class SubjectComponentNotInFormulationVersion(Exception):
+    """OQ-8 -- the named component does not belong to this formulation version.
+
+    Also the cross-tenant case: a component owned by another tenant necessarily
+    belongs to another formulation version, so it fails here without the caller
+    ever learning whether the UUID exists.
+    """
+
+
 class InvalidCalculationBinding(Exception):
     """A SYSTEM_CALCULATED question's binding cannot produce a placeholder.
 
@@ -337,35 +350,164 @@ def _questions_for_version(checklist_version):
     ).select_related("section")
 
 
-def _resolve_fda_derived_default(question):
+def _iid_binding(question) -> str:
+    """The `iid.*` FDA-derived binding this question declares, or ``""``."""
+    binding = (question.prefill_source or "").strip()
+    if not binding:
+        return ""
+    if question.data_source_classification != DataSourceClassification.FDA_DERIVED_DEFAULT:
+        return ""
+    return binding
+
+
+def version_requires_subject_component(questions) -> bool:
+    """OQ-8 -- does this checklist version read execution-level `iid.*`?
+
+    True when a question declares an `iid.*` FDA-derived binding, or an
+    applicability rule reads the `iid` field group. Those are exactly the two
+    consumers OQ-8 is about, and neither can produce an answer without a
+    governed subject component.
+
+    Scoped deliberately, and this is the one mechanical judgement in this change:
+
+    * A **component-scoped calculation** does *not* trigger the requirement. It
+      already has an approved selector of its own (`Q_SUBJECT_COMPONENT`,
+      M4D3-FCR-002..004), and the regulatory decision's constraint on it is one
+      of *consistency* -- it must not select a different component from the
+      execution's. That is enforced in
+      ``calculation_inputs._resolve_subject_component`` whenever a governed
+      subject exists, rather than by demanding one up front.
+    * Demanding a subject regardless would make an execution impossible against
+      a formulation version that has no components at all -- a real case, and one
+      where a component-scoped calculation simply fails closed as before.
+
+    If the regulatory owner intends *every* execution to carry a governed subject
+    component irrespective of content, this predicate is the single place to
+    widen; the invariants downstream do not change.
+    """
+    from .applicability_runtime import referenced_field_groups
+
+    for question in questions:
+        if _iid_binding(question):
+            return True
+
+        rule = question.applicability_rule
+        if rule is not None and "iid" in referenced_field_groups(rule.condition_json):
+            return True
+    return False
+
+
+def _resolve_fda_derived_default(question, precedent=None):
     """Resolve one FDA-derived question's default through the governed registry.
 
     Returns ``(raw_value, provenance)``. Both are ``None`` for a question that
     declares no binding, so nothing changes for content that does not use the
     mechanism.
 
-    **The governed source is not selected here.** Which IID precedent record
-    answers a given question depends on ingredient/route matching that is scoped
-    to a formulation *component*, and no approved specification says which
-    component governs an execution-level default. Choosing one would be
-    engineering inventing a regulatory mapping, so the resolver is invoked with
-    no source and returns an explicit ``source_unavailable`` outcome, which is
-    recorded as provenance. That is the honest state: the binding is real,
-    validated and audited, and the selection rule is a registered governance
-    question (5A-P1 OQ-8). A resolved-looking empty answer would be worse than
-    a visibly unresolved one.
+    ``precedent`` is the governed ``IIDPrecedentRecord`` selected by the caller
+    for this execution's subject component (OQ-8, `5A-DEC-OQ8`). The resolver
+    stays pure: it receives an already-selected source and performs no lookup of
+    its own.
+
+    ``None`` is still a legitimate argument and still yields an explicit
+    ``source_unavailable`` provenance record with no value -- for a legacy
+    execution that has no governed subject component, for a subject component
+    whose assessment matched no IID precedent, or when no active FDA release
+    exists. No default is ever fabricated to paper over any of those.
     """
     from .answer_sources import resolve
 
-    binding = (question.prefill_source or "").strip()
+    binding = _iid_binding(question)
     if not binding:
         return None, None
-    if question.data_source_classification != DataSourceClassification.FDA_DERIVED_DEFAULT:
-        return None, None
 
-    outcome, resolver_version = resolve(binding, None)
+    outcome, resolver_version = resolve(binding, precedent)
     provenance = outcome.provenance(binding, resolver_version)
     return (outcome.value if outcome.resolved else None), provenance
+
+
+def _resolve_creation_subject_component(formulation_version, subject_component_public_id):
+    """OQ-8 -- validate a client-named subject component against the execution.
+
+    Scoped to the execution's own formulation version, exactly as
+    ``calculation_inputs._component_in_execution`` does, so a component from
+    another formulation -- and therefore possibly another tenant -- can never be
+    attached, and its existence is never disclosed. A UUID that exists is not
+    sufficient grounds to trust it.
+    """
+    from formulations.models import FormulationComponent
+
+    component = FormulationComponent.objects.filter(
+        public_id=subject_component_public_id,
+        formulation_version_id=formulation_version.pk,
+    ).first()
+    if component is None:
+        raise SubjectComponentNotInFormulationVersion()
+    return component
+
+
+def _create_execution_iid_source(*, tenant, execution, formulation_version, actor):
+    """OQ-8 -- the governed IID source for this execution's `iid.*` values.
+
+    Creates the component-specific ``AssessmentSnapshot`` through the approved
+    ``iid_assessment`` service and returns
+    ``(snapshot, precedent_record_or_None)``.
+
+    Reuses the approved snapshot semantics wholesale (M4D3-SNO-001/006/008,
+    M4D3-SRC-001/003/004): the release is resolved server-side, the Part 14.1
+    worst-case daily units come from the one shared helper every governed
+    snapshot caller uses, and the snapshot is *created*, never selected -- no
+    ``.first()``, no ``.latest()``, no reuse of a pre-existing row.
+
+    Exactly one snapshot is created per creation pass and shared by every `iid.*`
+    binding in it. That is not the forbidden kind of reuse: the row is new, made
+    inside this transaction, for this execution's one subject component. Sharing
+    it is what makes the bindings mutually consistent -- minting a separate
+    snapshot per question could straddle a release change and leave one execution
+    answering from two different sources.
+
+    Returns ``(None, None)`` when the execution has no governed subject
+    component, which keeps every binding at ``source_unavailable``.
+    """
+    if execution.subject_component_id is None:
+        return None, None
+
+    from formulations.dosing import governed_maximum_daily_units_value
+    from iid_assessment.services import (
+        ActiveReleaseUnavailable,
+        ReleaseNotEligible,
+        create_assessment_snapshot,
+    )
+
+    try:
+        result = create_assessment_snapshot(
+            tenant=tenant,
+            formulation_version=formulation_version,
+            formulation_component=execution.subject_component,
+            actor=actor,
+            # M4D3-SRC-001/003 -- resolved server-side, never named by a caller.
+            selected_release=None,
+            # M4D3-SRC-004 -- the governed Part 14.1 worst case, injected.
+            maximum_dosage_units_per_day=governed_maximum_daily_units_value(
+                formulation_version=formulation_version
+            ),
+        )
+    except (ActiveReleaseUnavailable, ReleaseNotEligible):
+        # A governed error, not a crash (M4D3-SRC-002). Every binding then
+        # records source_unavailable rather than a fabricated value.
+        return None, None
+
+    snapshot = result.snapshot
+    precedent = None
+    if snapshot.iid_precedent_record_public_id is not None:
+        from fda_data.models import IIDPrecedentRecord
+
+        precedent = (
+            IIDPrecedentRecord.objects.select_related("release")
+            .filter(public_id=snapshot.iid_precedent_record_public_id)
+            .first()
+        )
+    return snapshot, precedent
 
 
 def create_execution(
@@ -374,6 +516,7 @@ def create_execution(
     checklist_version_public_id,
     formulation_version_public_id,
     actor,
+    subject_component_public_id=None,
 ):
     """Create a ChecklistExecution with pre-created response slots.
 
@@ -432,16 +575,31 @@ def create_execution(
         if q.answer_type == AnswerType.QUANTITY_WITH_UNIT and not q.allowed_units:
             raise InvalidQuantityUnitConfig(q.code)
 
+    # Step 4b (OQ-8, `5A-DEC-OQ8`): establish the governed subject component
+    # *before* the transaction, so it is already known when FDA-derived defaults
+    # and applicability resolve inside it. This is the ordering fix: the previous
+    # design had no subject at that point and could only fail closed.
+    subject_component = None
+    if subject_component_public_id is not None:
+        subject_component = _resolve_creation_subject_component(fv, subject_component_public_id)
+    elif version_requires_subject_component(questions):
+        raise SubjectComponentRequired()
+
     # Step 5: transactional creation.
     with db_transaction.atomic():
         locked_version = ChecklistVersion.objects.select_for_update().get(pk=checklist_version.pk)
 
+        # OQ-8: duplicate detection is per subject component, matching the
+        # split uniqueness constraints. The regulatory decision explicitly
+        # allows several component-specific executions for one formulation, so
+        # filtering without the component would refuse a legitimate second one.
         existing = (
             ChecklistExecution.objects.select_for_update()
             .filter(
                 tenant=tenant,
                 checklist_version=locked_version,
                 formulation_version=fv,
+                subject_component=subject_component,
             )
             .exclude(status__in=["rejected", "cancelled", "superseded"])
             .first()
@@ -455,11 +613,22 @@ def create_execution(
                 tenant=tenant,
                 checklist_version=locked_version,
                 formulation_version=fv,
+                subject_component=subject_component,
                 status=ExecutionStatus.DRAFT,
                 created_by=actor,
             )
         except IntegrityError as exc:
             raise ExecutionAlreadyActive() from exc
+
+        # OQ-8: the governed IID source for this execution, created once before
+        # any binding reads it. Inside this transaction, so a later failure
+        # discards the snapshot with the execution (M4D3-SNO-003/012).
+        iid_snapshot, iid_precedent = _create_execution_iid_source(
+            tenant=tenant,
+            execution=execution,
+            formulation_version=fv,
+            actor=actor,
+        )
 
         for q in questions:
             # `5A-DEC-001` -- governed FDA-derived population, before any
@@ -468,7 +637,18 @@ def create_execution(
             # before; a bound one records either a value with its source
             # provenance or an explicit reason there is none. There is no third
             # outcome: a fabricated default is never written.
-            fda_value, fda_provenance = _resolve_fda_derived_default(q)
+            fda_value, fda_provenance = _resolve_fda_derived_default(q, iid_precedent)
+            if fda_provenance is not None and iid_snapshot is not None:
+                # OQ-8 provenance: enough for a reviewer to reconstruct which
+                # formulation version, which excipient and which snapshot the
+                # value came from. The release identity is already recorded by
+                # the resolver as `source_version`.
+                fda_provenance = {
+                    **fda_provenance,
+                    "subject_component_public_id": str(execution.subject_component.public_id),
+                    "formulation_version_public_id": str(fv.public_id),
+                    "assessment_snapshot_public_id": str(iid_snapshot.public_id),
+                }
             response = _create_validated(
                 ChecklistResponse,
                 execution=execution,
@@ -505,7 +685,9 @@ def create_execution(
         # question in this execution is judged against identical product state.
         from .applicability_runtime import evaluate_execution_applicability
 
-        evaluate_execution_applicability(execution=execution, actor=actor)
+        evaluate_execution_applicability(
+            execution=execution, actor=actor, iid_snapshot=iid_snapshot
+        )
 
     # Step 6: post-commit audit.
     def _audit():
@@ -518,6 +700,16 @@ def create_execution(
             payload={
                 "checklist_version_public_id": str(checklist_version.public_id),
                 "formulation_version_public_id": str(fv.public_id),
+                # OQ-8: which excipient this execution governs, and the snapshot
+                # its iid.* values came from. UUIDs only, never internal ids.
+                # None is recorded truthfully rather than omitted -- "no governed
+                # subject" is itself the fact an auditor needs.
+                "subject_component_public_id": (
+                    str(subject_component.public_id) if subject_component is not None else None
+                ),
+                "assessment_snapshot_public_id": (
+                    str(iid_snapshot.public_id) if iid_snapshot is not None else None
+                ),
             },
         )
 

@@ -562,6 +562,29 @@ class ChecklistExecution(PublicIDModel, TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="checklist_executions",
     )
+    #: OQ-8 (`5A-DEC-OQ8`) -- the one governed subject component this execution
+    #: is about. The regulatory decision is that an IID/IIG execution is
+    #: component-scoped: FDA IID evaluation is excipient-specific (inactive
+    #: ingredient + route + dosage form, with potency/MDE on the individual
+    #: excipient record), so there is no whole-formulation aggregate to compute.
+    #:
+    #: A live FK, not a frozen UUID: unlike `AssessmentSnapshot`, an execution is
+    #: operational state, and PROTECT is what stops a component being deleted out
+    #: from under a governed execution. `formulation_version` is already an FK
+    #: with PROTECT, so this matches.
+    #:
+    #: Nullable only for executions created before this field existed. New
+    #: executions whose checklist content is component-specific must supply it
+    #: (see `services.create_execution`); a legacy NULL keeps the pre-OQ-8
+    #: behaviour so an already-approved execution stays reproducible, and never
+    #: silently acquires a component.
+    subject_component = models.ForeignKey(
+        "formulations.FormulationComponent",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     status = models.CharField(
         max_length=30,
         choices=ExecutionStatus.choices,
@@ -634,16 +657,80 @@ class ChecklistExecution(PublicIDModel, TimeStampedModel):
 
     class Meta:
         constraints = [
+            # OQ-8: uniqueness is now per subject component, because the
+            # regulatory decision explicitly allows "multiple component-specific
+            # IID/IIG executions where required" for one formulation. Split in
+            # two so the pre-OQ-8 guarantee is not silently weakened: SQL treats
+            # NULLs as distinct, so a single constraint including the nullable
+            # column would let unlimited subject-less executions coexist.
+            models.UniqueConstraint(
+                fields=[
+                    "tenant",
+                    "checklist_version",
+                    "formulation_version",
+                    "subject_component",
+                ],
+                condition=Q(subject_component__isnull=False)
+                & ~Q(status__in=["rejected", "cancelled", "superseded"]),
+                name="unique_active_execution_per_formulation_component",
+            ),
             models.UniqueConstraint(
                 fields=["tenant", "checklist_version", "formulation_version"],
-                condition=~Q(status__in=["rejected", "cancelled", "superseded"]),
+                condition=Q(subject_component__isnull=True)
+                & ~Q(status__in=["rejected", "cancelled", "superseded"]),
                 name="unique_active_execution_per_version_formulation",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["tenant", "status"]),
             models.Index(fields=["checklist_version"]),
+            models.Index(fields=["subject_component"]),
         ]
+
+    def clean(self):
+        """OQ-8 invariants on the governed subject component.
+
+        Enforced on the model rather than only in the service so no code path --
+        including a future one -- can attach a foreign component or swap it after
+        the fact. `full_clean()` runs before every governed save (M4D3-PST-005).
+        """
+        super().clean()
+        if self.subject_component_id is None:
+            return
+
+        # The component must belong to this execution's own formulation version.
+        # That version is already tenant-guarded by the creation service, so this
+        # single check also closes the cross-tenant case: a component from
+        # another tenant necessarily belongs to another formulation version.
+        if self.subject_component.formulation_version_id != self.formulation_version_id:
+            raise ValidationError(
+                {
+                    "subject_component": (
+                        "The subject component must belong to this execution's "
+                        "formulation version."
+                    )
+                }
+            )
+
+        if self.pk:
+            original = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("subject_component_id", flat=True)
+                .first()
+            )
+            # Immutable once governed. A correction requires a new execution, so
+            # an approved execution can never be re-pointed at a different
+            # excipient after the fact.
+            if original is not None and original != self.subject_component_id:
+                raise ValidationError(
+                    {
+                        "subject_component": (
+                            "The governed subject component cannot be changed after "
+                            "the execution has been created."
+                        )
+                    }
+                )
 
 
 class ChecklistResponse(PublicIDModel, TimeStampedModel):
