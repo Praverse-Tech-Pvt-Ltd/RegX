@@ -20,6 +20,12 @@ export interface ChecklistExecutionDTO {
   status: string;
   checklist_version: ChecklistVersionSummaryDTO;
   formulation_version_public_id: string;
+  // OQ-8: the governed subject component. `null` only for executions
+  // created before the field existed.
+  // Optional, not just nullable: a server predating OQ-8 omits the keys
+  // entirely, and the mapper normalises both cases to null.
+  subject_component_public_id?: string | null;
+  subject_component_ingredient_name?: string | null;
   created_by_email: string | null;
   submitted_by_email: string | null;
   submitted_at: string | null;
@@ -98,6 +104,8 @@ export interface ChecklistExecution {
   status: string;
   checklistVersion: ChecklistVersionSummary;
   formulationVersionPublicId: string;
+  subjectComponentPublicId: string | null;
+  subjectComponentIngredientName: string | null;
   createdByEmail: string | null;
   submittedByEmail: string | null;
   submittedAt: string | null;
@@ -172,6 +180,10 @@ export function toChecklistExecution(dto: ChecklistExecutionDTO): ChecklistExecu
       status: dto.checklist_version.status,
     },
     formulationVersionPublicId: dto.formulation_version_public_id,
+    // `?? null` rather than a bare read: a server that predates the field
+    // omits it, and `undefined` would render as "undefined" in the UI.
+    subjectComponentPublicId: dto.subject_component_public_id ?? null,
+    subjectComponentIngredientName: dto.subject_component_ingredient_name ?? null,
     createdByEmail: dto.created_by_email,
     submittedByEmail: dto.submitted_by_email,
     submittedAt: dto.submitted_at,

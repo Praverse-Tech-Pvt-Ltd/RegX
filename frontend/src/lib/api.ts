@@ -1513,7 +1513,13 @@ export const iigChecklists = {
 
     create: (
       tenantSlug: string,
-      data: { checklist_version_public_id: string; formulation_version_public_id: string }
+      data: {
+        checklist_version_public_id: string;
+        formulation_version_public_id: string;
+        // OQ-8: required by the server whenever the checklist content reads
+        // execution-level iid.* values.
+        subject_component_public_id?: string;
+      }
     ) =>
       apiRequest<ChecklistExecutionDTO>("/api/regx/v1/iig-checklists/executions/", {
         method: "POST",

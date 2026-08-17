@@ -99,6 +99,8 @@ from .services import (
     SelfApprovalForbidden,
     VersionAllocationConflict,
     clone_definition,
+    SubjectComponentNotInFormulationVersion,
+    SubjectComponentRequired,
     create_execution,
     create_next_version,
     enter_reviewer_conclusion,
@@ -1011,6 +1013,11 @@ class ChecklistExecutionListCreateView(APIView):
                 formulation_version_public_id=serializer.validated_data[
                     "formulation_version_public_id"
                 ],
+                # OQ-8: absent means "not supplied", which the service refuses
+                # when the checklist content is component-specific.
+                subject_component_public_id=serializer.validated_data.get(
+                    "subject_component_public_id"
+                ),
                 actor=request.user,
             )
         except ExecutionAlreadyActive:
@@ -1020,6 +1027,31 @@ class ChecklistExecutionListCreateView(APIView):
                     "detail": "An active execution already exists for this combination.",
                 },
                 status=status.HTTP_409_CONFLICT,
+            )
+        except SubjectComponentRequired:
+            return Response(
+                {
+                    "error_code": "subject_component_required",
+                    "detail": (
+                        "This checklist version contains component-specific content, "
+                        "so a governed subject component must be supplied."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except SubjectComponentNotInFormulationVersion:
+            # Deliberately does not distinguish "no such component" from
+            # "component belongs to another formulation or tenant": the caller
+            # learns only that this one is not eligible here.
+            return Response(
+                {
+                    "error_code": "subject_component_not_eligible",
+                    "detail": (
+                        "The subject component does not belong to this "
+                        "formulation version."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except ChecklistVersionNotActive:
             return Response(

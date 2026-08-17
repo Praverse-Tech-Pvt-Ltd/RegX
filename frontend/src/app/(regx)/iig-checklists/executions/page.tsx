@@ -60,6 +60,10 @@ function ExecutionListPageInner() {
               <th>Status</th>
               <th>Checklist version</th>
               <th>Formulation version</th>
+              {/* OQ-8: an execution is scoped to one excipient, so which one
+                  it governs belongs beside the formulation, not buried in the
+                  detail page. */}
+              <th>Subject component</th>
               <th>Created</th>
               <th></th>
             </tr>
@@ -70,6 +74,11 @@ function ExecutionListPageInner() {
                 <td>{ex.status}</td>
                 <td>v{ex.checklistVersion.versionNumber} ({ex.checklistVersion.status})</td>
                 <td>{ex.formulationVersionPublicId}</td>
+                <td>
+                  {/* An em dash, not "None": a pre-OQ-8 execution has no
+                      governed subject, which is a fact rather than a value. */}
+                  {ex.subjectComponentIngredientName ?? "—"}
+                </td>
                 <td>{new Date(ex.createdAt).toLocaleDateString()}</td>
                 <td>
                   <Link href={`/iig-checklists/executions/${ex.publicId}?tenant=${tenantSlug}`}>
