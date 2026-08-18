@@ -57,9 +57,9 @@ jobs:
 
       - name: check_env names a single missing variable
         env:
-          DJANGO_SECRET_KEY: ci-nonplaceholder-value-aaaaaaaaaaaa
-          POSTGRES_PASSWORD: ci-nonplaceholder-value-bbbbbbbbbbbb
-          MFA_ENCRYPTION_KEY: ci-nonplaceholder-value-cccccccccccc
+          DJANGO_SECRET_KEY: ci-accepted-value-aaaaaaaaaaaa
+          POSTGRES_PASSWORD: ci-accepted-value-bbbbbbbbbbbb
+          MFA_ENCRYPTION_KEY: ci-accepted-value-cccccccccccc
         run: |
           # COMPANY_SECRET_KEY intentionally unset.
           output="$(python scripts/check_env.py 2>&1 || true)"
@@ -82,10 +82,10 @@ jobs:
 
       - name: check_env accepts a complete environment and warns on the stub scanner
         env:
-          DJANGO_SECRET_KEY: ci-nonplaceholder-value-aaaaaaaaaaaa
-          POSTGRES_PASSWORD: ci-nonplaceholder-value-bbbbbbbbbbbb
-          MFA_ENCRYPTION_KEY: ci-nonplaceholder-value-cccccccccccc
-          COMPANY_SECRET_KEY: ci-nonplaceholder-value-dddddddddddd
+          DJANGO_SECRET_KEY: ci-accepted-value-aaaaaaaaaaaa
+          POSTGRES_PASSWORD: ci-accepted-value-bbbbbbbbbbbb
+          MFA_ENCRYPTION_KEY: ci-accepted-value-cccccccccccc
+          COMPANY_SECRET_KEY: ci-accepted-value-dddddddddddd
         run: |
           output="$(python scripts/check_env.py)"
           echo "$output"
@@ -155,8 +155,32 @@ jobs:
 
       - name: restore refuses a production-looking target
         run: |
+          # The previous step deliberately tampered postgres.dump. Un-tamper it
+          # first: otherwise this run aborts at checksum verification and never
+          # reaches the production guard, and the step would pass even if that
+          # guard were deleted.
+          echo "postgres" > /tmp/fake-set/postgres.dump
+          bash scripts/restore.sh --from /tmp/fake-set --verify-only >/dev/null             || { echo "FAIL: set did not re-verify; this step would not test the guard"; exit 1; }
+
           set +e
           bash scripts/restore.sh --from /tmp/fake-set --project acme-production --yes-destroy-data 2>&1 | tee /tmp/out4
           rc=${PIPESTATUS[0]}
+          set -e
           [ "$rc" -ne 0 ] || { echo "FAIL: did not refuse a production-looking target"; exit 1; }
-          echo "OK: refused a production-looking target"
+          # Assert it stopped for the RIGHT reason, not incidentally.
+          grep -q "looks like production" /tmp/out4             || { echo "FAIL: refused, but not by the production guard"; exit 1; }
+          echo "OK: refused a production-looking target, by the production guard"
+
+      - name: restore refuses without --project and without --yes-destroy-data
+        run: |
+          set +e
+          bash scripts/restore.sh --from /tmp/fake-set --yes-destroy-data 2>&1 | tee /tmp/out5
+          rc=${PIPESTATUS[0]}
+          [ "$rc" -ne 0 ] || { echo "FAIL: restored with no --project"; exit 1; }
+          grep -q -- "--project NAME is required" /tmp/out5             || { echo "FAIL: did not name the missing --project"; exit 1; }
+
+          bash scripts/restore.sh --from /tmp/fake-set --project regx-ci 2>&1 | tee /tmp/out6
+          rc=${PIPESTATUS[0]}
+          [ "$rc" -ne 0 ] || { echo "FAIL: restored without --yes-destroy-data"; exit 1; }
+          grep -q -- "--yes-destroy-data is required" /tmp/out6             || { echo "FAIL: did not require explicit confirmation"; exit 1; }
+          echo "OK: refused both unconfirmed forms"
