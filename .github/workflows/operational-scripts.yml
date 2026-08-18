@@ -1,0 +1,186 @@
+name: Operational Scripts
+
+# scripts/** had no CI coverage at all, which is how check_env.py came to
+# enforce a contract that did not match the runtime and nobody noticed. A
+# recovery tool that never runs in CI rots the same way -- and it rots
+# silently, because you only find out on the day you need it.
+#
+# This is deliberately a light, deterministic job: shell syntax, the pre-flight
+# checker's real behaviours, and the restore script's refusal paths. It does NOT
+# stand up the stack or perform a full restore on every commit; that is
+# expensive, and the guards below are what actually prevent data loss.
+
+on:
+  push:
+    branches: [regx-main]
+    paths:
+      - "scripts/**"
+      - ".github/workflows/operational-scripts.yml"
+  pull_request:
+    branches: [regx-main]
+    paths:
+      - "scripts/**"
+      - ".github/workflows/operational-scripts.yml"
+
+jobs:
+  scripts:
+    name: Shell syntax, pre-flight checker, restore guards
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Shell syntax check
+        run: |
+          for f in scripts/*.sh; do
+            echo "checking $f"
+            bash -n "$f"
+          done
+
+      - name: ShellCheck
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          # SC2312 (masked return values in command substitution) is noisy for
+          # this style and not a correctness risk here.
+          shellcheck --severity=warning --exclude=SC2312 scripts/*.sh
+
+      - name: check_env rejects an empty environment
+        run: |
+          if python scripts/check_env.py; then
+            echo "FAIL: check_env passed with no variables set"; exit 1
+          fi
+          echo "OK: refused an empty environment"
+
+      - name: check_env names a single missing variable
+        env:
+          DJANGO_SECRET_KEY: ci-accepted-value-aaaaaaaaaaaa
+          POSTGRES_PASSWORD: ci-accepted-value-bbbbbbbbbbbb
+          MFA_ENCRYPTION_KEY: ci-accepted-value-cccccccccccc
+        run: |
+          # COMPANY_SECRET_KEY intentionally unset.
+          output="$(python scripts/check_env.py 2>&1 || true)"
+          echo "$output"
+          echo "$output" | grep -q "COMPANY_SECRET_KEY" \
+            || { echo "FAIL: did not name the missing variable"; exit 1; }
+          echo "OK: named the missing variable"
+
+      - name: check_env rejects placeholder values
+        env:
+          DJANGO_SECRET_KEY: change-me-generate-with-python-secrets
+          POSTGRES_PASSWORD: change-me-strong-password
+          MFA_ENCRYPTION_KEY: change-me-generate-fernet-key
+          COMPANY_SECRET_KEY: change-me
+        run: |
+          if python scripts/check_env.py; then
+            echo "FAIL: check_env accepted placeholder values"; exit 1
+          fi
+          echo "OK: refused placeholders"
+
+      - name: check_env accepts a complete environment and warns on the stub scanner
+        env:
+          DJANGO_SECRET_KEY: ci-accepted-value-aaaaaaaaaaaa
+          POSTGRES_PASSWORD: ci-accepted-value-bbbbbbbbbbbb
+          MFA_ENCRYPTION_KEY: ci-accepted-value-cccccccccccc
+          COMPANY_SECRET_KEY: ci-accepted-value-dddddddddddd
+        run: |
+          output="$(python scripts/check_env.py)"
+          echo "$output"
+          echo "$output" | grep -q "uploads are NOT scanned" \
+            || { echo "FAIL: no warning about the stub scanner"; exit 1; }
+          echo "OK: accepted, and warned that the stub scanner does not scan"
+
+      - name: restore refuses without an explicit target
+        run: |
+          set +e
+          # A syntactically valid but empty directory: the run must stop long
+          # before anything is touched.
+          mkdir -p /tmp/empty-set
+          bash scripts/restore.sh --from /tmp/empty-set --yes-destroy-data 2>&1 | tee /tmp/out
+          grep -q "manifest.json is missing" /tmp/out \
+            || { echo "FAIL: did not refuse a set with no manifest"; exit 1; }
+          echo "OK: refused a set with no manifest"
+
+      - name: restore verifies checksums before mutating
+        run: |
+          set -e
+          # Build a minimal, well-formed backup set, then corrupt one artifact
+          # and confirm verification stops the run.
+          mkdir -p /tmp/fake-set
+          cd /tmp/fake-set
+          echo "postgres" > postgres.dump
+          echo "documents" > document_storage.tar.gz
+          echo "companydb" > company_db.sqlite3
+          python - <<'PY'
+          import hashlib, json, os
+          arts = {}
+          for name in ("postgres.dump", "document_storage.tar.gz", "company_db.sqlite3"):
+              data = open(name, "rb").read()
+              arts[name] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+          json.dump({
+              "backup_set_id": "ci-fake", "schema_version": 1,
+              "created_at_utc": "20260101T000000Z", "application_commit": "ci",
+              "applied_migrations": 0, "checksum_algorithm": "sha256",
+              "includes_company_media": False, "artifacts": arts,
+          }, open("manifest.json", "w"), indent=2)
+          PY
+          cd "$GITHUB_WORKSPACE"
+          bash scripts/restore.sh --from /tmp/fake-set --verify-only
+          echo "OK: a well-formed set verifies"
+
+          printf 'tampered' >> /tmp/fake-set/postgres.dump
+          set +e
+          bash scripts/restore.sh --from /tmp/fake-set --verify-only 2>&1 | tee /tmp/out2
+          rc=${PIPESTATUS[0]}
+          set -e
+          [ "$rc" -ne 0 ] || { echo "FAIL: accepted a tampered artifact"; exit 1; }
+          grep -q "checksum mismatch" /tmp/out2 \
+            || { echo "FAIL: did not report a checksum mismatch"; exit 1; }
+          echo "OK: refused a tampered artifact"
+
+      - name: restore refuses a malformed manifest
+        run: |
+          set +e
+          mkdir -p /tmp/bad-manifest
+          echo '{ not json' > /tmp/bad-manifest/manifest.json
+          bash scripts/restore.sh --from /tmp/bad-manifest --verify-only 2>&1 | tee /tmp/out3
+          rc=${PIPESTATUS[0]}
+          [ "$rc" -ne 0 ] || { echo "FAIL: accepted a malformed manifest"; exit 1; }
+          grep -q "not valid JSON" /tmp/out3 \
+            || { echo "FAIL: did not report invalid JSON"; exit 1; }
+          echo "OK: refused a malformed manifest"
+
+      - name: restore refuses a production-looking target
+        run: |
+          # The previous step deliberately tampered postgres.dump. Un-tamper it
+          # first: otherwise this run aborts at checksum verification and never
+          # reaches the production guard, and the step would pass even if that
+          # guard were deleted.
+          echo "postgres" > /tmp/fake-set/postgres.dump
+          bash scripts/restore.sh --from /tmp/fake-set --verify-only >/dev/null             || { echo "FAIL: set did not re-verify; this step would not test the guard"; exit 1; }
+
+          set +e
+          bash scripts/restore.sh --from /tmp/fake-set --project acme-production --yes-destroy-data 2>&1 | tee /tmp/out4
+          rc=${PIPESTATUS[0]}
+          set -e
+          [ "$rc" -ne 0 ] || { echo "FAIL: did not refuse a production-looking target"; exit 1; }
+          # Assert it stopped for the RIGHT reason, not incidentally.
+          grep -q "looks like production" /tmp/out4             || { echo "FAIL: refused, but not by the production guard"; exit 1; }
+          echo "OK: refused a production-looking target, by the production guard"
+
+      - name: restore refuses without --project and without --yes-destroy-data
+        run: |
+          set +e
+          bash scripts/restore.sh --from /tmp/fake-set --yes-destroy-data 2>&1 | tee /tmp/out5
+          rc=${PIPESTATUS[0]}
+          [ "$rc" -ne 0 ] || { echo "FAIL: restored with no --project"; exit 1; }
+          grep -q -- "--project NAME is required" /tmp/out5             || { echo "FAIL: did not name the missing --project"; exit 1; }
+
+          bash scripts/restore.sh --from /tmp/fake-set --project regx-ci 2>&1 | tee /tmp/out6
+          rc=${PIPESTATUS[0]}
+          [ "$rc" -ne 0 ] || { echo "FAIL: restored without --yes-destroy-data"; exit 1; }
+          grep -q -- "--yes-destroy-data is required" /tmp/out6             || { echo "FAIL: did not require explicit confirmation"; exit 1; }
+          echo "OK: refused both unconfirmed forms"

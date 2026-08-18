@@ -13,6 +13,10 @@
 set -eu
 
 SRC="${1:-../Booking final/booking-demo-final}"
+# `CDPATH= cd` is deliberate: it empties CDPATH for this one command so a
+# user's CDPATH cannot silently redirect the cd somewhere else. ShellCheck
+# reads the trailing `=` as a typo; it is not.
+# shellcheck disable=SC1007
 DEST="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)/company_site"
 
 if [ ! -d "$SRC" ]; then

@@ -174,9 +174,9 @@ fix.
 
 ## 4. Classification
 
-**DONE (1):** F-1
+**DONE (3):** F-1, F-2, F-3
 
-**READY NOW (6):** F-2, F-3, F-4, F-5, F-6, F-7
+**READY NOW (4):** F-4, F-5, F-6, F-7
 
 **BLOCKED BY REGULATORY INPUT:** all 20 register items; production question
 authoring; template instantiation; anything that would advance `0/20`.

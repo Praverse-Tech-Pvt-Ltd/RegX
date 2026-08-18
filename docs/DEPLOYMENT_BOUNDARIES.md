@@ -190,8 +190,9 @@ python scripts/check_env.py
       `script-src 'self' 'unsafe-inline'` — the reasoning is recorded in
       `frontend/next.config.ts`
 - [ ] Backup and restore rehearsed for `postgres_data`, `document_storage` and
-      `company_db` — **no procedure exists yet** (tracked as F-3 in
-      `REGX_PARALLEL_TECHNICAL_READINESS.md`)
+      `company_db` — procedure and scripts now exist, see
+      `BACKUP_RESTORE_DR.md`. RPO, RTO, retention, off-site storage and
+      backup encryption remain **PENDING BUSINESS / QA / IT APPROVAL**
 
 ---
 
