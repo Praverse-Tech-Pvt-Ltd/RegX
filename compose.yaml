@@ -86,6 +86,36 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      # A live process is not a live worker. SIGSTOP the worker and the
+      # container still reports "running" while nothing is consumed at all, so
+      # the probe has to ask the worker itself to answer over the broker.
+      #
+      # -d celery@... targets THIS worker by nodename. A bare `inspect ping` is
+      # a broadcast that succeeds if ANY worker replies, which would report a
+      # dead worker healthy the moment a second one existed; it also waits out
+      # the full --timeout collecting replies (5.8s measured) instead of
+      # returning on the first (0.5s).
+      #
+      # $$(hostname), not $$HOSTNAME: HOSTNAME is absent from this container's
+      # Config.Env -- it is injected on the exec path, not declared -- so a
+      # healthcheck could see it empty, target the node "celery@" that never
+      # replies, and pin the service unhealthy forever. `hostname` reads the
+      # UTS namespace, which is what celery uses for its nodename. The doubled
+      # $$ escapes compose interpolation so the container's shell expands it
+      # rather than compose expanding it from the host environment.
+      #
+      # Output is discarded and replaced with one fixed line: the failure path
+      # is a ~120-line Python traceback. It was checked with a password in the
+      # broker URL and did not contain it, but keeping arbitrary library text
+      # out of `docker inspect` health logs is the safer default.
+      test: ["CMD-SHELL", "celery -A regx inspect ping -d celery@$$(hostname) --timeout 5 >/dev/null 2>&1 || { echo 'celery worker did not reply to inspect ping'; exit 1; }"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      # Measured cold start to first successful ping: ~6s locally. 30s leaves
+      # room for a slower CI runner without hiding a real failure for minutes.
+      start_period: 30s
 
   frontend:
     build:
@@ -105,6 +135,24 @@ services:
       - backend
     ports:
       - "3000:3000"
+    healthcheck:
+      # 127.0.0.1, not localhost: node:22-alpine resolves localhost to ::1
+      # first and Next binds 0.0.0.0 (IPv4 only), so a localhost probe is
+      # refused outright -- verified in this image, and the same trap that once
+      # had nginx reporting unhealthy while it was serving every request.
+      #
+      # /signin, not /: it is the frontend's real entry route through nginx
+      # (nginx gives / to the company site, so / is a page nobody reaches),
+      # it needs no session, and it is a client component -- rendering it makes
+      # no backend call. The probe therefore reports on the frontend alone,
+      # which is what a per-service health signal should do. wget exits
+      # non-zero on any HTTP error status, so a 404 or 500 fails the probe.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/signin || { echo 'frontend did not serve /signin'; exit 1; }"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      # Measured cold start to first 200: ~1s locally.
+      start_period: 15s
 
   # The company website (booking-demo-final), carried in verbatim and run as
   # its own service. It keeps its own SQLite database and is completely

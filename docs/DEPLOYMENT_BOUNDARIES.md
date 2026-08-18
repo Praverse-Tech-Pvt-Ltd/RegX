@@ -193,6 +193,10 @@ python scripts/check_env.py
       `company_db` — procedure and scripts now exist, see
       `BACKUP_RESTORE_DR.md`. RPO, RTO, retention, off-site storage and
       backup encryption remain **PENDING BUSINESS / QA / IT APPROVAL**
+- [ ] `docker compose ps` reports all seven services healthy — every service now
+      carries a healthcheck, see `SERVICE_HEALTH.md`. Note that per-container
+      health is not an end-to-end guarantee, and that nginx must be restarted
+      after any upstream container is recreated
 
 ---
 
