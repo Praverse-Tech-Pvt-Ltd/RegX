@@ -13,6 +13,7 @@ from .calculation_registry import get_entry
 from .codes import normalize_code
 from .enums import (
     CLONABLE_SOURCE_VERSION_STATUSES,
+    ChecklistExecutionScope,
     ChecklistVersionStatus,
     DataSourceClassification,
     ExecutionStatus,
@@ -130,6 +131,13 @@ def clone_definition(request: CloneRequest) -> CloneResult:
             code=normalized_code,
             title=request.new_title,
             scope_type=request.target_scope_type,
+            # OQ-8: the clone regulates the same thing as its source, so the
+            # governed execution scope travels with it. Without this every clone
+            # would be born unclassified and therefore unexecutable. This is not
+            # inference from content -- it is carrying forward an explicit
+            # classification. `target_scope_type` changes *ownership*, which is
+            # independent of execution scope.
+            execution_scope=request.source_version.definition.execution_scope,
             tenant=request.target_tenant if request.target_scope_type == "tenant" else None,
             created_by=request.actor,
         )
@@ -241,6 +249,23 @@ class InvalidQuantityUnitConfig(Exception):
 
 class SubjectComponentRequired(Exception):
     """OQ-8 -- component-specific content cannot be executed without a subject."""
+
+
+class UnclassifiedChecklistExecutionScope(Exception):
+    """OQ-8 -- the definition carries no governed `execution_scope`.
+
+    Deliberately distinct from `NoEligibleSubjectComponent`: one means "we do not
+    know what this checklist regulates", the other means "we know, and this
+    formulation cannot satisfy it". Collapsing them would hide which fault to fix.
+    """
+
+
+class NoEligibleSubjectComponent(Exception):
+    """OQ-8 -- a component-scoped checklist against a formulation with none."""
+
+
+class SubjectComponentNotPermittedForScope(Exception):
+    """OQ-8 -- a subject was supplied for a formulation-version-scoped checklist."""
 
 
 class SubjectComponentNotInFormulationVersion(Exception):
@@ -360,41 +385,28 @@ def _iid_binding(question) -> str:
     return binding
 
 
-def version_requires_subject_component(questions) -> bool:
-    """OQ-8 -- does this checklist version read execution-level `iid.*`?
+def definition_requires_subject_component(definition) -> bool:
+    """OQ-8 -- does an execution of this checklist require a subject component?
 
-    True when a question declares an `iid.*` FDA-derived binding, or an
-    applicability rule reads the `iid` field group. Those are exactly the two
-    consumers OQ-8 is about, and neither can produce an answer without a
-    governed subject component.
+    Determined **solely** by the governed
+    ``ChecklistDefinition.execution_scope`` classification, never by question
+    content. An execution's regulatory scope is an invariant of the checklist;
+    it must not change because a version added, removed or reworded a question.
 
-    Scoped deliberately, and this is the one mechanical judgement in this change:
+    Question bindings are deliberately not scanned. The earlier
+    content-triggered predicate was corrected by the regulatory owner precisely
+    because a checklist that temporarily has no `iid.*` binding is still an
+    IID/IIG checklist.
 
-    * A **component-scoped calculation** does *not* trigger the requirement. It
-      already has an approved selector of its own (`Q_SUBJECT_COMPONENT`,
-      M4D3-FCR-002..004), and the regulatory decision's constraint on it is one
-      of *consistency* -- it must not select a different component from the
-      execution's. That is enforced in
-      ``calculation_inputs._resolve_subject_component`` whenever a governed
-      subject exists, rather than by demanding one up front.
-    * Demanding a subject regardless would make an execution impossible against
-      a formulation version that has no components at all -- a real case, and one
-      where a component-scoped calculation simply fails closed as before.
-
-    If the regulatory owner intends *every* execution to carry a governed subject
-    component irrespective of content, this predicate is the single place to
-    widen; the invariants downstream do not change.
+    Raises ``UnclassifiedChecklistExecutionScope`` for a definition that has no
+    governed classification: there is no permissive default and no inference
+    from title, code, description, question codes, bindings, calculations,
+    jurisdiction or regulatory basis.
     """
-    from .applicability_runtime import referenced_field_groups
-
-    for question in questions:
-        if _iid_binding(question):
-            return True
-
-        rule = question.applicability_rule
-        if rule is not None and "iid" in referenced_field_groups(rule.condition_json):
-            return True
-    return False
+    scope = (definition.execution_scope or "").strip()
+    if not scope:
+        raise UnclassifiedChecklistExecutionScope()
+    return scope == ChecklistExecutionScope.FORMULATION_COMPONENT
 
 
 def _resolve_fda_derived_default(question, precedent=None):
@@ -579,11 +591,29 @@ def create_execution(
     # *before* the transaction, so it is already known when FDA-derived defaults
     # and applicability resolve inside it. This is the ordering fix: the previous
     # design had no subject at that point and could only fail closed.
+    #
+    # The requirement comes from the definition's governed execution_scope, not
+    # from what this version's questions happen to contain. An unclassified
+    # definition raises before anything else is considered.
+    requires_subject = definition_requires_subject_component(checklist_version.definition)
+
     subject_component = None
-    if subject_component_public_id is not None:
+    if requires_subject:
+        if subject_component_public_id is None:
+            # Distinguish "you did not name one" from "there is none to name":
+            # the first is a caller error, the second an invalid precondition on
+            # the formulation.
+            from formulations.models import FormulationComponent
+
+            if not FormulationComponent.objects.filter(formulation_version=fv).exists():
+                raise NoEligibleSubjectComponent()
+            raise SubjectComponentRequired()
         subject_component = _resolve_creation_subject_component(fv, subject_component_public_id)
-    elif version_requires_subject_component(questions):
-        raise SubjectComponentRequired()
+    elif subject_component_public_id is not None:
+        # A formulation-version-scoped execution has no governed subject. Accepting
+        # one anyway would create a component-scoped record under a scope that does
+        # not govern components, so it is validated and refused rather than ignored.
+        raise SubjectComponentNotPermittedForScope()
 
     # Step 5: transactional creation.
     with db_transaction.atomic():

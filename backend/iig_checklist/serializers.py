@@ -48,6 +48,10 @@ class ChecklistDefinitionSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "scope_type",
+            # OQ-8: the governed execution-scope classification. Writable at
+            # creation and constrained to the enum by ModelSerializer; the model
+            # refuses any later change to an already-governed value.
+            "execution_scope",
             "tenant_public_id",
         ]
         read_only_fields = ["public_id"]

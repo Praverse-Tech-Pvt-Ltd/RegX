@@ -1255,12 +1255,19 @@ export type ChecklistVersionStatus =
   | "rejected"
   | "retired";
 
+/** OQ-8: what one execution of this checklist is about. Distinct from
+ *  `scope_type`, which is about who owns the content. An empty string means the
+ *  definition is not yet classified and no execution may be created against it. */
+export type ChecklistExecutionScope = "formulation_component" | "formulation_version" | "";
+
 export interface ChecklistDefinition {
   public_id: string;
   code: string;
   title: string;
   description: string;
   scope_type: "platform_master" | "tenant";
+  // Optional as well as unioned: a server predating OQ-8 omits the key.
+  execution_scope?: ChecklistExecutionScope;
   tenant_public_id: string | null;
   created_at: string;
 }
@@ -1390,7 +1397,15 @@ export const iigChecklists = {
 
     create: (
       tenantSlug: string,
-      data: { code: string; title: string; description?: string; scope_type: string }
+      data: {
+        code: string;
+        title: string;
+        description?: string;
+        scope_type: string;
+        // OQ-8: required for the definition to be executable at all. Omitting it
+        // creates an unclassified definition, which the server refuses to run.
+        execution_scope?: ChecklistExecutionScope;
+      }
     ) =>
       apiRequest<ChecklistDefinition>("/api/regx/v1/iig-checklists/definitions/", {
         method: "POST",

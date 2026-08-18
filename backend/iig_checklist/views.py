@@ -99,8 +99,11 @@ from .services import (
     SelfApprovalForbidden,
     VersionAllocationConflict,
     clone_definition,
+    NoEligibleSubjectComponent,
     SubjectComponentNotInFormulationVersion,
+    SubjectComponentNotPermittedForScope,
     SubjectComponentRequired,
+    UnclassifiedChecklistExecutionScope,
     create_execution,
     create_next_version,
     enter_reviewer_conclusion,
@@ -1027,6 +1030,42 @@ class ChecklistExecutionListCreateView(APIView):
                     "detail": "An active execution already exists for this combination.",
                 },
                 status=status.HTTP_409_CONFLICT,
+            )
+        except UnclassifiedChecklistExecutionScope:
+            # Distinct from the subject-component errors on purpose: this says we
+            # do not know what the checklist regulates, not that the formulation
+            # cannot satisfy it.
+            return Response(
+                {
+                    "error_code": "execution_scope_unclassified",
+                    "detail": (
+                        "This checklist definition has no governed execution scope, "
+                        "so an execution cannot be created against it."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except NoEligibleSubjectComponent:
+            return Response(
+                {
+                    "error_code": "subject_component_unavailable",
+                    "detail": (
+                        "This checklist is component-scoped, but the formulation "
+                        "version has no eligible components."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except SubjectComponentNotPermittedForScope:
+            return Response(
+                {
+                    "error_code": "subject_component_not_permitted",
+                    "detail": (
+                        "This checklist is scoped to the formulation version, so a "
+                        "subject component must not be supplied."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except SubjectComponentRequired:
             return Response(

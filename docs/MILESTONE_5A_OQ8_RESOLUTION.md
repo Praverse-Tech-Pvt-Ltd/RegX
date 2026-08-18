@@ -485,27 +485,79 @@ omitted rather than nulled for a legacy execution, and mirrored in the CSV
 flattening. `EXECUTION_CREATED` audit gains the subject component and snapshot
 UUIDs, recording `None` truthfully rather than omitting it. UUIDs only.
 
-## 18. One mechanical judgement, flagged for confirmation
+## 18. What determines the subject requirement — CORRECTED
 
-The requirement to supply a subject component is triggered by content that
-**reads execution-level `iid.*`** — an `iid.*` FDA-derived binding, or an
-applicability rule reading the `iid` group. A component-scoped *calculation* does
-not trigger it, because it already has its own approved selector and the
-decision's constraint on it is one of consistency, enforced whenever a subject
-exists.
+**Execution subject requirement is determined solely by the governed
+`ChecklistDefinition.execution_scope` classification, and never by question
+content.**
 
-This matters because a formulation version may legitimately have **no components
-at all**, and demanding a subject regardless would make such executions
-impossible while a component-scoped calculation simply fails closed as before.
+An earlier revision of this document triggered the requirement on content that
+read `iid.*`. The regulatory owner corrected that: an execution's regulatory
+scope must not change merely because a version added, removed or reworded a
+question. A component-scoped checklist that currently declares no `iid.*`
+binding is still a component-scoped checklist.
 
-If the owner intends *every* execution to carry a governed subject irrespective of
-content, `services.version_requires_subject_component()` is the single place to
-widen; no downstream invariant changes.
+| `ChecklistDefinition.execution_scope` | Requirement |
+| --- | --- |
+| `formulation_component` | **Subject component required**, always — independent of question content |
+| `formulation_version` | **Not inherently required.** Supplying one is refused rather than ignored |
+| *blank / unclassified* | **Execution creation prohibited** — `execution_scope_unclassified` |
+
+### The classifier
+
+`ChecklistExecutionScope` on **`ChecklistDefinition`**, never on
+`ChecklistVersion`: execution scope is an invariant of the checklist, and putting
+it on the version is exactly what would let a new content version silently
+re-scope it. It sits beside `scope_type`, which is about *ownership*
+(`platform_master` / `tenant`) and is a different question entirely.
+
+Named for the scope rather than for the product label, so the engine enforces a
+structural invariant instead of having to know what "IID/IIG" means.
+
+**No classifier previously existed.** This was verified before adding one:
+neither `ChecklistDefinition`, `ChecklistVersion`, the enums, the templates
+registry (`category` is free text with no link to this app), nor any
+specification carried a machine-readable checklist type. Nothing is inferred
+from title, code, description, question codes, bindings, calculations,
+jurisdiction, `regulatory_basis` or template free text — a test asserts that a
+definition named "IIG Proportionality Clearance - Tablets and Capsules", with an
+IID description and `iid.*` content, is still refused while unclassified.
+
+### Zero eligible components
+
+For a `formulation_component` definition whose formulation version has **no
+eligible components**: **execution creation is not permitted — fail closed**,
+with `subject_component_unavailable`. No subject-less component-scoped execution
+is created, no component is invented, and selection is not deferred.
+
+Kept distinct from `subject_component_required` (the caller named none) and from
+`execution_scope_unclassified` (we do not know what the checklist regulates).
+Three different faults, three different fixes.
+
+### Governance of the classification
+
+`execution_scope` is governed configuration. `ChecklistDefinitionDetailView`
+exposes only `GET` and `DELETE` — there is no `PATCH`/`PUT`, so in practice the
+value is set once at creation, and a test pins that. `clean()` additionally
+refuses changing an already-governed value: re-classifying would silently alter
+what every existing approved version and completed execution of that checklist
+was regulating. Blank → value **is** permitted, because existing definitions must
+be able to become governed.
+
+Cloning carries the classification forward, otherwise every clone would be born
+unclassified and unexecutable. That is not inference: it is propagating an
+explicit classification to content that regulates the same thing.
 
 ## 19. Historical data
 
-No backfill, and no guessing. Existing executions keep `subject_component = NULL`
-and retain pre-OQ-8 behaviour exactly: `iid.*` stays unresolved, no snapshot is
+**Existing definitions are NOT auto-classified.** The migration adds the column
+and backfills nothing — no title, code or content heuristic runs. Every existing
+definition is unclassified until a human governs it, and until then no execution
+can be created against it. That is deliberate: a permissive default would have
+silently under-governed a component-specific checklist.
+
+No backfill of executions either, and no guessing. Existing executions keep
+`subject_component = NULL` and retain pre-OQ-8 behaviour exactly: `iid.*` stays unresolved, no snapshot is
 created for them, and a component-scoped calculation continues to be governed by
 its own selector. An already-approved execution therefore keeps reproducing what
 it was assessed against, which the decision requires.

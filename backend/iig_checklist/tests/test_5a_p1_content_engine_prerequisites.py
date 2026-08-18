@@ -72,8 +72,16 @@ def _formulation(product, user):
 def _version(definition, user, status="active", **kwargs):
     from iig_checklist.models import ChecklistVersion
 
+    # version_number is popped rather than hard-coded so a caller can create
+    # several versions of one definition; unique_version_number_per_definition
+    # otherwise rejects the second.
+    version_number = kwargs.pop("version_number", 1)
     return ChecklistVersion.objects.create(
-        definition=definition, version_number=1, status=status, created_by=user, **kwargs
+        definition=definition,
+        version_number=version_number,
+        status=status,
+        created_by=user,
+        **kwargs,
     )
 
 
@@ -760,13 +768,13 @@ class TestApplicabilityIsActuallyEvaluated:
         assert response.raw_value is None
 
     def test_an_unresolvable_source_fails_closed_to_review(
-        self, db, tenant_a, tenant_definition, user_a, doer_membership
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
     ):
         # "We could not find out" must not become "no". The rule's own false
         # branch would have said applicable; the unresolved source forces review.
         _, response = self._world(
             tenant_a,
-            tenant_definition,
+            component_scoped_definition,
             user_a,
             {"field": "iid.has_mde", "op": "eq", "value": True},
         )
@@ -1030,6 +1038,8 @@ class TestBindingAuthoringValidation:
 
 class TestPopulationAtExecutionCreation:
     def _bound_execution(self, tenant, definition, user):
+        # definition here must be component-scoped: iid.* content is only
+        # executable under an IID/IIG classification (OQ-8).
         version = _version(definition, user, status="draft")
         section = _section(version)
         question = _question(
@@ -1046,11 +1056,11 @@ class TestPopulationAtExecutionCreation:
         return ChecklistResponse.objects.get(execution=execution, question=question)
 
     def test_an_unresolvable_binding_records_why_and_fabricates_nothing(
-        self, db, tenant_a, tenant_definition, user_a, doer_membership
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
     ):
         # The governed source-selection rule is OQ-8 and unanswered, so the
         # honest outcome is a recorded failure -- never an invented default.
-        response = self._bound_execution(tenant_a, tenant_definition, user_a)
+        response = self._bound_execution(tenant_a, component_scoped_definition, user_a)
         assert response.raw_value is None
         assert response.source_provenance["status"] == "source_unavailable"
         assert response.source_provenance["resolver_identifier"] == "iid.potency_amount"
@@ -1068,11 +1078,11 @@ class TestPopulationAtExecutionCreation:
         assert response.source_provenance is None
 
     def test_provenance_reaches_the_controlled_export(
-        self, db, tenant_a, tenant_definition, user_a, doer_membership
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
     ):
         from iig_checklist.controlled_export import build_export_artifact
 
-        response = self._bound_execution(tenant_a, tenant_definition, user_a)
+        response = self._bound_execution(tenant_a, component_scoped_definition, user_a)
         execution = response.execution
         execution.status = "approved"
         execution.save(update_fields=["status"])

@@ -28,6 +28,7 @@ from .enums import (
     ApplicabilityOutcome,
     ApplicabilityRuleStatus,
     CalculationStatus,
+    ChecklistExecutionScope,
     ChecklistScopeType,
     ChecklistVersionStatus,
     Criticality,
@@ -58,6 +59,15 @@ class ChecklistDefinition(PublicIDModel, TimeStampedModel):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     scope_type = models.CharField(max_length=20, choices=ChecklistScopeType.choices)
+    #: OQ-8 (`5A-DEC-OQ8`) -- the governed regulatory scope of one execution of
+    #: this checklist. See `ChecklistExecutionScope`. Blank means "not yet
+    #: classified" and fails closed at execution creation; existing definitions
+    #: are deliberately left unclassified rather than guessed at.
+    execution_scope = models.CharField(
+        max_length=32,
+        choices=ChecklistExecutionScope.choices,
+        blank=True,
+    )
     tenant = models.ForeignKey(
         "tenancy.Tenant",
         on_delete=models.PROTECT,
@@ -68,6 +78,41 @@ class ChecklistDefinition(PublicIDModel, TimeStampedModel):
     created_by = models.ForeignKey("identity.User", on_delete=models.PROTECT, related_name="+")
 
     objects = ChecklistDefinitionManager()
+
+    def clean(self):
+        """`execution_scope` is governed configuration, not editable metadata.
+
+        There is no PATCH/PUT on this model today -- `ChecklistDefinitionDetailView`
+        exposes only GET and DELETE -- so in practice the value is set once at
+        creation. This guard exists so that stays true for any future code path:
+        classifying an unclassified definition (blank -> value) is permitted,
+        because existing definitions must be able to become governed, but
+        *changing* an already-governed classification is refused.
+
+        Re-classifying would silently alter what every existing approved version
+        and completed execution of this checklist was regulating, which no
+        lifecycle state can make safe. Consistent with the existing rule that a
+        definition whose version has been submitted or activated cannot be
+        deleted.
+        """
+        super().clean()
+        if not self.pk:
+            return
+        original = (
+            type(self)
+            .objects.filter(pk=self.pk)
+            .values_list("execution_scope", flat=True)
+            .first()
+        )
+        if original and original != self.execution_scope:
+            raise ValidationError(
+                {
+                    "execution_scope": (
+                        "The governed execution scope cannot be changed once set. "
+                        "Create a new checklist definition instead."
+                    )
+                }
+            )
 
     class Meta:
         ordering = ["code"]

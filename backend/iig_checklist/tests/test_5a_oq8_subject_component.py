@@ -35,15 +35,29 @@ from iig_checklist.tests.test_5a_p1_content_engine_prerequisites import (  # noq
 )
 
 
-def _iid_version(definition, user, *, binding="iid.potency_amount", rule_condition=None):
-    """An active checklist version whose content reads execution-level iid.*."""
-    version = _version(definition, user, status="draft")
+def _iid_version(
+    definition,
+    user,
+    *,
+    binding="iid.potency_amount",
+    rule_condition=None,
+    calculation_only=False,
+    version_number=1,
+):
+    """An active checklist version, with content shaped by the arguments.
+
+    These tests vary the content shape precisely to prove it does *not*
+    affect whether a subject component is required.
+    """
+    version = _version(definition, user, status="draft", version_number=version_number)
     section = _section(version)
     rule = _rule(version, user, rule_condition) if rule_condition is not None else None
     kwargs = {"applicability_rule": rule} if rule is not None else {}
     if binding:
         kwargs["data_source_classification"] = DataSourceClassification.FDA_DERIVED_DEFAULT
         kwargs["prefill_source"] = binding
+    if calculation_only:
+        kwargs["calculation_binding_identifier"] = "percentage_w_w"
     question = _question(section, "Q-IID", **kwargs)
     version.status = "active"
     version.save(update_fields=["status"])
@@ -51,7 +65,7 @@ def _iid_version(definition, user, *, binding="iid.potency_amount", rule_conditi
 
 
 @pytest.fixture
-def world(db, tenant_a, tenant_definition, user_a, vp_user, doer_membership):
+def world(db, tenant_a, component_scoped_definition, user_a, vp_user, doer_membership):
     """A tenant, an approved formulation version, and two components."""
     product = _product(tenant_a, user_a, code="OQ8-PROD")
     fv = _formulation(product, user_a)
@@ -59,7 +73,7 @@ def world(db, tenant_a, tenant_definition, user_a, vp_user, doer_membership):
     second = _component(fv, "EXCIPIENT-BETA")
     return {
         "tenant": tenant_a,
-        "definition": tenant_definition,
+        "definition": component_scoped_definition,
         "user": user_a,
         "approver": vp_user,
         "fv": fv,
@@ -101,12 +115,59 @@ class TestSubjectComponentRequirement:
         with pytest.raises(SubjectComponentRequired):
             _create(world, version)
 
-    def test_content_that_reads_no_iid_field_does_not_require_one(self, world):
-        # Scoped deliberately: demanding a subject where nothing reads it would
-        # make executions impossible against a formulation with no components.
+    def test_still_required_when_the_version_reads_no_iid_field(self, world):
+        """(B) The requirement is identity-based, not content-based.
+
+        This is the §18 correction: a component-scoped checklist that currently
+        declares no `iid.*` binding is still a component-scoped checklist. Its
+        regulatory scope must not change because a version reworded its content.
+        """
         version, _ = _iid_version(world["definition"], world["user"], binding=None)
-        execution = _create(world, version)
-        assert execution.subject_component_id is None
+        with pytest.raises(SubjectComponentRequired):
+            _create(world, version)
+
+    def test_still_required_for_calculation_only_content(self, world):
+        """(C) Only a component-scoped calculation, no iid.* binding at all."""
+        version, _ = _iid_version(
+            world["definition"], world["user"], binding=None, calculation_only=True
+        )
+        with pytest.raises(SubjectComponentRequired):
+            _create(world, version)
+
+    def test_changing_question_content_never_changes_the_requirement(
+        self, world, tenant_a, user_a
+    ):
+        """(I/J) Four different content shapes, one unchanged invariant.
+
+        A separate definition per shape because only one *active* version may
+        exist per definition -- the point is the classification, not the row.
+        """
+        from iig_checklist.models import ChecklistDefinition
+
+        shapes = (
+            ("iid.potency_amount", None, False),
+            (None, None, False),
+            (None, {"field": "product.route", "op": "eq", "value": "oral"}, False),
+            (None, None, True),
+        )
+        for number, (binding, rule, calc) in enumerate(shapes, start=1):
+            definition = ChecklistDefinition.objects.create(
+                code=f"IIG-SHAPE-{number}",
+                title=f"Shape {number}",
+                scope_type="tenant",
+                execution_scope="formulation_component",
+                tenant=tenant_a,
+                created_by=user_a,
+            )
+            version, _ = _iid_version(
+                definition,
+                user_a,
+                binding=binding,
+                rule_condition=rule,
+                calculation_only=calc,
+            )
+            with pytest.raises(SubjectComponentRequired):
+                _create(world, version)
 
     def test_a_single_component_formulation_works_the_same_way(self, world):
         from formulations.models import FormulationComponent
@@ -168,7 +229,7 @@ class TestSubjectComponentEligibility:
             _create(world, version, component=_Fake())
 
     def test_two_tenant_adversarial_isolation(
-        self, db, tenant_a, tenant_b, tenant_definition, user_a, reviewer_user, doer_membership
+        self, db, tenant_a, tenant_b, component_scoped_definition, user_a, reviewer_user, doer_membership
     ):
         """Tenant B's component must never attach to tenant A's execution, and
         the failure must not disclose whether it exists."""
@@ -177,7 +238,7 @@ class TestSubjectComponentEligibility:
 
         a_fv = _formulation(_product(tenant_a, user_a, code="OQ8-TENANT-A"), user_a)
         _component(a_fv, "TENANT-A-EXCIPIENT")
-        version, _ = _iid_version(tenant_definition, user_a)
+        version, _ = _iid_version(component_scoped_definition, user_a)
 
         with pytest.raises(SubjectComponentNotInFormulationVersion):
             create_execution(
@@ -249,11 +310,15 @@ class TestModelInvariants:
         with pytest.raises(ExecutionAlreadyActive):
             _create(world, version, component=world["first"])
 
-    def test_still_only_one_subject_less_execution(self, world):
-        """The pre-OQ-8 guarantee is not weakened by the nullable column."""
+    def test_still_only_one_subject_less_execution(self, world, tenant_definition):
+        """The pre-OQ-8 guarantee is not weakened by the nullable column.
+
+        Uses a formulation-version-scoped definition, because a subject-less
+        execution is only legitimate under that scope now.
+        """
         from iig_checklist.services import ExecutionAlreadyActive
 
-        version, _ = _iid_version(world["definition"], world["user"], binding=None)
+        version, _ = _iid_version(tenant_definition, world["user"], binding=None)
         _create(world, version)
         with pytest.raises(ExecutionAlreadyActive):
             _create(world, version)
@@ -492,25 +557,195 @@ class TestCalculationConsistency:
         assert F_UPSTREAM_COMPONENT_MISMATCH  # referenced for the mismatch path
 
 
-class TestLegacyExecutions:
-    def test_a_subject_less_execution_keeps_pre_oq8_behaviour(self, world):
-        """Historical reproducibility: nothing is retro-fitted or guessed."""
-        from iig_checklist.applicability_runtime import build_context
+class TestFormulationVersionScope:
+    """(H) A non-IID/IIG checklist stays subject-less."""
 
-        version, _ = _iid_version(world["definition"], world["user"], binding=None)
+    def test_a_version_scoped_execution_needs_no_subject(self, world, tenant_definition):
+        version, _ = _iid_version(tenant_definition, world["user"], binding=None)
         execution = _create(world, version)
         assert execution.subject_component_id is None
+
+    def test_it_refuses_a_supplied_subject_rather_than_ignoring_it(
+        self, world, tenant_definition
+    ):
+        from iig_checklist.services import SubjectComponentNotPermittedForScope
+
+        version, _ = _iid_version(tenant_definition, world["user"], binding=None)
+        with pytest.raises(SubjectComponentNotPermittedForScope):
+            _create(world, version, component=world["first"])
+
+    def test_component_aware_calculation_content_does_not_force_a_subject(
+        self, world, tenant_definition
+    ):
+        version, _ = _iid_version(
+            tenant_definition, world["user"], binding=None, calculation_only=True
+        )
+        execution = _create(world, version)
+        assert execution.subject_component_id is None
+
+    def test_iid_stays_unresolved_and_no_snapshot_is_created(self, world, tenant_definition):
+        """Historical reproducibility: nothing is retro-fitted or guessed."""
+        from iid_assessment.models import AssessmentSnapshot
+        from iig_checklist.applicability_runtime import build_context
+
+        version, _ = _iid_version(tenant_definition, world["user"], binding=None)
+        execution = _create(world, version)
 
         context = build_context(execution)
         assert "iid" in context.unresolved_groups
         assert not any(key.startswith("iid.") for key in context.values)
-
-    def test_no_component_is_ever_inferred_for_it(self, world):
-        from iid_assessment.models import AssessmentSnapshot
-
-        version, _ = _iid_version(world["definition"], world["user"], binding=None)
-        _create(world, version)
         assert AssessmentSnapshot.objects.count() == 0
+
+
+class TestUnclassifiedDefinition:
+    """(I) No permissive default, and no inference of any kind."""
+
+    def test_execution_creation_is_refused(self, world, unclassified_definition):
+        from iig_checklist.services import UnclassifiedChecklistExecutionScope
+
+        version, _ = _iid_version(unclassified_definition, world["user"], binding=None)
+        with pytest.raises(UnclassifiedChecklistExecutionScope):
+            _create(world, version)
+
+    def test_refused_even_when_a_subject_is_offered(self, world, unclassified_definition):
+        from iig_checklist.services import UnclassifiedChecklistExecutionScope
+
+        version, _ = _iid_version(unclassified_definition, world["user"], binding=None)
+        with pytest.raises(UnclassifiedChecklistExecutionScope):
+            _create(world, version, component=world["first"])
+
+    def test_refused_even_with_iid_content_present(self, world, unclassified_definition):
+        """(K) iid.* content must not be read as an implicit classification."""
+        from iig_checklist.services import UnclassifiedChecklistExecutionScope
+
+        version, _ = _iid_version(unclassified_definition, world["user"])
+        with pytest.raises(UnclassifiedChecklistExecutionScope):
+            _create(world, version, component=world["first"])
+
+    def test_the_title_and_code_are_never_consulted(self, world, user_a, tenant_a):
+        """(K) An IIG-looking name and description grant nothing."""
+        from iig_checklist.models import ChecklistDefinition
+        from iig_checklist.services import UnclassifiedChecklistExecutionScope
+
+        looks_like_iig = ChecklistDefinition.objects.create(
+            code="IIG-PROPORTIONALITY-CLEARANCE-TABLETS",
+            title="IIG Proportionality Clearance - Tablets and Capsules",
+            description="Inactive ingredient IID assessment for oral solids",
+            scope_type="tenant",
+            tenant=tenant_a,
+            created_by=user_a,
+        )
+        version, _ = _iid_version(looks_like_iig, user_a)
+        with pytest.raises(UnclassifiedChecklistExecutionScope):
+            _create(world, version, component=world["first"])
+
+
+class TestZeroEligibleComponents:
+    """(D) A valid invalid-precondition, distinct from a caller omission."""
+
+    def _empty_world(self, tenant, user, code):
+        product = _product(tenant, user, code=code)
+        return _formulation(product, user)
+
+    def test_a_component_scoped_execution_fails_closed(
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
+    ):
+        from iig_checklist.services import NoEligibleSubjectComponent
+
+        empty_fv = self._empty_world(tenant_a, user_a, "OQ8-NO-COMPONENTS")
+        version, _ = _iid_version(component_scoped_definition, user_a)
+
+        with pytest.raises(NoEligibleSubjectComponent):
+            create_execution(
+                tenant=tenant_a,
+                checklist_version_public_id=str(version.public_id),
+                formulation_version_public_id=str(empty_fv.public_id),
+                actor=user_a,
+            )
+
+    def test_it_is_distinguished_from_a_caller_omission(
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
+    ):
+        """Zero components is the formulation's fault; omitting one is the caller's."""
+        from iig_checklist.services import NoEligibleSubjectComponent
+
+        empty_fv = self._empty_world(tenant_a, user_a, "OQ8-NO-COMPONENTS-DISTINCT")
+        version, _ = _iid_version(component_scoped_definition, user_a)
+        with pytest.raises(NoEligibleSubjectComponent):
+            create_execution(
+                tenant=tenant_a,
+                checklist_version_public_id=str(version.public_id),
+                formulation_version_public_id=str(empty_fv.public_id),
+                actor=user_a,
+            )
+
+    def test_no_execution_and_no_snapshot_is_left_behind(
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
+    ):
+        from iid_assessment.models import AssessmentSnapshot
+        from iig_checklist.models import ChecklistExecution
+        from iig_checklist.services import NoEligibleSubjectComponent
+
+        empty_fv = self._empty_world(tenant_a, user_a, "OQ8-NO-COMPONENTS-2")
+        version, _ = _iid_version(component_scoped_definition, user_a)
+
+        with pytest.raises(NoEligibleSubjectComponent):
+            create_execution(
+                tenant=tenant_a,
+                checklist_version_public_id=str(version.public_id),
+                formulation_version_public_id=str(empty_fv.public_id),
+                actor=user_a,
+            )
+        assert not ChecklistExecution.objects.filter(formulation_version=empty_fv).exists()
+        assert AssessmentSnapshot.objects.count() == 0
+
+
+class TestExecutionScopeGovernance:
+    """(O) execution_scope is governed configuration, not editable metadata."""
+
+    def test_there_is_no_api_mutation_path(self):
+        """The detail view exposes GET and DELETE only -- no PATCH or PUT."""
+        from iig_checklist.views import ChecklistDefinitionDetailView
+
+        assert not hasattr(ChecklistDefinitionDetailView, "patch")
+        assert not hasattr(ChecklistDefinitionDetailView, "put")
+
+    def test_a_governed_classification_cannot_be_changed(self, component_scoped_definition):
+        from django.core.exceptions import ValidationError
+
+        component_scoped_definition.execution_scope = "formulation_version"
+        with pytest.raises(ValidationError) as excinfo:
+            component_scoped_definition.full_clean()
+        assert "execution_scope" in excinfo.value.message_dict
+
+    def test_an_unclassified_definition_may_be_classified(self, unclassified_definition):
+        """Blank -> value is permitted; existing definitions must become governed."""
+        unclassified_definition.execution_scope = "formulation_component"
+        unclassified_definition.full_clean()
+        unclassified_definition.save()
+        unclassified_definition.refresh_from_db()
+        assert unclassified_definition.execution_scope == "formulation_component"
+
+    def test_a_clone_carries_the_classification_forward(
+        self, db, tenant_a, component_scoped_definition, user_a
+    ):
+        """Otherwise every clone would be born unclassified and unexecutable."""
+        from iig_checklist.services import CloneRequest, clone_definition
+
+        version, _ = _iid_version(component_scoped_definition, user_a)
+        version.status = "active"
+        version.save(update_fields=["status"])
+        result = clone_definition(
+            CloneRequest(
+                source_version=version,
+                target_scope_type="tenant",
+                target_tenant=tenant_a,
+                new_code="IIG-COMPONENT-SCOPED-CLONE",
+                new_title="Clone",
+                actor=user_a,
+            )
+        )
+        assert result.definition.execution_scope == "formulation_component"
 
 
 class TestExportAndAudit:
@@ -528,10 +763,12 @@ class TestExportAndAudit:
         assert block["subject_component_public_id"] == str(world["first"].public_id)
         assert block["subject_component_ingredient_name"] == "EXCIPIENT-ALPHA"
 
-    def test_it_is_omitted_rather_than_nulled_for_a_legacy_execution(self, world):
+    def test_it_is_omitted_rather_than_nulled_for_a_subject_less_execution(
+        self, world, tenant_definition
+    ):
         from iig_checklist.controlled_export import build_export_artifact
 
-        version, _ = _iid_version(world["definition"], world["user"], binding=None)
+        version, _ = _iid_version(tenant_definition, world["user"], binding=None)
         execution = _create(world, version)
         execution.status = "approved"
         execution.save(update_fields=["status"])
@@ -563,11 +800,14 @@ class TestExportAndAudit:
         execution.status = "approved"
         execution.save(update_fields=["status"])
 
-        block = build_export_artifact(execution=execution, generated_at=execution.created_at)["payload"]["execution"]
-        rendered = json.dumps(block)
-        assert str(world["first"].pk) not in rendered.replace(
-            str(world["first"].public_id), ""
-        )
+        block = build_export_artifact(
+            execution=execution, generated_at=execution.created_at
+        )["payload"]["execution"]
+        # Compare values, not substrings: a small integer pk occurs by chance
+        # inside UUID hex, which made a substring check assert nothing useful.
+        assert world["first"].pk not in block.values()
+        assert str(world["first"].pk) not in block.values()
+        assert "id" not in block and "pk" not in block
 
 
 class TestDecimalRendering:
