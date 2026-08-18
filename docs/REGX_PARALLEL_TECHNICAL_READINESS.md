@@ -159,7 +159,7 @@ fix.
 
 | # | Work item | Why needed | Existing source | Reg. dep | Sec. dep | Risk if not done | Priority | Ready now | Change surface | Next action |
 |---|---|---|---|:-:|:-:|---|---|:-:|---|---|
-| F-1 | Make the E2E harness fail loudly instead of testing the wrong server | Measured 40 false failures; risk of false passes | `INTEGRATION_E2E_EVIDENCE.md` | No | No | Wrong conclusions from test runs; has already happened once | **P1** | **YES** | `playwright.config.ts` + possibly a port guard; ~1 file | Implement |
+| F-1 | Make the E2E harness fail loudly instead of testing the wrong server | Measured 40 false failures; risk of false passes | `INTEGRATION_E2E_EVIDENCE.md` | No | No | Wrong conclusions from test runs; has already happened once | **P1** | **DONE** | dedicated port 3100, `reuseExistingServer: false`, split configs, contract test | **Implemented** on `regx/feat/e2e-harness-correctness` |
 | F-2 | Correct the deployment secret contract | Documented contract is wrong; deploy fails at build | `DEPLOYMENT_BOUNDARIES.md`, `compose.yaml`, `settings/base.py` | No | No | A first deployment fails on interpolation | **P1** | **YES** | 1 doc | Implement |
 | F-3 | Backup / restore / DR documentation | 3 stateful volumes, no procedure | `compose.yaml` volumes | No | No | Unrecoverable data loss; audit trail is the product | **P1** | **YES** | 1 new doc (+ optional script) | Implement |
 | F-4 | Healthchecks for `celery` and `frontend` | Runtime cannot detect a dead worker | `compose.yaml` | No | No | Silent worker failure; tasks queue unprocessed | **P2** | **YES** | `compose.yaml`; ~2 blocks | Implement |
@@ -174,7 +174,9 @@ fix.
 
 ## 4. Classification
 
-**READY NOW (7):** F-1, F-2, F-3, F-4, F-5, F-6, F-7
+**DONE (1):** F-1
+
+**READY NOW (6):** F-2, F-3, F-4, F-5, F-6, F-7
 
 **BLOCKED BY REGULATORY INPUT:** all 20 register items; production question
 authoring; template instantiation; anything that would advance `0/20`.

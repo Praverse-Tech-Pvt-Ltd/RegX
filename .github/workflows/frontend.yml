@@ -48,10 +48,15 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: E2E tests
+      # Local E2E: Playwright starts and owns a dev server on port 3100, the
+      # dedicated E2E port. BASE_URL is deliberately no longer set -- the config
+      # pins its own baseURL so CI and local runs share one contract, and so no
+      # environment variable can silently aim the suite elsewhere. The
+      # integrated-origin suite is excluded by the config and runs in the
+      # Docker Integration workflow instead, against the real stack.
+      - name: E2E tests (local frontend)
         env:
           CI: true
-          BASE_URL: http://localhost:3000
           NEXT_PUBLIC_API_URL: http://localhost:8000
         run: npm run test:e2e
 
