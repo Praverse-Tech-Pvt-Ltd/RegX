@@ -75,12 +75,21 @@ jobs:
           echo "$resp" | grep -q '"database":"ok"' || { echo "database check failed"; exit 1; }
           echo "$resp" | grep -q '"cache":"ok"' || { echo "cache check failed"; exit 1; }
 
-      - name: Verify Celery connected to Redis and is running
+      - name: Wait for celery health (the worker answers an inspect ping)
         run: |
-          sleep 3
-          docker compose -p regx-ci logs celery | grep -q "ready\." || { echo "celery worker never reported ready"; docker compose -p regx-ci logs celery; exit 1; }
-          status=$(docker inspect --format='{{.State.Status}}' regx-ci-celery-1)
-          [ "$status" = "running" ] || { echo "celery is not running: $status"; exit 1; }
+          # Was: sleep 3, grep the log for "ready.", then assert .State.Status
+          # is "running". SIGSTOP the worker and all three of those still pass
+          # -- the process exists, the log line is historical, and the container
+          # is still "running" -- while nothing is consumed at all. The
+          # healthcheck asks the worker itself to reply over the broker, so wait
+          # on that instead of on a sleep.
+          for i in $(seq 1 45); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' regx-ci-celery-1 2>/dev/null || echo "starting")
+            [ "$status" = "healthy" ] && break
+            sleep 2
+          done
+          [ "$status" = "healthy" ] || { echo "celery did not become healthy: $status"; docker compose -p regx-ci logs celery; exit 1; }
+          echo "celery healthy: worker replied to inspect ping"
 
       - name: Verify no container has restarted (no crash-loops)
         run: |
@@ -89,6 +98,19 @@ jobs:
             echo "$c restarts: $count"
             [ "$count" = "0" ] || { echo "$c has restarted — crash-loop suspected"; exit 1; }
           done
+
+      - name: Wait for frontend health
+        run: |
+          # The frontend had no wait at all: the steps below passed because
+          # earlier steps happened to take long enough. That is a race, not a
+          # guarantee. Now that the service has a healthcheck, wait on it.
+          for i in $(seq 1 30); do
+            status=$(docker inspect --format='{{.State.Health.Status}}' regx-ci-frontend-1 2>/dev/null || echo "starting")
+            [ "$status" = "healthy" ] && break
+            sleep 2
+          done
+          [ "$status" = "healthy" ] || { echo "frontend did not become healthy: $status"; docker compose -p regx-ci logs frontend; exit 1; }
+          echo "frontend healthy: served /signin"
 
       - name: Verify /signin and /documents return HTTP 200
         run: |
