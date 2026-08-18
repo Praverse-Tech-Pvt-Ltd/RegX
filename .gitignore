@@ -118,3 +118,6 @@ Thumbs.db
 # whose results already live in db.sqlite3. Never read while serving a
 # request, and client-named, so better kept out of a shared repository.
 /company_site/AIDatabase/management/commands/*.xlsx
+
+# Backup sets produced by scripts/backup.sh. Never commit application data.
+/backups/
