@@ -30,3 +30,11 @@ CSP_FRAME_ANCESTORS = ("'none'",)
 CSP_OBJECT_SRC = ("'none'",)
 CSP_BASE_URI = ("'self'",)
 CSP_FORM_ACTION = ("'self'",)
+
+# ---------------------------------------------------------------------------
+# Operational logging
+# ---------------------------------------------------------------------------
+# INFO to stdout. Inherited from base; stated explicitly because it is a
+# production posture decision, not an accident of the default.
+LOGGING["root"]["level"] = "INFO"  # noqa: F405
+LOGGING["loggers"]["regx"]["level"] = "INFO"  # noqa: F405

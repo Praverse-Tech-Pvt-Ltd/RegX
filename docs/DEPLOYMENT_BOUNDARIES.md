@@ -193,6 +193,10 @@ python scripts/check_env.py
       `company_db` — procedure and scripts now exist, see
       `BACKUP_RESTORE_DR.md`. RPO, RTO, retention, off-site storage and
       backup encryption remain **PENDING BUSINESS / QA / IT APPROVAL**
+- [ ] Operational log destination and retention agreed — the application logs
+      structured JSON to stdout and configures no aggregation, see
+      `OPERATIONAL_LOGGING.md`. Aggregation is **PENDING IT / OPERATIONS
+      DECISION** and retention **PENDING QA / IT / SECURITY APPROVAL**
 - [ ] `docker compose ps` reports all seven services healthy — every service now
       carries a healthcheck, see `SERVICE_HEALTH.md`. Note that per-container
       health is not an end-to-end guarantee, and that nginx must be restarted
