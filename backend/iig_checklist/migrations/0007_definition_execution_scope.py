@@ -4,15 +4,21 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('iig_checklist', '0006_execution_subject_component'),
+        ("iig_checklist", "0006_execution_subject_component"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='checklistdefinition',
-            name='execution_scope',
-            field=models.CharField(blank=True, choices=[('formulation_component', 'Formulation component'), ('formulation_version', 'Formulation version')], max_length=32),
+            model_name="checklistdefinition",
+            name="execution_scope",
+            field=models.CharField(
+                blank=True,
+                choices=[
+                    ("formulation_component", "Formulation component"),
+                    ("formulation_version", "Formulation version"),
+                ],
+                max_length=32,
+            ),
         ),
     ]

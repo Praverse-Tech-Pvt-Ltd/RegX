@@ -464,7 +464,7 @@ jobs:
           vp_client = api_client(vp)
           H = {'HTTP_X_TENANT_SLUG': tenant.slug, 'content_type': 'application/json'}
 
-          resp = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-SMOKE', 'title': 'CI IIG Smoke (synthetic)', 'scope_type': 'tenant'}), **H)
+          resp = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-SMOKE', 'title': 'CI IIG Smoke (synthetic)', 'scope_type': 'tenant', 'execution_scope': 'formulation_version'}), **H)
           assert resp.status_code == 201, 'STEP 1 FAIL: definition create returned %s' % resp.status_code
           definition = resp.json()
           assert 'id' not in definition and 'pk' not in definition, 'STEP 1 FAIL: numeric id leaked'
@@ -539,7 +539,7 @@ jobs:
           assert resp.status_code == 400, 'STEP 15 FAIL: deletion of a definition whose version was submitted/activated should be blocked, got %s' % resp.status_code
           print('STEP 15 non-empty-draft (submitted/active) definition delete blocked: OK')
 
-          resp2 = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-EMPTY-DRAFT', 'title': 'CI IIG Empty Draft', 'scope_type': 'tenant'}), **H)
+          resp2 = doer_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-EMPTY-DRAFT', 'title': 'CI IIG Empty Draft', 'scope_type': 'tenant', 'execution_scope': 'formulation_version'}), **H)
           empty_def = resp2.json()
           resp3 = doer_client.post(BASE + '/definitions/%s/versions/' % empty_def['public_id'], **H)
           assert resp3.status_code == 201, 'STEP 16 FAIL: empty-draft version create returned %s' % resp3.status_code
@@ -576,7 +576,7 @@ jobs:
               platform_actor.save(update_fields=['is_superuser', 'is_staff'])
           make_actor('ci-iig-platform-actor@example.com', 'CI IIG Platform Actor', 'doer')
           platform_client = api_client(platform_actor)
-          resp = platform_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-PLATFORM-OK', 'title': 'x', 'scope_type': 'platform_master'}), **H)
+          resp = platform_client.post(BASE + '/definitions/', data=json.dumps({'code': 'CI-IIG-PLATFORM-OK', 'title': 'x', 'scope_type': 'platform_master', 'execution_scope': 'formulation_version'}), **H)
           assert resp.status_code == 201, 'STEP 21 FAIL: authorized platform actor create returned %s' % resp.status_code
           platform_def = resp.json()
           assert platform_def.get('tenant_public_id') is None, 'STEP 21 FAIL: platform-master definition unexpectedly has a tenant'
@@ -683,9 +683,13 @@ jobs:
           H = {'HTTP_X_TENANT_SLUG': tenant.slug, 'content_type': 'application/json'}
 
           # Create a tenant definition and active checklist version.
+          # OQ-8: a definition must carry a governed execution_scope before an
+          # execution can be created against it. This flow exercises the generic
+          # execution lifecycle, not IID/IIG, so it is formulation-version scoped.
           defn = ChecklistDefinition.objects.create(
               code='CI-4D2-SMOKE', title='CI 4D-2 Smoke (synthetic)',
-              scope_type='tenant', tenant=tenant, created_by=doer,
+              scope_type='tenant', execution_scope='formulation_version',
+              tenant=tenant, created_by=doer,
           )
           cv = ChecklistVersion.objects.create(
               definition=defn, version_number=1, status='active', created_by=doer,

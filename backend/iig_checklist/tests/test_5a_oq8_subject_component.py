@@ -24,14 +24,16 @@ from iig_checklist.services import (
 # knowledge here: ApplicabilityRule needs rule_version/outcomes/field registry
 # version, and duplicating that produced fixtures that were wrong in ways the
 # code under test never sees.
-from iig_checklist.tests.test_5a_p1_content_engine_prerequisites import (  # noqa: E402
+from iig_checklist.tests.test_5a_p1_content_engine_prerequisites import (
     _formulation,
     _product,
     _question,
     _rule,
     _section,
-    _subject_component as _component,
     _version,
+)
+from iig_checklist.tests.test_5a_p1_content_engine_prerequisites import (
+    _subject_component as _component,
 )
 
 
@@ -134,9 +136,7 @@ class TestSubjectComponentRequirement:
         with pytest.raises(SubjectComponentRequired):
             _create(world, version)
 
-    def test_changing_question_content_never_changes_the_requirement(
-        self, world, tenant_a, user_a
-    ):
+    def test_changing_question_content_never_changes_the_requirement(self, world, tenant_a, user_a):
         """(I/J) Four different content shapes, one unchanged invariant.
 
         A separate definition per shape because only one *active* version may
@@ -229,7 +229,14 @@ class TestSubjectComponentEligibility:
             _create(world, version, component=_Fake())
 
     def test_two_tenant_adversarial_isolation(
-        self, db, tenant_a, tenant_b, component_scoped_definition, user_a, reviewer_user, doer_membership
+        self,
+        db,
+        tenant_a,
+        tenant_b,
+        component_scoped_definition,
+        user_a,
+        reviewer_user,
+        doer_membership,
     ):
         """Tenant B's component must never attach to tenant A's execution, and
         the failure must not disclose whether it exists."""
@@ -472,9 +479,7 @@ class TestApplicabilityResolution:
         )
         # The precedent carries an MDE, so the rule matched and the question is
         # governed as not-applicable rather than left at review_required.
-        assert response.not_applicable_reason != (
-            "REVIEW_REQUIRED:APPLICABILITY_SOURCE_UNRESOLVED"
-        )
+        assert response.not_applicable_reason != ("REVIEW_REQUIRED:APPLICABILITY_SOURCE_UNRESOLVED")
 
     def test_without_a_governed_source_it_still_fails_closed(self, world):
         # No active release: "we could not find out" must not become "no".
@@ -482,9 +487,7 @@ class TestApplicabilityResolution:
             world, {"field": "iid.has_mde", "op": "eq", "value": True}, world["first"]
         )
         assert response.is_not_applicable is False
-        assert response.not_applicable_reason == (
-            "REVIEW_REQUIRED:APPLICABILITY_SOURCE_UNRESOLVED"
-        )
+        assert response.not_applicable_reason == ("REVIEW_REQUIRED:APPLICABILITY_SOURCE_UNRESOLVED")
 
     def test_the_outcome_stays_frozen_after_creation(self, world):
         """PST-009 preserved: no live recomputation from later source changes."""
@@ -505,9 +508,7 @@ class TestApplicabilityResolution:
         changed = evaluate_execution_applicability(execution=execution)
         assert changed == {}
         response = ChecklistResponse.objects.get(execution=execution, question=question)
-        assert response.not_applicable_reason == (
-            "REVIEW_REQUIRED:APPLICABILITY_SOURCE_UNRESOLVED"
-        )
+        assert response.not_applicable_reason == ("REVIEW_REQUIRED:APPLICABILITY_SOURCE_UNRESOLVED")
 
 
 # ---------------------------------------------------------------------------
@@ -519,7 +520,6 @@ class TestCalculationConsistency:
     def test_the_execution_subject_is_recorded_as_a_component_source(self, world):
         """The execution asserts the identity, not only the selector response."""
         from iig_checklist.calculation_inputs import (
-            COMPONENT_SOURCE_EXECUTION,
             _resolve_subject_component,
         )
         from iig_checklist.calculation_registry import get_entry
@@ -565,9 +565,7 @@ class TestFormulationVersionScope:
         execution = _create(world, version)
         assert execution.subject_component_id is None
 
-    def test_it_refuses_a_supplied_subject_rather_than_ignoring_it(
-        self, world, tenant_definition
-    ):
+    def test_it_refuses_a_supplied_subject_rather_than_ignoring_it(self, world, tenant_definition):
         from iig_checklist.services import SubjectComponentNotPermittedForScope
 
         version, _ = _iid_version(tenant_definition, world["user"], binding=None)
@@ -773,7 +771,9 @@ class TestExportAndAudit:
         execution.status = "approved"
         execution.save(update_fields=["status"])
 
-        block = build_export_artifact(execution=execution, generated_at=execution.created_at)["payload"]["execution"]
+        block = build_export_artifact(execution=execution, generated_at=execution.created_at)[
+            "payload"
+        ]["execution"]
         assert "subject_component_public_id" not in block
 
     def test_subject_component_participates_in_the_checksum(self, world):
@@ -786,13 +786,15 @@ class TestExportAndAudit:
             execution.status = "approved"
             execution.save(update_fields=["status"])
 
-        one = build_export_artifact(execution=first, generated_at=first.created_at)["checksum"]["value"]
-        two = build_export_artifact(execution=second, generated_at=second.created_at)["checksum"]["value"]
+        one = build_export_artifact(execution=first, generated_at=first.created_at)["checksum"][
+            "value"
+        ]
+        two = build_export_artifact(execution=second, generated_at=second.created_at)["checksum"][
+            "value"
+        ]
         assert one != two
 
     def test_no_internal_database_id_reaches_the_artifact(self, world):
-        import json
-
         from iig_checklist.controlled_export import build_export_artifact
 
         version, _ = _iid_version(world["definition"], world["user"])
@@ -800,9 +802,9 @@ class TestExportAndAudit:
         execution.status = "approved"
         execution.save(update_fields=["status"])
 
-        block = build_export_artifact(
-            execution=execution, generated_at=execution.created_at
-        )["payload"]["execution"]
+        block = build_export_artifact(execution=execution, generated_at=execution.created_at)[
+            "payload"
+        ]["execution"]
         # Compare values, not substrings: a small integer pk occurs by chance
         # inside UUID hex, which made a substring check assert nothing useful.
         assert world["first"].pk not in block.values()

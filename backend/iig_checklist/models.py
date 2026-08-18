@@ -99,10 +99,7 @@ class ChecklistDefinition(PublicIDModel, TimeStampedModel):
         if not self.pk:
             return
         original = (
-            type(self)
-            .objects.filter(pk=self.pk)
-            .values_list("execution_scope", flat=True)
-            .first()
+            type(self).objects.filter(pk=self.pk).values_list("execution_scope", flat=True).first()
         )
         if original and original != self.execution_scope:
             raise ValidationError(
@@ -751,8 +748,7 @@ class ChecklistExecution(PublicIDModel, TimeStampedModel):
             raise ValidationError(
                 {
                     "subject_component": (
-                        "The subject component must belong to this execution's "
-                        "formulation version."
+                        "The subject component must belong to this execution's formulation version."
                     )
                 }
             )

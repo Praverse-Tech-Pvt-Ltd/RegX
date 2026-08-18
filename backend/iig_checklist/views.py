@@ -85,6 +85,7 @@ from .services import (
     InvalidCalculationBinding,
     InvalidQuantityUnitConfig,
     MissingReturnReason,
+    NoEligibleSubjectComponent,
     ReviewerConclusionCorrectionReasonRequired,
     ReviewerConclusionEmpty,
     ReviewerConclusionInvalidExpectedVersion,
@@ -97,13 +98,12 @@ from .services import (
     ReviewerConclusionTooLong,
     ReviewerConclusionWrongAnswerType,
     SelfApprovalForbidden,
-    VersionAllocationConflict,
-    clone_definition,
-    NoEligibleSubjectComponent,
     SubjectComponentNotInFormulationVersion,
     SubjectComponentNotPermittedForScope,
     SubjectComponentRequired,
     UnclassifiedChecklistExecutionScope,
+    VersionAllocationConflict,
+    clone_definition,
     create_execution,
     create_next_version,
     enter_reviewer_conclusion,
@@ -1086,8 +1086,7 @@ class ChecklistExecutionListCreateView(APIView):
                 {
                     "error_code": "subject_component_not_eligible",
                     "detail": (
-                        "The subject component does not belong to this "
-                        "formulation version."
+                        "The subject component does not belong to this formulation version."
                     ),
                 },
                 status=status.HTTP_400_BAD_REQUEST,

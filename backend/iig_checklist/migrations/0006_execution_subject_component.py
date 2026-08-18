@@ -6,34 +6,57 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('formulations', '0001_initial'),
-        ('iig_checklist', '0005_response_source_provenance'),
-        ('tenancy', '0001_initial'),
+        ("formulations", "0001_initial"),
+        ("iig_checklist", "0005_response_source_provenance"),
+        ("tenancy", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.RemoveConstraint(
-            model_name='checklistexecution',
-            name='unique_active_execution_per_version_formulation',
+            model_name="checklistexecution",
+            name="unique_active_execution_per_version_formulation",
         ),
         migrations.AddField(
-            model_name='checklistexecution',
-            name='subject_component',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='+', to='formulations.formulationcomponent'),
+            model_name="checklistexecution",
+            name="subject_component",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="+",
+                to="formulations.formulationcomponent",
+            ),
         ),
         migrations.AddIndex(
-            model_name='checklistexecution',
-            index=models.Index(fields=['subject_component'], name='iig_checkli_subject_af4a12_idx'),
+            model_name="checklistexecution",
+            index=models.Index(fields=["subject_component"], name="iig_checkli_subject_af4a12_idx"),
         ),
         migrations.AddConstraint(
-            model_name='checklistexecution',
-            constraint=models.UniqueConstraint(condition=models.Q(('subject_component__isnull', False), models.Q(('status__in', ['rejected', 'cancelled', 'superseded']), _negated=True)), fields=('tenant', 'checklist_version', 'formulation_version', 'subject_component'), name='unique_active_execution_per_formulation_component'),
+            model_name="checklistexecution",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(
+                    ("subject_component__isnull", False),
+                    models.Q(
+                        ("status__in", ["rejected", "cancelled", "superseded"]), _negated=True
+                    ),
+                ),
+                fields=("tenant", "checklist_version", "formulation_version", "subject_component"),
+                name="unique_active_execution_per_formulation_component",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='checklistexecution',
-            constraint=models.UniqueConstraint(condition=models.Q(('subject_component__isnull', True), models.Q(('status__in', ['rejected', 'cancelled', 'superseded']), _negated=True)), fields=('tenant', 'checklist_version', 'formulation_version'), name='unique_active_execution_per_version_formulation'),
+            model_name="checklistexecution",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(
+                    ("subject_component__isnull", True),
+                    models.Q(
+                        ("status__in", ["rejected", "cancelled", "superseded"]), _negated=True
+                    ),
+                ),
+                fields=("tenant", "checklist_version", "formulation_version"),
+                name="unique_active_execution_per_version_formulation",
+            ),
         ),
     ]

@@ -12,10 +12,9 @@ at 0 of 20, and these tests would be equally valid if it never moved.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
-
-import json
 
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
