@@ -171,6 +171,48 @@ jobs:
           grep -q "looks like production" /tmp/out4             || { echo "FAIL: refused, but not by the production guard"; exit 1; }
           echo "OK: refused a production-looking target, by the production guard"
 
+      - name: release_verify is read-only and fails closed with no stack
+        run: |
+          # Guard the property the script depends on: it must never deploy,
+          # migrate, restart, restore or write. A verification tool that mutates
+          # is not a verification tool.
+          #
+          # Comment lines are stripped first. The script legitimately *discusses*
+          # `compose restart nginx` in a comment explaining why it waits for
+          # health; a guard that trips on prose is a false-positive generator,
+          # and the next person to hit one deletes the guard.
+          sed 's/#.*$//' scripts/release_verify.sh > /tmp/rv-code
+          for forbidden in "compose up" "compose down" "compose restart"                            "compose build" "compose stop" "manage.py migrate --noinput"                            "restore.sh" "backup.sh" "rm -rf" "docker rm" "docker kill"; do
+            if grep -F -q -- "$forbidden" /tmp/rv-code; then
+              echo "FAIL: release_verify.sh contains a mutating operation: $forbidden"; exit 1
+            fi
+          done
+          echo "OK: no mutating operation in release_verify.sh code"
+
+          # migrate --check and manage.py check are read-only; assert the
+          # migrate call is only ever the checking form.
+          if grep -E "manage\.py migrate" /tmp/rv-code | grep -qv -- "--check"; then
+            echo "FAIL: release_verify.sh calls migrate without --check"; exit 1
+          fi
+          echo "OK: migrate is only ever called with --check"
+
+          # With no stack present every check fails, and the script must say so
+          # rather than exiting 0.
+          set +e
+          bash scripts/release_verify.sh --project no-such-project-xyz 2>&1 | tail -5 | tee /tmp/rv-out
+          rc=${PIPESTATUS[0]}
+          set -e
+          [ "$rc" -ne 0 ] || { echo "FAIL: passed against a non-existent stack"; exit 1; }
+          grep -q "RESULT: FAIL" /tmp/rv-out || { echo "FAIL: did not report FAIL"; exit 1; }
+          echo "OK: fails closed against a non-existent stack"
+
+      - name: release_verify rejects an unknown argument
+        run: |
+          set +e
+          bash scripts/release_verify.sh --not-a-real-flag >/dev/null 2>&1
+          [ "$?" -eq 2 ] || { echo "FAIL: did not reject an unknown argument"; exit 1; }
+          echo "OK: rejected an unknown argument"
+
       - name: restore refuses without --project and without --yes-destroy-data
         run: |
           set +e

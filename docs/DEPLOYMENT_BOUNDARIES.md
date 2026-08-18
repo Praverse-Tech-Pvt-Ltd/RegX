@@ -193,6 +193,9 @@ python scripts/check_env.py
       `company_db` — procedure and scripts now exist, see
       `BACKUP_RESTORE_DR.md`. RPO, RTO, retention, off-site storage and
       backup encryption remain **PENDING BUSINESS / QA / IT APPROVAL**
+- [ ] Release deployed and verified per `RELEASE_ROLLBACK_RUNBOOK.md` — including
+      the migration risk classification, which decides whether a rollback is
+      possible at all, and a rollback target chosen **before** deploying
 - [ ] Operational log destination and retention agreed — the application logs
       structured JSON to stdout and configures no aggregation, see
       `OPERATIONAL_LOGGING.md`. Aggregation is **PENDING IT / OPERATIONS
