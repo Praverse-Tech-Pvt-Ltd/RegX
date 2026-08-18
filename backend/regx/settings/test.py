@@ -30,7 +30,13 @@ CACHES = {
 # Allow unsafe-eval only in test (for snapshot testing if needed)
 CSP_SCRIPT_SRC = ("'self'", "'unsafe-eval'")
 
-LOGGING = {}  # Silence logging during tests
+# Keep the real formatter, filter and middleware wiring in place -- the logging
+# tests must exercise what production runs, not a stub -- but send records
+# nowhere by default so the suite output stays readable. Tests that assert on
+# log content attach their own handler via assertLogs/caplog, which works
+# regardless of the level set here.
+LOGGING["handlers"]["console"]["class"] = "logging.NullHandler"  # noqa: F405
+LOGGING["root"]["level"] = "WARNING"  # noqa: F405
 
 # Override to predictable test value
 MFA_ENCRYPTION_KEY = "test_key_not_for_production_use_only_32b"

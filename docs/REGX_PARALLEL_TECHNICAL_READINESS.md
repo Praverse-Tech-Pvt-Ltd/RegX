@@ -163,7 +163,7 @@ fix.
 | F-2 | Correct the deployment secret contract | Documented contract is wrong; deploy fails at build | `DEPLOYMENT_BOUNDARIES.md`, `compose.yaml`, `settings/base.py` | No | No | A first deployment fails on interpolation | **P1** | **YES** | 1 doc | Implement |
 | F-3 | Backup / restore / DR documentation | 3 stateful volumes, no procedure | `compose.yaml` volumes | No | No | Unrecoverable data loss; audit trail is the product | **P1** | **YES** | 1 new doc (+ optional script) | Implement |
 | F-4 | Healthchecks for `celery` and `frontend` | Runtime cannot detect a dead worker | `compose.yaml` | No | No | Silent worker failure; tasks queue unprocessed | **P2** | **DONE** | `compose.yaml` (2 blocks), CI wait logic, `SERVICE_HEALTH.md` | **Implemented** on `regx/feat/service-healthchecks` |
-| F-5 | `LOGGING` configuration + what must never be logged | No structured logging; regulated values in payloads | `settings/*.py` | No | No | Undiagnosable production incidents; possible over-logging of regulated data | **P2** | **YES** | 1–2 settings files + doc | Implement |
+| F-5 | `LOGGING` configuration + what must never be logged | No structured logging; regulated values in payloads | `settings/*.py` | No | No | Undiagnosable production incidents; possible over-logging of regulated data | **P2** | **DONE** | JSON formatter, request-id middleware, `LOGGING`, 43 tests, `OPERATIONAL_LOGGING.md` | **Implemented** on `regx/feat/structured-operational-logging` |
 | F-6 | Rollback procedure + release verification checklist | No documented release or revert path | `DEPLOYMENT_BOUNDARIES.md` | No | No | Unrehearsed recovery during an incident | **P2** | **YES** | 1 doc | Implement |
 | F-7 | `fda-iid` parallel flakiness | Intermittent false failures | `INTEGRATION_E2E_EVIDENCE.md` | No | No | Noise erodes trust in the suite | **P3** | **YES** | 1 spec file | Ticket |
 | S-1 | GitHub purge of PR #22 superseded objects | Old unsanitized DB blob still fetchable by SHA | prior security pass | No | **Yes** | Password hashes remain retrievable | **P1** | **NO** | none — external request | Owner raises with GitHub Support |
@@ -174,9 +174,9 @@ fix.
 
 ## 4. Classification
 
-**DONE (4):** F-1, F-2, F-3, F-4
+**DONE (5):** F-1, F-2, F-3, F-4, F-5
 
-**READY NOW (3):** F-5, F-6, F-7
+**READY NOW (2):** F-6, F-7
 
 **BLOCKED BY REGULATORY INPUT:** all 20 register items; production question
 authoring; template instantiation; anything that would advance `0/20`.

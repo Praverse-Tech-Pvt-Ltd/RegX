@@ -49,6 +49,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # First: wraps every other middleware, so the measured duration covers the
+    # whole stack and the X-Request-ID header is set even on error responses.
+    "common.middleware.RequestIDMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -213,6 +216,11 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = "UTC"
+# By default a Celery worker takes over the root logger and installs its own
+# text handler, which would leave worker output in a different format from the
+# rest of the system and outside the allow-list formatter. Handing logging back
+# to LOGGING below is what makes the worker emit the same structured records.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
 # ---------------------------------------------------------------------------
 # MFA encryption key (Fernet symmetric key, base64-encoded)
@@ -250,3 +258,52 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 APP_VERSION = config("APP_VERSION", default="0.1.0")
 APP_ENVIRONMENT = config("APP_ENVIRONMENT", default="development")
+
+# ---------------------------------------------------------------------------
+# Operational logging
+# ---------------------------------------------------------------------------
+# Structured JSON to stdout, one event per line. Containers log to stdout;
+# nothing here writes files, and no aggregation target is assumed.
+#
+# THIS IS NOT THE AUDIT TRAIL. audit.models.AuditEvent is the authoritative
+# regulated record and is entirely independent of these handlers -- see
+# docs/OPERATIONAL_LOGGING.md.
+#
+# disable_existing_loggers is False so module-level loggers already created at
+# import time (documents.scanner, documents.tasks) keep working.
+LOG_LEVEL = config("LOG_LEVEL", default="INFO")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {"()": "common.structured_logging.RequestIDRecoveryFilter"},
+        "redaction": {"()": "common.structured_logging.RedactionFilter"},
+    },
+    "formatters": {
+        "json": {"()": "common.structured_logging.JSONFormatter"},
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["request_id", "redaction"],
+        },
+    },
+    # Root catches everything not named below, including Celery's own loggers,
+    # so worker output is formatted by the same allow-list formatter.
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+    "loggers": {
+        "regx": {"level": LOG_LEVEL, "propagate": True},
+        "django": {"level": "INFO", "propagate": True},
+        # Django logs 4xx/5xx here and attaches the HttpRequest to the record.
+        # The formatter's allow-list is what keeps that request object -- and
+        # its headers, cookies and body -- out of the output.
+        "django.request": {"level": "WARNING", "propagate": True},
+        "django.security": {"level": "WARNING", "propagate": True},
+        # Never DEBUG: this logger emits every SQL statement executed, which
+        # means parameter values, in production and in development alike.
+        "django.db.backends": {"level": "WARNING", "propagate": True},
+        "celery": {"level": "INFO", "propagate": True},
+    },
+}
