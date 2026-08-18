@@ -4,21 +4,25 @@
 // Unlike every other spec here, this one needs the REAL stack — the company
 // Django container, the REGX backend and nginx — because the whole point is
 // that unmocked company pages render from the company's own code and data.
-// It therefore only runs when BASE_URL points at the integrated origin:
 //
 //   docker compose up -d
-//   BASE_URL=http://localhost:8080 npx playwright test company-site-integration
+//   npm run test:e2e:integrated
 //
-// Against the default :3000 dev server the company routes do not exist, so
-// the suite skips rather than reporting misleading failures.
+// It runs under playwright.integrated.config.ts, which targets the nginx origin
+// and starts no server of its own. The local config (playwright.config.ts)
+// excludes this file, so the two families can never exercise each other's
+// environment.
 import { test, expect } from "@playwright/test";
 
-const BASE = process.env["BASE_URL"] ?? "";
+// Defaults to the integrated origin, matching playwright.integrated.config.ts.
+// The local config excludes this file entirely, so this guard is a second
+// line of defence rather than the mechanism that separates the two suites.
+const BASE = process.env["INTEGRATED_BASE_URL"] ?? "http://localhost:8080";
 const INTEGRATED = /:8080(\/|$)/.test(BASE);
 
 test.skip(
   !INTEGRATED,
-  "Requires the integrated stack; run with BASE_URL=http://localhost:8080",
+  "Requires the integrated stack; run `npm run test:e2e:integrated`",
 );
 
 // The company homepage builds pandas dataframes over the FDA-483 dataset.

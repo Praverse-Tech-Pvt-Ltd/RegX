@@ -23,8 +23,12 @@ on the origin the mocks expect) gives a completely different picture:
 this integration, described below. The "6" was an artifact of the harness, not
 a property of the code.
 
-Method used from here on: stop `regx-frontend` before running any suite that
-relies on `:8000` mocks.
+**This is now fixed in configuration rather than procedure (F-1).** The local
+suite runs on a dedicated port that the compose stack does not use, and never
+reuses a server it did not start, so a running container cannot affect it. The
+"remember to stop the container first" instruction below is obsolete and is kept
+only to explain the earlier evidence. See §"Test modes" at the end of this
+document.
 
 ## The one genuine regression — found and fixed
 
@@ -92,9 +96,58 @@ Honest summary:
 ## Reproducing
 
 ```bash
-docker compose stop frontend          # free :3000 so Playwright runs its own dev server
 cd frontend
-npx playwright test                   # historical + shell
-docker compose up -d frontend
-BASE_URL=http://localhost:8080 npx playwright test company-site-integration
+npm run test:e2e              # local frontend  -> Playwright's own server on :3100
+npm run test:e2e:integrated   # integrated origin -> the compose stack on :8080
 ```
+
+Neither command depends on the other, and neither depends on whether the compose
+stack is running. Stopping containers is no longer part of the procedure.
+
+## Test modes
+
+Two families, two configs, two commands. They cannot exercise each other's
+environment.
+
+| | **Local frontend E2E** | **Integrated-origin E2E** |
+|---|---|---|
+| Command | `npm run test:e2e` | `npm run test:e2e:integrated` |
+| Config | `playwright.config.ts` | `playwright.integrated.config.ts` |
+| Server | Next.js dev server **Playwright starts and owns** | the **compose stack**; Playwright starts nothing |
+| Origin | `http://localhost:3100` — pinned, ignores env | `http://localhost:8080` (override: `INTEGRATED_BASE_URL`) |
+| API target | `http://localhost:8000`, **mocked** via `page.route` | real backend through nginx, **not mocked** |
+| Specs | everything except `company-site-integration.spec.ts` | only `company-site-integration.spec.ts` |
+| Needs the stack? | **No** | **Yes** — `docker compose up -d` first |
+
+**A running Docker frontend must not affect local E2E results, and no longer
+can.** Three things enforce that, none of them a convention someone has to
+remember:
+
+1. The local suite runs on **port 3100**, which nothing in `compose.yaml`
+   publishes. The container is on 3000.
+2. `reuseExistingServer: false`, always — in CI and locally alike. Playwright
+   owns 3100 or fails immediately with a port error. That loud failure is the
+   guard.
+3. The local config **pins `baseURL`** instead of reading an environment
+   variable, so nothing can silently aim the suite at another environment.
+
+`tests/unit/playwright-config-contract.test.ts` asserts all three, plus that the
+two configs target different origins. It is a configuration test, so it cannot
+flake.
+
+**Why the override is named `INTEGRATED_BASE_URL` and not `BASE_URL`:** Vite
+sets `process.env.BASE_URL` to `"/"` in its own process, so a config reading
+`BASE_URL` can resolve to `"/"` instead of the intended origin. The
+config-contract test caught exactly that during this work.
+
+### Measured before and after
+
+Same command, same commit, with the compose stack running:
+
+| | Local suite result |
+|---|---|
+| Before F-1 | **40 failed / 72 passed** — silently attached to the container |
+| After F-1 | **112 passed / 0 failed** — ran against its own server on `:3100` |
+
+With the container stopped, after F-1: **112 passed / 0 failed**. The suite now
+gives the same answer either way, which is the point.
