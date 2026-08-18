@@ -48,6 +48,10 @@ class ChecklistDefinitionSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "scope_type",
+            # OQ-8: the governed execution-scope classification. Writable at
+            # creation and constrained to the enum by ModelSerializer; the model
+            # refuses any later change to an already-governed value.
+            "execution_scope",
             "tenant_public_id",
         ]
         read_only_fields = ["public_id"]
@@ -229,6 +233,12 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
         source="formulation_version.public_id",
         read_only=True,
     )
+    # OQ-8 (`5A-DEC-OQ8`): the authoritative subject component. `None` only for
+    # executions created before the field existed. The ingredient name travels
+    # with it so a reviewer can see *which excipient* was governed without a
+    # second request; the UUID remains the identity.
+    subject_component_public_id = serializers.SerializerMethodField()
+    subject_component_ingredient_name = serializers.SerializerMethodField()
     created_by_email = serializers.EmailField(
         source="created_by.email",
         read_only=True,
@@ -247,6 +257,8 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
             "status",
             "checklist_version",
             "formulation_version_public_id",
+            "subject_component_public_id",
+            "subject_component_ingredient_name",
             "created_by_email",
             "submitted_by_email",
             "submitted_at",
@@ -264,6 +276,14 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = fields
+
+    def get_subject_component_public_id(self, obj):
+        component = obj.subject_component
+        return str(component.public_id) if component is not None else None
+
+    def get_subject_component_ingredient_name(self, obj):
+        component = obj.subject_component
+        return component.ingredient_name if component is not None else None
 
     def get_submitted_by_email(self, obj):
         return getattr(obj.submitted_by, "email", None)
@@ -284,6 +304,11 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
 class ChecklistExecutionCreateSerializer(serializers.Serializer):
     checklist_version_public_id = serializers.UUIDField()
     formulation_version_public_id = serializers.UUIDField()
+    # OQ-8: optional at the wire level, required by the service whenever the
+    # checklist content is component-specific. Accepting a well-formed UUID here
+    # asserts nothing: the service still proves it belongs to this execution's
+    # formulation version before it is attached.
+    subject_component_public_id = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, attrs):
         # Reject any unknown fields via strict mass-assignment guard.

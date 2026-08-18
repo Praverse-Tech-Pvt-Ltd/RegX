@@ -130,6 +130,8 @@ class TestResponseList:
             code="IIG-B-RESP",
             title="B",
             scope_type="tenant",
+            # OQ-8: a definition must be classified to be executable.
+            execution_scope="formulation_version",
             tenant=tenant_b,
             created_by=other_user,
         )

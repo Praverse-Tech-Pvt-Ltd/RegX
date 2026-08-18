@@ -28,6 +28,7 @@ from .enums import (
     ApplicabilityOutcome,
     ApplicabilityRuleStatus,
     CalculationStatus,
+    ChecklistExecutionScope,
     ChecklistScopeType,
     ChecklistVersionStatus,
     Criticality,
@@ -58,6 +59,15 @@ class ChecklistDefinition(PublicIDModel, TimeStampedModel):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     scope_type = models.CharField(max_length=20, choices=ChecklistScopeType.choices)
+    #: OQ-8 (`5A-DEC-OQ8`) -- the governed regulatory scope of one execution of
+    #: this checklist. See `ChecklistExecutionScope`. Blank means "not yet
+    #: classified" and fails closed at execution creation; existing definitions
+    #: are deliberately left unclassified rather than guessed at.
+    execution_scope = models.CharField(
+        max_length=32,
+        choices=ChecklistExecutionScope.choices,
+        blank=True,
+    )
     tenant = models.ForeignKey(
         "tenancy.Tenant",
         on_delete=models.PROTECT,
@@ -68,6 +78,38 @@ class ChecklistDefinition(PublicIDModel, TimeStampedModel):
     created_by = models.ForeignKey("identity.User", on_delete=models.PROTECT, related_name="+")
 
     objects = ChecklistDefinitionManager()
+
+    def clean(self):
+        """`execution_scope` is governed configuration, not editable metadata.
+
+        There is no PATCH/PUT on this model today -- `ChecklistDefinitionDetailView`
+        exposes only GET and DELETE -- so in practice the value is set once at
+        creation. This guard exists so that stays true for any future code path:
+        classifying an unclassified definition (blank -> value) is permitted,
+        because existing definitions must be able to become governed, but
+        *changing* an already-governed classification is refused.
+
+        Re-classifying would silently alter what every existing approved version
+        and completed execution of this checklist was regulating, which no
+        lifecycle state can make safe. Consistent with the existing rule that a
+        definition whose version has been submitted or activated cannot be
+        deleted.
+        """
+        super().clean()
+        if not self.pk:
+            return
+        original = (
+            type(self).objects.filter(pk=self.pk).values_list("execution_scope", flat=True).first()
+        )
+        if original and original != self.execution_scope:
+            raise ValidationError(
+                {
+                    "execution_scope": (
+                        "The governed execution scope cannot be changed once set. "
+                        "Create a new checklist definition instead."
+                    )
+                }
+            )
 
     class Meta:
         ordering = ["code"]
@@ -562,6 +604,29 @@ class ChecklistExecution(PublicIDModel, TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="checklist_executions",
     )
+    #: OQ-8 (`5A-DEC-OQ8`) -- the one governed subject component this execution
+    #: is about. The regulatory decision is that an IID/IIG execution is
+    #: component-scoped: FDA IID evaluation is excipient-specific (inactive
+    #: ingredient + route + dosage form, with potency/MDE on the individual
+    #: excipient record), so there is no whole-formulation aggregate to compute.
+    #:
+    #: A live FK, not a frozen UUID: unlike `AssessmentSnapshot`, an execution is
+    #: operational state, and PROTECT is what stops a component being deleted out
+    #: from under a governed execution. `formulation_version` is already an FK
+    #: with PROTECT, so this matches.
+    #:
+    #: Nullable only for executions created before this field existed. New
+    #: executions whose checklist content is component-specific must supply it
+    #: (see `services.create_execution`); a legacy NULL keeps the pre-OQ-8
+    #: behaviour so an already-approved execution stays reproducible, and never
+    #: silently acquires a component.
+    subject_component = models.ForeignKey(
+        "formulations.FormulationComponent",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     status = models.CharField(
         max_length=30,
         choices=ExecutionStatus.choices,
@@ -634,16 +699,79 @@ class ChecklistExecution(PublicIDModel, TimeStampedModel):
 
     class Meta:
         constraints = [
+            # OQ-8: uniqueness is now per subject component, because the
+            # regulatory decision explicitly allows "multiple component-specific
+            # IID/IIG executions where required" for one formulation. Split in
+            # two so the pre-OQ-8 guarantee is not silently weakened: SQL treats
+            # NULLs as distinct, so a single constraint including the nullable
+            # column would let unlimited subject-less executions coexist.
+            models.UniqueConstraint(
+                fields=[
+                    "tenant",
+                    "checklist_version",
+                    "formulation_version",
+                    "subject_component",
+                ],
+                condition=Q(subject_component__isnull=False)
+                & ~Q(status__in=["rejected", "cancelled", "superseded"]),
+                name="unique_active_execution_per_formulation_component",
+            ),
             models.UniqueConstraint(
                 fields=["tenant", "checklist_version", "formulation_version"],
-                condition=~Q(status__in=["rejected", "cancelled", "superseded"]),
+                condition=Q(subject_component__isnull=True)
+                & ~Q(status__in=["rejected", "cancelled", "superseded"]),
                 name="unique_active_execution_per_version_formulation",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["tenant", "status"]),
             models.Index(fields=["checklist_version"]),
+            models.Index(fields=["subject_component"]),
         ]
+
+    def clean(self):
+        """OQ-8 invariants on the governed subject component.
+
+        Enforced on the model rather than only in the service so no code path --
+        including a future one -- can attach a foreign component or swap it after
+        the fact. `full_clean()` runs before every governed save (M4D3-PST-005).
+        """
+        super().clean()
+        if self.subject_component_id is None:
+            return
+
+        # The component must belong to this execution's own formulation version.
+        # That version is already tenant-guarded by the creation service, so this
+        # single check also closes the cross-tenant case: a component from
+        # another tenant necessarily belongs to another formulation version.
+        if self.subject_component.formulation_version_id != self.formulation_version_id:
+            raise ValidationError(
+                {
+                    "subject_component": (
+                        "The subject component must belong to this execution's formulation version."
+                    )
+                }
+            )
+
+        if self.pk:
+            original = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("subject_component_id", flat=True)
+                .first()
+            )
+            # Immutable once governed. A correction requires a new execution, so
+            # an approved execution can never be re-pointed at a different
+            # excipient after the fact.
+            if original is not None and original != self.subject_component_id:
+                raise ValidationError(
+                    {
+                        "subject_component": (
+                            "The governed subject component cannot be changed after "
+                            "the execution has been created."
+                        )
+                    }
+                )
 
 
 class ChecklistResponse(PublicIDModel, TimeStampedModel):

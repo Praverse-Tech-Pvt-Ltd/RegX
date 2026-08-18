@@ -172,6 +172,40 @@ def tenant_definition(db, tenant_a, user_a):
         code="IIG-ORAL-SOLID",
         title="IIG Oral Solid (synthetic)",
         scope_type="tenant",
+        # OQ-8: every definition must carry a governed execution scope before an
+        # execution can be created against it. This shared fixture is
+        # formulation-version scoped because most suites here exercise the generic
+        # checklist engine; the component-scoped fixture below is for IID/IIG.
+        execution_scope="formulation_version",
+        tenant=tenant_a,
+        created_by=user_a,
+    )
+
+
+@pytest.fixture
+def component_scoped_definition(db, tenant_a, user_a):
+    """An IID/IIG definition: one execution is about one inactive ingredient."""
+    from iig_checklist.models import ChecklistDefinition
+
+    return ChecklistDefinition.objects.create(
+        code="IIG-COMPONENT-SCOPED",
+        title="IIG component-scoped (synthetic)",
+        scope_type="tenant",
+        execution_scope="formulation_component",
+        tenant=tenant_a,
+        created_by=user_a,
+    )
+
+
+@pytest.fixture
+def unclassified_definition(db, tenant_a, user_a):
+    """A definition with no governed execution scope -- must fail closed."""
+    from iig_checklist.models import ChecklistDefinition
+
+    return ChecklistDefinition.objects.create(
+        code="IIG-UNCLASSIFIED",
+        title="IIG unclassified (synthetic)",
+        scope_type="tenant",
         tenant=tenant_a,
         created_by=user_a,
     )
@@ -196,6 +230,7 @@ def platform_definition(db, platform_actor_user):
         code="PLATFORM-ORAL-SOLID",
         title="Platform Oral Solid (synthetic)",
         scope_type="platform_master",
+        execution_scope="formulation_version",
         tenant=None,
         created_by=platform_actor_user,
     )

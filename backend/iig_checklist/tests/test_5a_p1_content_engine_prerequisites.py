@@ -12,6 +12,7 @@ at 0 of 20, and these tests would be equally valid if it never moved.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -70,8 +71,16 @@ def _formulation(product, user):
 def _version(definition, user, status="active", **kwargs):
     from iig_checklist.models import ChecklistVersion
 
+    # version_number is popped rather than hard-coded so a caller can create
+    # several versions of one definition; unique_version_number_per_definition
+    # otherwise rejects the second.
+    version_number = kwargs.pop("version_number", 1)
     return ChecklistVersion.objects.create(
-        definition=definition, version_number=1, status=status, created_by=user, **kwargs
+        definition=definition,
+        version_number=version_number,
+        status=status,
+        created_by=user,
+        **kwargs,
     )
 
 
@@ -119,15 +128,34 @@ def _question(section, code, **kwargs):
     return ChecklistQuestion.objects.create(section=section, code=code, **defaults)
 
 
-def _execute(tenant, version, user):
+def _subject_component(formulation_version, name="SYNTHETIC-EXCIPIENT"):
+    """One inactive component to act as the execution's governed OQ-8 subject."""
+    from formulations.models import FormulationComponent
+
+    component = FormulationComponent(
+        formulation_version=formulation_version,
+        component_type="inactive",
+        ingredient_name=name,
+        quantity_per_dosage_unit="10.000000",
+        quantity_unit="milligram",
+        display_order=1,
+    )
+    component.full_clean()
+    component.save()
+    return component
+
+
+def _execute(tenant, version, user, *, with_subject_component=False):
     from iig_checklist.services import create_execution
 
     product = _product(tenant, user, code=f"PROD-{version.public_id.hex[:8]}")
     fv = _formulation(product, user)
+    subject = _subject_component(fv) if with_subject_component else None
     return create_execution(
         tenant=tenant,
         checklist_version_public_id=str(version.public_id),
         formulation_version_public_id=str(fv.public_id),
+        subject_component_public_id=(str(subject.public_id) if subject else None),
         actor=user,
     )
 
@@ -683,7 +711,13 @@ class TestApplicabilityIsActuallyEvaluated:
         question = _question(section, "Q-RULED", applicability_rule=rule)
         version.status = "active"
         version.save(update_fields=["status"])
-        execution = _execute(tenant, version, user)
+        # A rule reading `iid.*` needs a governed subject component to be
+        # executable at all now (OQ-8); supplying one for every case keeps the
+        # helper uniform. No active FDA IID release exists in these tests, so an
+        # `iid.*` rule still has no governed source and still fails closed --
+        # which is exactly what the unresolved-source case asserts.
+        needs_subject = "iid." in json.dumps(condition)
+        execution = _execute(tenant, version, user, with_subject_component=needs_subject)
         from iig_checklist.models import ChecklistResponse
 
         return execution, ChecklistResponse.objects.get(execution=execution, question=question)
@@ -733,13 +767,13 @@ class TestApplicabilityIsActuallyEvaluated:
         assert response.raw_value is None
 
     def test_an_unresolvable_source_fails_closed_to_review(
-        self, db, tenant_a, tenant_definition, user_a, doer_membership
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
     ):
         # "We could not find out" must not become "no". The rule's own false
         # branch would have said applicable; the unresolved source forces review.
         _, response = self._world(
             tenant_a,
-            tenant_definition,
+            component_scoped_definition,
             user_a,
             {"field": "iid.has_mde", "op": "eq", "value": True},
         )
@@ -1003,6 +1037,8 @@ class TestBindingAuthoringValidation:
 
 class TestPopulationAtExecutionCreation:
     def _bound_execution(self, tenant, definition, user):
+        # definition here must be component-scoped: iid.* content is only
+        # executable under an IID/IIG classification (OQ-8).
         version = _version(definition, user, status="draft")
         section = _section(version)
         question = _question(
@@ -1013,17 +1049,17 @@ class TestPopulationAtExecutionCreation:
         )
         version.status = "active"
         version.save(update_fields=["status"])
-        execution = _execute(tenant, version, user)
+        execution = _execute(tenant, version, user, with_subject_component=True)
         from iig_checklist.models import ChecklistResponse
 
         return ChecklistResponse.objects.get(execution=execution, question=question)
 
     def test_an_unresolvable_binding_records_why_and_fabricates_nothing(
-        self, db, tenant_a, tenant_definition, user_a, doer_membership
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
     ):
         # The governed source-selection rule is OQ-8 and unanswered, so the
         # honest outcome is a recorded failure -- never an invented default.
-        response = self._bound_execution(tenant_a, tenant_definition, user_a)
+        response = self._bound_execution(tenant_a, component_scoped_definition, user_a)
         assert response.raw_value is None
         assert response.source_provenance["status"] == "source_unavailable"
         assert response.source_provenance["resolver_identifier"] == "iid.potency_amount"
@@ -1041,11 +1077,11 @@ class TestPopulationAtExecutionCreation:
         assert response.source_provenance is None
 
     def test_provenance_reaches_the_controlled_export(
-        self, db, tenant_a, tenant_definition, user_a, doer_membership
+        self, db, tenant_a, component_scoped_definition, user_a, doer_membership
     ):
         from iig_checklist.controlled_export import build_export_artifact
 
-        response = self._bound_execution(tenant_a, tenant_definition, user_a)
+        response = self._bound_execution(tenant_a, component_scoped_definition, user_a)
         execution = response.execution
         execution.status = "approved"
         execution.save(update_fields=["status"])

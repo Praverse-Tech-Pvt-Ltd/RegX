@@ -547,6 +547,15 @@ def build_export_artifact(*, execution, generated_at):
         "status": execution.status,
         "formulation_version_public_id": str(execution.formulation_version.public_id),
     }
+    # OQ-8 (`5A-DEC-OQ8`): the governed subject component, so a reviewer can
+    # reconstruct which excipient the iid.* values in this artifact describe.
+    # Conditional in the same style as reviewer_conclusion_note -- omitted rather
+    # than emitted as a null placeholder for a pre-OQ-8 execution that has none.
+    # Inside `execution_block`, so it is covered by the payload checksum.
+    if execution.subject_component_id is not None:
+        component = execution.subject_component
+        execution_block["subject_component_public_id"] = str(component.public_id)
+        execution_block["subject_component_ingredient_name"] = component.ingredient_name
     # Conditional per 4D4-DEC-005 -- omitted rather than emitted as a null
     # placeholder when no governed reviewer conclusion exists.
     if execution.reviewer_conclusion_note:
@@ -733,6 +742,14 @@ def render_csv(artifact) -> str:
         # Conditional in the payload, so read conditionally here. The CSV stays a
         # flattening of the governed artifact rather than a second model: an
         # absent governed record renders as an empty cell, not an invented value.
+        (
+            "subject_component_public_id",
+            payload["execution"].get("subject_component_public_id"),
+        ),
+        (
+            "subject_component_ingredient_name",
+            payload["execution"].get("subject_component_ingredient_name"),
+        ),
         ("reviewer_conclusion_note", payload["execution"].get("reviewer_conclusion_note")),
         ("definition_public_id", payload["checklist_definition"]["definition_public_id"]),
         ("definition_code", payload["checklist_definition"]["definition_code"]),

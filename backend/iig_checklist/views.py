@@ -85,6 +85,7 @@ from .services import (
     InvalidCalculationBinding,
     InvalidQuantityUnitConfig,
     MissingReturnReason,
+    NoEligibleSubjectComponent,
     ReviewerConclusionCorrectionReasonRequired,
     ReviewerConclusionEmpty,
     ReviewerConclusionInvalidExpectedVersion,
@@ -97,6 +98,10 @@ from .services import (
     ReviewerConclusionTooLong,
     ReviewerConclusionWrongAnswerType,
     SelfApprovalForbidden,
+    SubjectComponentNotInFormulationVersion,
+    SubjectComponentNotPermittedForScope,
+    SubjectComponentRequired,
+    UnclassifiedChecklistExecutionScope,
     VersionAllocationConflict,
     clone_definition,
     create_execution,
@@ -1011,6 +1016,11 @@ class ChecklistExecutionListCreateView(APIView):
                 formulation_version_public_id=serializer.validated_data[
                     "formulation_version_public_id"
                 ],
+                # OQ-8: absent means "not supplied", which the service refuses
+                # when the checklist content is component-specific.
+                subject_component_public_id=serializer.validated_data.get(
+                    "subject_component_public_id"
+                ),
                 actor=request.user,
             )
         except ExecutionAlreadyActive:
@@ -1020,6 +1030,66 @@ class ChecklistExecutionListCreateView(APIView):
                     "detail": "An active execution already exists for this combination.",
                 },
                 status=status.HTTP_409_CONFLICT,
+            )
+        except UnclassifiedChecklistExecutionScope:
+            # Distinct from the subject-component errors on purpose: this says we
+            # do not know what the checklist regulates, not that the formulation
+            # cannot satisfy it.
+            return Response(
+                {
+                    "error_code": "execution_scope_unclassified",
+                    "detail": (
+                        "This checklist definition has no governed execution scope, "
+                        "so an execution cannot be created against it."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except NoEligibleSubjectComponent:
+            return Response(
+                {
+                    "error_code": "subject_component_unavailable",
+                    "detail": (
+                        "This checklist is component-scoped, but the formulation "
+                        "version has no eligible components."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except SubjectComponentNotPermittedForScope:
+            return Response(
+                {
+                    "error_code": "subject_component_not_permitted",
+                    "detail": (
+                        "This checklist is scoped to the formulation version, so a "
+                        "subject component must not be supplied."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except SubjectComponentRequired:
+            return Response(
+                {
+                    "error_code": "subject_component_required",
+                    "detail": (
+                        "This checklist version contains component-specific content, "
+                        "so a governed subject component must be supplied."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except SubjectComponentNotInFormulationVersion:
+            # Deliberately does not distinguish "no such component" from
+            # "component belongs to another formulation or tenant": the caller
+            # learns only that this one is not eligible here.
+            return Response(
+                {
+                    "error_code": "subject_component_not_eligible",
+                    "detail": (
+                        "The subject component does not belong to this formulation version."
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except ChecklistVersionNotActive:
             return Response(

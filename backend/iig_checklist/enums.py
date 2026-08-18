@@ -12,6 +12,35 @@ class ChecklistScopeType(models.TextChoices):
     TENANT = "tenant", "Tenant"
 
 
+class ChecklistExecutionScope(models.TextChoices):
+    """OQ-8 (`5A-DEC-OQ8`) -- what one execution of this checklist is *about*.
+
+    Distinct from `ChecklistScopeType`, which is about who owns the content.
+    This is the governed regulatory scope of an execution:
+
+    * ``FORMULATION_COMPONENT`` -- an IID/IIG execution. It is about exactly one
+      inactive ingredient, so it requires exactly one governed subject component.
+    * ``FORMULATION_VERSION`` -- an execution about the formulation version as a
+      whole. No subject component is inherently required.
+
+    Deliberately named for the scope rather than for the product label, so the
+    engine enforces a structural invariant instead of having to know what
+    "IID/IIG" means.
+
+    Lives on `ChecklistDefinition`, never on `ChecklistVersion`: execution scope
+    is an invariant of the checklist, and putting it on the version would let a
+    new content version silently re-scope what an execution regulates.
+
+    Blank is a real, meaningful state -- "not yet classified" -- and it fails
+    closed: no execution may be created against an unclassified definition. There
+    is no permissive default, because a wrong default would silently under-govern
+    a component-specific checklist.
+    """
+
+    FORMULATION_COMPONENT = "formulation_component", "Formulation component"
+    FORMULATION_VERSION = "formulation_version", "Formulation version"
+
+
 class ChecklistVersionStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     UNDER_REVIEW = "under_review", "Under review"

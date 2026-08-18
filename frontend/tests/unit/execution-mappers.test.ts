@@ -190,3 +190,38 @@ describe("toChecklistResponse", () => {
     expect(snakeKeys).toHaveLength(0);
   });
 });
+
+describe("toChecklistExecution — OQ-8 subject component", () => {
+  it("maps the governed subject component and its ingredient name", () => {
+    const result = toChecklistExecution(
+      makeExecutionDTO({
+        subject_component_public_id: "comp-oq8-1",
+        subject_component_ingredient_name: "EXCIPIENT-ALPHA",
+      })
+    );
+    expect(result.subjectComponentPublicId).toBe("comp-oq8-1");
+    expect(result.subjectComponentIngredientName).toBe("EXCIPIENT-ALPHA");
+  });
+
+  it("normalises an explicit null, as a legacy execution reports", () => {
+    const result = toChecklistExecution(
+      makeExecutionDTO({
+        subject_component_public_id: null,
+        subject_component_ingredient_name: null,
+      })
+    );
+    expect(result.subjectComponentPublicId).toBeNull();
+    expect(result.subjectComponentIngredientName).toBeNull();
+  });
+
+  it("normalises absent keys to null rather than undefined", () => {
+    // A server predating OQ-8 omits them entirely; undefined would render as
+    // the string "undefined" in the table.
+    const dto = makeExecutionDTO();
+    delete dto.subject_component_public_id;
+    delete dto.subject_component_ingredient_name;
+    const result = toChecklistExecution(dto);
+    expect(result.subjectComponentPublicId).toBeNull();
+    expect(result.subjectComponentIngredientName).toBeNull();
+  });
+});

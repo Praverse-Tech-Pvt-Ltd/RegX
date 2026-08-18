@@ -76,7 +76,7 @@ def _product_record(execution):
     return getattr(formulation_version, "product", None)
 
 
-def build_context(execution) -> ApplicabilityContext:
+def build_context(execution, iid_snapshot=None) -> ApplicabilityContext:
     """M4D3-APP-006/007 -- assemble exactly the six registry-version-1 fields.
 
     In-memory only, assembled once per governed pass and never persisted: a
@@ -87,15 +87,18 @@ def build_context(execution) -> ApplicabilityContext:
     ``FormulationVersion -> ProductDevelopmentRecord``, which is already
     tenant-scoped by the execution, so no cross-tenant read is possible here.
 
-    ``iid.*`` is **deliberately left unresolved.** Those three fields describe a
-    *matched IID precedent*, and an ``AssessmentSnapshot`` is scoped to one
-    formulation **component**, while applicability is a property of the
-    execution. Which component's snapshot governs an execution-level rule -- or
-    whether one must be created during an applicability pass at all -- is not
-    settled by any approved specification, and choosing one here would be
-    engineering inventing regulatory meaning. It is registered as an open
-    governance question (5A-P1 OQ-8); until it is answered, a rule that reads
-    these fields fails closed to ``review_required`` rather than guessing.
+    ``iid.*`` resolves from ``iid_snapshot`` -- the governed, component-specific
+    ``AssessmentSnapshot`` the caller created for this execution's one subject
+    component (OQ-8, `5A-DEC-OQ8`). It is passed in rather than looked up here on
+    purpose: this function is in-memory only and must not create a regulated
+    record, and there is no "find the right existing snapshot" query to make --
+    the approved semantics create a snapshot, never select one.
+
+    With no snapshot -- a legacy execution carrying no governed subject
+    component, or a subject component for which no governed source could be
+    established -- the ``iid`` group stays unresolved and a rule reading it still
+    fails closed to ``review_required``. "We could not find out" is never
+    recorded as "no".
     """
     values: dict = {}
     product = _product_record(execution)
@@ -110,10 +113,26 @@ def build_context(execution) -> ApplicabilityContext:
         if product.release_type:
             values["product.release_type"] = product.release_type
 
-    # `iid` is always unresolved today -- see the docstring and 5A-P1 OQ-8.
-    unresolved = {"iid"}
+    unresolved: set[str] = set()
     if product is None:
         unresolved.add("product")
+
+    if iid_snapshot is None:
+        unresolved.add("iid")
+    else:
+        # A snapshot always records a match_status, including the reproducible
+        # "no precedent matched" case, so all three fields are answerable
+        # together. has_* are booleans about presence, not about magnitude:
+        # whether a precedent carried a value, not whether it is acceptable.
+        values["iid.match_status"] = iid_snapshot.match_status
+        values["iid.has_potency"] = iid_snapshot.iid_potency_amount is not None
+        values["iid.has_mde"] = iid_snapshot.iid_mde is not None
+        if not iid_snapshot.match_status:
+            # Blank is treated as absent for the same reason as product.route
+            # (APP-005): matching a rule against "" is a false positive.
+            del values["iid.match_status"]
+            unresolved.add("iid")
+
     return ApplicabilityContext(values=values, unresolved_groups=frozenset(unresolved))
 
 
@@ -215,7 +234,7 @@ def derive_applicability_outcome(response) -> str:
     return "no_rule"
 
 
-def evaluate_execution_applicability(*, execution, actor=None) -> dict:
+def evaluate_execution_applicability(*, execution, actor=None, iid_snapshot=None) -> dict:
     """Evaluate and persist applicability for every rule-governed response.
 
     Returns ``{response_public_id: outcome}`` for the responses this pass
@@ -241,7 +260,7 @@ def evaluate_execution_applicability(*, execution, actor=None) -> dict:
 
     from .models import ChecklistResponse
 
-    context = build_context(execution)
+    context = build_context(execution, iid_snapshot)
     changed: dict[str, str] = {}
 
     responses = (
