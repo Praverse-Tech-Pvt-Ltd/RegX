@@ -129,7 +129,8 @@ fi
 [ "$CONFIRMED" -eq 1 ] || fail "--yes-destroy-data is required. Restoring replaces all data in project '$PROJECT'."
 
 case "$PROJECT" in
-    *prod*|*production*|*live*)
+    # *prod* already covers "production"; listing both is a dead alternative.
+    *prod*|*live*)
         if [ "${REGX_ALLOW_PROD_RESTORE:-0}" != "1" ]; then
             fail "target '$PROJECT' looks like production. Refusing. Set REGX_ALLOW_PROD_RESTORE=1 only if you are certain."
         fi

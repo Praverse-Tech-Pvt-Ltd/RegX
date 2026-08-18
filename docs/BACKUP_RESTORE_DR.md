@@ -125,7 +125,7 @@ Five guards, in the order they fire:
 2. `--project` must be explicit. There is no default target, so a restore cannot
    land wherever the environment happens to point.
 3. `--yes-destroy-data` must be explicit.
-4. A target whose name contains `prod`, `production` or `live` is **refused**
+4. A target whose name contains `prod` or `live` is **refused**
    unless `REGX_ALLOW_PROD_RESTORE=1` is also set.
 5. **Every checksum is verified before any mutation.** A tampered, truncated or
    missing artifact stops the run while the target is still intact.
