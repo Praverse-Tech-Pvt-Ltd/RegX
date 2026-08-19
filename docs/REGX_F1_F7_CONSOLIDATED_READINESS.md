@@ -4,7 +4,7 @@
 page records what exists, what is merged, what is still owed, and by whom. It
 deliberately does not restate the runbooks — follow the links.
 
-Reviewed against `regx-main` `c79cf0717b53c454ab645750587a7609549ecb3c`.
+Reviewed against `regx-main` `ecfd369d6ef081ba7f327790fc5dc5b0e9a4bc9c`.
 F-7 candidate head `56488cbe16f9fbd0d331df951ada344c5afb05d4` (PR #30, **open**).
 
 `REGX_PARALLEL_TECHNICAL_READINESS.md` is the *discovery* record that found
@@ -39,13 +39,15 @@ these seven items. This is the *closure* record.
 | F-4 | [`SERVICE_HEALTH.md`](SERVICE_HEALTH.md) |
 | F-5 | [`OPERATIONAL_LOGGING.md`](OPERATIONAL_LOGGING.md) |
 | F-6 | [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) |
+| Pending decisions across F-3, F-5, F-6 and the security actions | [`REGX_OWNER_POLICY_DECISION_PACKAGE.md`](REGX_OWNER_POLICY_DECISION_PACKAGE.md) |
 
 ---
 
 ## 3. Verified on main by inspection
 
 Not taken from the PR descriptions — re-checked against the files at
-`c79cf07`:
+`ecfd369`. Every item below was re-run at that SHA rather than carried forward
+from the earlier review:
 
 - **F-1** — `baseURL: "http://localhost:3100"`, `reuseExistingServer: false`,
   `--port 3100`; integrated suite on its own config. No port-3000 reuse.
@@ -146,6 +148,12 @@ Technical capability exists for all of these. The decisions do not.
 Operational-log retention is a separate question from regulated audit-record
 retention, which concerns `AuditEvent` rows and their backups.
 
+Each of these thirteen is written up decision-ready — what must be decided, why
+it matters, what the system can already do, the realistic options and the
+trade-offs — in
+[`REGX_OWNER_POLICY_DECISION_PACKAGE.md`](REGX_OWNER_POLICY_DECISION_PACKAGE.md).
+**That package decides nothing**; publishing it did not change any status here.
+
 ---
 
 ## 7. Security owner actions — carried forward
@@ -158,6 +166,10 @@ retention, which concerns `AuditEvent` rows and their backups.
 Neither is engineering-actionable, and no value is reproduced anywhere in this
 repository. Removal from this repository did **not** invalidate them: they
 remain in the company's own untouched source.
+
+Required owner action and the evidence needed to close each are set out in
+[`REGX_OWNER_POLICY_DECISION_PACKAGE.md`](REGX_OWNER_POLICY_DECISION_PACKAGE.md)
+§D. Both remain **NOT CONFIRMED**.
 
 ---
 
@@ -223,8 +235,10 @@ its own commit (F-6); a timeout ceiling is a margin, not a guarantee (F-7).
    - §5, Layer 1: `READY — F-7 PENDING MERGE` → `READY`, and drop the
      qualification under *Engineering blockers*;
    - a line stating F-1 through F-7 are all on `regx-main`.
-2. **Layer 2** — the thirteen decisions in §6. Engineering can state the
+2. **Layer 2** — the thirteen decisions in §6, each written up decision-ready in
+   `REGX_OWNER_POLICY_DECISION_PACKAGE.md`. Engineering can state the
    consequence of each; it cannot make them.
-3. **Layer 3** — S-1 and S-2 remain with the owner.
+3. **Layer 3** — S-1 and S-2 remain with the owner; see that package §D for the
+   closure evidence each needs.
 4. **Layer 4** — Item 1 awaits corrected human regulatory input. Nothing
    downstream can start until it lands.
