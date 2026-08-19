@@ -49,6 +49,13 @@ governed by Milestone 5A and is untouched by any choice on this page.
 any particular one.** Meeting a chosen RPO requires the scheduling decision (4)
 to be made and implemented.
 
+One property to hold in mind when choosing: **the backup is not an atomic
+cross-volume snapshot.** Artifacts are captured sequentially, so a backup taken
+while the system is being written to has a consistency window the width of the
+run. Quiescing the writers first gives a strictly consistent set. A tight RPO
+achieved by running hot more often narrows the gap between backups without
+removing that window — see `BACKUP_RESTORE_DR.md` §2.
+
 ## 2. RTO — recovery time objective
 
 | | |
