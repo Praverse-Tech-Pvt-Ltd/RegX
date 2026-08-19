@@ -165,7 +165,7 @@ fix.
 | F-4 | Healthchecks for `celery` and `frontend` | Runtime cannot detect a dead worker | `compose.yaml` | No | No | Silent worker failure; tasks queue unprocessed | **P2** | **DONE** | `compose.yaml` (2 blocks), CI wait logic, `SERVICE_HEALTH.md` | **Implemented** on `regx/feat/service-healthchecks` |
 | F-5 | `LOGGING` configuration + what must never be logged | No structured logging; regulated values in payloads | `settings/*.py` | No | No | Undiagnosable production incidents; possible over-logging of regulated data | **P2** | **DONE** | JSON formatter, request-id middleware, `LOGGING`, 43 tests, `OPERATIONAL_LOGGING.md` | **Implemented** on `regx/feat/structured-operational-logging` |
 | F-6 | Rollback procedure + release verification checklist | No documented release or revert path | `DEPLOYMENT_BOUNDARIES.md` | No | No | Unrehearsed recovery during an incident | **P2** | **DONE** | `RELEASE_ROLLBACK_RUNBOOK.md`, `scripts/release_verify.sh`, CI guards | **Implemented** on `regx/feat/release-rollback-runbook` |
-| F-7 | `fda-iid` parallel flakiness | Intermittent false failures | `INTEGRATION_E2E_EVIDENCE.md` | No | No | Noise erodes trust in the suite | **P3** | **YES** | 1 spec file | Ticket |
+| F-7 | `fda-iid` parallel flakiness | Intermittent false failures | `INTEGRATION_E2E_EVIDENCE.md` | No | No | Noise erodes trust in the suite | **P3** | **DONE** | 1 config line (`expect.timeout`), no spec changed; `FDA_IID_E2E_FLAKINESS_INVESTIGATION.md` | **Reproduced, root-caused and fixed** on `regx/investigate/fda-iid-flakiness` |
 | S-1 | GitHub purge of PR #22 superseded objects | Old unsanitized DB blob still fetchable by SHA | prior security pass | No | **Yes** | Password hashes remain retrievable | **P1** | **NO** | none — external request | Owner raises with GitHub Support |
 | S-2 | Rotate 3 OpenAI keys + SMTP password | Live credentials in the read-only company source | prior security pass | No | **Yes** | Credentials remain valid | **P1** | **NO** | none — provider-side | Owner rotates |
 | G-1 | Items 1–20 governance decisions | The production content gate | `MILESTONE_5A_APPROVAL_REGISTER.md` | **Yes** | No | Milestone 5A cannot close | — | **NO** | — | Awaiting human input |
@@ -174,9 +174,9 @@ fix.
 
 ## 4. Classification
 
-**DONE (6):** F-1, F-2, F-3, F-4, F-5, F-6
+**DONE (7):** F-1, F-2, F-3, F-4, F-5, F-6, F-7
 
-**READY NOW (1):** F-7
+**READY NOW (0):** every finding from this pass is now implemented.
 
 **BLOCKED BY REGULATORY INPUT:** all 20 register items; production question
 authoring; template instantiation; anything that would advance `0/20`.

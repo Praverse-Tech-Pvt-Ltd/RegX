@@ -76,6 +76,16 @@ Left unfixed deliberately: the hardening brief says not to fix unrelated
 failures. Worth a separate ticket to add an explicit `waitForURL` or to await
 the submit response in those tests.
 
+> **RESOLVED by F-7 — and the suggestion above was aimed at the wrong thing.**
+> The failure is a latency ceiling, not a race: `router.push()` does not change
+> the URL until the destination route's payload is ready, and `next dev`
+> compiles routes on demand, so under parallel workers a cold compile can exceed
+> the 5 s default `expect` timeout. Nor is it specific to `fda-iid` —
+> `regx-shell.spec.ts` fails identically under the same load. Fixed with one
+> line, `expect: { timeout: 15_000 }`, with no spec modified: 16 failures in 896
+> executions at 5 s, 0 in 672 at 15 s. See
+> `FDA_IID_E2E_FLAKINESS_INVESTIGATION.md`.
+
 ## Current status
 
 | Suite | Command | Result |

@@ -37,6 +37,29 @@ export default defineConfig({
   retries: process.env["CI"] ? 2 : 0,
   workers: process.env["CI"] ? 1 : undefined,
   reporter: [["html", { open: "never" }], ["list"]],
+  expect: {
+    // 15s, not Playwright's 5s default.
+    //
+    // `router.push()` in the App Router does not change the URL until the
+    // destination route's payload is ready, and `npm run dev` compiles routes on
+    // demand. Under parallel workers all hitting one dev server, a cold route
+    // compile can take longer than 5s, so `expect(page).toHaveURL(...)` expires
+    // while the navigation is still legitimately in flight -- the assertion
+    // outruns the compiler, not the application.
+    //
+    // Measured on this suite at --repeat-each=2 --workers=20:
+    //   expect 5s  -> 16 failures / 896 executions, every one a toHaveURL
+    //   expect 15s ->  0 failures / 672 executions
+    //   expect 30s ->  0 failures / 896 executions
+    // At the default local worker count nothing failed in 1,410 executions, so
+    // this is a margin for contention, not a fix for a broken test.
+    //
+    // Kept at 15s rather than 30s deliberately: a genuinely wrong assertion
+    // should still fail promptly. This raises the ceiling; it does not hide a
+    // race. Nothing here waits on a timer -- every assertion still polls for the
+    // real condition and returns as soon as it holds.
+    timeout: 15_000,
+  },
   use: {
     baseURL: "http://localhost:3100",
     trace: "on-first-retry",
