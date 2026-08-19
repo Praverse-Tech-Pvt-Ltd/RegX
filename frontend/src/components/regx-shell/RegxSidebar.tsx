@@ -77,6 +77,12 @@ const REGX_MODULES: Item[] = [
     ],
   },
   {
+    id: "workflows",
+    href: "/workflows",
+    label: "Workflows",
+    icon: "mdi mdi-sitemap",
+  },
+  {
     id: "migration-batches",
     href: "/migration-batches",
     label: "Migration Batches",

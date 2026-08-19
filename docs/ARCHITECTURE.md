@@ -18,7 +18,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `tenancy` | Tenant, TenantMembership, tenant context |
 | `authorization` | Roles, permissions, RBAC |
 | `audit` | Immutable audit trail |
-| `workflows` | Regulatory workflow items (scaffold) |
+| `workflows` | Generic tenant-scoped workflow engine: state machine, append-only transition history, assignment ([`WORKFLOW_ENGINE.md`](WORKFLOW_ENGINE.md)) |
 
 ## Key invariants
 
@@ -37,5 +37,5 @@ identity ← no tenancy/authorization imports
 tenancy → identity (via string FK), common
 authorization → tenancy, identity, common
 audit → no domain imports (self-contained)
-workflows → tenancy, identity, common
+workflows → tenancy, identity, authorization, audit, common
 ```

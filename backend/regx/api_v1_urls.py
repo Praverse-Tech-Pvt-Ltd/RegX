@@ -14,4 +14,5 @@ urlpatterns = [
     path("", include("formulations.urls")),
     path("", include("iid_assessment.urls")),
     path("", include("iig_checklist.urls")),
+    path("", include("workflows.urls")),
 ]
