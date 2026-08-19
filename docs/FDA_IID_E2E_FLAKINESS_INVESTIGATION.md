@@ -173,14 +173,20 @@ Material differences, and they matter here:
 | Retries | 0 | **2** |
 | Server | Playwright's own `next dev` on `:3100` | same |
 
-**CI is not exposed to this failure mode** — it runs serially, so no contention
-builds on the dev server, and two retries would absorb a stray timeout anyway.
-The exposure is local runs, and it only appeared at double the default worker
-count.
+**CI is materially less exposed to this contention-driven failure mode** because
+it runs serially (`workers: 1`), so the contention that produces it does not
+build up on the dev server. **But CI was not demonstrated to reproduce or to
+exclude the issue** — no run was made under CI conditions that either triggered
+it or ruled it out.
 
-This also means **local reproduction does not prove CI equivalence**, and no such
-claim is made. What it does prove is that the ceiling exists and that raising it
-is safe.
+Two retries would in any case absorb an isolated timeout, which cuts both ways:
+it protects a CI run from a stray failure, and it would also **mask** one, so a
+green CI history is not evidence that the ceiling was never hit there.
+
+What was demonstrated is local: the failure reproduces under high contention, and
+it only appeared at double the default worker count. **Local reproduction does not
+prove CI equivalence**, and no such claim is made. What it does prove is that the
+ceiling exists and that raising it is safe.
 
 ---
 
