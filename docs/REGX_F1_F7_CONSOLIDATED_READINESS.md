@@ -4,8 +4,7 @@
 page records what exists, what is merged, what is still owed, and by whom. It
 deliberately does not restate the runbooks — follow the links.
 
-Reviewed against `regx-main` `ecfd369d6ef081ba7f327790fc5dc5b0e9a4bc9c`.
-F-7 candidate head `56488cbe16f9fbd0d331df951ada344c5afb05d4` (PR #30, **open**).
+Reviewed against `regx-main` `3db40b573ad24cd041b98008b680e5e79777b1a2`.
 
 `REGX_PARALLEL_TECHNICAL_READINESS.md` is the *discovery* record that found
 these seven items. This is the *closure* record.
@@ -22,10 +21,13 @@ these seven items. This is the *closure* record.
 | **F-4** | `celery` and `frontend` had no healthcheck | Targeted Celery `inspect ping`; frontend HTTP probe; CI waits on health | #27 | **MERGED** |
 | **F-5** | No `LOGGING` config at all; no correlation id; no never-log policy | JSON to stdout, allow-list formatter, `X-Request-ID`, 27 test functions / 44 cases | #28 | **MERGED** |
 | **F-6** | No release procedure, no rollback, no migration-risk classification | Runbook, A/B/C/D classification, three rollback levels, read-only `release_verify.sh` | #29 | **MERGED** |
-| **F-7** | `toHaveURL` flakiness under parallel load | Global `expect` timeout 15 s; no spec modified | #30 | **PENDING MERGE** |
+| **F-7** | `toHaveURL` flakiness under parallel load | Global `expect` timeout 15 s; no spec modified | #30 | **MERGED** |
 
-**F-7 is implemented and evidenced but is not on `regx-main`.** Verified: the
-`expect:` block is absent from `frontend/playwright.config.ts` on main.
+**F-1 through F-7 are all merged into authoritative `regx-main`.** F-7 landed as
+merge commit `3db40b573ad24cd041b98008b680e5e79777b1a2`. Verified rather than
+assumed: the `expect: { timeout: 15_000 }` block is now **present** in
+`frontend/playwright.config.ts` on main — the same check that previously
+confirmed its absence.
 
 ---
 
@@ -33,7 +35,7 @@ these seven items. This is the *closure* record.
 
 | Control | Document |
 |---|---|
-| F-1, F-7 | [`INTEGRATION_E2E_EVIDENCE.md`](INTEGRATION_E2E_EVIDENCE.md), [`FDA_IID_E2E_FLAKINESS_INVESTIGATION.md`](FDA_IID_E2E_FLAKINESS_INVESTIGATION.md) *(F-7 doc lands with PR #30)* |
+| F-1, F-7 | [`INTEGRATION_E2E_EVIDENCE.md`](INTEGRATION_E2E_EVIDENCE.md), [`FDA_IID_E2E_FLAKINESS_INVESTIGATION.md`](FDA_IID_E2E_FLAKINESS_INVESTIGATION.md) |
 | F-2 | [`DEPLOYMENT_BOUNDARIES.md`](DEPLOYMENT_BOUNDARIES.md) |
 | F-3 | [`BACKUP_RESTORE_DR.md`](BACKUP_RESTORE_DR.md) |
 | F-4 | [`SERVICE_HEALTH.md`](SERVICE_HEALTH.md) |
@@ -46,8 +48,8 @@ these seven items. This is the *closure* record.
 ## 3. Verified on main by inspection
 
 Not taken from the PR descriptions — re-checked against the files at
-`ecfd369`. Every item below was re-run at that SHA rather than carried forward
-from the earlier review:
+`3db40b5`. Every item below was re-run at that SHA rather than carried forward
+from an earlier review:
 
 - **F-1** — `baseURL: "http://localhost:3100"`, `reuseExistingServer: false`,
   `--port 3100`; integrated suite on its own config. No port-3000 reuse.
@@ -63,6 +65,9 @@ from the earlier review:
 - **F-5** — 7-field allow-list, `ContextVar` (zero `threading.local`),
   `X-Request-ID`, **zero** `record.__dict__` serialisation, and the
   exception-echo limitation pinned by a named test.
+- **F-7** — `expect: { timeout: 15_000 }` present in `playwright.config.ts`;
+  `baseURL`, `reuseExistingServer` and the dedicated port unchanged, so the F-1
+  contract survived the change.
 - **F-6** — `release_verify.sh` contains no mutating operation in its code;
   `iig_checklist/0006` is **Class C — DATA RESTORE REQUIRED**, never a backward
   migration; new-code/old-schema **NOT SUPPORTED**, old-code/new-schema
@@ -103,7 +108,7 @@ These only make sense read together.
 
 | Layer | Status | Why |
 |---|---|---|
-| **1 — Engineering** | **READY — F-7 PENDING MERGE** | All seven findings implemented and evidenced. F-1 to F-6 are on `regx-main`; F-7 is verified locally but **not yet on authoritative main**. No engineering work is blocked. |
+| **1 — Engineering** | **READY** | All seven findings implemented, evidenced and **merged to `regx-main`**. No engineering work is blocked. |
 | **2 — Operations** | **PARTIAL** | Every technical capability exists and has been exercised. Every *policy* input is unanswered — §6. |
 | **3 — Security owner** | **BLOCKED** | Both actions are external and **NOT CONFIRMED** — §7. Neither is engineering-actionable. |
 | **4 — Regulatory governance** | **BLOCKED** | 0 of 20. Item 1 **PENDING** — §8. |
@@ -114,10 +119,6 @@ no amount of engineering will.
 ### Engineering blockers
 
 **Critical: 0 · Major: 0 · Minor: 0 · Engineering blockers: NONE.**
-
-Qualification: **F-7 is implemented and verified locally but is not yet on
-authoritative main.** Until PR #30 merges, the engineering layer is complete in
-substance and incomplete in publication.
 
 The pending items in §6, §7 and §8 are **policy, owner and governance
 decisions**. None of them is a technical defect, and none is counted above.
@@ -224,17 +225,8 @@ its own commit (F-6); a timeout ceiling is a margin, not a guarantee (F-7).
 
 ## 10. Next actions
 
-1. **PR #30** — let Frontend CI finish, then merge on the owner's decision. Only
-   then does F-7 become *complete on main*.
-
-   When it merges, this page needs **five small edits and nothing else** — do not
-   rewrite it:
-   - the authoritative `regx-main` SHA in the header;
-   - §1, F-7 row: `PENDING MERGE` → `MERGED`, with its merge SHA;
-   - the header line naming the F-7 candidate head and PR #30 as open;
-   - §5, Layer 1: `READY — F-7 PENDING MERGE` → `READY`, and drop the
-     qualification under *Engineering blockers*;
-   - a line stating F-1 through F-7 are all on `regx-main`.
+1. **Layer 1 — complete.** All seven findings are merged. Nothing further is
+   owed by engineering in this workstream.
 2. **Layer 2** — the thirteen decisions in §6, each written up decision-ready in
    `REGX_OWNER_POLICY_DECISION_PACKAGE.md`. Engineering can state the
    consequence of each; it cannot make them.

@@ -3,7 +3,7 @@
 **Discovery only. No code changed, no governance state touched.**
 
 > **This is the discovery record.** All seven findings have since been
-> implemented; F-1 to F-6 are merged and F-7 is awaiting PR #30. For closure
+> implemented and merged to `regx-main`. For closure
 > status, merge state, cross-control interactions and the readiness layers, see
 > [`REGX_F1_F7_CONSOLIDATED_READINESS.md`](REGX_F1_F7_CONSOLIDATED_READINESS.md).
 
