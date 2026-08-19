@@ -20,7 +20,7 @@ these seven items. This is the *closure* record.
 | **F-2** | Documented secret contract did not exist — listed `DATABASE_URL`, omitted two hard-required secrets | Contract rebuilt from `compose.yaml` and settings; `check_env.py` enforces the real four | #25 | **MERGED** |
 | **F-3** | Three stateful stores, no backup or restore procedure | `backup.sh` / `restore.sh`, SHA-256 manifest, destructive-action guards, tested restore | #26 | **MERGED** |
 | **F-4** | `celery` and `frontend` had no healthcheck | Targeted Celery `inspect ping`; frontend HTTP probe; CI waits on health | #27 | **MERGED** |
-| **F-5** | No `LOGGING` config at all; no correlation id; no never-log policy | JSON to stdout, allow-list formatter, `X-Request-ID`, 44 tests | #28 | **MERGED** |
+| **F-5** | No `LOGGING` config at all; no correlation id; no never-log policy | JSON to stdout, allow-list formatter, `X-Request-ID`, 27 test functions / 44 cases | #28 | **MERGED** |
 | **F-6** | No release procedure, no rollback, no migration-risk classification | Runbook, A/B/C/D classification, three rollback levels, read-only `release_verify.sh` | #29 | **MERGED** |
 | **F-7** | `toHaveURL` flakiness under parallel load | Global `expect` timeout 15 s; no spec modified | #30 | **PENDING MERGE** |
 
@@ -62,7 +62,8 @@ Not taken from the PR descriptions — re-checked against the files at
   `X-Request-ID`, **zero** `record.__dict__` serialisation, and the
   exception-echo limitation pinned by a named test.
 - **F-6** — `release_verify.sh` contains no mutating operation in its code;
-  `0006` is Class C; new-code/old-schema **NOT SUPPORTED**, old-code/new-schema
+  `iig_checklist/0006` is **Class C — DATA RESTORE REQUIRED**, never a backward
+  migration; new-code/old-schema **NOT SUPPORTED**, old-code/new-schema
   **NOT PROVEN**.
 
 ---
@@ -100,13 +101,24 @@ These only make sense read together.
 
 | Layer | Status | Why |
 |---|---|---|
-| **1 — Engineering** | **READY** | All seven findings implemented and evidenced. Six merged; F-7 awaits its own CI. No engineering work is blocked. |
+| **1 — Engineering** | **READY — F-7 PENDING MERGE** | All seven findings implemented and evidenced. F-1 to F-6 are on `regx-main`; F-7 is verified locally but **not yet on authoritative main**. No engineering work is blocked. |
 | **2 — Operations** | **PARTIAL** | Every technical capability exists and has been exercised. Every *policy* input is unanswered — §6. |
 | **3 — Security owner** | **BLOCKED** | Both actions are external and **NOT CONFIRMED** — §7. Neither is engineering-actionable. |
 | **4 — Regulatory governance** | **BLOCKED** | 0 of 20. Item 1 **PENDING** — §8. |
 
 These are independent. Layer 1 being ready does not advance any other layer, and
 no amount of engineering will.
+
+### Engineering blockers
+
+**Critical: 0 · Major: 0 · Minor: 0 · Engineering blockers: NONE.**
+
+Qualification: **F-7 is implemented and verified locally but is not yet on
+authoritative main.** Until PR #30 merges, the engineering layer is complete in
+substance and incomplete in publication.
+
+The pending items in §6, §7 and §8 are **policy, owner and governance
+decisions**. None of them is a technical defect, and none is counted above.
 
 ---
 
@@ -167,8 +179,9 @@ The register's rule stands and is unchanged:
 > document completeness, engineering readiness or milestone progress.
 
 **Item 1 requires corrected human regulatory input.** The register records the
-dosage-form candidates as *candidates only* — "Engineering has selected
-nothing" — and no scope mapping is treated as approved. Verified: no
+dosage forms as **CANDIDATES ONLY — NOT APPROVED — ENGINEERING SELECTED
+NOTHING**. No scope mapping is treated as approved, and any earlier
+dosage-form scope mapping is **superseded and must not be reused**. Verified: no
 `INCLUDE`/`DEFER` scope mapping for those candidates exists anywhere on
 `regx-main`.
 
@@ -201,6 +214,15 @@ its own commit (F-6); a timeout ceiling is a margin, not a guarantee (F-7).
 
 1. **PR #30** — let Frontend CI finish, then merge on the owner's decision. Only
    then does F-7 become *complete on main*.
+
+   When it merges, this page needs **five small edits and nothing else** — do not
+   rewrite it:
+   - the authoritative `regx-main` SHA in the header;
+   - §1, F-7 row: `PENDING MERGE` → `MERGED`, with its merge SHA;
+   - the header line naming the F-7 candidate head and PR #30 as open;
+   - §5, Layer 1: `READY — F-7 PENDING MERGE` → `READY`, and drop the
+     qualification under *Engineering blockers*;
+   - a line stating F-1 through F-7 are all on `regx-main`.
 2. **Layer 2** — the thirteen decisions in §6. Engineering can state the
    consequence of each; it cannot make them.
 3. **Layer 3** — S-1 and S-2 remain with the owner.
