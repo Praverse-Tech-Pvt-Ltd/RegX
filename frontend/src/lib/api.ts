@@ -1767,3 +1767,138 @@ export const mfa = {
       body: { recovery_code },
     }),
 };
+
+// ---------------------------------------------------------------------------
+// Workflows — generic regulatory workflow engine (Milestone 6)
+//
+// State is never sent as a field. It changes only through the action endpoints
+// below; the API rejects a PATCH carrying `state`.
+// ---------------------------------------------------------------------------
+
+export interface WorkflowUserRef {
+  public_id: string;
+  email: string;
+  full_name: string;
+}
+
+export type WorkflowState =
+  | "draft"
+  | "submitted"
+  | "in_review"
+  | "approved"
+  | "rejected"
+  | "cancelled";
+
+export type WorkflowAction =
+  | "submit"
+  | "begin_review"
+  | "approve"
+  | "reject"
+  | "cancel"
+  | "return_to_draft";
+
+export interface WorkflowItem {
+  public_id: string;
+  title: string;
+  description: string;
+  state: WorkflowState;
+  created_by: WorkflowUserRef | null;
+  assigned_to: WorkflowUserRef | null;
+  assigned_at: string | null;
+  due_at: string | null;
+  is_overdue: boolean;
+  is_terminal: boolean;
+  /** Backend-computed: structurally legal AND permitted for this caller. */
+  available_actions: WorkflowAction[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowTransitionRecord {
+  public_id: string;
+  action: string;
+  from_state: WorkflowState;
+  to_state: WorkflowState;
+  actor: WorkflowUserRef | null;
+  reason: string;
+  created_at: string;
+}
+
+/** Actions the backend requires a non-blank reason for. Mirrored here only to
+ *  prompt the user before the round trip -- the backend is authoritative and
+ *  rejects a blank reason regardless of what the UI does. */
+export const WORKFLOW_REASON_REQUIRED: WorkflowAction[] = ["reject", "cancel"];
+
+const workflowActionPath: Record<WorkflowAction, string> = {
+  submit: "submit",
+  begin_review: "begin-review",
+  approve: "approve",
+  reject: "reject",
+  cancel: "cancel",
+  return_to_draft: "return-to-draft",
+};
+
+export const workflows = {
+  list: (tenantSlug: string, params?: { page?: number; state?: WorkflowState }) => {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.state) qs.set("state", params.state);
+    const query = qs.toString() ? `?${qs}` : "";
+    return apiRequest<PaginatedResponse<WorkflowItem>>(`/api/regx/v1/workflows/${query}`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    });
+  },
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<WorkflowItem>(`/api/regx/v1/workflows/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  create: (
+    tenantSlug: string,
+    data: { title: string; description?: string; due_at?: string | null }
+  ) =>
+    apiRequest<WorkflowItem>("/api/regx/v1/workflows/", {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  updateDraft: (
+    tenantSlug: string,
+    publicId: string,
+    data: { title?: string; description?: string; due_at?: string | null }
+  ) =>
+    apiRequest<WorkflowItem>(`/api/regx/v1/workflows/${publicId}/`, {
+      method: "PATCH",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  transition: (
+    tenantSlug: string,
+    publicId: string,
+    action: WorkflowAction,
+    reason?: string
+  ) =>
+    apiRequest<WorkflowItem>(
+      `/api/regx/v1/workflows/${publicId}/${workflowActionPath[action]}/`,
+      {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason: reason ?? "" },
+      }
+    ),
+
+  assign: (tenantSlug: string, publicId: string, assignedTo: string | null) =>
+    apiRequest<WorkflowItem>(`/api/regx/v1/workflows/${publicId}/assign/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { assigned_to: assignedTo },
+    }),
+
+  history: (tenantSlug: string, publicId: string) =>
+    apiRequest<WorkflowTransitionRecord[]>(`/api/regx/v1/workflows/${publicId}/history/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+};

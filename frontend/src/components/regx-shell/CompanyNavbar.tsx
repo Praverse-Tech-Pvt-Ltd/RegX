@@ -65,6 +65,7 @@ const REGX_AREA_PREFIXES = [
   "/template-sources",
   "/tenants",
   "/dashboard",
+  "/workflows",
 ];
 
 export default function CompanyNavbar() {
