@@ -9,6 +9,8 @@ State is never assigned directly. It changes only through
 holding a row lock.
 """
 
+import uuid
+
 from django.db import models
 from django.utils import timezone
 
@@ -155,3 +157,115 @@ class WorkflowTransition(PublicIDModel, TimeStampedModel):
                 "WorkflowTransition rows are append-only; save() on an existing row is forbidden."
             )
         super().save(*args, **kwargs)
+
+
+class WorkflowEvidenceMutationForbidden(Exception):
+    """Raised when a WorkflowEvidence row is mutated outside the service layer."""
+
+
+class _EvidenceQuerySet(models.QuerySet):
+    """Blocks bulk paths that would bypass the service layer's rules.
+
+    `update()` is refused outright: unlinking goes through
+    `workflows.services.unlink_evidence`, which checks workflow state, records
+    the actor and emits audit. A queryset update would skip all three.
+    """
+
+    def update(self, **kwargs):
+        raise WorkflowEvidenceMutationForbidden(
+            "WorkflowEvidence rows are governed; use workflows.services to unlink."
+        )
+
+    def delete(self):
+        raise WorkflowEvidenceMutationForbidden(
+            "WorkflowEvidence rows are append-only and cannot be deleted; unlink instead."
+        )
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise WorkflowEvidenceMutationForbidden(
+            "WorkflowEvidence rows are governed and cannot be bulk-updated."
+        )
+
+
+class WorkflowEvidenceManager(models.Manager):
+    def get_queryset(self):
+        return _EvidenceQuerySet(self.model, using=self._db)
+
+
+class WorkflowEvidence(models.Model):
+    """A governed link from a workflow item to one exact DocumentVersion.
+
+    **References a version, never a document.** `DocumentVersion` is immutable
+    once processed and carries its own `sha256_checksum`, so a link identifies
+    specific bytes. Linking a `Document` would mean "whatever this says today",
+    and uploading version N+1 would silently change what the evidence asserts.
+    Because the FK is to the version row, that cannot happen -- there is no
+    "latest" pointer to follow.
+
+    **No file bytes are stored here.** The document platform remains sole owner
+    of storage, checksum, scan status, processing status and retrieval.
+
+    Rows are never deleted. Unlinking stamps `unlinked_at`/`unlinked_by`, so the
+    historical fact that a version was once cited survives -- the same reasoning
+    behind `WorkflowTransition`. Database-level immutability is applied by
+    migration `0005`.
+    """
+
+    objects = WorkflowEvidenceManager()
+
+    public_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, db_index=True)
+
+    workflow_item = models.ForeignKey(
+        WorkflowItem, on_delete=models.PROTECT, related_name="evidence"
+    )
+    # PROTECT, plus a DeletionProtectionRegistry checker registered from
+    # AppConfig.ready(). Two independent defences, matching how the repository
+    # already guards governed references to a version.
+    document_version = models.ForeignKey(
+        "documents.DocumentVersion", on_delete=models.PROTECT, related_name="workflow_evidence"
+    )
+    # Denormalised so evidence stays tenant-filterable without joining through
+    # workflow_item -> tenant on every query.
+    tenant = models.ForeignKey(
+        "tenancy.Tenant", on_delete=models.CASCADE, related_name="workflow_evidence"
+    )
+
+    label = models.CharField(max_length=255, blank=True)
+
+    linked_by = models.ForeignKey("identity.User", on_delete=models.PROTECT, related_name="+")
+    linked_at = models.DateTimeField(auto_now_add=True)
+    unlinked_by = models.ForeignKey(
+        "identity.User", on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    unlinked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["linked_at", "id"]
+        constraints = [
+            # Partial: one ACTIVE link per (item, version). Relinking after an
+            # unlink stays possible, duplicates do not. The database is the
+            # arbiter, so two concurrent link attempts cannot both win.
+            models.UniqueConstraint(
+                fields=["workflow_item", "document_version"],
+                condition=models.Q(unlinked_at__isnull=True),
+                name="unique_active_workflow_evidence",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["workflow_item", "unlinked_at"]),
+            models.Index(fields=["tenant"]),
+            models.Index(fields=["document_version"]),
+        ]
+
+    def __str__(self):
+        state = "active" if self.is_active else "unlinked"
+        return f"evidence {self.public_id} ({state})"
+
+    @property
+    def is_active(self) -> bool:
+        return self.unlinked_at is None
+
+    def delete(self, using=None, keep_parents=False):
+        raise WorkflowEvidenceMutationForbidden(
+            "WorkflowEvidence rows are append-only and cannot be deleted; unlink instead."
+        )

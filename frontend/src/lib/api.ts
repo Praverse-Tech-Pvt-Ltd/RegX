@@ -1902,3 +1902,61 @@ export const workflows = {
       headers: { "X-Tenant-Slug": tenantSlug },
     }),
 };
+
+
+// ---------------------------------------------------------------------------
+// Workflow evidence (Milestone 7)
+//
+// Evidence references an exact DocumentVersion, never a Document. Uploading a
+// newer version cannot change what an existing link means.
+//
+// `document` is present only when the caller holds `documents.view`. Workflow
+// permission and document permission are separate gates, so a caller may see
+// that evidence exists without seeing document detail.
+// ---------------------------------------------------------------------------
+
+export interface WorkflowEvidenceDocument {
+  title: string;
+  document_type: string;
+  version_number: number;
+  original_filename: string;
+  size_bytes: number;
+  sha256_checksum: string;
+  scan_status: string;
+  uploaded_at: string;
+}
+
+export interface WorkflowEvidenceLink {
+  public_id: string;
+  label: string;
+  linked_by: WorkflowUserRef | null;
+  linked_at: string;
+  document_version_public_id: string;
+  document_public_id: string;
+  /** Absent when the caller lacks `documents.view` in this tenant. */
+  document?: WorkflowEvidenceDocument;
+}
+
+export const workflowEvidence = {
+  list: (tenantSlug: string, workflowPublicId: string) =>
+    apiRequest<WorkflowEvidenceLink[]>(
+      `/api/regx/v1/workflows/${workflowPublicId}/evidence/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  link: (
+    tenantSlug: string,
+    workflowPublicId: string,
+    data: { document_version_public_id: string; label?: string }
+  ) =>
+    apiRequest<WorkflowEvidenceLink>(
+      `/api/regx/v1/workflows/${workflowPublicId}/evidence/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+    ),
+
+  unlink: (tenantSlug: string, workflowPublicId: string, evidencePublicId: string) =>
+    apiRequest<WorkflowEvidenceLink>(
+      `/api/regx/v1/workflows/${workflowPublicId}/evidence/${evidencePublicId}/`,
+      { method: "DELETE", headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+};

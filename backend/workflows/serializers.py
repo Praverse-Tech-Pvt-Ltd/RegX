@@ -101,3 +101,29 @@ class AssignRequestSerializer(serializers.Serializer):
     """`assigned_to` null clears the assignment."""
 
     assigned_to = serializers.UUIDField(required=False, allow_null=True, default=None)
+
+
+class WorkflowEvidenceSerializer(serializers.Serializer):
+    """Evidence link. public_id only, and document detail is conditional.
+
+    `document` is populated only when the caller holds `documents.view` in this
+    tenant. Workflow permission and document permission are separate gates:
+    seeing a workflow must not confer document access. PLATFORM_SUPPORT is the
+    live case -- it holds `workflows.view` and no document permission at all.
+    """
+
+    public_id = serializers.UUIDField(read_only=True)
+    label = serializers.CharField(read_only=True)
+    linked_by = UserRefSerializer(read_only=True)
+    linked_at = serializers.DateTimeField(read_only=True)
+    # Always present: identity of the cited version. These are opaque UUIDs and
+    # disclose nothing on their own.
+    document_version_public_id = serializers.UUIDField(read_only=True)
+    document_public_id = serializers.UUIDField(read_only=True)
+    # Present only with documents.view.
+    document = serializers.DictField(read_only=True, required=False)
+
+
+class EvidenceLinkRequestSerializer(serializers.Serializer):
+    document_version_public_id = serializers.UUIDField()
+    label = serializers.CharField(required=False, allow_blank=True, default="", max_length=255)

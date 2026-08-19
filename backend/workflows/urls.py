@@ -33,4 +33,14 @@ urlpatterns = [
         name="item-return-to-draft",
     ),
     path("workflows/<uuid:public_id>/assign/", views.AssignView.as_view(), name="item-assign"),
+    path(
+        "workflows/<uuid:public_id>/evidence/",
+        views.WorkflowEvidenceView.as_view(),
+        name="item-evidence",
+    ),
+    path(
+        "workflows/<uuid:public_id>/evidence/<uuid:evidence_public_id>/",
+        views.WorkflowEvidenceDetailView.as_view(),
+        name="item-evidence-detail",
+    ),
 ]

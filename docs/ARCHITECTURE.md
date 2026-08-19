@@ -18,7 +18,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `tenancy` | Tenant, TenantMembership, tenant context |
 | `authorization` | Roles, permissions, RBAC |
 | `audit` | Immutable audit trail |
-| `workflows` | Generic tenant-scoped workflow engine: state machine, append-only transition history, assignment ([`WORKFLOW_ENGINE.md`](WORKFLOW_ENGINE.md)) |
+| `workflows` | Generic tenant-scoped workflow engine: state machine, append-only transition history, assignment, governed document evidence ([`WORKFLOW_ENGINE.md`](WORKFLOW_ENGINE.md), [`WORKFLOW_EVIDENCE.md`](WORKFLOW_EVIDENCE.md)) |
 
 ## Key invariants
 
@@ -37,5 +37,7 @@ identity ← no tenancy/authorization imports
 tenancy → identity (via string FK), common
 authorization → tenancy, identity, common
 audit → no domain imports (self-contained)
-workflows → tenancy, identity, authorization, audit, common
+workflows → tenancy, identity, authorization, audit, documents, common
+documents ← never imports workflows (evidence deletion protection goes
+            through DeletionProtectionRegistry, keeping it one-way)
 ```

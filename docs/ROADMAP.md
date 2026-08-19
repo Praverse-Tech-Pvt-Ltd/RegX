@@ -2,6 +2,34 @@
 
 Tracks milestone status on the `regx-main` line. This branch is a clean-room implementation and shares no code with the legacy booking demo on `main` — see [LEGACY_BOUNDARY.md](LEGACY_BOUNDARY.md).
 
+## Milestone 6 — Generic Regulatory Workflow Engine
+
+**Status: COMPLETE**
+**Merge SHA: `70267448506d30cef30c28b0536f78cc5c1f47bb`** (PR #33)
+
+Turned the `workflows` scaffold — one model, four states, no views, no urls, no
+tests, unrouted — into a working engine. A centrally enforced transition table
+(`DRAFT → SUBMITTED → IN_REVIEW → APPROVED | REJECTED`, plus `CANCELLED` and
+`REJECTED → DRAFT`), a service layer holding a row lock so two conflicting
+transitions resolve deterministically, append-only `WorkflowTransition` history
+protected by a PostgreSQL trigger, tenant isolation, allow-listed audit and a
+generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
+
+`workflows/0002` is **Class C for rollback** once transition data exists —
+reversing it destroys append-only history. `workflows/0003` (the trigger) is
+Class A on its own terms and does not make reversing `0002` safe.
+
+## Milestone 7 — Workflow Evidence and Document Linking
+
+**Status: IN REVIEW**
+
+Connects workflow items to the existing document platform. Evidence references
+an exact `DocumentVersion` — never a `Document` — so uploading a newer version
+cannot change what historical evidence means. No file bytes are duplicated: the
+document platform stays the sole owner of storage, checksum, scan status and
+retrieval. Workflow permission and document permission are enforced as separate
+gates. See [WORKFLOW_EVIDENCE.md](WORKFLOW_EVIDENCE.md).
+
 ## Milestone 5A — Production Regulatory Checklist Content Readiness
 
 **Status: ENGINEERING PREREQUISITES COMPLETE (5A-P1) — BLOCKED ON REGULATORY APPROVAL**
@@ -237,5 +265,11 @@ Branch and tenancy/identity/authorization/audit foundation preceding the documen
 Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx-main`. Production FDA data ingestion, production client formulation use, and production regulatory-template migration remain open and require real source/client content plus the corresponding human review and approval processes.
 
 **Milestone 5A is in discovery** and is the defined successor: it makes the production regulatory checklist-content gate signable. It is blocked on human regulatory approval, not on engineering. The next action is a regulatory one — the template-scope decision (register item 1).
+
+Engineering has since continued on tracks that do not touch the regulatory gate:
+findings F-1 to F-7 (technical readiness, all merged), Milestone 6 (workflow
+engine, merged) and Milestone 7 (workflow evidence, in review). **None of that
+work advances the content gate**, which moves only when a named regulatory
+authority supplies a real approval.
 
 Milestones 5B–5D are **not scoped**. 5A deliberately records no detailed requirements for them; each needs its own discovery. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration remain unscoped as engineering milestones.
