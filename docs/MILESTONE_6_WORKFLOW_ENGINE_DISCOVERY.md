@@ -149,10 +149,20 @@ Actor and IP context comes from `audit/middleware.py`, which keeps
 - model-level `save()` rejecting any call where `self.pk is not None`, and
   `delete()` always rejecting.
 
-`WorkflowTransition` will reuse this exact structure. Note it is **model-level**,
-not a database trigger — the trigger approach is reserved for `AuditEvent`.
-Using model guards here keeps a second history table consistent with the first,
-which is what §4 asks for; a DB trigger would be a third mechanism.
+`WorkflowTransition` reuses this exact structure — **and adds the database
+trigger too**.
+
+The original plan used model guards alone, on the reasoning that a second
+history table should match the first. Review corrected that, rightly: model
+guards stop the ORM, and a *governed* history table needs the database itself to
+refuse. So `WorkflowTransition` gets **both** — the `ChecklistResponseHistory`
+model/queryset guards for a clear domain exception, and the `AuditEvent`-style
+PostgreSQL trigger underneath so raw SQL, a `psql` session or any future code
+path that bypasses the manager is stopped as well.
+
+These are not two mechanisms competing; they are one mechanism at two layers.
+The trigger follows `audit/0001_initial.py` exactly rather than inventing a
+separate immutability architecture — see `workflows/0003`.
 
 ---
 
@@ -246,28 +256,56 @@ stays terminal** in this milestone.
 
 Classified per `RELEASE_ROLLBACK_RUNBOOK.md` §4.
 
-| Change | Class | Note |
+**Forward application and rollback must be classified separately.** Django
+reporting an operation as reversible is a statement about the *schema*, not
+about whether reversing it is safe against the data that will exist by then —
+which is exactly what the runbook's Class A requires.
+
+### Forward application — low risk
+
+| Migration | Change | Forward risk |
 |---|---|---|
-| Add `IN_REVIEW`, `CANCELLED` to `State.choices` | **A** | Choices are not a DB constraint in Django; no data change |
-| Add nullable `assigned_to`, `assigned_at`, `due_at` | **A** | Additive, nullable, reversible |
-| Create `WorkflowTransition` | **A** | New table; reverse drops it |
-| Register permission codenames | **A** | `get_or_create`, idempotent |
+| `0002` | `IN_REVIEW`, `CANCELLED` added to `State.choices` | additive; choices are not a DB constraint in Django |
+| `0002` | nullable `assigned_to`, `assigned_at`, `due_at` | additive, nullable |
+| `0002` | create `WorkflowTransition` | new table |
+| `0003` | `WorkflowTransition` immutability trigger | new function + two BEFORE triggers |
+| — | register permission codenames | `get_or_create`, idempotent, not a migration |
 
-**No `RunPython`. No data migration. No destructive operation.** The whole
-change set is additive and structurally reversible.
+**No `RunPython`. No data migration. No destructive forward operation.** The
+forward direction is additive throughout and low risk.
 
-Existing-row check: `WorkflowItem` has no factory, no fixture and no test in the
-repository, and the app is not routed, so **no row can have been created through
-the application**. A deployed database could still hold rows created by hand;
-because every new field is nullable and no existing field changes, such rows
-remain valid and land in `DRAFT` semantics unchanged.
+### Rollback classification — this is the part that matters
 
-**One caveat that is class C if it is ever attempted:** once `WorkflowTransition`
-rows exist, reversing the migration drops them. They are append-only *history*,
-so that is destruction of an audit-like record, not a schema rollback. The
-runbook's answer applies — data restore, not backward migration.
+| Migration | Rollback class | Why |
+|---|---|---|
+| `0003` (trigger) | **A** | `reverse_sql` drops only the function and the two triggers it created. It touches no row. |
+| `0002` (creates `WorkflowTransition`) | **C once transition data may exist** | Reversing drops the table and **destroys append-only workflow history** |
 
----
+> **`workflows/0002` is CLASS C — DATA RESTORE REQUIRED** once any
+> `WorkflowTransition` row exists.
+>
+> **Do not backward-migrate `0002` merely because Django marks `CreateModel` as
+> reversible.** Django is telling you the schema can be undone. It is not
+> telling you the history it holds is expendable — and that history is an
+> append-only governed record, protected at the database level precisely so it
+> cannot be removed casually.
+
+This is the same distinction `RELEASE_ROLLBACK_RUNBOOK.md` §4 draws for
+`iig_checklist/0006`: structurally reversible, not data-safe to reverse. The
+runbook's answer applies unchanged — **Level 3 data restore, not a backward
+migration.**
+
+The trigger in `0003` does not change this. It makes casual deletion harder,
+not the rollback safer: a rollback that drops the table removes the trigger with
+it.
+
+### Existing rows
+
+`WorkflowItem` has no factory, no fixture and no test in the repository, and the
+app is not routed, so **no row can have been created through the application**.
+A deployed database could still hold rows created by hand; because every new
+field is nullable and no existing field changes, such rows remain valid and land
+in `DRAFT` semantics unchanged.
 
 ## L. Security and data integrity
 

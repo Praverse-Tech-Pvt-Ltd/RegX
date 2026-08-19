@@ -142,9 +142,27 @@ leakage, and transition public IDs used cross-tenant.
 There is no update or delete endpoint, and the read endpoint returns 405 for
 every write method.
 
-The guard is model-level, matching `iig_checklist.ChecklistResponseHistory`.
-`audit.AuditEvent` uses a PostgreSQL trigger instead; two history tables sharing
-one mechanism is deliberate, a third mechanism would not be.
+Protection is at **two layers**, and both are load-bearing:
+
+| Layer | Mechanism | Stops |
+|---|---|---|
+| ORM | `_ImmutableTransitionQuerySet` + model `save()`/`delete()` guards, matching `iig_checklist.ChecklistResponseHistory` | application code, with a clear domain exception |
+| **Database** | PostgreSQL trigger from `workflows/0003`, following `audit/0001_initial.py` | **everything**, including raw SQL and a `psql` session |
+
+The database rejects `UPDATE` and `DELETE` on `workflows_workflowtransition`
+outright:
+
+```
+ERROR: workflow_transition rows are immutable: UPDATE and DELETE are forbidden.
+```
+
+`INSERT` remains permitted — the triggers are `BEFORE UPDATE` and
+`BEFORE DELETE` only, so appending still works. Tests prove raw UPDATE, raw
+DELETE, unqualified `UPDATE`/`DELETE` across the whole table, and both ORM paths
+are all refused, while insertion and normal transitions still succeed.
+
+Model guards are kept as defence in depth rather than replaced: they fire first
+and give application code a domain exception instead of a database error.
 
 A failed transition writes **no** history row — validation completes before any
 write.
@@ -233,7 +251,42 @@ sees the real current state.
 
 ---
 
-## 11. Known limitations
+## 11. Migrations and rollback classification
+
+Classified per [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) §4.
+**Forward risk and rollback risk are different questions**, and Django's notion
+of "reversible" answers only the first.
+
+| Migration | Forward | Rollback class |
+|---|---|---|
+| `0002` — states, nullable fields, `WorkflowTransition` table | additive, no `RunPython`, no destructive operation | **C once transition data exists** |
+| `0003` — immutability trigger | additive; creates one function and two triggers | **A** — `reverse_sql` drops only what it created, touching no row |
+
+> ### `workflows/0002` is CLASS C — DATA RESTORE REQUIRED
+>
+> Once any `WorkflowTransition` row exists, reversing `0002` **drops the table
+> and destroys append-only workflow history**.
+>
+> **Do not backward-migrate `0002` merely because Django marks `CreateModel` as
+> reversible.** Django is describing the schema, not the value of the history it
+> holds. That history is a governed append-only record, protected at the
+> database level precisely so it cannot be removed casually.
+>
+> Use **Level 3 data restore**, not a backward migration.
+
+This is the same distinction the runbook draws for `iig_checklist/0006`:
+structurally reversible, not data-safe to reverse.
+
+The `0003` trigger does not change the classification of `0002`. It makes
+casual deletion harder; it does not make the rollback safer, because a rollback
+that drops the table takes the trigger with it.
+
+**Forward application is low risk** in both migrations: additive throughout,
+no `RunPython`, no data migration, no destructive forward operation.
+
+---
+
+## 12. Known limitations
 
 - **`APPROVED` is terminal.** No supersede or reopen path — §1.
 - **No notifications.** No framework exists and none was invented.
@@ -249,7 +302,7 @@ sees the real current state.
 
 ---
 
-## 12. Non-goals
+## 13. Non-goals
 
 This milestone deliberately does **not**:
 
