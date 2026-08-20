@@ -298,7 +298,7 @@ function DocumentDetailPageInner() {
               fontSize: 11,
               padding: "2px 6px",
               borderRadius: 4,
-              background: doc.status === "archived" ? "#f4f8fe" : "#eaf7f0",
+              background: doc.status === "archived" ? "#e4ecf7" : "#eaf7f0",
               color: doc.status === "archived" ? "#314155" : "#1a6b46",
               fontWeight: 600,
             }}

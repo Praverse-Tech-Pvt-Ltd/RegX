@@ -106,6 +106,21 @@ test.describe("visual capture", () => {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       await page.screenshot({ path: `${OUT}/shell-${label}-1440.png`, fullPage: true });
+
+      // Regression guard. `.content-wrapper` is a column flex container, and
+      // auto cross-axis margins on each page's <main> suppressed the default
+      // stretch -- every authenticated page was laying out at 390px on a
+      // 1440px viewport. If that recurs, this fails rather than merely looking
+      // wrong in a screenshot nobody opens.
+      const geom = await page.evaluate(() => {
+        const m = document.querySelector("main");
+        return {
+          mainWidth: m ? Math.round(m.getBoundingClientRect().width) : 0,
+          overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+        };
+      });
+      expect(geom.mainWidth, `${label} content collapsed`).toBeGreaterThan(600);
+      expect(geom.overflow, `${label} overflows horizontally`).toBe(false);
     });
   }
 });
