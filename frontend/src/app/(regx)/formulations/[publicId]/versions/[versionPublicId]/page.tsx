@@ -125,7 +125,7 @@ function VersionDetailInner() {
   if (error || !version) {
     return (
       <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error ?? "Formulation version not found."}
         </p>
       </main>
@@ -137,29 +137,29 @@ function VersionDetailInner() {
       <div style={{ marginBottom: "0.5rem" }}>
         <Link
           href={`/formulations/${productPublicId}?tenant=${tenantSlug}`}
-          style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}
+          style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}
         >
           ← Product detail
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.25rem" }}>Formulation Version {version.version_number}</h1>
-      <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0 }}>
+      <p style={{ color: "#66768b", fontSize: 13, marginTop: 0 }}>
         {version.total_dosage_unit_weight} {version.total_dosage_unit_weight_unit} total dosage-unit
         weight <ProvenanceLabel kind="USER_INPUT" /> · status: {version.status}
       </p>
       {version.maximum_dosage_units_per_day && (
-        <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0 }}>
+        <p style={{ color: "#66768b", fontSize: 13, marginTop: 0 }}>
           Maximum {version.maximum_dosage_units_per_day} dosage units/day <ProvenanceLabel kind="USER_INPUT" />
         </p>
       )}
 
       {/* Components */}
-      <section style={{ marginTop: "1.5rem", border: "1px solid #e5e7eb", borderRadius: 8, padding: "1rem" }}>
+      <section style={{ marginTop: "1.5rem", border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem" }}>
         <h2 style={{ fontSize: 16, margin: "0 0 0.5rem" }}>Formulation components</h2>
         {components.length > 0 ? (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 8 }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #e5e7eb", textAlign: "left" }}>
+              <tr style={{ borderBottom: "1px solid #dce7f4", textAlign: "left" }}>
                 <th style={{ padding: "6px 8px" }} scope="col">
                   Ingredient <ProvenanceLabel kind="USER_INPUT" />
                 </th>
@@ -176,9 +176,9 @@ function VersionDetailInner() {
             </thead>
             <tbody>
               {components.map((c) => (
-                <tr key={c.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <tr key={c.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                   <td style={{ padding: "6px 8px" }}>{c.ingredient_name}</td>
-                  <td style={{ padding: "6px 8px", color: "#6b7280" }}>{c.component_type}</td>
+                  <td style={{ padding: "6px 8px", color: "#66768b" }}>{c.component_type}</td>
                   <td style={{ padding: "6px 8px" }}>
                     {c.quantity_per_dosage_unit} {c.quantity_unit}
                   </td>
@@ -190,7 +190,7 @@ function VersionDetailInner() {
             </tbody>
           </table>
         ) : (
-          <p style={{ color: "#6b7280", fontSize: 13 }}>No components added yet.</p>
+          <p style={{ color: "#66768b", fontSize: 13 }}>No components added yet.</p>
         )}
         <button onClick={() => setShowComponentForm((s) => !s)} style={smallButtonStyle}>
           {showComponentForm ? "Cancel" : "Add component"}
@@ -223,7 +223,7 @@ function VersionDetailInner() {
               </label>
             </div>
             {componentError && (
-              <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+              <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
                 {componentError}
               </p>
             )}
@@ -235,7 +235,7 @@ function VersionDetailInner() {
       </section>
 
       {/* Dosing regimen */}
-      <section style={{ marginTop: "1.5rem", border: "1px solid #e5e7eb", borderRadius: 8, padding: "1rem" }}>
+      <section style={{ marginTop: "1.5rem", border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem" }}>
         <h2 style={{ fontSize: 16, margin: "0 0 0.5rem" }}>Dosing regimen</h2>
         {regimens.length > 0 ? (
           <ul style={{ paddingLeft: 18, fontSize: 14 }}>
@@ -247,7 +247,7 @@ function VersionDetailInner() {
             ))}
           </ul>
         ) : (
-          <p style={{ color: "#6b7280", fontSize: 13 }}>No dosing regimen recorded yet.</p>
+          <p style={{ color: "#66768b", fontSize: 13 }}>No dosing regimen recorded yet.</p>
         )}
         <button onClick={() => setShowRegimenForm((s) => !s)} style={smallButtonStyle}>
           {showRegimenForm ? "Cancel" : "Add dosing regimen"}
@@ -269,7 +269,7 @@ function VersionDetailInner() {
               </label>
             </div>
             {regimenError && (
-              <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+              <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
                 {regimenError}
               </p>
             )}
@@ -297,13 +297,13 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   marginTop: 4,
   padding: "6px 8px",
-  border: "1px solid #d1d5db",
+  border: "1px solid #dce7f4",
   borderRadius: 4,
   boxSizing: "border-box",
 };
 
 const smallButtonStyle: React.CSSProperties = {
-  background: "#1d4ed8",
+  background: "#045e8f",
   color: "#fff",
   border: "none",
   borderRadius: 6,

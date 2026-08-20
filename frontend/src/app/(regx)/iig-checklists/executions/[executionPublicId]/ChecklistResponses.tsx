@@ -299,7 +299,7 @@ export function isApplicabilityRuleGoverned(question: ChecklistQuestion | undefi
 export function CalculationResult({ calculation }: { calculation: CalculationOutcomeSummary | null }) {
   if (calculation === null) {
     return (
-      <p data-testid="calculation-unavailable" style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+      <p data-testid="calculation-unavailable" style={{ margin: "0.25rem 0", color: "#66768b" }}>
         No calculated result available.
       </p>
     );
@@ -331,7 +331,7 @@ export function CalculationResult({ calculation }: { calculation: CalculationOut
       data-testid="calculation-state"
       data-status={status}
       data-reason-code={reasonCode ?? ""}
-      style={{ margin: "0.25rem 0", color: "#4b5563" }}
+      style={{ margin: "0.25rem 0", color: "#66768b" }}
     >
       {label}
     </p>
@@ -706,7 +706,7 @@ export function ChecklistResponses({
               data-classification={classification}
               data-editable={editable ? "true" : "false"}
               data-version={response.version}
-              style={{ borderTop: "1px solid #e5e7eb", padding: "0.75rem 0" }}
+              style={{ borderTop: "1px solid #dce7f4", padding: "0.75rem 0" }}
             >
               <div>
                 <strong>{question?.question_text ?? question?.code ?? "Response"}</strong>
@@ -718,7 +718,7 @@ export function ChecklistResponses({
                   <span
                     data-testid={`applicability-${response.publicId}`}
                     data-outcome={response.applicabilityOutcome}
-                    style={{ marginLeft: "0.5rem", color: "#92400e" }}
+                    style={{ marginLeft: "0.5rem", color: "#8a5a10" }}
                   >
                     {APPLICABILITY_LABEL[response.applicabilityOutcome]}
                   </span>
@@ -740,7 +740,7 @@ export function ChecklistResponses({
                     {toEditableText(response.rawValue) || "No reviewer conclusion recorded."}
                   </p>
                   {response.enteredByEmail && (
-                    <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+                    <p style={{ margin: "0.25rem 0", color: "#66768b" }}>
                       Recorded by {response.enteredByEmail}
                     </p>
                   )}
@@ -807,13 +807,13 @@ export function ChecklistResponses({
                     <CalculationResult calculation={response.calculation} />
                   ) : (
                     <>
-                      <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+                      <p style={{ margin: "0.25rem 0", color: "#66768b" }}>
                         FDA-derived default. Server-owned and not editable here.
                       </p>
                       {response.overrideReason && (
                         <p
                           data-testid={`override-recorded-${response.publicId}`}
-                          style={{ margin: "0.25rem 0", color: "#92400e" }}
+                          style={{ margin: "0.25rem 0", color: "#8a5a10" }}
                         >
                           Overridden. Reason: {response.overrideReason}
                         </p>
@@ -927,7 +927,7 @@ export function ChecklistResponses({
                   {isApplicabilityRuleGoverned(question) ? (
                     <span
                       data-testid={`applicability-governed-${response.publicId}`}
-                      style={{ color: "#4b5563" }}
+                      style={{ color: "#66768b" }}
                     >
                       Applicability is determined by a rule and is not editable here.
                     </span>
@@ -980,12 +980,12 @@ export function ChecklistResponses({
                 // `5A-DEC-002` — the approved label, never the machine value.
                 <p
                   data-testid={`select-answer-${response.publicId}`}
-                  style={{ margin: "0.25rem 0", color: "#4b5563" }}
+                  style={{ margin: "0.25rem 0", color: "#66768b" }}
                 >
                   {selectedOptionLabels(question, response.rawValue).join(", ") || "—"}
                 </p>
               ) : (
-                <p style={{ margin: "0.25rem 0", color: "#4b5563" }}>
+                <p style={{ margin: "0.25rem 0", color: "#66768b" }}>
                   {toEditableText(response.rawValue) || "—"}
                 </p>
               )}

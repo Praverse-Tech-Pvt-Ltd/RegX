@@ -45,7 +45,7 @@ function NewProductPageInner() {
   if (!tenantSlug) {
     return (
       <main style={{ maxWidth: 700, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           Select a tenant first.
         </p>
       </main>
@@ -55,7 +55,7 @@ function NewProductPageInner() {
   return (
     <main style={{ maxWidth: 700, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/formulations?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/formulations?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← Product records
         </Link>
       </div>
@@ -68,7 +68,7 @@ function NewProductPageInner() {
             value={productCode}
             onChange={(e) => setProductCode(e.target.value)}
             required
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
           />
         </label>
         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, fontSize: 13 }}>
@@ -77,7 +77,7 @@ function NewProductPageInner() {
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
             required
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
           />
         </label>
         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, fontSize: 13 }}>
@@ -86,7 +86,7 @@ function NewProductPageInner() {
             value={activeIngredient}
             onChange={(e) => setActiveIngredient(e.target.value)}
             required
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
           />
         </label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: "1rem" }}>
@@ -95,7 +95,7 @@ function NewProductPageInner() {
             <input
               value={route}
               onChange={(e) => setRoute(e.target.value)}
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
             />
           </label>
           <label style={{ fontWeight: 500, fontSize: 13 }}>
@@ -103,19 +103,19 @@ function NewProductPageInner() {
             <input
               value={dosageForm}
               onChange={(e) => setDosageForm(e.target.value)}
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
             />
           </label>
         </div>
         {formError && (
-          <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+          <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
             {formError}
           </p>
         )}
         <button
           type="submit"
           disabled={submitting}
-          style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: submitting ? "#93c5fd" : "#1d4ed8", color: "#fff", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
+          style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: submitting ? "#35b1f6" : "#045e8f", color: "#fff", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
         >
           {submitting ? "Creating…" : "Create"}
         </button>

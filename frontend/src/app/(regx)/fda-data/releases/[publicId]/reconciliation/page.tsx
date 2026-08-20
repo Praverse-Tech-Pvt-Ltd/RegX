@@ -6,10 +6,10 @@ import Link from "next/link";
 import { fdaData, type FdaReconciliationReport, ApiError } from "@/lib/api";
 
 const RESULT_COLOURS: Record<string, string> = {
-  imported: "#166534",
-  duplicate: "#374151",
-  failed: "#991b1b",
-  review_required: "#92400e",
+  imported: "#1a6b46",
+  duplicate: "#314155",
+  failed: "#8f2c20",
+  review_required: "#8a5a10",
 };
 
 function ReconciliationPageInner() {
@@ -53,7 +53,7 @@ function ReconciliationPageInner() {
       <div style={{ marginBottom: "0.5rem" }}>
         <Link
           href={`/fda-data/releases/${publicId}?tenant=${tenantSlug}`}
-          style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}
+          style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}
         >
           ← Release detail
         </Link>
@@ -62,7 +62,7 @@ function ReconciliationPageInner() {
 
       {loading && <p>Loading…</p>}
       {error && (
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error}
         </p>
       )}
@@ -70,13 +70,13 @@ function ReconciliationPageInner() {
       {report && (
         <>
           <dl style={{ display: "grid", gridTemplateColumns: "160px 1fr", rowGap: 8, fontSize: 14, marginBottom: "1.5rem" }}>
-            <dt style={{ color: "#6b7280" }}>Expected</dt>
+            <dt style={{ color: "#66768b" }}>Expected</dt>
             <dd style={{ margin: 0 }}>{report.counts.expected}</dd>
-            <dt style={{ color: "#6b7280" }}>Extracted</dt>
+            <dt style={{ color: "#66768b" }}>Extracted</dt>
             <dd style={{ margin: 0 }}>{report.counts.extracted}</dd>
-            <dt style={{ color: "#6b7280" }}>Imported</dt>
+            <dt style={{ color: "#66768b" }}>Imported</dt>
             <dd style={{ margin: 0 }}>{report.counts.imported}</dd>
-            <dt style={{ color: "#6b7280" }}>Failed</dt>
+            <dt style={{ color: "#66768b" }}>Failed</dt>
             <dd style={{ margin: 0 }}>{report.counts.failed}</dd>
           </dl>
 
@@ -85,7 +85,7 @@ function ReconciliationPageInner() {
             style={{
               display: "inline-block",
               marginBottom: "1rem",
-              background: "#374151",
+              background: "#314155",
               color: "#fff",
               borderRadius: 6,
               padding: "6px 14px",
@@ -98,11 +98,11 @@ function ReconciliationPageInner() {
           </Link>
 
           {report.results.length === 0 ? (
-            <p style={{ color: "#6b7280" }}>No row-level results recorded for this release.</p>
+            <p style={{ color: "#66768b" }}>No row-level results recorded for this release.</p>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+                <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
                   <th style={{ padding: "8px 10px" }} scope="col">
                     Row
                   </th>
@@ -116,7 +116,7 @@ function ReconciliationPageInner() {
               </thead>
               <tbody>
                 {report.results.map((r) => (
-                  <tr key={r.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <tr key={r.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                     <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>{r.row_locator}</td>
                     <td style={{ padding: "8px 10px" }}>
                       <span
@@ -125,7 +125,7 @@ function ReconciliationPageInner() {
                           fontWeight: 600,
                           padding: "2px 7px",
                           borderRadius: 4,
-                          background: RESULT_COLOURS[r.result] ?? "#374151",
+                          background: RESULT_COLOURS[r.result] ?? "#314155",
                           color: "#fff",
                           textTransform: "uppercase",
                         }}
@@ -133,7 +133,7 @@ function ReconciliationPageInner() {
                         {r.result.replace("_", " ")}
                       </span>
                     </td>
-                    <td style={{ padding: "8px 10px", color: "#6b7280" }}>{r.reason_code || "—"}</td>
+                    <td style={{ padding: "8px 10px", color: "#66768b" }}>{r.reason_code || "—"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -32,16 +32,16 @@ const DECISION_STATUS_LABELS: Record<string, string> = {
 };
 
 const DECISION_COLOURS: Record<string, string> = {
-  PASS_WITH_IID_PRECEDENT: "#166534",
-  REVIEW_REQUIRED: "#92400e",
-  EXCEEDS_IID_PRECEDENT: "#991b1b",
-  NO_MATCH: "#6b7280",
-  NOT_COMPARABLE: "#6b7280",
+  PASS_WITH_IID_PRECEDENT: "#1a6b46",
+  REVIEW_REQUIRED: "#8a5a10",
+  EXCEEDS_IID_PRECEDENT: "#8f2c20",
+  NO_MATCH: "#66768b",
+  NOT_COMPARABLE: "#66768b",
 };
 
 function CandidateRow({ candidate, selectable, onSelect }: { candidate: MatchCandidate; selectable: boolean; onSelect: () => void }) {
   return (
-    <tr style={{ borderBottom: "1px solid #f3f4f6" }}>
+    <tr style={{ borderBottom: "1px solid #f4f8fe" }}>
       <td style={{ padding: "8px 10px" }}>{candidate.ingredient_name}</td>
       <td style={{ padding: "8px 10px" }}>
         {candidate.potency_amount ?? "FDA VALUE UNAVAILABLE"} {candidate.potency_unit ?? ""}{" "}
@@ -72,7 +72,7 @@ function CalculationBlock({ label, calc }: { label: string; calc: Record<string,
           {String(calc.value)} {calc.unit ? String(calc.unit) : ""}
         </span>
       ) : (
-        <span style={{ marginLeft: 8, color: "#92400e" }}>Blocked: {String(calc.status)}</span>
+        <span style={{ marginLeft: 8, color: "#8a5a10" }}>Blocked: {String(calc.status)}</span>
       )}
     </div>
   );
@@ -131,7 +131,7 @@ function IidPreviewInner() {
   if (!tenantSlug) {
     return (
       <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           Select a tenant first.
         </p>
         <Link href="/tenants">Go to tenants</Link>
@@ -142,13 +142,13 @@ function IidPreviewInner() {
   return (
     <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
       <h1 style={{ margin: "0 0 0.25rem" }}>IID Assessment Preview</h1>
-      <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0, marginBottom: "1rem" }}>
+      <p style={{ fontSize: 13, color: "#66768b", marginTop: 0, marginBottom: "1rem" }}>
         Comparing your proposed formulation quantity against a selected FDA IID precedent
         record. This preview is not a regulatory decision and does not determine safety or
         approval — see the disclaimer on any &quot;within precedent&quot; result below.
       </p>
 
-      <form onSubmit={runPreview} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "1rem", marginBottom: "1.5rem" }}>
+      <form onSubmit={runPreview} style={{ border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem", marginBottom: "1.5rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
           <label style={{ fontSize: 13 }}>
             Ingredient ID <ProvenanceLabel kind="USER_INPUT" />
@@ -199,7 +199,7 @@ function IidPreviewInner() {
       </form>
 
       {error && (
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error}
         </p>
       )}
@@ -212,13 +212,13 @@ function IidPreviewInner() {
 
           {preview.match_status === "MULTIPLE_EXACT_MATCHES" && (
             <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 13, color: "#92400e" }}>
+              <p style={{ fontSize: 13, color: "#8a5a10" }}>
                 Multiple exact IID precedent records match. You must select one — the system
                 never picks the highest or most favourable value automatically.
               </p>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid #e5e7eb", textAlign: "left" }}>
+                  <tr style={{ borderBottom: "1px solid #dce7f4", textAlign: "left" }}>
                     <th style={{ padding: "6px 10px" }}>Ingredient</th>
                     <th style={{ padding: "6px 10px" }}>Potency</th>
                     <th style={{ padding: "6px 10px" }}>MDE</th>
@@ -268,17 +268,17 @@ function IidPreviewInner() {
           <div
             role="status"
             style={{
-              border: `1px solid ${DECISION_COLOURS[preview.decision_status] ?? "#6b7280"}`,
+              border: `1px solid ${DECISION_COLOURS[preview.decision_status] ?? "#66768b"}`,
               borderRadius: 8,
               padding: "1rem",
             }}
           >
-            <p style={{ margin: "0 0 4px", fontWeight: 700, color: DECISION_COLOURS[preview.decision_status] ?? "#374151" }}>
+            <p style={{ margin: "0 0 4px", fontWeight: 700, color: DECISION_COLOURS[preview.decision_status] ?? "#314155" }}>
               {DECISION_STATUS_LABELS[preview.decision_status] ?? preview.decision_status}
             </p>
             <p style={{ margin: 0, fontSize: 13 }}>{preview.decision_note}</p>
             {preview.escalation_required && (
-              <p style={{ margin: "8px 0 0", fontSize: 13, color: "#92400e", fontWeight: 600 }}>
+              <p style={{ margin: "8px 0 0", fontSize: 13, color: "#8a5a10", fontWeight: 600 }}>
                 Reviewer escalation required before proceeding.
               </p>
             )}
@@ -294,13 +294,13 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   marginTop: 4,
   padding: "6px 8px",
-  border: "1px solid #d1d5db",
+  border: "1px solid #dce7f4",
   borderRadius: 4,
   boxSizing: "border-box",
 };
 
 const smallButtonStyle: React.CSSProperties = {
-  background: "#1d4ed8",
+  background: "#045e8f",
   color: "#fff",
   border: "none",
   borderRadius: 6,

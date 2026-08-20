@@ -54,7 +54,7 @@ function FormulationsPageInner() {
         <Link
           href={`/formulations/new?tenant=${tenantSlug}`}
           style={{
-            background: "#1d4ed8",
+            background: "#045e8f",
             color: "#fff",
             border: "none",
             borderRadius: 6,
@@ -71,18 +71,18 @@ function FormulationsPageInner() {
 
       {loading && <p>Loading…</p>}
       {error && (
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error}
         </p>
       )}
       {!loading && items.length === 0 && !error && (
-        <p style={{ color: "#6b7280" }}>No product records yet.</p>
+        <p style={{ color: "#66768b" }}>No product records yet.</p>
       )}
 
       {items.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
-            <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+            <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
               <th style={{ padding: "8px 12px" }} scope="col">
                 Product code
               </th>
@@ -102,18 +102,18 @@ function FormulationsPageInner() {
           </thead>
           <tbody>
             {items.map((p) => (
-              <tr key={p.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+              <tr key={p.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                 <td style={{ padding: "10px 12px", fontFamily: "monospace", fontSize: 13 }}>
-                  <Link href={`/formulations/${p.public_id}?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", textDecoration: "none" }}>
+                  <Link href={`/formulations/${p.public_id}?tenant=${tenantSlug}`} style={{ color: "#045e8f", textDecoration: "none" }}>
                     {p.product_code}
                   </Link>
                 </td>
                 <td style={{ padding: "10px 12px" }}>{p.proposed_product_name}</td>
-                <td style={{ padding: "10px 12px", color: "#6b7280" }}>{p.active_ingredient}</td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                <td style={{ padding: "10px 12px", color: "#66768b" }}>{p.active_ingredient}</td>
+                <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
                   {p.selected_ob_product_public_id ? "Selected" : "Not yet selected"}
                 </td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>{p.status}</td>
+                <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>{p.status}</td>
               </tr>
             ))}
           </tbody>

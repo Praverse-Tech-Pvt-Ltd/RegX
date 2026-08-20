@@ -50,7 +50,7 @@ function NewWorkflowInner() {
       <h1>New workflow</h1>
 
       {error && (
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error}
         </p>
       )}
@@ -100,7 +100,7 @@ function NewWorkflowInner() {
           type="submit"
           disabled={submitting || title.trim() === ""}
           style={{
-            background: "#1d4ed8",
+            background: "#045e8f",
             color: "#fff",
             border: "none",
             borderRadius: 6,

@@ -64,7 +64,7 @@ function MappingDetailInner() {
       <div style={{ marginBottom: "0.5rem" }}>
         <Link
           href={`/fda-data/mappings?tenant=${tenantSlug}`}
-          style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}
+          style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}
         >
           ← Terminology mapping review
         </Link>
@@ -73,13 +73,13 @@ function MappingDetailInner() {
 
       {loading && <p>Loading…</p>}
       {error && (
-        <div role="alert" style={{ color: "#b91c1c" }}>
+        <div role="alert" style={{ color: "#c0392b" }}>
           <p>{error}</p>
           <button
             onClick={() => loadRecords(page)}
             style={{
               color: "#fff",
-              background: "#1d4ed8",
+              background: "#045e8f",
               border: "none",
               borderRadius: 6,
               padding: "6px 12px",
@@ -97,8 +97,8 @@ function MappingDetailInner() {
         <>
           <section
             style={{
-              background: "#f9fafb",
-              border: "1px solid #e5e7eb",
+              background: "#f8fbff",
+              border: "1px solid #dce7f4",
               borderRadius: 8,
               padding: "1rem 1.25rem",
               marginBottom: "1.25rem",
@@ -113,56 +113,56 @@ function MappingDetailInner() {
                 margin: 0,
               }}
             >
-              <dt style={{ color: "#6b7280" }}>Source value</dt>
+              <dt style={{ color: "#66768b" }}>Source value</dt>
               <dd style={{ margin: 0, fontFamily: "monospace" }}>
                 {mapping.source_raw_value} <ProvenanceLabel kind="FDA_SOURCE" />
               </dd>
 
-              <dt style={{ color: "#6b7280" }}>Mapping type</dt>
+              <dt style={{ color: "#66768b" }}>Mapping type</dt>
               <dd style={{ margin: 0 }}>{mapping.mapping_type.replace("_", " ")}</dd>
 
-              <dt style={{ color: "#6b7280" }}>Proposed value</dt>
+              <dt style={{ color: "#66768b" }}>Proposed value</dt>
               <dd style={{ margin: 0 }}>{mapping.proposed_controlled_value ?? "—"}</dd>
 
               {mapping.mapping_type === "substance" && (
                 <>
-                  <dt style={{ color: "#6b7280" }}>Proposed UNII</dt>
+                  <dt style={{ color: "#66768b" }}>Proposed UNII</dt>
                   <dd style={{ margin: 0, fontFamily: "monospace" }}>
                     {mapping.proposed_unii ?? "—"}
                   </dd>
-                  <dt style={{ color: "#6b7280" }}>Proposed CAS</dt>
+                  <dt style={{ color: "#66768b" }}>Proposed CAS</dt>
                   <dd style={{ margin: 0, fontFamily: "monospace" }}>
                     {mapping.proposed_cas_number ?? "—"}
                   </dd>
-                  <dt style={{ color: "#6b7280" }}>Mapping method</dt>
+                  <dt style={{ color: "#66768b" }}>Mapping method</dt>
                   <dd style={{ margin: 0 }}>{mapping.mapping_method ?? "—"}</dd>
                 </>
               )}
 
-              <dt style={{ color: "#6b7280" }}>Status</dt>
+              <dt style={{ color: "#66768b" }}>Status</dt>
               <dd style={{ margin: 0, textTransform: "uppercase", fontWeight: 600 }}>
                 {mapping.status.replace("_", " ")}
               </dd>
 
-              <dt style={{ color: "#6b7280" }}>FDA release</dt>
+              <dt style={{ color: "#66768b" }}>FDA release</dt>
               <dd style={{ margin: 0, fontFamily: "monospace", fontSize: 12 }}>
                 {mapping.release_public_id ?? "platform master (no single release)"}
               </dd>
 
-              <dt style={{ color: "#6b7280" }}>Affected records</dt>
+              <dt style={{ color: "#66768b" }}>Affected records</dt>
               <dd style={{ margin: 0 }}>{count}</dd>
             </dl>
           </section>
 
           {records.length === 0 && (
-            <p style={{ color: "#6b7280" }}>No records reference this mapping&apos;s raw value.</p>
+            <p style={{ color: "#66768b" }}>No records reference this mapping&apos;s raw value.</p>
           )}
 
           {records.length > 0 && (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+                  <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
                     <th style={{ padding: "8px 10px" }} scope="col">
                       Record
                     </th>
@@ -185,12 +185,12 @@ function MappingDetailInner() {
                 </thead>
                 <tbody>
                   {records.map((r) => (
-                    <tr key={r.record_public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                    <tr key={r.record_public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                       <td style={{ padding: "8px 10px", fontFamily: "monospace", fontSize: 11 }}>
                         {r.dataset_type.startsWith("orange_book") ? (
                           <Link
                             href={`/fda-data/orange-book/${r.record_public_id}?tenant=${tenantSlug}`}
-                            style={{ color: "#1d4ed8", textDecoration: "none" }}
+                            style={{ color: "#045e8f", textDecoration: "none" }}
                           >
                             {r.record_public_id.slice(0, 8)}…
                           </Link>
@@ -198,17 +198,17 @@ function MappingDetailInner() {
                           `${r.record_public_id.slice(0, 8)}…`
                         )}
                       </td>
-                      <td style={{ padding: "8px 10px", color: "#6b7280" }}>{r.dataset_type}</td>
+                      <td style={{ padding: "8px 10px", color: "#66768b" }}>{r.dataset_type}</td>
                       <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>{r.raw_value}</td>
                       <td style={{ padding: "8px 10px" }}>{r.normalized_value ?? "—"}</td>
-                      <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                      <td style={{ padding: "8px 10px", color: "#66768b" }}>
                         {r.calculability_status ?? "—"}
                       </td>
                       <td style={{ padding: "8px 10px" }}>
                         {r.blocked ? (
-                          <span style={{ color: "#b91c1c", fontWeight: 600 }}>Blocked</span>
+                          <span style={{ color: "#c0392b", fontWeight: 600 }}>Blocked</span>
                         ) : (
-                          <span style={{ color: "#166534" }}>OK</span>
+                          <span style={{ color: "#1a6b46" }}>OK</span>
                         )}
                       </td>
                     </tr>
@@ -227,7 +227,7 @@ function MappingDetailInner() {
               >
                 Previous
               </button>
-              <span style={{ fontSize: 13, color: "#6b7280" }}>Page {page}</span>
+              <span style={{ fontSize: 13, color: "#66768b" }}>Page {page}</span>
               <button
                 onClick={() => loadRecords(page + 1)}
                 disabled={!hasNext || loading}
@@ -247,7 +247,7 @@ const pagerButtonStyle: React.CSSProperties = {
   fontSize: 13,
   padding: "5px 12px",
   borderRadius: 6,
-  border: "1px solid #d1d5db",
+  border: "1px solid #dce7f4",
   background: "#fff",
   cursor: "pointer",
 };

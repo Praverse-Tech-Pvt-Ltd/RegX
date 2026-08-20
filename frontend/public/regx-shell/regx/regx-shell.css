@@ -1309,3 +1309,27 @@
     .navbar-brand {
       width:145px !important;
     }
+
+/* ==========================================================================
+   Page content width
+   --------------------------------------------------------------------------
+   The purchased theme makes `.content-wrapper` a COLUMN flex container. Every
+   REGX page renders its own <main style="max-width:900px; margin:2rem auto">
+   inside it, and auto margins on a flex item's cross axis suppress the
+   default stretch -- so the element shrink-wrapped to its content and centred
+   instead of taking the 900px it asks for. On a 1440px viewport the Documents
+   page was laying out at 390px, which is what pushed its title and "Upload
+   document" button flush together with no gap.
+
+   `width: 100%` restores the intended measure: the item fills the column,
+   its own max-width caps it, and the auto margins still centre it.
+
+   `min-width: 0` is the necessary companion -- without it a wide data table
+   cannot shrink below its intrinsic width and would push the whole shell
+   sideways instead of scrolling within its own container, which is the
+   behaviour dense regulatory tables need.
+   ========================================================================== */
+.content-wrapper > main {
+  width: 100%;
+  min-width: 0;
+}

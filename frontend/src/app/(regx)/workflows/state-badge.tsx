@@ -3,12 +3,12 @@
 import type { WorkflowState } from "@/lib/api";
 
 const STATE_STYLES: Record<WorkflowState, { bg: string; fg: string; label: string }> = {
-  draft: { bg: "#f1f5f9", fg: "#334155", label: "Draft" },
-  submitted: { bg: "#e0f2fe", fg: "#075985", label: "Submitted" },
-  in_review: { bg: "#fef3c7", fg: "#92400e", label: "In Review" },
-  approved: { bg: "#dcfce7", fg: "#166534", label: "Approved" },
-  rejected: { bg: "#fee2e2", fg: "#991b1b", label: "Rejected" },
-  cancelled: { bg: "#e5e7eb", fg: "#4b5563", label: "Cancelled" },
+  draft: { bg: "#f4f8fe", fg: "#314155", label: "Draft" },
+  submitted: { bg: "#eaf2fd", fg: "#045e8f", label: "Submitted" },
+  in_review: { bg: "#fdf6e6", fg: "#8a5a10", label: "In Review" },
+  approved: { bg: "#eaf7f0", fg: "#1a6b46", label: "Approved" },
+  rejected: { bg: "#fdf3f2", fg: "#8f2c20", label: "Rejected" },
+  cancelled: { bg: "#dce7f4", fg: "#66768b", label: "Cancelled" },
 };
 
 export function StateBadge({ state }: { state: WorkflowState }) {

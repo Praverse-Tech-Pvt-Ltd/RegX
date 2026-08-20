@@ -7,12 +7,12 @@ import { fdaData, type TerminologyMapping, type MappingType, ApiError } from "@/
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 
 const STATUS_COLOURS: Record<string, string> = {
-  proposed: "#374151",
-  reviewed: "#1d4ed8",
-  under_review: "#b45309",
-  approved: "#166534",
-  rejected: "#991b1b",
-  returned: "#6d28d9",
+  proposed: "#314155",
+  reviewed: "#045e8f",
+  under_review: "#a8690f",
+  approved: "#1a6b46",
+  rejected: "#8f2c20",
+  returned: "#5b3a9e",
 };
 
 type MappingAction = "submit_review" | "approve" | "reject" | "return";
@@ -34,7 +34,7 @@ function StatusBadge({ status }: { status: string }) {
         fontWeight: 600,
         padding: "2px 7px",
         borderRadius: 4,
-        background: STATUS_COLOURS[status] ?? "#374151",
+        background: STATUS_COLOURS[status] ?? "#314155",
         color: "#fff",
         textTransform: "uppercase",
       }}
@@ -200,13 +200,13 @@ function MappingsPageInner() {
       <div style={{ marginBottom: "0.5rem" }}>
         <Link
           href={`/fda-data/releases?tenant=${tenantSlug}`}
-          style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}
+          style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}
         >
           ← FDA releases
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.5rem" }}>Terminology Mapping Review</h1>
-      <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0, marginBottom: "0.75rem" }}>
+      <p style={{ fontSize: 13, color: "#66768b", marginTop: 0, marginBottom: "0.75rem" }}>
         No mapping is ever auto-approved. Every approval, rejection, or return here requires an
         explicit reviewer action and is fully auditable. Fuzzy matches only ever surface as
         proposals for a human to decide.
@@ -216,9 +216,9 @@ function MappingsPageInner() {
         role="note"
         style={{
           fontSize: 12,
-          color: "#78350f",
-          background: "#fffbeb",
-          border: "1px solid #fde68a",
+          color: "#6f4a12",
+          background: "#fdf9ef",
+          border: "1px solid #f2ddaa",
           borderRadius: 6,
           padding: "8px 12px",
           marginBottom: "1rem",
@@ -246,9 +246,9 @@ function MappingsPageInner() {
                 fontSize: 13,
                 padding: "6px 12px",
                 borderRadius: 6,
-                border: active ? "1px solid #1d4ed8" : "1px solid #d1d5db",
-                background: active ? "#eff6ff" : "#fff",
-                color: active ? "#1d4ed8" : "#374151",
+                border: active ? "1px solid #045e8f" : "1px solid #dce7f4",
+                background: active ? "#f4f8fe" : "#fff",
+                color: active ? "#045e8f" : "#314155",
                 fontWeight: active ? 600 : 400,
                 cursor: "pointer",
               }}
@@ -260,12 +260,12 @@ function MappingsPageInner() {
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: "1rem", alignItems: "center" }}>
-        <label style={{ fontSize: 13, color: "#374151" }}>
+        <label style={{ fontSize: 13, color: "#314155" }}>
           Status:{" "}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #d1d5db", fontSize: 13 }}
+            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #dce7f4", fontSize: 13 }}
           >
             <option value="">All</option>
             <option value="proposed">Proposed</option>
@@ -281,7 +281,7 @@ function MappingsPageInner() {
               resetProposeForm();
               setShowProposeDialog(true);
             }}
-            style={{ ...actionButtonStyle, background: "#1d4ed8", marginLeft: "auto" }}
+            style={{ ...actionButtonStyle, background: "#045e8f", marginLeft: "auto" }}
           >
             + Propose substance mapping
           </button>
@@ -290,22 +290,22 @@ function MappingsPageInner() {
 
       {loading && <p>Loading…</p>}
       {error && (
-        <div role="alert" style={{ color: "#b91c1c" }}>
+        <div role="alert" style={{ color: "#c0392b" }}>
           <p>{error}</p>
-          <button onClick={load} style={{ ...actionButtonStyle, background: "#1d4ed8" }}>
+          <button onClick={load} style={{ ...actionButtonStyle, background: "#045e8f" }}>
             Retry
           </button>
         </div>
       )}
       {!loading && items.length === 0 && !error && (
-        <p style={{ color: "#6b7280" }}>No terminology mappings match this filter.</p>
+        <p style={{ color: "#66768b" }}>No terminology mappings match this filter.</p>
       )}
 
       {items.length > 0 && (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+              <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
                 <th style={{ padding: "8px 10px" }} scope="col">
                   Source value <ProvenanceLabel kind="FDA_SOURCE" />
                 </th>
@@ -344,11 +344,11 @@ function MappingsPageInner() {
             </thead>
             <tbody>
               {items.map((m) => (
-                <tr key={m.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <tr key={m.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                   <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>
                     {m.source_raw_value}
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                  <td style={{ padding: "8px 10px", color: "#66768b" }}>
                     {m.mapping_type.replace("_", " ")}
                   </td>
                   <td style={{ padding: "8px 10px" }}>{m.proposed_controlled_value ?? "—"}</td>
@@ -360,7 +360,7 @@ function MappingsPageInner() {
                       <td style={{ padding: "8px 10px", fontFamily: "monospace" }}>
                         {m.proposed_cas_number ?? "—"}
                       </td>
-                      <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                      <td style={{ padding: "8px 10px", color: "#66768b" }}>
                         {m.mapping_method ?? "—"}
                       </td>
                     </>
@@ -368,14 +368,14 @@ function MappingsPageInner() {
                   <td style={{ padding: "8px 10px" }}>
                     <StatusBadge status={m.status} />
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                  <td style={{ padding: "8px 10px", color: "#66768b" }}>
                     {m.reviewer_email ?? "—"}
                     {m.reviewer_email && <ProvenanceLabel kind="REVIEWER_CONFIRMED" />}
                   </td>
-                  <td style={{ padding: "8px 10px", color: "#6b7280" }}>
+                  <td style={{ padding: "8px 10px", color: "#66768b" }}>
                     <Link
                       href={`/fda-data/mappings/${m.public_id}?tenant=${tenantSlug}`}
-                      style={{ color: "#1d4ed8", textDecoration: "none" }}
+                      style={{ color: "#045e8f", textDecoration: "none" }}
                     >
                       {m.affected_record_count} record(s) →
                     </Link>
@@ -390,12 +390,12 @@ function MappingsPageInner() {
                             ...actionButtonStyle,
                             background:
                               action === "approve"
-                                ? "#166534"
+                                ? "#1a6b46"
                                 : action === "reject"
-                                  ? "#991b1b"
+                                  ? "#8f2c20"
                                   : action === "return"
-                                    ? "#6d28d9"
-                                    : "#1d4ed8",
+                                    ? "#5b3a9e"
+                                    : "#045e8f",
                           }}
                         >
                           {ACTION_LABELS[action]}
@@ -430,13 +430,13 @@ function MappingsPageInner() {
             <h2 id="mapping-confirm-title" style={{ fontSize: 16, marginTop: 0 }}>
               {ACTION_LABELS[confirmAction.action]}
             </h2>
-            <p style={{ fontSize: 13, color: "#6b7280" }}>
+            <p style={{ fontSize: 13, color: "#66768b" }}>
               {confirmAction.mapping.source_raw_value} →{" "}
               {confirmAction.mapping.proposed_controlled_value ?? "(no controlled value)"}. This
               affects {confirmAction.mapping.affected_record_count} record(s).
             </p>
             {confirmAction.action === "approve" && (
-              <p style={{ fontSize: 12, color: "#78350f" }}>
+              <p style={{ fontSize: 12, color: "#6f4a12" }}>
                 Approving records your identity as the approver. You cannot approve a mapping you
                 have already reviewed.
               </p>
@@ -452,14 +452,14 @@ function MappingsPageInner() {
                   width: "100%",
                   marginTop: 4,
                   padding: "6px 8px",
-                  border: "1px solid #d1d5db",
+                  border: "1px solid #dce7f4",
                   borderRadius: 4,
                   boxSizing: "border-box",
                 }}
               />
             </label>
             {actionError && (
-              <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+              <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
                 {actionError}
               </p>
             )}
@@ -470,14 +470,14 @@ function MappingsPageInner() {
                   setActionError(null);
                   setReason("");
                 }}
-                style={{ ...actionButtonStyle, background: "#6b7280" }}
+                style={{ ...actionButtonStyle, background: "#66768b" }}
               >
                 Cancel
               </button>
               <button
                 onClick={confirmAndRun}
                 disabled={actionBusy}
-                style={{ ...actionButtonStyle, background: "#1d4ed8" }}
+                style={{ ...actionButtonStyle, background: "#045e8f" }}
               >
                 {actionBusy ? "Working…" : "Confirm"}
               </button>
@@ -518,12 +518,12 @@ function MappingsPageInner() {
 
             {proposeSuccess ? (
               <>
-                <p style={{ fontSize: 13, color: "#166534" }}>
+                <p style={{ fontSize: 13, color: "#1a6b46" }}>
                   Proposal created. It is recorded as <strong>PROPOSED</strong> and has not been
                   auto-approved — it now requires submit-for-review and a separate VP approval
                   before it takes effect.
                 </p>
-                <p style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>
+                <p style={{ fontSize: 12, color: "#66768b", fontFamily: "monospace" }}>
                   {proposeSuccess}
                 </p>
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -532,7 +532,7 @@ function MappingsPageInner() {
                       setShowProposeDialog(false);
                       resetProposeForm();
                     }}
-                    style={{ ...actionButtonStyle, background: "#1d4ed8" }}
+                    style={{ ...actionButtonStyle, background: "#045e8f" }}
                   >
                     Done
                   </button>
@@ -540,7 +540,7 @@ function MappingsPageInner() {
               </>
             ) : (
               <>
-                <p style={{ fontSize: 13, color: "#6b7280" }}>
+                <p style={{ fontSize: 13, color: "#66768b" }}>
                   This only creates a <strong>PROPOSED</strong> candidate mapping. It is never
                   auto-approved: a reviewer must submit it for review, and a separate VP-level
                   approver must approve it before it affects any IID assessment.
@@ -657,7 +657,7 @@ function MappingsPageInner() {
                 </label>
 
                 {proposeError && (
-                  <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+                  <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
                     {proposeError}
                   </p>
                 )}
@@ -668,7 +668,7 @@ function MappingsPageInner() {
                       setShowProposeDialog(false);
                       resetProposeForm();
                     }}
-                    style={{ ...actionButtonStyle, background: "#6b7280" }}
+                    style={{ ...actionButtonStyle, background: "#66768b" }}
                   >
                     Cancel
                   </button>
@@ -679,7 +679,7 @@ function MappingsPageInner() {
                       !proposeForm.raw_ingredient_name ||
                       !proposeForm.normalized_ingredient_name
                     }
-                    style={{ ...actionButtonStyle, background: "#1d4ed8" }}
+                    style={{ ...actionButtonStyle, background: "#045e8f" }}
                   >
                     {proposeBusy ? "Submitting…" : "Submit proposal"}
                   </button>
@@ -708,7 +708,7 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   marginTop: 4,
   padding: "6px 8px",
-  border: "1px solid #d1d5db",
+  border: "1px solid #dce7f4",
   borderRadius: 4,
   boxSizing: "border-box",
   fontSize: 13,

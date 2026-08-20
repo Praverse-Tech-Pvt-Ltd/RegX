@@ -1,0 +1,396 @@
+/* ==========================================================================
+   RegX authentication screens
+   --------------------------------------------------------------------------
+   The sign-in and MFA pages, in the company design language.
+
+   Every colour, radius, shadow and family below is taken from the system that
+   already exists -- regx-shell.css for the application tokens, HomePage.html
+   for the marketing side. Nothing here is a new brand decision:
+
+     --navy #003865, --blue #045e8f, --cyan #35b1f6, --orange #fe9409
+     --ink  #001f45, --text #314155, --muted #66768b
+     --line #dce7f4, --soft #eaf2fd, --panel #f4f8fe
+     Inter 700 for headings (as .hero-title), DM Sans for body
+     -- both already loaded in layout.tsx. Syne is the company's accent
+     face for small labels and counters, not for headings.
+
+   Component shapes follow the shell too: 8px radius and the gradient primary
+   from .tt-button, the soft low-opacity navy shadow from .tt-card.
+   ========================================================================== */
+
+.regx-auth {
+  --navy: #003865;
+  --blue: #045e8f;
+  --blue-2: #0878b5;
+  --cyan: #35b1f6;
+  --orange: #fe9409;
+  --ink: #001f45;
+  --text: #314155;
+  --muted: #66768b;
+  --line: #dce7f4;
+  --soft: #eaf2fd;
+  --panel: #f4f8fe;
+  --white: #ffffff;
+
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  font-family: "DM Sans", sans-serif;
+  color: var(--text);
+  background: var(--white);
+}
+
+/* ── Brand panel ─────────────────────────────────────────────────────────
+   The marketing site opens on a deep navy hero; the application reuses that
+   surface here so the two read as one product. Decorative only -- it is
+   hidden below 900px rather than stacked, so the form stays above the fold
+   on a phone. */
+.regx-auth__brand {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 36px;
+  background: linear-gradient(150deg, var(--ink) 0%, var(--navy) 52%, var(--blue) 100%);
+  color: #fff;
+}
+
+.regx-auth__brand::after {
+  /* Same soft cyan bloom the hero uses, kept well under the text. */
+  content: "";
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  right: -170px;
+  bottom: -190px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(53, 177, 246, 0.34), transparent 68%);
+  pointer-events: none;
+}
+
+.regx-auth__brand-body {
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+}
+
+.regx-auth__eyebrow {
+  display: inline-block;
+  margin-bottom: 18px;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #cfe8fb;
+}
+
+.regx-auth__brand-title {
+  margin: 0 0 16px;
+  /* Inter 700 at 1.15 leading, exactly as .hero-title does it in
+     HomePage.html. Syne is the company's accent face -- it is used on small
+     labels and counters, never on a primary heading -- and setting it here
+     made the panel read as a different product. */
+  font-family: "Inter", sans-serif;
+  font-size: clamp(30px, 3vw, 42px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.regx-auth__brand-title em {
+  font-style: normal;
+  color: var(--cyan);
+}
+
+.regx-auth__brand-text {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.72;
+  color: rgba(226, 240, 252, 0.9);
+}
+
+.regx-auth__points {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 13px;
+}
+
+.regx-auth__points li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 14.5px;
+  color: rgba(226, 240, 252, 0.92);
+}
+
+.regx-auth__points li::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 0 4px rgba(53, 177, 246, 0.2);
+}
+
+/* ── Form panel ──────────────────────────────────────────────────────────── */
+.regx-auth__panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  background: var(--panel);
+}
+
+.regx-auth__card {
+  width: 100%;
+  max-width: 424px;
+  padding: 40px;
+  border: 1px solid rgba(0, 56, 101, 0.08);
+  border-radius: 8px;
+  background: #fcfdfe;
+  box-shadow: 0 18px 42px rgba(0, 31, 69, 0.08);
+}
+
+.regx-auth__card-logo {
+  /* The navbar's own treatment: 145px wide, auto height, no filter. The mark
+     is dark-on-light and stays on the light card at every width, so it never
+     needs inverting. */
+  width: 145px;
+  height: auto;
+  margin-bottom: 26px;
+}
+
+.regx-auth__title {
+  margin: 0 0 8px;
+  font-family: "Inter", sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.regx-auth__subtitle {
+  margin: 0 0 28px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.regx-auth__field {
+  margin-bottom: 18px;
+}
+
+.regx-auth__field label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.regx-auth__field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.regx-auth__field input::placeholder {
+  color: #9fb0c4;
+}
+
+.regx-auth__field input:hover {
+  border-color: #c3d7ee;
+}
+
+/* Focus is a visible ring, not just a colour shift -- :focus-visible so a
+   mouse click does not paint it but keyboard traversal always does. */
+.regx-auth__field input:focus-visible {
+  outline: none;
+  border-color: var(--blue-2);
+  box-shadow: 0 0 0 3px rgba(53, 177, 246, 0.26);
+}
+
+.regx-auth__field input:disabled {
+  background: var(--soft);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* OTP: a short, centred, tracked field reads as a code entry rather than a
+   truncated text box. */
+.regx-auth__field--otp input {
+  letter-spacing: 0.42em;
+  text-align: center;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.regx-auth__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 50px;
+  margin-top: 6px;
+  padding: 13px 26px;
+  border: 1px solid var(--navy);
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--blue), var(--navy));
+  box-shadow: 0 16px 34px rgba(4, 94, 143, 0.26);
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.24s ease, box-shadow 0.24s ease, filter 0.24s ease;
+}
+
+.regx-auth__button:hover:not(:disabled) {
+  transform: translateY(-3px);
+  filter: brightness(1.06);
+}
+
+.regx-auth__button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(53, 177, 246, 0.42), 0 16px 34px rgba(4, 94, 143, 0.26);
+}
+
+.regx-auth__button:disabled {
+  /* Stays legible while submitting -- a dimmed-out control that also loses
+     its label reads as broken rather than busy. */
+  opacity: 0.66;
+  cursor: progress;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Error ───────────────────────────────────────────────────────────────
+   Not bare red text: a bordered block with an icon glyph, so the failure is
+   distinguishable without relying on colour alone. */
+.regx-auth__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #f3c9c4;
+  border-left: 3px solid #c0392b;
+  border-radius: 8px;
+  background: #fdf3f2;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #8f2c20;
+}
+
+.regx-auth__error::before {
+  content: "!";
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: #c0392b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.regx-auth__foot {
+  margin: 26px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: center;
+}
+
+.regx-auth__foot a {
+  color: var(--blue-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.regx-auth__foot a:hover {
+  text-decoration: underline;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────
+   1024px: the brand panel narrows before it is dropped.
+    900px: single column. The decorative panel is removed rather than stacked
+           above the form, so the fields stay above the fold on a phone; the
+           card then shows the logo itself. */
+@media (max-width: 1024px) {
+  .regx-auth {
+    grid-template-columns: 0.85fr 1fr;
+  }
+
+  .regx-auth__brand {
+    padding: 44px 36px;
+  }
+}
+
+@media (max-width: 900px) {
+  .regx-auth {
+    grid-template-columns: 1fr;
+  }
+
+  .regx-auth__brand {
+    display: none;
+  }
+
+}
+
+@media (max-width: 520px) {
+  .regx-auth__panel {
+    padding: 28px 18px;
+    /* Fills the viewport on mobile instead of leaving a panel-coloured band. */
+    background: var(--white);
+  }
+
+  .regx-auth__card {
+    padding: 28px 22px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .regx-auth__title {
+    font-size: 23px;
+  }
+}
+
+/* Honour a reduced-motion preference: the lift on hover is decoration. */
+@media (prefers-reduced-motion: reduce) {
+  .regx-auth__button,
+  .regx-auth__field input {
+    transition: none;
+  }
+
+  .regx-auth__button:hover:not(:disabled) {
+    transform: none;
+  }
+}

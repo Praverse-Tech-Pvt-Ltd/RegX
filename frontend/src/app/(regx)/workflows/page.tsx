@@ -68,7 +68,7 @@ function WorkflowsPageInner() {
         <Link
           href={`/workflows/new?tenant=${tenantSlug}`}
           style={{
-            background: "#1d4ed8",
+            background: "#045e8f",
             color: "#fff",
             borderRadius: 6,
             padding: "0.5rem 1rem",
@@ -105,7 +105,7 @@ function WorkflowsPageInner() {
       {!loading && items.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>
+            <tr style={{ textAlign: "left", borderBottom: "2px solid #dce7f4" }}>
               <th style={{ padding: "0.5rem" }}>Title</th>
               <th style={{ padding: "0.5rem" }}>State</th>
               <th style={{ padding: "0.5rem" }}>Assigned to</th>
@@ -114,7 +114,7 @@ function WorkflowsPageInner() {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.public_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+              <tr key={item.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                 <td style={{ padding: "0.5rem" }}>
                   <Link href={`/workflows/${item.public_id}?tenant=${tenantSlug}`}>
                     {item.title}
@@ -129,7 +129,7 @@ function WorkflowsPageInner() {
                 <td style={{ padding: "0.5rem" }}>
                   {item.due_at ? new Date(item.due_at).toLocaleDateString() : "—"}
                   {item.is_overdue && (
-                    <span style={{ color: "#b91c1c", marginLeft: "0.5rem" }}>Overdue</span>
+                    <span style={{ color: "#c0392b", marginLeft: "0.5rem" }}>Overdue</span>
                   )}
                 </td>
               </tr>
