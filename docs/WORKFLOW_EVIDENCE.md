@@ -180,6 +180,28 @@ The effect is append-only with one permitted transition: a row moves
 active → unlinked once, and nothing else ever changes. ORM-level guards on the
 manager remain as defence in depth.
 
+The guard names the frozen columns explicitly, which is sound only while that
+list is complete — so two things are proven rather than asserted:
+
+- **Nothing rides along with an unlink.** The interesting attack is not
+  tampering on its own but tampering *inside* a well-formed unlink, in the same
+  `UPDATE`, where a guard that only validated the stamps would wave it through.
+  A test parametrised over all eight frozen columns — `workflow_item`,
+  `document_version`, `tenant`, `linked_by`, `linked_at`, `label`, `id`,
+  `public_id` — issues exactly that statement and asserts the whole thing is
+  refused, including the unlink half.
+- **The enumeration is complete.** A test reads `information_schema.columns` and
+  asserts every column on the table is either frozen or one of the two stamps,
+  so a future migration that adds a field fails the build instead of leaving it
+  silently mutable.
+
+Both were mutation-tested: removing the column-comparison block from the trigger
+turns them red.
+
+A partial stamp is also refused — both `unlinked_at` and `unlinked_by` or
+neither, since an unlinked row with no actor would be a governed record with a
+hole where the accountability should be.
+
 ---
 
 ## 8. Deletion protection

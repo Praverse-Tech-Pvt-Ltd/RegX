@@ -7,6 +7,7 @@ Cross-tenant leakage here is release-blocking. Synthetic data only.
 import io
 import threading
 import uuid
+from datetime import timedelta
 
 import pytest
 from django.db import InternalError, ProgrammingError, connection, transaction
@@ -576,6 +577,21 @@ class TestNoDuplicationAndDeletionProtection:
 class TestDatabaseLevelProtection:
     TABLE = "workflows_workflowevidence"
 
+    # The trigger in workflows/0005 enumerates columns by name. These mirror it,
+    # and `test_the_guard_covers_every_column_on_the_table` fails if the two
+    # ever drift apart.
+    UNLINK_STAMPS = {"unlinked_at", "unlinked_by_id"}
+    FROZEN_COLUMNS = (
+        "id",
+        "public_id",
+        "workflow_item_id",
+        "document_version_id",
+        "tenant_id",
+        "label",
+        "linked_by_id",
+        "linked_at",
+    )
+
     def _linked(self, item, tenant, actor, version):
         return services.link_evidence(
             item=item,
@@ -635,6 +651,79 @@ class TestDatabaseLevelProtection:
                     f"UPDATE {self.TABLE} SET unlinked_at = NULL WHERE id = %s", [record.pk]
                 )
         assert "already unlinked" in str(exc.value).lower()
+
+    def _tamper_value(self, record, column):
+        return {
+            "id": record.pk + 1000,
+            "public_id": uuid.uuid4(),
+            "workflow_item_id": record.workflow_item_id + 1000,
+            "document_version_id": record.document_version_id + 1000,
+            "tenant_id": record.tenant_id + 1000,
+            "label": "tampered",
+            "linked_by_id": record.linked_by_id + 1000,
+            "linked_at": record.linked_at - timedelta(days=1),
+        }[column]
+
+    @pytest.mark.parametrize("column", FROZEN_COLUMNS)
+    def test_no_frozen_column_may_ride_along_with_a_valid_unlink(
+        self, item_a, tenant_a, doer_a, version_a, column
+    ):
+        """The unlink is the one UPDATE the trigger permits, so tampering on its
+        own is not the interesting attack -- tampering *inside* a well-formed
+        unlink is. A guard that only validated the stamps would wave this
+        through, and the row would change identity, tenant or provenance in the
+        same statement that retired it.
+        """
+        record = self._linked(item_a, tenant_a, doer_a, version_a)
+
+        with pytest.raises((InternalError, ProgrammingError)) as exc:
+            with transaction.atomic(), connection.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {self.TABLE} "
+                    f"SET unlinked_at = NOW(), unlinked_by_id = %s, {column} = %s "
+                    f"WHERE id = %s",
+                    [doer_a.pk, self._tamper_value(record, column), record.pk],
+                )
+
+        assert "immutable" in str(exc.value).lower()
+
+        # The whole statement is refused, so the unlink half does not land either.
+        record.refresh_from_db()
+        assert record.unlinked_at is None
+        assert record.is_active
+
+    def test_the_guard_covers_every_column_on_the_table(self):
+        """An enumerate-by-name guard is sound only while the enumeration is
+        complete. Add a column and forget the trigger and it would be silently
+        mutable inside an unlink -- so this fails the build instead of failing
+        quietly in production.
+        """
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = %s",
+                [self.TABLE],
+            )
+            actual = {row[0] for row in cur.fetchall()}
+
+        assert actual == set(self.FROZEN_COLUMNS) | self.UNLINK_STAMPS, (
+            "workflows/0005 lists columns by name -- update the trigger and this "
+            "test together whenever WorkflowEvidence gains or loses a field"
+        )
+
+    def test_a_partial_unlink_stamp_is_rejected(self, item_a, tenant_a, doer_a, version_a):
+        """Both stamps or neither: an unlinked row with no actor would be a
+        governed record with a hole where the accountability should be."""
+        record = self._linked(item_a, tenant_a, doer_a, version_a)
+
+        with pytest.raises((InternalError, ProgrammingError)) as exc:
+            with transaction.atomic(), connection.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {self.TABLE} SET unlinked_at = NOW() WHERE id = %s", [record.pk]
+                )
+
+        assert "must set both unlinked_at and unlinked_by" in str(exc.value).lower()
+        record.refresh_from_db()
+        assert record.is_active
 
     def test_orm_bulk_paths_are_blocked(self, item_a, tenant_a, doer_a, version_a):
         from workflows.models import WorkflowEvidenceMutationForbidden
