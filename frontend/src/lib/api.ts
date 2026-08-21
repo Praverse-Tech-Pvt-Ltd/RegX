@@ -2148,3 +2148,281 @@ export const regulatoryCases = {
       headers: { "X-Tenant-Slug": tenantSlug },
     }),
 };
+
+
+// ---------------------------------------------------------------------------
+// Submission dossiers (Milestone 9)
+//
+// `readiness` is DERIVED by the backend and has no setter here on purpose: the
+// one authoritative calculation lives server-side, and a client that recomputed
+// it would drift. `restricted` on a link row means the caller holds the dossier
+// permission but not that module's own view permission.
+//
+// Module counts are `number | null`, never defaulting to 0: null means withheld,
+// and rendering 0 would assert something false about resources the caller
+// cannot see.
+// ---------------------------------------------------------------------------
+export type DossierStatus = "open" | "on_hold" | "completed" | "cancelled";
+export type SectionStatus =
+  | "not_started"
+  | "in_progress"
+  | "blocked"
+  | "complete"
+  | "not_applicable";
+export type Readiness = "not_ready" | "partially_ready" | "ready" | "not_applicable";
+export type BlockerSeverity = "low" | "medium" | "high";
+
+export interface SubmissionDossier {
+  public_id: string;
+  regulatory_case_public_id: string;
+  title: string;
+  description: string;
+  status: DossierStatus;
+  owner: { public_id: string; full_name: string } | null;
+  target_date: string | null;
+  created_by: { public_id: string; full_name: string } | null;
+  created_at: string;
+  updated_at: string;
+  is_terminal: boolean;
+}
+
+export interface DossierSection {
+  public_id: string;
+  parent_public_id: string | null;
+  section_code: string;
+  title: string;
+  description: string;
+  notes: string;
+  sequence: number;
+  required: boolean;
+  status: SectionStatus;
+  readiness: Readiness;
+  readiness_reason: string;
+  owner: { public_id: string; full_name: string } | null;
+  due_date: string | null;
+  is_retired: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DossierBlocker {
+  public_id: string;
+  section_public_id: string;
+  title: string;
+  description: string;
+  severity: BlockerSeverity;
+  status: "open" | "resolved";
+  created_by: { public_id: string; full_name: string } | null;
+  created_at: string;
+  resolved_by: { public_id: string; full_name: string } | null;
+  resolved_at: string | null;
+}
+
+export interface DossierPermissions {
+  can_create: boolean;
+  can_edit: boolean;
+  can_manage_sections: boolean;
+  can_manage_links: boolean;
+  can_manage_blockers: boolean;
+  can_complete: boolean;
+  can_cancel: boolean;
+}
+
+export interface DossierSummary {
+  total_sections: number;
+  required_sections: number;
+  ready: number;
+  partially_ready: number;
+  not_ready: number;
+  not_applicable: number;
+  open_blockers: number;
+  overall_readiness: Readiness;
+  overall_reason: string;
+}
+
+export interface ModuleCounts {
+  workflow_evidence_links: number | null;
+}
+
+interface BaseSectionLink {
+  public_id: string;
+  purpose: string;
+  linked_at: string;
+  linked_by: { full_name: string } | null;
+  restricted?: true;
+}
+
+export interface SectionDocumentLink extends BaseSectionLink {
+  document_public_id: string;
+  document?: {
+    title: string;
+    document_type: string;
+    status: string;
+    current_version_number: number | null;
+    scan_status: string | null;
+  };
+}
+
+export interface SectionWorkflowLink extends BaseSectionLink {
+  workflow_public_id: string;
+  workflow?: {
+    title: string;
+    state: string;
+    is_terminal: boolean;
+    due_at: string | null;
+    is_overdue: boolean;
+  };
+}
+
+export interface SectionChecklistLink extends BaseSectionLink {
+  execution_public_id: string;
+  checklist?: { status: string; checklist_version_public_id: string };
+}
+
+export interface DossierDetail {
+  dossier: SubmissionDossier;
+  sections: DossierSection[];
+  summary: DossierSummary;
+  module_counts: ModuleCounts;
+  permissions: DossierPermissions;
+}
+
+export interface SectionDetail {
+  section: DossierSection;
+  children: DossierSection[];
+  documents: SectionDocumentLink[];
+  workflows: SectionWorkflowLink[];
+  checklists: SectionChecklistLink[];
+  blockers: DossierBlocker[];
+  module_counts: ModuleCounts;
+  permissions: DossierPermissions;
+}
+
+const DOSSIER_V1 = "/api/regx/v1";
+
+export const submissionDossiers = {
+  listForCase: (tenantSlug: string, casePublicId: string) =>
+    apiRequest<{ results: SubmissionDossier[]; permissions: DossierPermissions }>(
+      `${DOSSIER_V1}/regulatory-cases/${casePublicId}/dossiers/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  create: (
+    tenantSlug: string,
+    casePublicId: string,
+    data: { title: string; description?: string; target_date?: string | null }
+  ) =>
+    apiRequest<SubmissionDossier>(`${DOSSIER_V1}/regulatory-cases/${casePublicId}/dossiers/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<DossierDetail>(`${DOSSIER_V1}/submission-dossiers/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  update: (tenantSlug: string, publicId: string, data: Record<string, unknown>) =>
+    apiRequest<SubmissionDossier>(`${DOSSIER_V1}/submission-dossiers/${publicId}/`, {
+      method: "PATCH",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  complete: (tenantSlug: string, publicId: string, reason?: string) =>
+    apiRequest<SubmissionDossier>(`${DOSSIER_V1}/submission-dossiers/${publicId}/complete/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { reason: reason ?? "" },
+    }),
+
+  cancel: (tenantSlug: string, publicId: string, reason?: string) =>
+    apiRequest<SubmissionDossier>(`${DOSSIER_V1}/submission-dossiers/${publicId}/cancel/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { reason: reason ?? "" },
+    }),
+
+  createSection: (
+    tenantSlug: string,
+    dossierPublicId: string,
+    data: {
+      section_code: string;
+      title: string;
+      parent_public_id?: string | null;
+      required?: boolean;
+      due_date?: string | null;
+      description?: string;
+    }
+  ) =>
+    apiRequest<DossierSection>(
+      `${DOSSIER_V1}/submission-dossiers/${dossierPublicId}/sections/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+    ),
+
+  getSection: (tenantSlug: string, sectionPublicId: string) =>
+    apiRequest<SectionDetail>(`${DOSSIER_V1}/dossier-sections/${sectionPublicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  updateSection: (tenantSlug: string, sectionPublicId: string, data: Record<string, unknown>) =>
+    apiRequest<DossierSection>(`${DOSSIER_V1}/dossier-sections/${sectionPublicId}/`, {
+      method: "PATCH",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  reorderSection: (tenantSlug: string, sectionPublicId: string, sequence: number) =>
+    apiRequest<DossierSection>(`${DOSSIER_V1}/dossier-sections/${sectionPublicId}/reorder/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { sequence },
+    }),
+
+  createBlocker: (
+    tenantSlug: string,
+    sectionPublicId: string,
+    data: { title: string; description?: string; severity?: BlockerSeverity }
+  ) =>
+    apiRequest<DossierBlocker>(
+      `${DOSSIER_V1}/dossier-sections/${sectionPublicId}/blockers/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+    ),
+
+  resolveBlocker: (tenantSlug: string, blockerPublicId: string) =>
+    apiRequest<DossierBlocker>(`${DOSSIER_V1}/section-blockers/${blockerPublicId}/resolve/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  // The kind is part of the path, matching the backend: a document permission
+  // can never be aimed at a workflow by changing a body field.
+  linkTarget: (
+    tenantSlug: string,
+    sectionPublicId: string,
+    kind: "documents" | "workflows" | "checklists",
+    targetPublicId: string,
+    purpose?: string
+  ) =>
+    apiRequest<SectionDocumentLink | SectionWorkflowLink | SectionChecklistLink>(
+      `${DOSSIER_V1}/dossier-sections/${sectionPublicId}/${kind}/`,
+      {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { target_public_id: targetPublicId, purpose: purpose ?? "" },
+      }
+    ),
+
+  unlinkTarget: (
+    tenantSlug: string,
+    sectionPublicId: string,
+    kind: "documents" | "workflows" | "checklists",
+    linkPublicId: string
+  ) =>
+    apiRequest<void>(
+      `${DOSSIER_V1}/dossier-sections/${sectionPublicId}/${kind}/${linkPublicId}/`,
+      { method: "DELETE", headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+};

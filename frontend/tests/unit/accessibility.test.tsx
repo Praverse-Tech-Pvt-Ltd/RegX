@@ -540,3 +540,146 @@ describe("Accessibility — /iig-checklists/versions/{version_public_id}", () =>
     expect(results).toHaveNoViolations();
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Milestone 9 -- section tree, readiness badges, blocker indicators
+// ---------------------------------------------------------------------------
+import { SectionTree } from "@/app/(regx)/submission-dossiers/section-tree";
+import {
+  ReadinessBadge,
+  SectionStatusBadge,
+  BlockerIndicator,
+  DossierStatusBadge,
+} from "@/app/(regx)/submission-dossiers/readiness-badge";
+
+function dossierSection(over: Record<string, unknown> = {}) {
+  return {
+    public_id: "a11y-1",
+    parent_public_id: null,
+    section_code: "1",
+    title: "Quality overall summary",
+    description: "",
+    notes: "",
+    sequence: 0,
+    required: true,
+    status: "not_started",
+    readiness: "not_ready",
+    readiness_reason: "no_supporting_work",
+    owner: null,
+    due_date: null,
+    is_retired: false,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    ...over,
+  };
+}
+
+describe("Accessibility — dossier section tree", () => {
+  const tree = [
+    dossierSection(),
+    dossierSection({ public_id: "a11y-2", section_code: "1.1", parent_public_id: "a11y-1" }),
+  ];
+
+  it("has no serious or critical automated violations", async () => {
+    const { container } = render(<SectionTree sections={tree as never} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("exposes tree, treeitem, level and expanded state", () => {
+    render(<SectionTree sections={tree as never} />);
+    expect(screen.getByRole("tree", { name: /dossier sections/i })).toBeInTheDocument();
+    const items = screen.getAllByRole("treeitem");
+    expect(items[0]).toHaveAttribute("aria-level", "1");
+    expect(items[1]).toHaveAttribute("aria-level", "2");
+    expect(items[0]).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("gives the expand control an accessible name naming its section", () => {
+    render(<SectionTree sections={tree as never} />);
+    expect(screen.getByRole("button", { name: /collapse 1/i })).toBeInTheDocument();
+  });
+
+  it("labels the search field for screen readers", () => {
+    render(<SectionTree sections={tree as never} />);
+    expect(screen.getByLabelText(/search sections/i)).toBeInTheDocument();
+  });
+});
+
+describe("Accessibility — readiness is never colour alone", () => {
+  it("every readiness badge carries a text label", () => {
+    for (const r of ["ready", "partially_ready", "not_ready", "not_applicable"] as const) {
+      const { unmount } = render(<ReadinessBadge readiness={r} />);
+      const text = screen.getByTestId("readiness-badge").textContent ?? "";
+      // Strip the decorative glyph: what remains must still say what it means.
+      expect(text.replace(/[\u25cf\u25d0\u25cb\u2013]/g, "").trim().length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it("badges have no automated violations", async () => {
+    const { container } = render(
+      <div>
+        <ReadinessBadge readiness="ready" />
+        <SectionStatusBadge status="complete" />
+        <DossierStatusBadge status="open" />
+        <BlockerIndicator count={2} />
+      </div>
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("the blocker indicator states the count in text", () => {
+    render(<BlockerIndicator count={3} />);
+    expect(screen.getByTestId("blocker-indicator")).toHaveTextContent("3 blockers");
+  });
+});
+
+describe("Accessibility — readiness badge colour contrast", () => {
+  // axe cannot resolve these pills: the background is set inline on the badge
+  // while the page ground is painted by a parent, so the automated check has no
+  // pair to measure and stays silent. Two real AA failures hid behind that
+  // silence, so the ratio is computed here from the rendered inline styles
+  // rather than trusted.
+  const luminance = (hex: string) => {
+    const v = (i: number) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * v(1) + 0.7152 * v(3) + 0.0722 * v(5);
+  };
+  const toHex = (rgb: string) => {
+    const m = rgb.match(/\d+/g);
+    if (!m) return rgb;
+    return "#" + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+  };
+  const contrast = (el: HTMLElement) => {
+    const s = getComputedStyle(el);
+    const a = luminance(toHex(s.color));
+    const b = luminance(toHex(s.backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+
+  const AA = 4.5;
+
+  it.each(["ready", "partially_ready", "not_ready", "not_applicable"] as const)(
+    "readiness badge %s meets WCAG AA",
+    (r) => {
+      render(<ReadinessBadge readiness={r} />);
+      expect(contrast(screen.getByTestId("readiness-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it.each(["open", "on_hold", "completed", "cancelled"] as const)(
+    "dossier status badge %s meets WCAG AA",
+    (s) => {
+      render(<DossierStatusBadge status={s} />);
+      expect(contrast(screen.getByTestId("dossier-status-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it("the section status badge meets WCAG AA", () => {
+    render(<SectionStatusBadge status="not_started" />);
+    expect(contrast(screen.getByTestId("section-status-badge"))).toBeGreaterThanOrEqual(AA);
+  });
+});

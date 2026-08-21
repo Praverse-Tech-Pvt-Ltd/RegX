@@ -11,7 +11,7 @@ from .models import (
 )
 
 
-class UserRefSerializer(serializers.Serializer):
+class DossierUserRefSerializer(serializers.Serializer):
     """`full_name` only -- never the email. See projection.py."""
 
     public_id = serializers.UUIDField(read_only=True)
@@ -19,8 +19,8 @@ class UserRefSerializer(serializers.Serializer):
 
 
 class DossierSerializer(serializers.ModelSerializer):
-    owner = UserRefSerializer(read_only=True)
-    created_by = UserRefSerializer(read_only=True)
+    owner = DossierUserRefSerializer(read_only=True)
+    created_by = DossierUserRefSerializer(read_only=True)
     is_terminal = serializers.BooleanField(read_only=True)
     regulatory_case_public_id = serializers.UUIDField(
         source="regulatory_case.public_id", read_only=True
@@ -49,7 +49,7 @@ class SectionSerializer(serializers.ModelSerializer):
     recursive serialisation of an unbounded tree on every request is exactly
     the N+1 shape this avoids."""
 
-    owner = UserRefSerializer(read_only=True)
+    owner = DossierUserRefSerializer(read_only=True)
     parent_public_id = serializers.SerializerMethodField()
     is_retired = serializers.BooleanField(read_only=True)
 
@@ -80,8 +80,8 @@ class SectionSerializer(serializers.ModelSerializer):
 
 
 class BlockerSerializer(serializers.ModelSerializer):
-    created_by = UserRefSerializer(read_only=True)
-    resolved_by = UserRefSerializer(read_only=True)
+    created_by = DossierUserRefSerializer(read_only=True)
+    resolved_by = DossierUserRefSerializer(read_only=True)
     section_public_id = serializers.UUIDField(source="section.public_id", read_only=True)
 
     class Meta:
@@ -184,7 +184,7 @@ class BlockerCreateSerializer(serializers.Serializer):
         return v.strip()
 
 
-class LinkRequestSerializer(serializers.Serializer):
+class SectionLinkRequestSerializer(serializers.Serializer):
     """The kind comes from the URL, not the body, so a document permission
     cannot be aimed at a workflow."""
 
@@ -192,5 +192,5 @@ class LinkRequestSerializer(serializers.Serializer):
     purpose = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
 
-class StatusChangeSerializer(serializers.Serializer):
+class DossierStatusChangeSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=2000, required=False, allow_blank=True)

@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { regulatoryCases, ApiError, type CaseDetail } from "@/lib/api";
 import { CaseStatusBadge } from "../status-badge";
+import { CaseDossiersPanel } from "./dossiers-panel";
 
 const T = {
   ink: "#001f45",
@@ -17,7 +18,7 @@ const T = {
   navy: "#003865",
 } as const;
 
-const TABS = ["overview", "documents", "workflows", "checklists", "evidence"] as const;
+const TABS = ["overview", "documents", "workflows", "checklists", "dossiers", "evidence"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -25,6 +26,7 @@ const TAB_LABELS: Record<Tab, string> = {
   documents: "Documents",
   workflows: "Workflow",
   checklists: "Checklists",
+  dossiers: "Dossiers",
   evidence: "Evidence / Activity",
 };
 
@@ -443,6 +445,14 @@ function CaseDetailInner() {
             tenantSlug={tenantSlug}
           />
         </section>
+      )}
+
+      {tab === "dossiers" && (
+        <CaseDossiersPanel
+          tenantSlug={tenantSlug}
+          casePublicId={publicId}
+          caseTerminal={c.is_terminal}
+        />
       )}
 
       {tab === "evidence" && (

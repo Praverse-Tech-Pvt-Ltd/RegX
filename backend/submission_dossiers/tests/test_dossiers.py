@@ -350,6 +350,54 @@ class TestDossierAggregation:
         assert r.data["summary"]["overall_readiness"] == Readiness.NOT_READY
         assert r.data["summary"]["total_sections"] == 0
 
+    def test_a_dossier_with_no_required_sections_never_reaches_ready(
+        self, client_doer_a, dossier_a, tenant_a, doer_a
+    ):
+        """KNOWN LIMITATION, pinned deliberately so it cannot drift unnoticed.
+
+        `aggregate()` derives overall readiness from the REQUIRED, non-N/A
+        sections only. Three shapes therefore have no required sections at all
+        and can never reach READY, so `complete_dossier` refuses them forever:
+
+          1. an empty dossier -- intended, and the reason code is truthful;
+          2. every section optional, even when every one of them is READY;
+          3. every section NOT_APPLICABLE.
+
+        (1) is the designed behaviour. (2) and (3) fall out of the same rule and
+        are a usability trap rather than a safety property: the returned reason
+        is NO_SUPPORTING_WORK, which is FALSE in case (2) -- the work exists and
+        is ready, it simply is not required.
+
+        This is NOT fixed here. What READY should mean for a dossier that
+        requires nothing is a governance judgement about the meaning of a
+        regulatory readiness signal, not an implementation detail, so it is
+        raised for the owner rather than decided unilaterally. The conservative
+        behaviour (refuse to complete) is the safe side to be wrong on: it
+        under-claims readiness rather than over-claiming it.
+        """
+        optional_ready = make_section(dossier_a, tenant_a, doer_a, "1", required=False)
+        services.update_section(
+            section=optional_ready,
+            tenant=tenant_a,
+            actor=doer_a,
+            status=SectionStatus.COMPLETE,
+        )
+        assert _refresh(optional_ready).readiness == Readiness.READY
+
+        r = client_doer_a.get(f"{DOSS}/{dossier_a.public_id}/")
+        summary = r.data["summary"]
+        # Every section present is READY ...
+        assert summary["ready"] == 1
+        assert summary["not_ready"] == 0
+        # ... and the dossier still reports NOT_READY, with a reason that does
+        # not describe what actually happened.
+        assert summary["overall_readiness"] == Readiness.NOT_READY
+        assert summary["overall_reason"] == ReadinessReason.NO_SUPPORTING_WORK
+
+        # And completion is refused, not merely discouraged.
+        with pytest.raises(services.NotReady):
+            services.complete_dossier(dossier=dossier_a, tenant=tenant_a, actor=doer_a)
+
     def test_summary_counts(self, client_doer_a, dossier_a, tenant_a, doer_a):
         a = make_section(dossier_a, tenant_a, doer_a, "1")
         make_section(dossier_a, tenant_a, doer_a, "2", required=False)

@@ -43,13 +43,13 @@ from .serializers import (
     BlockerSerializer,
     DossierCreateSerializer,
     DossierSerializer,
+    DossierStatusChangeSerializer,
     DossierUpdateSerializer,
-    LinkRequestSerializer,
     ReorderSerializer,
     SectionCreateSerializer,
+    SectionLinkRequestSerializer,
     SectionSerializer,
     SectionUpdateSerializer,
-    StatusChangeSerializer,
 )
 
 KINDS = ("document", "workflow", "checklist")
@@ -228,11 +228,11 @@ class DossierCompleteView(APIView):
 
     permission_classes = [CanCompleteDossiers]
 
-    @extend_schema(tags=["submission-dossiers"], request=StatusChangeSerializer)
+    @extend_schema(tags=["submission-dossiers"], request=DossierStatusChangeSerializer)
     def post(self, request, public_id):
         tenant = _tenant(request)
         dossier = _get_dossier_or_404(public_id, tenant)
-        s = StatusChangeSerializer(data=request.data)
+        s = DossierStatusChangeSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         try:
             updated = services.complete_dossier(
@@ -256,11 +256,11 @@ class DossierCompleteView(APIView):
 class DossierCancelView(APIView):
     permission_classes = [CanCancelDossiers]
 
-    @extend_schema(tags=["submission-dossiers"], request=StatusChangeSerializer)
+    @extend_schema(tags=["submission-dossiers"], request=DossierStatusChangeSerializer)
     def post(self, request, public_id):
         tenant = _tenant(request)
         dossier = _get_dossier_or_404(public_id, tenant)
-        s = StatusChangeSerializer(data=request.data)
+        s = DossierStatusChangeSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         try:
             updated = services.cancel_dossier(
@@ -513,11 +513,11 @@ class SectionLinkListCreateView(APIView):
         rows = services.active_links(kind=self.kind, section=section)
         return Response(project_links(self.kind, rows, request.user, tenant))
 
-    @extend_schema(tags=["submission-dossiers"], request=LinkRequestSerializer)
+    @extend_schema(tags=["submission-dossiers"], request=SectionLinkRequestSerializer)
     def post(self, request, public_id):
         tenant = _tenant(request)
         section = _get_section_or_404(public_id, tenant)
-        s = LinkRequestSerializer(data=request.data)
+        s = SectionLinkRequestSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         try:
             link = services.link_target(
