@@ -72,12 +72,12 @@ function OrangeBookSearchInner() {
   return (
     <main style={{ maxWidth: 1000, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← FDA releases
         </Link>
       </div>
       <h1 style={{ margin: "0 0 1rem" }}>Orange Book Product Search</h1>
-      <p style={{ fontSize: 13, color: "#6b7280", marginTop: -8, marginBottom: "1rem" }}>
+      <p style={{ fontSize: 13, color: "#66768b", marginTop: -8, marginBottom: "1rem" }}>
         Results shown here are FDA-sourced reference records only. Selecting one as your
         reference product is always a separate, explicit step on your product record — no
         product is ever auto-selected as an RLD or reference standard, even when it is the
@@ -89,36 +89,36 @@ function OrangeBookSearchInner() {
           value={ingredient}
           onChange={(e) => setIngredient(e.target.value)}
           placeholder="Active ingredient"
-          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, flex: 1, minWidth: 160 }}
+          style={{ padding: "6px 10px", border: "1px solid #dce7f4", borderRadius: 4, flex: 1, minWidth: 160 }}
         />
         <input
           value={route}
           onChange={(e) => setRoute(e.target.value)}
           placeholder="Route code (e.g. oral)"
-          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 150 }}
+          style={{ padding: "6px 10px", border: "1px solid #dce7f4", borderRadius: 4, width: 150 }}
         />
         <input
           value={dosageForm}
           onChange={(e) => setDosageForm(e.target.value)}
           placeholder="Dosage form code (e.g. tablet)"
-          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 180 }}
+          style={{ padding: "6px 10px", border: "1px solid #dce7f4", borderRadius: 4, width: 180 }}
         />
         <input
           value={strength}
           onChange={(e) => setStrength(e.target.value)}
           placeholder="Strength (e.g. 500MG)"
-          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 140 }}
+          style={{ padding: "6px 10px", border: "1px solid #dce7f4", borderRadius: 4, width: 140 }}
         />
         <input
           value={applicationType}
           onChange={(e) => setApplicationType(e.target.value)}
           placeholder="Application type (e.g. A)"
-          style={{ padding: "6px 10px", border: "1px solid #d1d5db", borderRadius: 4, width: 160 }}
+          style={{ padding: "6px 10px", border: "1px solid #dce7f4", borderRadius: 4, width: 160 }}
         />
         <button
           type="submit"
           disabled={loading}
-          style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 6, padding: "8px 18px", cursor: loading ? "not-allowed" : "pointer", fontWeight: 600 }}
+          style={{ background: "#045e8f", color: "#fff", border: "none", borderRadius: 6, padding: "8px 18px", cursor: loading ? "not-allowed" : "pointer", fontWeight: 600 }}
         >
           {loading ? "Searching…" : "Search"}
         </button>
@@ -142,7 +142,7 @@ function OrangeBookSearchInner() {
           <select
             value={discontinuedFilter}
             onChange={(e) => setDiscontinuedFilter(e.target.value as "" | "true" | "false")}
-            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #d1d5db" }}
+            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #dce7f4" }}
           >
             <option value="">Any</option>
             <option value="false">Active only</option>
@@ -152,19 +152,19 @@ function OrangeBookSearchInner() {
       </div>
 
       {error && (
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error}
         </p>
       )}
       {searched && results.length === 0 && !error && (
-        <p style={{ color: "#6b7280" }}>No matching Orange Book products found.</p>
+        <p style={{ color: "#66768b" }}>No matching Orange Book products found.</p>
       )}
 
       {results.length > 0 && (
         <>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
-              <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+              <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
                 <th style={{ padding: "8px 12px" }} scope="col">
                   Trade name <ProvenanceLabel kind="FDA_SOURCE" />
                 </th>
@@ -187,20 +187,20 @@ function OrangeBookSearchInner() {
             </thead>
             <tbody>
               {results.map((p) => (
-                <tr key={p.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <tr key={p.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                   <td style={{ padding: "10px 12px" }}>
                     <Link
                       href={`/fda-data/orange-book/${p.public_id}?tenant=${tenantSlug}`}
-                      style={{ color: "#1d4ed8", textDecoration: "none" }}
+                      style={{ color: "#045e8f", textDecoration: "none" }}
                     >
                       {p.trade_name || "(untitled)"}
                     </Link>
                   </td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                  <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
                     {p.application_number}-{p.product_number}
                   </td>
                   <td style={{ padding: "10px 12px" }}>{p.strength_raw}</td>
-                  <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                  <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
                     {p.route_normalized ?? p.route_raw} / {p.dosage_form_normalized ?? p.dosage_form_raw}
                   </td>
                   <td style={{ padding: "10px 12px", fontSize: 12 }}>
@@ -216,15 +216,15 @@ function OrangeBookSearchInner() {
             <button
               onClick={() => runSearch(page - 1)}
               disabled={page <= 1 || loading}
-              style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: page <= 1 ? "not-allowed" : "pointer", fontSize: 13 }}
+              style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #dce7f4", background: "#fff", cursor: page <= 1 ? "not-allowed" : "pointer", fontSize: 13 }}
             >
               Previous
             </button>
-            <span style={{ fontSize: 13, color: "#6b7280", alignSelf: "center" }}>Page {page}</span>
+            <span style={{ fontSize: 13, color: "#66768b", alignSelf: "center" }}>Page {page}</span>
             <button
               onClick={() => runSearch(page + 1)}
               disabled={!hasNext || loading}
-              style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #d1d5db", background: "#fff", cursor: !hasNext ? "not-allowed" : "pointer", fontSize: 13 }}
+              style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #dce7f4", background: "#fff", cursor: !hasNext ? "not-allowed" : "pointer", fontSize: 13 }}
             >
               Next
             </button>

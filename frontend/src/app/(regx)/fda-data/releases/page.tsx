@@ -7,14 +7,14 @@ import { fdaData, type FdaDataSourceRelease, type FdaReleaseStatus, ApiError } f
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 
 const STATUS_COLOURS: Record<FdaReleaseStatus, string> = {
-  registered: "#374151",
-  staged: "#374151",
-  validated: "#1d4ed8",
-  under_review: "#92400e",
-  approved: "#0f766e",
-  active: "#166534",
-  superseded: "#6b7280",
-  rejected: "#991b1b",
+  registered: "#314155",
+  staged: "#314155",
+  validated: "#045e8f",
+  under_review: "#8a5a10",
+  approved: "#0e6b6b",
+  active: "#1a6b46",
+  superseded: "#66768b",
+  rejected: "#8f2c20",
 };
 
 function StatusBadge({ status }: { status: FdaReleaseStatus }) {
@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: FdaReleaseStatus }) {
         fontWeight: 600,
         padding: "2px 7px",
         borderRadius: 4,
-        background: STATUS_COLOURS[status] ?? "#374151",
+        background: STATUS_COLOURS[status] ?? "#314155",
         color: "#fff",
         textTransform: "uppercase",
       }}
@@ -85,20 +85,20 @@ function FdaReleasesPageInner() {
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <Link
             href={`/fda-data/orange-book?tenant=${tenantSlug}`}
-            style={{ fontSize: 13, color: "#1d4ed8", textDecoration: "none" }}
+            style={{ fontSize: 13, color: "#045e8f", textDecoration: "none" }}
           >
             Orange Book search
           </Link>
           <Link
             href={`/fda-data/mappings?tenant=${tenantSlug}`}
-            style={{ fontSize: 13, color: "#1d4ed8", textDecoration: "none" }}
+            style={{ fontSize: 13, color: "#045e8f", textDecoration: "none" }}
           >
             Terminology mappings
           </Link>
           <Link
             href={`/fda-data/releases/new?tenant=${tenantSlug}`}
             style={{
-              background: "#1d4ed8",
+              background: "#045e8f",
               color: "#fff",
               border: "none",
               borderRadius: 6,
@@ -114,19 +114,19 @@ function FdaReleasesPageInner() {
         </div>
       </div>
 
-      <p style={{ fontSize: 13, color: "#6b7280", marginTop: -8, marginBottom: "1rem" }}>
+      <p style={{ fontSize: 13, color: "#66768b", marginTop: -8, marginBottom: "1rem" }}>
         Registering a release only stages it. Activation always requires an explicit,
         separately-permissioned action after review and approval — nothing here
         auto-activates.
       </p>
 
       <div style={{ marginBottom: "1rem" }}>
-        <label style={{ fontSize: 13, color: "#374151" }}>
+        <label style={{ fontSize: 13, color: "#314155" }}>
           Filter by dataset type:{" "}
           <select
             value={datasetFilter}
             onChange={(e) => setDatasetFilter(e.target.value)}
-            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #d1d5db", fontSize: 13 }}
+            style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #dce7f4", fontSize: 13 }}
           >
             <option value="">All</option>
             <option value="orange_book_products">Orange Book products</option>
@@ -143,18 +143,18 @@ function FdaReleasesPageInner() {
 
       {loading && <p>Loading…</p>}
       {error && (
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error}
         </p>
       )}
       {!loading && items.length === 0 && !error && (
-        <p style={{ color: "#6b7280" }}>No FDA data-source releases registered yet.</p>
+        <p style={{ color: "#66768b" }}>No FDA data-source releases registered yet.</p>
       )}
 
       {items.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
-            <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+            <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
               <th style={{ padding: "8px 12px" }} scope="col">
                 Source
               </th>
@@ -174,25 +174,25 @@ function FdaReleasesPageInner() {
           </thead>
           <tbody>
             {items.map((release) => (
-              <tr key={release.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+              <tr key={release.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                 <td style={{ padding: "10px 12px" }}>
                   <Link
                     href={`/fda-data/releases/${release.public_id}?tenant=${tenantSlug}`}
-                    style={{ color: "#1d4ed8", textDecoration: "none" }}
+                    style={{ color: "#045e8f", textDecoration: "none" }}
                   >
                     {release.source_name}
                   </Link>
                 </td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontFamily: "monospace", fontSize: 12 }}>
+                <td style={{ padding: "10px 12px", color: "#66768b", fontFamily: "monospace", fontSize: 12 }}>
                   {release.dataset_type}
                 </td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
                   {release.publication_date ?? "—"}
                 </td>
                 <td style={{ padding: "10px 12px" }}>
                   <StatusBadge status={release.status} />
                 </td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
                   {release.record_count_imported}/{release.record_count_extracted}
                 </td>
               </tr>

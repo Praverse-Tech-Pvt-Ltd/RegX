@@ -128,7 +128,7 @@ function WorkflowDetailInner() {
       </div>
 
       {error && (
-        <p role="alert" data-testid="workflow-error" style={{ color: "#b91c1c" }}>
+        <p role="alert" data-testid="workflow-error" style={{ color: "#c0392b" }}>
           {error}
         </p>
       )}
@@ -143,7 +143,7 @@ function WorkflowDetailInner() {
         <dt>Due</dt>
         <dd>
           {item.due_at ? new Date(item.due_at).toLocaleString() : "—"}
-          {item.is_overdue && <strong style={{ color: "#b91c1c" }}> Overdue</strong>}
+          {item.is_overdue && <strong style={{ color: "#c0392b" }}> Overdue</strong>}
         </dd>
       </dl>
 
@@ -166,7 +166,7 @@ function WorkflowDetailInner() {
                 style={{
                   padding: "0.45rem 0.9rem",
                   borderRadius: 6,
-                  border: "1px solid #cbd5e1",
+                  border: "1px solid #dce7f4",
                   background: "#fff",
                   cursor: submitting ? "default" : "pointer",
                 }}
@@ -181,10 +181,10 @@ function WorkflowDetailInner() {
       {pendingAction && (
         <section
           data-testid="reason-form"
-          style={{ border: "1px solid #cbd5e1", borderRadius: 8, padding: "1rem" }}
+          style={{ border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem" }}
         >
           <h3 style={{ marginTop: 0 }}>{ACTION_LABELS[pendingAction]} — reason required</h3>
-          <p style={{ fontSize: "0.9rem", color: "#475569" }}>
+          <p style={{ fontSize: "0.9rem", color: "#66768b" }}>
             A reason is recorded in the workflow history. It is not an electronic signature.
           </p>
           <textarea
@@ -232,7 +232,7 @@ function WorkflowDetailInner() {
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }} data-testid="history-table">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>
+              <tr style={{ textAlign: "left", borderBottom: "2px solid #dce7f4" }}>
                 <th style={{ padding: "0.4rem" }}>When</th>
                 <th style={{ padding: "0.4rem" }}>Change</th>
                 <th style={{ padding: "0.4rem" }}>Actor</th>
@@ -241,7 +241,7 @@ function WorkflowDetailInner() {
             </thead>
             <tbody>
               {history.map((row) => (
-                <tr key={row.public_id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <tr key={row.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                   <td style={{ padding: "0.4rem" }}>
                     {new Date(row.created_at).toLocaleString()}
                   </td>

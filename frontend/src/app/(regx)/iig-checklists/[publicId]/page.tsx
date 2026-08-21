@@ -12,14 +12,14 @@ import {
 } from "@/lib/api";
 
 const STATUS_COLOURS: Record<ChecklistVersionStatus, string> = {
-  draft: "#374151",
-  under_review: "#92400e",
-  returned: "#b45309",
-  approved: "#0f766e",
-  active: "#166534",
-  superseded: "#6b7280",
-  rejected: "#991b1b",
-  retired: "#6b7280",
+  draft: "#314155",
+  under_review: "#8a5a10",
+  returned: "#a8690f",
+  approved: "#0e6b6b",
+  active: "#1a6b46",
+  superseded: "#66768b",
+  rejected: "#8f2c20",
+  retired: "#66768b",
 };
 
 function StatusBadge({ status }: { status: ChecklistVersionStatus }) {
@@ -30,7 +30,7 @@ function StatusBadge({ status }: { status: ChecklistVersionStatus }) {
         fontWeight: 600,
         padding: "2px 7px",
         borderRadius: 4,
-        background: STATUS_COLOURS[status] ?? "#374151",
+        background: STATUS_COLOURS[status] ?? "#314155",
         color: "#fff",
         textTransform: "uppercase",
       }}
@@ -135,7 +135,7 @@ function DefinitionDetailInner() {
   if (error || !definition) {
     return (
       <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error ?? "Checklist definition not found."}
         </p>
       </main>
@@ -155,26 +155,26 @@ function DefinitionDetailInner() {
   return (
     <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/iig-checklists?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/iig-checklists?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← Checklist definitions
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.25rem" }}>{definition.title}</h1>
-      <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0, fontFamily: "monospace" }}>
+      <p style={{ color: "#66768b", fontSize: 13, marginTop: 0, fontFamily: "monospace" }}>
         {definition.code} · {definition.scope_type.replace(/_/g, " ")}
       </p>
       {definition.description && (
-        <p style={{ fontSize: 14, color: "#374151" }}>{definition.description}</p>
+        <p style={{ fontSize: 14, color: "#314155" }}>{definition.description}</p>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: "1rem", flexWrap: "wrap" }}>
         {canDeleteAsEmptyDraft && (
-          <button onClick={deleteDefinition} disabled={actionBusy} style={{ ...buttonStyle, background: "#991b1b" }}>
+          <button onClick={deleteDefinition} disabled={actionBusy} style={{ ...buttonStyle, background: "#8f2c20" }}>
             Delete draft definition
           </button>
         )}
         {clonableVersion && (
-          <button onClick={() => cloneDefinition(clonableVersion)} disabled={actionBusy} style={{ ...buttonStyle, background: "#374151" }}>
+          <button onClick={() => cloneDefinition(clonableVersion)} disabled={actionBusy} style={{ ...buttonStyle, background: "#314155" }}>
             Clone into new definition
           </button>
         )}
@@ -190,17 +190,17 @@ function DefinitionDetailInner() {
       </div>
 
       {actionError && (
-        <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+        <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
           {actionError}
         </p>
       )}
 
       {versions.length === 0 ? (
-        <p style={{ color: "#6b7280", fontSize: 14 }}>No versions yet.</p>
+        <p style={{ color: "#66768b", fontSize: 14 }}>No versions yet.</p>
       ) : (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
-            <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+            <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
               <th style={{ padding: "8px 12px" }} scope="col">
                 Version
               </th>
@@ -214,11 +214,11 @@ function DefinitionDetailInner() {
           </thead>
           <tbody>
             {versions.map((v) => (
-              <tr key={v.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+              <tr key={v.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                 <td style={{ padding: "10px 12px" }}>
                   <Link
                     href={`/iig-checklists/versions/${v.public_id}?tenant=${tenantSlug}`}
-                    style={{ color: "#1d4ed8", textDecoration: "none" }}
+                    style={{ color: "#045e8f", textDecoration: "none" }}
                   >
                     v{v.version_number}
                   </Link>
@@ -226,7 +226,7 @@ function DefinitionDetailInner() {
                 <td style={{ padding: "10px 12px" }}>
                   <StatusBadge status={v.status} />
                 </td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
                   {v.effective_date ?? "—"}
                 </td>
               </tr>
@@ -235,7 +235,7 @@ function DefinitionDetailInner() {
         </table>
       )}
 
-      <p style={{ fontSize: 12, color: "#6b7280", marginTop: 16 }}>
+      <p style={{ fontSize: 12, color: "#66768b", marginTop: 16 }}>
         This screen governs checklist structure and lifecycle only. It never displays
         or produces checklist execution responses or calculation outcomes.
       </p>
@@ -244,7 +244,7 @@ function DefinitionDetailInner() {
 }
 
 const buttonStyle: React.CSSProperties = {
-  background: "#1d4ed8",
+  background: "#045e8f",
   color: "#fff",
   border: "none",
   borderRadius: 6,

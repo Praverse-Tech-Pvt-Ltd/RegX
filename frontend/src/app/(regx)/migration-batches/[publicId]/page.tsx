@@ -13,14 +13,14 @@ import {
 
 function resultColour(result: MigrationRecordResult["result"]) {
   const colours: Record<string, string> = {
-    imported: "#166534",
-    skipped: "#6b7280",
-    excluded: "#92400e",
-    duplicate: "#92400e",
-    failed: "#991b1b",
-    requires_review: "#1d4ed8",
+    imported: "#1a6b46",
+    skipped: "#66768b",
+    excluded: "#8a5a10",
+    duplicate: "#8a5a10",
+    failed: "#8f2c20",
+    requires_review: "#045e8f",
   };
-  return colours[result] ?? "#374151";
+  return colours[result] ?? "#314155";
 }
 
 function MigrationBatchDetailPageInner() {
@@ -100,7 +100,7 @@ function MigrationBatchDetailPageInner() {
   }
 
   if (loading) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p>Loading…</p></main>;
-  if (error) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p role="alert" style={{ color: "#b91c1c" }}>{error}</p></main>;
+  if (error) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p role="alert" style={{ color: "#c0392b" }}>{error}</p></main>;
   if (!batch) return null;
 
   const csvUrl = `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/regx/v1/migration-batches/${publicId}/reconciliation.csv`;
@@ -108,18 +108,18 @@ function MigrationBatchDetailPageInner() {
   return (
     <main style={{ maxWidth: 960, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/migration-batches?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/migration-batches?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← All migration batches
         </Link>
       </div>
 
       <h1 style={{ margin: "0 0 4px" }}>Migration Batch</h1>
-      <p style={{ color: "#6b7280", fontFamily: "monospace", fontSize: 13 }}>{batch.correlation_id}</p>
+      <p style={{ color: "#66768b", fontFamily: "monospace", fontSize: 13 }}>{batch.correlation_id}</p>
 
       <section style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ fontSize: 16, marginBottom: "0.5rem" }}>Reconciliation summary</h2>
         {!report && (
-          <p style={{ color: "#6b7280", fontSize: 13 }}>
+          <p style={{ color: "#66768b", fontSize: 13 }}>
             Reconciliation reports are restricted to reviewers with export permission.
           </p>
         )}
@@ -129,7 +129,7 @@ function MigrationBatchDetailPageInner() {
               <tbody>
                 {Object.entries(report.counts).map(([key, value]) => (
                   <tr key={key}>
-                    <td style={{ padding: "2px 12px 2px 0", color: "#6b7280", textTransform: "capitalize" }}>
+                    <td style={{ padding: "2px 12px 2px 0", color: "#66768b", textTransform: "capitalize" }}>
                       {key.replace(/_/g, " ")}
                     </td>
                     <td style={{ padding: "2px 0", fontWeight: 600 }}>{value}</td>
@@ -138,7 +138,7 @@ function MigrationBatchDetailPageInner() {
               </tbody>
             </table>
             <div style={{ marginTop: 8 }}>
-              <a href={csvUrl} style={{ fontSize: 13, color: "#1d4ed8" }}>
+              <a href={csvUrl} style={{ fontSize: 13, color: "#045e8f" }}>
                 Download reconciliation.csv
               </a>
             </div>
@@ -150,7 +150,7 @@ function MigrationBatchDetailPageInner() {
         <h2 style={{ fontSize: 16, marginBottom: "0.5rem" }}>Record-level results ({results.length})</h2>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+            <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
               <th style={{ padding: "6px 10px" }}>Source identifier</th>
               <th style={{ padding: "6px 10px" }}>Result</th>
               <th style={{ padding: "6px 10px" }}>Reason</th>
@@ -158,7 +158,7 @@ function MigrationBatchDetailPageInner() {
           </thead>
           <tbody>
             {results.map((r) => (
-              <tr key={r.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+              <tr key={r.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                 <td style={{ padding: "6px 10px", fontFamily: "monospace" }}>{r.source_record_identifier}</td>
                 <td style={{ padding: "6px 10px" }}>
                   <span
@@ -175,7 +175,7 @@ function MigrationBatchDetailPageInner() {
                     {r.result.replace(/_/g, " ")}
                   </span>
                 </td>
-                <td style={{ padding: "6px 10px", color: "#6b7280" }}>{r.reason_code || "—"}</td>
+                <td style={{ padding: "6px 10px", color: "#66768b" }}>{r.reason_code || "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -189,7 +189,7 @@ function MigrationBatchDetailPageInner() {
           </h2>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+              <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
                 <th style={{ padding: "6px 10px" }}>Record</th>
                 <th style={{ padding: "6px 10px" }}>Rule</th>
                 <th style={{ padding: "6px 10px" }}>Raw value</th>
@@ -198,9 +198,9 @@ function MigrationBatchDetailPageInner() {
             </thead>
             <tbody>
               {report.normalization_mappings.map((m) => (
-                <tr key={m.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <tr key={m.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                   <td style={{ padding: "6px 10px", fontFamily: "monospace" }}>{m.source_record_identifier}</td>
-                  <td style={{ padding: "6px 10px", color: "#6b7280" }}>{m.normalization_rule}</td>
+                  <td style={{ padding: "6px 10px", color: "#66768b" }}>{m.normalization_rule}</td>
                   <td style={{ padding: "6px 10px", maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={m.raw_value}>
                     {m.raw_value}
                   </td>
@@ -220,13 +220,13 @@ function MigrationBatchDetailPageInner() {
           Duplicate candidates ({report.duplicate_candidates.length})
         </h2>
         {report.duplicate_candidates.length === 0 && (
-          <p style={{ color: "#6b7280", fontSize: 13 }}>No duplicate candidates for this batch.</p>
+          <p style={{ color: "#66768b", fontSize: 13 }}>No duplicate candidates for this batch.</p>
         )}
         {report.duplicate_candidates.length > 0 && (
           <>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+                <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
                   <th style={{ padding: "6px 10px" }}>Match type</th>
                   <th style={{ padding: "6px 10px" }}>Current resolution</th>
                   <th style={{ padding: "6px 10px" }}>Set resolution</th>
@@ -234,8 +234,8 @@ function MigrationBatchDetailPageInner() {
               </thead>
               <tbody>
                 {report.duplicate_candidates.map((candidate) => (
-                  <tr key={candidate.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                    <td style={{ padding: "6px 10px", color: "#6b7280" }}>{candidate.match_type.replace(/_/g, " ")}</td>
+                  <tr key={candidate.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
+                    <td style={{ padding: "6px 10px", color: "#66768b" }}>{candidate.match_type.replace(/_/g, " ")}</td>
                     <td style={{ padding: "6px 10px", textTransform: "capitalize" }}>{candidate.resolution}</td>
                     <td style={{ padding: "6px 10px" }}>
                       <select
@@ -243,7 +243,7 @@ function MigrationBatchDetailPageInner() {
                         onChange={(e) =>
                           setResolutions((prev) => ({ ...prev, [candidate.public_id]: e.target.value }))
                         }
-                        style={{ fontSize: 12, padding: "3px 6px", borderRadius: 4, border: "1px solid #d1d5db" }}
+                        style={{ fontSize: 12, padding: "3px 6px", borderRadius: 4, border: "1px solid #dce7f4" }}
                       >
                         <option value="">— no change —</option>
                         <option value="same">Same</option>
@@ -256,7 +256,7 @@ function MigrationBatchDetailPageInner() {
                 ))}
               </tbody>
             </table>
-            {reviewError && <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginTop: 8 }}>{reviewError}</p>}
+            {reviewError && <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginTop: 8 }}>{reviewError}</p>}
             <button
               onClick={submitDuplicateReview}
               disabled={reviewSubmitting}
@@ -265,7 +265,7 @@ function MigrationBatchDetailPageInner() {
                 padding: "7px 16px",
                 borderRadius: 6,
                 border: "none",
-                background: reviewSubmitting ? "#93c5fd" : "#1d4ed8",
+                background: reviewSubmitting ? "#35b1f6" : "#045e8f",
                 color: "#fff",
                 fontWeight: 600,
                 cursor: reviewSubmitting ? "not-allowed" : "pointer",

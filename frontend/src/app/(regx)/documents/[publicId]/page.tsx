@@ -25,10 +25,10 @@ function scanLabel(s: ScanStatus) {
 }
 
 function scanColour(s: ScanStatus) {
-  if (s === "clean") return "#166534";
-  if (s === "quarantined" || s === "infected") return "#991b1b";
-  if (s === "scan_failed" || s === "scanner_unavailable") return "#92400e";
-  return "#374151";
+  if (s === "clean") return "#1a6b46";
+  if (s === "quarantined" || s === "infected") return "#8f2c20";
+  if (s === "scan_failed" || s === "scanner_unavailable") return "#8a5a10";
+  return "#314155";
 }
 
 function processingLabel(s: ProcessingStatus) {
@@ -43,10 +43,10 @@ function processingLabel(s: ProcessingStatus) {
 }
 
 function processingColour(s: ProcessingStatus) {
-  if (s === "complete") return "#166534";
-  if (s === "failed") return "#991b1b";
-  if (s === "processing") return "#1d4ed8";
-  return "#374151";
+  if (s === "complete") return "#1a6b46";
+  if (s === "failed") return "#8f2c20";
+  if (s === "processing") return "#045e8f";
+  return "#314155";
 }
 
 function fmt(bytes: number) {
@@ -98,22 +98,22 @@ function VersionRow({
   return (
     <div
       style={{
-        border: `1px solid ${isCurrent ? "#bfdbfe" : "#e5e7eb"}`,
+        border: `1px solid ${isCurrent ? "#cfe8fb" : "#dce7f4"}`,
         borderRadius: 8,
         padding: "1rem",
         marginBottom: "0.75rem",
-        background: isCurrent ? "#eff6ff" : "#fff",
+        background: isCurrent ? "#f4f8fe" : "#fff",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <span style={{ fontWeight: 600 }}>Version {v.version_number}</span>
           {isCurrent && (
-            <span style={{ marginLeft: 8, fontSize: 11, padding: "1px 6px", background: "#1d4ed8", color: "#fff", borderRadius: 4 }}>
+            <span style={{ marginLeft: 8, fontSize: 11, padding: "1px 6px", background: "#045e8f", color: "#fff", borderRadius: 4 }}>
               current
             </span>
           )}
-          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: "#66768b", marginTop: 4 }}>
             {v.original_filename} &bull; {fmt(v.size_bytes)} &bull;{" "}
             {new Date(v.uploaded_at).toLocaleString()}
           </div>
@@ -154,24 +154,24 @@ function VersionRow({
               fontSize: 12,
               padding: "4px 10px",
               borderRadius: 4,
-              border: "1px solid #d1d5db",
+              border: "1px solid #dce7f4",
               cursor: "pointer",
-              background: "#f9fafb",
+              background: "#f8fbff",
             }}
           >
             {loadingLocators ? "Loading…" : showLocators ? "Hide structure" : "Show structure"}
           </button>
-          {locatorError && <span style={{ color: "#b91c1c", fontSize: 12, marginLeft: 8 }}>{locatorError}</span>}
+          {locatorError && <span style={{ color: "#c0392b", fontSize: 12, marginLeft: 8 }}>{locatorError}</span>}
           {showLocators && locators.length > 0 && (
-            <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem", fontSize: 13, color: "#374151" }}>
+            <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem", fontSize: 13, color: "#314155" }}>
               {locators.slice(0, 20).map((loc) => (
                 <li key={loc.public_id} style={{ marginBottom: 2 }}>
-                  <span style={{ color: "#6b7280", fontStyle: "italic", textTransform: "capitalize" }}>{loc.locator_type}</span>
+                  <span style={{ color: "#66768b", fontStyle: "italic", textTransform: "capitalize" }}>{loc.locator_type}</span>
                   {" "}{loc.display_label}
                 </li>
               ))}
               {locators.length > 20 && (
-                <li style={{ color: "#6b7280" }}>…and {locators.length - 20} more</li>
+                <li style={{ color: "#66768b" }}>…and {locators.length - 20} more</li>
               )}
             </ul>
           )}
@@ -272,7 +272,7 @@ function DocumentDetailPageInner() {
   }
 
   if (loading) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p>Loading…</p></main>;
-  if (error) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p role="alert" style={{ color: "#b91c1c" }}>{error}</p></main>;
+  if (error) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p role="alert" style={{ color: "#c0392b" }}>{error}</p></main>;
   if (!doc) return null;
 
   return (
@@ -280,7 +280,7 @@ function DocumentDetailPageInner() {
       <div style={{ marginBottom: "0.5rem" }}>
         <Link
           href={`/documents?tenant=${tenantSlug}`}
-          style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}
+          style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}
         >
           ← All documents
         </Link>
@@ -289,7 +289,7 @@ function DocumentDetailPageInner() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
         <div>
           <h1 style={{ margin: "0 0 4px" }}>{doc.title}</h1>
-          <span style={{ fontSize: 12, color: "#6b7280", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 12, color: "#66768b", textTransform: "uppercase" }}>
             {doc.document_type}
           </span>
           {" "}
@@ -298,8 +298,8 @@ function DocumentDetailPageInner() {
               fontSize: 11,
               padding: "2px 6px",
               borderRadius: 4,
-              background: doc.status === "archived" ? "#f3f4f6" : "#dcfce7",
-              color: doc.status === "archived" ? "#374151" : "#166534",
+              background: doc.status === "archived" ? "#e4ecf7" : "#eaf7f0",
+              color: doc.status === "archived" ? "#314155" : "#1a6b46",
               fontWeight: 600,
             }}
           >
@@ -315,7 +315,7 @@ function DocumentDetailPageInner() {
               style={{
                 padding: "7px 14px",
                 borderRadius: 6,
-                border: "1px solid #d1d5db",
+                border: "1px solid #dce7f4",
                 cursor: archiving ? "not-allowed" : "pointer",
                 fontSize: 13,
               }}
@@ -329,7 +329,7 @@ function DocumentDetailPageInner() {
               style={{
                 padding: "7px 14px",
                 borderRadius: 6,
-                border: "1px solid #d1d5db",
+                border: "1px solid #dce7f4",
                 cursor: archiving ? "not-allowed" : "pointer",
                 fontSize: 13,
               }}
@@ -340,7 +340,7 @@ function DocumentDetailPageInner() {
         </div>
       </div>
 
-      {actionError && <p role="alert" style={{ color: "#b91c1c", fontSize: 13 }}>{actionError}</p>}
+      {actionError && <p role="alert" style={{ color: "#c0392b", fontSize: 13 }}>{actionError}</p>}
 
       {doc.status === "active" && (
         <section style={{ marginBottom: "2rem" }}>
@@ -361,7 +361,7 @@ function DocumentDetailPageInner() {
                 padding: "6px 14px",
                 borderRadius: 6,
                 border: "none",
-                background: uploadingVersion || !versionFile ? "#93c5fd" : "#1d4ed8",
+                background: uploadingVersion || !versionFile ? "#35b1f6" : "#045e8f",
                 color: "#fff",
                 fontWeight: 600,
                 cursor: uploadingVersion || !versionFile ? "not-allowed" : "pointer",
@@ -371,7 +371,7 @@ function DocumentDetailPageInner() {
               {uploadingVersion ? "Uploading…" : "Upload"}
             </button>
           </form>
-          {versionError && <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginTop: 4 }}>{versionError}</p>}
+          {versionError && <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginTop: 4 }}>{versionError}</p>}
         </section>
       )}
 
@@ -379,7 +379,7 @@ function DocumentDetailPageInner() {
         <h2 style={{ fontSize: 16, marginBottom: "0.75rem" }}>
           Versions ({versions.length})
         </h2>
-        {versions.length === 0 && <p style={{ color: "#6b7280" }}>No versions found.</p>}
+        {versions.length === 0 && <p style={{ color: "#66768b" }}>No versions found.</p>}
         {versions.map((v) => (
           <VersionRow
             key={v.public_id}

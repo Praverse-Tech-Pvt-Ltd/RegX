@@ -121,3 +121,7 @@ Thumbs.db
 
 # Backup sets produced by scripts/backup.sh. Never commit application data.
 /backups/
+
+# Visual-review captures from e2e/screenshots.spec.ts -- regenerated on demand,
+# not source.
+frontend/screenshots/

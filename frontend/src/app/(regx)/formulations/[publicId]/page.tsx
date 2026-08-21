@@ -120,7 +120,7 @@ function FormulationDetailInner() {
   if (error || !product) {
     return (
       <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error ?? "Product not found."}
         </p>
       </main>
@@ -130,17 +130,17 @@ function FormulationDetailInner() {
   return (
     <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/formulations?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/formulations?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← Product records
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.25rem" }}>{product.proposed_product_name}</h1>
-      <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0 }}>
+      <p style={{ color: "#66768b", fontSize: 13, marginTop: 0 }}>
         {product.product_code} · {product.active_ingredient} <ProvenanceLabel kind="USER_INPUT" />
       </p>
 
       {/* Reference product selection */}
-      <section style={{ marginTop: "1.5rem", border: "1px solid #e5e7eb", borderRadius: 8, padding: "1rem" }}>
+      <section style={{ marginTop: "1.5rem", border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem" }}>
         <h2 style={{ fontSize: 16, margin: "0 0 0.5rem" }}>Reference product</h2>
         {product.selected_ob_product_public_id ? (
           <div style={{ fontSize: 14 }}>
@@ -148,24 +148,24 @@ function FormulationDetailInner() {
               Application {product.selected_ob_application_number}-{product.selected_ob_product_number}{" "}
               <ProvenanceLabel kind="FDA_SOURCE" />
             </p>
-            <p style={{ margin: "0 0 4px", color: "#6b7280", fontSize: 13 }}>
+            <p style={{ margin: "0 0 4px", color: "#66768b", fontSize: 13 }}>
               Selected by {product.selecting_user_email ?? "—"} <ProvenanceLabel kind="REVIEWER_CONFIRMED" />
             </p>
             {product.selection_justification && (
-              <p style={{ margin: 0, color: "#6b7280", fontSize: 13 }}>
+              <p style={{ margin: 0, color: "#66768b", fontSize: 13 }}>
                 Justification: {product.selection_justification}
               </p>
             )}
           </div>
         ) : (
-          <p style={{ color: "#6b7280", fontSize: 13 }}>
+          <p style={{ color: "#66768b", fontSize: 13 }}>
             No reference product selected. A reference must be explicitly chosen and confirmed
             -- the system never auto-selects an RLD or reference standard.
           </p>
         )}
         <button
           onClick={() => setShowSelectForm((s) => !s)}
-          style={{ marginTop: 8, background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}
+          style={{ marginTop: 8, background: "#045e8f", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", cursor: "pointer", fontWeight: 600, fontSize: 13 }}
         >
           {showSelectForm ? "Cancel" : product.selected_ob_product_public_id ? "Change reference" : "Select reference product"}
         </button>
@@ -199,7 +199,7 @@ function FormulationDetailInner() {
               I confirm this is the correct reference product for this formulation.
             </label>
             {selError && (
-              <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+              <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
                 {selError}
               </p>
             )}
@@ -211,12 +211,12 @@ function FormulationDetailInner() {
       </section>
 
       {/* Formulation versions */}
-      <section style={{ marginTop: "1.5rem", border: "1px solid #e5e7eb", borderRadius: 8, padding: "1rem" }}>
+      <section style={{ marginTop: "1.5rem", border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem" }}>
         <h2 style={{ fontSize: 16, margin: "0 0 0.5rem" }}>Formulation versions</h2>
         {versions.length > 0 ? (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 12 }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #e5e7eb", textAlign: "left" }}>
+              <tr style={{ borderBottom: "1px solid #dce7f4", textAlign: "left" }}>
                 <th style={{ padding: "6px 8px" }} scope="col">
                   Version
                 </th>
@@ -230,11 +230,11 @@ function FormulationDetailInner() {
             </thead>
             <tbody>
               {versions.map((v) => (
-                <tr key={v.public_id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                <tr key={v.public_id} style={{ borderBottom: "1px solid #f4f8fe" }}>
                   <td style={{ padding: "6px 8px" }}>
                     <Link
                       href={`/formulations/${publicId}/versions/${v.public_id}?tenant=${tenantSlug}`}
-                      style={{ color: "#1d4ed8", textDecoration: "none" }}
+                      style={{ color: "#045e8f", textDecoration: "none" }}
                     >
                       v{v.version_number}
                     </Link>
@@ -242,13 +242,13 @@ function FormulationDetailInner() {
                   <td style={{ padding: "6px 8px" }}>
                     {v.total_dosage_unit_weight} {v.total_dosage_unit_weight_unit}
                   </td>
-                  <td style={{ padding: "6px 8px", color: "#6b7280" }}>{v.status}</td>
+                  <td style={{ padding: "6px 8px", color: "#66768b" }}>{v.status}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : (
-          <p style={{ color: "#6b7280", fontSize: 13 }}>No formulation version created yet.</p>
+          <p style={{ color: "#66768b", fontSize: 13 }}>No formulation version created yet.</p>
         )}
         <button onClick={() => setShowVersionForm((s) => !s)} style={smallButtonStyle}>
           {showVersionForm ? "Cancel" : "Create formulation version"}
@@ -270,7 +270,7 @@ function FormulationDetailInner() {
               </label>
             </div>
             {versionError && (
-              <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+              <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
                 {versionError}
               </p>
             )}
@@ -289,13 +289,13 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   marginTop: 4,
   padding: "6px 8px",
-  border: "1px solid #d1d5db",
+  border: "1px solid #dce7f4",
   borderRadius: 4,
   boxSizing: "border-box",
 };
 
 const smallButtonStyle: React.CSSProperties = {
-  background: "#1d4ed8",
+  background: "#045e8f",
   color: "#fff",
   border: "none",
   borderRadius: 6,
