@@ -25,6 +25,7 @@ PERM_APPROVE = "workflows.approve"
 PERM_REJECT = "workflows.reject"
 PERM_CANCEL = "workflows.cancel"
 PERM_ASSIGN = "workflows.assign"
+PERM_MANAGE_EVIDENCE = "workflows.manage_evidence"
 
 ALL_PERMISSIONS = [
     PERM_VIEW,
@@ -36,6 +37,7 @@ ALL_PERMISSIONS = [
     PERM_REJECT,
     PERM_CANCEL,
     PERM_ASSIGN,
+    PERM_MANAGE_EVIDENCE,
 ]
 
 #: Mirrors the intent already seeded for the legacy `workflow:*` codenames --
@@ -46,6 +48,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_VIEW,
         PERM_CREATE,
         PERM_EDIT_DRAFT,
+        PERM_MANAGE_EVIDENCE,
         PERM_SUBMIT,
         PERM_CANCEL,
     ],
@@ -69,6 +72,7 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_VIEW,
         PERM_CREATE,
         PERM_EDIT_DRAFT,
+        PERM_MANAGE_EVIDENCE,
         PERM_SUBMIT,
         PERM_CANCEL,
         PERM_ASSIGN,
@@ -160,3 +164,14 @@ class CanEditDraftWorkflows(_WorkflowPermissionBase):
 
 class CanAssignWorkflows(_WorkflowPermissionBase):
     required_codename = PERM_ASSIGN
+
+
+class CanManageWorkflowEvidence(_WorkflowPermissionBase):
+    """Workflow-side gate for evidence changes.
+
+    This is only half the check. Linking also requires documents.view, verified
+    separately in the view -- workflow permission must never confer document
+    access.
+    """
+
+    required_codename = PERM_MANAGE_EVIDENCE

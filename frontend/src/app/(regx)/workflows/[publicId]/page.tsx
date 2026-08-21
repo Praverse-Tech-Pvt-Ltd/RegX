@@ -12,6 +12,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { StateBadge } from "../state-badge";
+import { EvidenceSection } from "./evidence-section";
 
 const ACTION_LABELS: Record<WorkflowAction, string> = {
   submit: "Submit for review",
@@ -214,6 +215,15 @@ function WorkflowDetailInner() {
           </div>
         </section>
       )}
+
+      {/* Evidence. `canManage` is advisory for rendering only -- the API
+          re-checks workflows.manage_evidence AND documents.view on every call. */}
+      <EvidenceSection
+        tenantSlug={tenantSlug}
+        workflowPublicId={publicId}
+        state={item.state}
+        canManage={item.available_actions.length > 0 || item.state === "draft"}
+      />
 
       <section style={{ marginTop: "2rem" }}>
         <h2 style={{ fontSize: "1.1rem" }}>History</h2>

@@ -295,7 +295,10 @@ no `RunPython`, no data migration, no destructive forward operation.
 - **No bulk operations.** One item per request.
 - **No workflow *types*.** Every item shares one state graph; there is no
   per-type customisation, no dynamic transitions and no conditional routing.
-- **No attachments or comments thread.** A reason per transition, nothing more.
+- **Attachments: delivered in Milestone 7** — workflow items link governed
+  document versions as evidence, see [WORKFLOW_EVIDENCE.md](WORKFLOW_EVIDENCE.md).
+- **No comments thread.** A reason per transition and an optional evidence
+  label, nothing more.
 - **`available_actions` is advisory.** It reflects permissions at read time; a
   role change between read and action is resolved server-side, by refusal.
 - **Reason text is unbounded** (`TextField`). No size limit is imposed.

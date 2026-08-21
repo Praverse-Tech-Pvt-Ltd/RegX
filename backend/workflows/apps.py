@@ -24,3 +24,26 @@ class WorkflowsConfig(AppConfig):
         # scope here; this app wires its own registration rather than copying
         # the omission.
         post_migrate.connect(_register_workflow_permissions, sender=self)
+
+        # A DocumentVersion cited as workflow evidence must not be deletable.
+        # The registry keeps the dependency one-way -- documents never imports
+        # workflows -- and is the same mechanism iig_checklist uses. This is a
+        # second defence alongside the FK's on_delete=PROTECT, matching how the
+        # repository already guards governed references.
+        from documents.deletion_protection import DeletionProtectionRegistry
+
+        DeletionProtectionRegistry.register(
+            "workflow_evidence",
+            _check_workflow_evidence_reference,
+        )
+
+
+def _check_workflow_evidence_reference(document_version) -> bool:
+    """True if any workflow evidence link cites this version.
+
+    Includes unlinked rows on purpose: the historical record that a version was
+    once cited is itself governed, and deleting the version would strand it.
+    """
+    from workflows.models import WorkflowEvidence
+
+    return WorkflowEvidence.objects.filter(document_version=document_version).exists()

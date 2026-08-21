@@ -23,6 +23,8 @@ class WorkflowEvent:
     RETURNED_TO_DRAFT = "workflow.returned_to_draft"
     ASSIGNED = "workflow.assigned"
     UNASSIGNED = "workflow.unassigned"
+    EVIDENCE_LINKED = "workflow.evidence_linked"
+    EVIDENCE_UNLINKED = "workflow.evidence_unlinked"
 
 
 #: Action -> event type, for transitions driven through the service layer.
@@ -52,6 +54,13 @@ _ALLOWED_PAYLOAD_KEYS = frozenset(
         "fields_changed",
         "title_length",
         "due_at_set",
+        # Evidence. Public IDs only -- never the filename, which is
+        # user-supplied, can itself disclose subject matter, and resolves
+        # through the document API for anyone holding documents.view.
+        "workflow_public_id",
+        "document_public_id",
+        "document_version_public_id",
+        "evidence_public_id",
     }
 )
 
