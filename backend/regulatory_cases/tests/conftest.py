@@ -181,3 +181,66 @@ def document_a(db, tenant_a):
 @pytest.fixture
 def document_b(db, tenant_b):
     return _make_document(tenant_b, "Tenant B document")
+
+
+def _checklist_execution(tenant, user):
+    """A minimal real ChecklistExecution.
+
+    Built rather than stubbed: the checklist auth-separation test must exercise
+    the same projection path the API uses, and a stub would prove only that the
+    stub behaves.
+    """
+    from decimal import Decimal
+
+    from formulations.models import FormulationVersion, ProductDevelopmentRecord
+    from iig_checklist.models import (
+        ChecklistDefinition,
+        ChecklistExecution,
+        ChecklistVersion,
+    )
+
+    product = ProductDevelopmentRecord.objects.create(
+        tenant=tenant,
+        product_code=f"RC-PROD-{tenant.pk}",
+        proposed_product_name="Synthetic Product",
+        active_ingredient="Synthetic Ingredient",
+        dosage_form="tablet",
+        route="oral",
+        created_by=user,
+    )
+    formulation = FormulationVersion.objects.create(
+        product=product,
+        version_number=1,
+        status="approved",
+        total_dosage_unit_weight=Decimal("1.000000"),
+        total_dosage_unit_weight_unit="gram",
+        created_by=user,
+    )
+    definition = ChecklistDefinition.objects.create(
+        code=f"RC-CHK-{tenant.pk}",
+        title="Synthetic checklist",
+        scope_type="tenant",
+        execution_scope="formulation_version",
+        tenant=tenant,
+        created_by=user,
+    )
+    version = ChecklistVersion.objects.create(
+        definition=definition, version_number=1, status="active", created_by=user
+    )
+    return ChecklistExecution.objects.create(
+        tenant=tenant,
+        checklist_version=version,
+        formulation_version=formulation,
+        status="draft",
+        created_by=user,
+    )
+
+
+@pytest.fixture
+def checklist_a(db, tenant_a, doer_a):
+    return _checklist_execution(tenant_a, doer_a)
+
+
+@pytest.fixture
+def checklist_b(db, tenant_b, doer_b):
+    return _checklist_execution(tenant_b, doer_b)

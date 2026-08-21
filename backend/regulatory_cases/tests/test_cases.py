@@ -499,6 +499,57 @@ class TestSafeProjection:
         assert row["document_public_id"] == str(document_a.public_id)
         assert row["public_id"]
 
+    def test_checklist_detail_is_withheld_without_checklist_permission(
+        self, case_a, checklist_a, doer_a, outsider, tenant_a
+    ):
+        """The third of the three separations, proven the same way as workflows.
+
+        PLATFORM_SUPPORT cannot serve here either -- what matters is the gate,
+        and `outsider` has no membership, so `has_iig_checklist_permission`
+        returns False, which is what the projection keys on.
+        """
+        from regulatory_cases.projection import can_view_checklists, project_links
+
+        link = services.link_target(
+            kind="checklist",
+            case=case_a,
+            target_public_id=checklist_a.public_id,
+            actor=doer_a,
+            tenant=tenant_a,
+        )
+        assert can_view_checklists(outsider, tenant_a) is False
+
+        rows = project_links("checklist", [link], outsider, tenant_a)
+        assert rows[0]["restricted"] is True
+        assert "checklist" not in rows[0]
+        # The execution's own status must not appear anywhere in the row.
+        assert checklist_a.status not in str(rows[0].get("checklist", ""))
+
+    def test_checklist_link_is_tenant_scoped(self, client_doer_a, case_a, checklist_b):
+        """A checklist execution in another tenant cannot be linked, and the
+        refusal is indistinguishable from an absent one."""
+        cross = client_doer_a.post(
+            _url(case_a, "checklists/"),
+            {"target_public_id": str(checklist_b.public_id)},
+            format="json",
+        )
+        missing = client_doer_a.post(
+            _url(case_a, "checklists/"),
+            {"target_public_id": str(uuid.uuid4())},
+            format="json",
+        )
+        assert cross.status_code == missing.status_code == 400
+        assert str(cross.data["target_public_id"]) == str(missing.data["target_public_id"])
+
+    def test_checklist_link_duplicate_is_refused(self, client_doer_a, case_a, checklist_a):
+        body = {"target_public_id": str(checklist_a.public_id)}
+        assert (
+            client_doer_a.post(_url(case_a, "checklists/"), body, format="json").status_code == 201
+        )
+        assert (
+            client_doer_a.post(_url(case_a, "checklists/"), body, format="json").status_code == 409
+        )
+
     def test_summary_state_counts_are_gated_on_workflow_permission(
         self, case_a, workflow_a, doer_a, outsider, tenant_a
     ):
