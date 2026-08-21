@@ -15,11 +15,11 @@ const DECISION_STATUS_LABELS: Record<string, string> = {
 };
 
 const DECISION_COLOURS: Record<string, string> = {
-  PASS_WITH_IID_PRECEDENT: "#166534",
-  REVIEW_REQUIRED: "#92400e",
-  EXCEEDS_IID_PRECEDENT: "#991b1b",
-  NO_MATCH: "#6b7280",
-  NOT_COMPARABLE: "#6b7280",
+  PASS_WITH_IID_PRECEDENT: "#1a6b46",
+  REVIEW_REQUIRED: "#8a5a10",
+  EXCEEDS_IID_PRECEDENT: "#8f2c20",
+  NO_MATCH: "#66768b",
+  NOT_COMPARABLE: "#66768b",
 };
 
 function CalculationBlock({ label, calc }: { label: string; calc: Record<string, unknown> | undefined }) {
@@ -33,7 +33,7 @@ function CalculationBlock({ label, calc }: { label: string; calc: Record<string,
           {String(calc.value)} {calc.unit ? String(calc.unit) : ""}
         </span>
       ) : (
-        <span style={{ marginLeft: 8, color: "#92400e" }}>Blocked: {String(calc.status)}</span>
+        <span style={{ marginLeft: 8, color: "#8a5a10" }}>Blocked: {String(calc.status)}</span>
       )}
     </div>
   );
@@ -73,7 +73,7 @@ function SnapshotDetailInner() {
   if (error || !snapshot) {
     return (
       <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error ?? "Assessment snapshot not found."}
         </p>
       </main>
@@ -83,12 +83,12 @@ function SnapshotDetailInner() {
   return (
     <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/iid-assessments/preview?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/iid-assessments/preview?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← New assessment preview
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.25rem" }}>Persisted IID Assessment</h1>
-      <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0, marginBottom: "1rem" }}>
+      <p style={{ color: "#66768b", fontSize: 13, marginTop: 0, marginBottom: "1rem" }}>
         This is a frozen, immutable record. Later FDA data refreshes can never retroactively
         change what is displayed here — a correction always creates a new assessment, never an
         edit of this one.
@@ -100,7 +100,7 @@ function SnapshotDetailInner() {
           {snapshot.iid_ingredient_name || "—"} — {snapshot.iid_potency_amount ?? "FDA VALUE UNAVAILABLE"}{" "}
           {snapshot.iid_potency_unit} potency, {snapshot.iid_mde ?? "MDE UNAVAILABLE"} {snapshot.iid_mde_unit} MDE
         </p>
-        <p style={{ margin: "4px 0 0", color: "#6b7280" }}>
+        <p style={{ margin: "4px 0 0", color: "#66768b" }}>
           Route: {snapshot.iid_route || "—"} · Dosage form: {snapshot.iid_dosage_form || "—"}
         </p>
       </section>
@@ -123,12 +123,12 @@ function SnapshotDetailInner() {
       <div
         role="status"
         style={{
-          border: `1px solid ${DECISION_COLOURS[snapshot.decision_status] ?? "#6b7280"}`,
+          border: `1px solid ${DECISION_COLOURS[snapshot.decision_status] ?? "#66768b"}`,
           borderRadius: 8,
           padding: "1rem",
         }}
       >
-        <p style={{ margin: "0 0 4px", fontWeight: 700, color: DECISION_COLOURS[snapshot.decision_status] ?? "#374151" }}>
+        <p style={{ margin: "0 0 4px", fontWeight: 700, color: DECISION_COLOURS[snapshot.decision_status] ?? "#314155" }}>
           {DECISION_STATUS_LABELS[snapshot.decision_status] ?? snapshot.decision_status}
         </p>
         <p style={{ margin: 0, fontSize: 13 }}>{snapshot.decision_note}</p>
@@ -138,7 +138,7 @@ function SnapshotDetailInner() {
           </p>
         )}
         {snapshot.override_applied && (
-          <p style={{ margin: "8px 0 0", fontSize: 13, color: "#92400e" }}>
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: "#8a5a10" }}>
             Override applied: {snapshot.override_justification}
           </p>
         )}

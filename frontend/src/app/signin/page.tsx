@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { auth, ApiError } from "@/lib/api";
+import AuthLayout from "@/components/auth/AuthLayout";
 
 /**
  * Where to land after a successful sign-in.
@@ -57,37 +58,65 @@ export default function SignInPage() {
     }
   }
 
+  /*
+   * Presentation only. The markup keeps every contract the suites rely on:
+   * an <h1> matching /sign in/i, labels reading exactly "Email" and
+   * "Password", the form's accessible name "Sign in form", role="alert" on
+   * the error, and the button label "Sign in" / "Signing in...".
+   */
   return (
-    <main style={{ maxWidth: 400, margin: "4rem auto", padding: "0 1rem" }}>
-      <h1>Sign in to RegX</h1>
+    <AuthLayout
+      title="Sign in to RegX"
+      subtitle="Use your organisation account to continue."
+      footer={
+        <>
+          Access is granted by your organisation administrator.
+          <br />
+          Need an account? <a href="/ratools/requestdemo">Request access</a>
+        </>
+      }
+    >
       <form onSubmit={handleSubmit} aria-label="Sign in form">
-        <div>
+        {/* Rendered above the fields so it is adjacent to the control that
+            failed, and announced before the user re-reaches the inputs. */}
+        {error && (
+          <p role="alert" className="regx-auth__error">
+            {error}
+          </p>
+        )}
+
+        <div className="regx-auth__field">
           <label htmlFor="email">Email</label>
           <input
             id="email"
             type="email"
             autoComplete="email"
             required
+            placeholder="you@company.com"
+            disabled={loading}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
-        <div>
+
+        <div className="regx-auth__field">
           <label htmlFor="password">Password</label>
           <input
             id="password"
             type="password"
             autoComplete="current-password"
             required
+            placeholder="••••••••"
+            disabled={loading}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
         </div>
-        {error && <p role="alert" style={{ color: "red" }}>{error}</p>}
-        <button type="submit" disabled={loading}>
+
+        <button type="submit" className="regx-auth__button" disabled={loading}>
           {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
-    </main>
+    </AuthLayout>
   );
 }

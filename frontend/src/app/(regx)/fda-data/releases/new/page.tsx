@@ -64,7 +64,7 @@ function NewReleasePageInner() {
   if (!tenantSlug) {
     return (
       <main style={{ maxWidth: 700, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           Select a tenant first.
         </p>
       </main>
@@ -74,12 +74,12 @@ function NewReleasePageInner() {
   return (
     <main style={{ maxWidth: 700, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← FDA releases
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.5rem" }}>Register FDA Data-Source Release</h1>
-      <p style={{ fontSize: 13, color: "#6b7280", marginTop: 0, marginBottom: "1rem" }}>
+      <p style={{ fontSize: 13, color: "#66768b", marginTop: 0, marginBottom: "1rem" }}>
         Registration only stages the release for validation and review. It is never
         activated automatically — activation is a separate, explicitly permissioned
         step after approval.
@@ -91,7 +91,7 @@ function NewReleasePageInner() {
           <select
             value={datasetType}
             onChange={(e) => setDatasetType(e.target.value)}
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4 }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4 }}
           >
             {DATASET_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -106,7 +106,7 @@ function NewReleasePageInner() {
             value={sourceName}
             onChange={(e) => setSourceName(e.target.value)}
             required
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
           />
         </label>
         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, fontSize: 13 }}>
@@ -116,7 +116,7 @@ function NewReleasePageInner() {
             onChange={(e) => setSourceReference(e.target.value)}
             required
             placeholder="e.g. FDA Orange Book, 2026-06 edition"
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
           />
         </label>
         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, fontSize: 13 }}>
@@ -124,7 +124,7 @@ function NewReleasePageInner() {
           <input
             value={schemaVersion}
             onChange={(e) => setSchemaVersion(e.target.value)}
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
           />
         </label>
         <label style={{ display: "block", marginBottom: "1rem", fontWeight: 500, fontSize: 13 }}>
@@ -133,18 +133,18 @@ function NewReleasePageInner() {
             value={rowsJson}
             onChange={(e) => setRowsJson(e.target.value)}
             rows={6}
-            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box", fontFamily: "monospace", fontSize: 12 }}
+            style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box", fontFamily: "monospace", fontSize: 12 }}
           />
         </label>
         {formError && (
-          <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginBottom: 8 }}>
+          <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>
             {formError}
           </p>
         )}
         <button
           type="submit"
           disabled={submitting}
-          style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: submitting ? "#93c5fd" : "#1d4ed8", color: "#fff", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
+          style={{ padding: "8px 18px", borderRadius: 6, border: "none", background: submitting ? "#35b1f6" : "#045e8f", color: "#fff", fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer" }}
         >
           {submitting ? "Registering…" : "Register"}
         </button>

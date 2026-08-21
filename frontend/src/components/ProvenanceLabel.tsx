@@ -15,10 +15,10 @@ const LABELS: Record<Provenance, string> = {
 };
 
 const COLOURS: Record<Provenance, string> = {
-  FDA_SOURCE: "#1d4ed8",
-  USER_INPUT: "#374151",
-  CALCULATED: "#7c3aed",
-  REVIEWER_CONFIRMED: "#0f766e",
+  FDA_SOURCE: "#045e8f",
+  USER_INPUT: "#314155",
+  CALCULATED: "#5b3a9e",
+  REVIEWER_CONFIRMED: "#0e6b6b",
 };
 
 export function ProvenanceLabel({ kind }: { kind: Provenance }) {

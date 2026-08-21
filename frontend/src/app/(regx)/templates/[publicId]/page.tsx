@@ -14,15 +14,15 @@ import {
 } from "@/lib/api";
 
 const STATUS_COLOURS: Record<TemplateLifecycleStatus, string> = {
-  draft: "#374151",
-  imported: "#1d4ed8",
-  under_review: "#92400e",
-  returned: "#92400e",
-  approved: "#0f766e",
-  active: "#166534",
-  superseded: "#6b7280",
-  retired: "#6b7280",
-  rejected: "#991b1b",
+  draft: "#314155",
+  imported: "#045e8f",
+  under_review: "#8a5a10",
+  returned: "#8a5a10",
+  approved: "#0e6b6b",
+  active: "#1a6b46",
+  superseded: "#66768b",
+  retired: "#66768b",
+  rejected: "#8f2c20",
 };
 
 function StatusBadge({ status }: { status: TemplateLifecycleStatus }) {
@@ -33,7 +33,7 @@ function StatusBadge({ status }: { status: TemplateLifecycleStatus }) {
         fontWeight: 600,
         padding: "2px 7px",
         borderRadius: 4,
-        background: STATUS_COLOURS[status] ?? "#374151",
+        background: STATUS_COLOURS[status] ?? "#314155",
         color: "#fff",
         textTransform: "uppercase",
         letterSpacing: "0.03em",
@@ -84,30 +84,30 @@ function VersionPreview({
           fontSize: 12,
           padding: "4px 10px",
           borderRadius: 4,
-          border: "1px solid #d1d5db",
+          border: "1px solid #dce7f4",
           cursor: "pointer",
-          background: "#f9fafb",
+          background: "#f8fbff",
         }}
       >
         {loadingPreview ? "Loading…" : open ? "Hide section/item preview" : "Show section/item preview"}
       </button>
       {open && (
         <div style={{ marginTop: 8, fontSize: 13 }}>
-          {sections.length === 0 && <p style={{ color: "#6b7280" }}>No sections.</p>}
+          {sections.length === 0 && <p style={{ color: "#66768b" }}>No sections.</p>}
           {sections.map((section) => {
             const sectionItems = items.filter((it) => it.template_section === section.public_id);
             return (
               <div key={section.public_id} style={{ marginBottom: 12 }}>
-                <div style={{ fontWeight: 600, color: "#374151" }}>
+                <div style={{ fontWeight: 600, color: "#314155" }}>
                   {section.canonical_section_code} — {section.normalized_title}
                 </div>
                 {sectionItems.length === 0 ? (
-                  <p style={{ color: "#9ca3af", marginTop: 4, marginLeft: 20 }}>No items.</p>
+                  <p style={{ color: "#9fb0c4", marginTop: 4, marginLeft: 20 }}>No items.</p>
                 ) : (
                   <ul style={{ marginTop: 4, paddingLeft: 20 }}>
                     {sectionItems.map((item) => (
                       <li key={item.public_id} style={{ marginBottom: 4 }}>
-                        <span style={{ color: "#6b7280", fontFamily: "monospace", fontSize: 12 }}>
+                        <span style={{ color: "#66768b", fontFamily: "monospace", fontSize: 12 }}>
                           {item.canonical_item_code}
                         </span>{" "}
                         {item.normalized_text}
@@ -152,7 +152,7 @@ function VersionRow({
   }
 
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "1rem", marginBottom: "0.75rem" }}>
+    <div style={{ border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem", marginBottom: "0.75rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <span style={{ fontWeight: 600 }}>Version {version.version_number}</span>{" "}
@@ -233,7 +233,7 @@ function VersionRow({
           )}
         </div>
       </div>
-      {actionError && <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginTop: 6 }}>{actionError}</p>}
+      {actionError && <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginTop: 6 }}>{actionError}</p>}
       <div style={{ marginTop: "0.75rem" }}>
         <VersionPreview tenantSlug={tenantSlug} templateId={templateId} version={version} />
       </div>
@@ -245,7 +245,7 @@ const actionBtnStyle: React.CSSProperties = {
   fontSize: 12,
   padding: "5px 10px",
   borderRadius: 4,
-  border: "1px solid #d1d5db",
+  border: "1px solid #dce7f4",
   cursor: "pointer",
   background: "#fff",
 };
@@ -290,27 +290,27 @@ function TemplateDetailPageInner() {
   }, [tenantSlug, publicId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p>Loading…</p></main>;
-  if (error) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p role="alert" style={{ color: "#b91c1c" }}>{error}</p></main>;
+  if (error) return <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}><p role="alert" style={{ color: "#c0392b" }}>{error}</p></main>;
   if (!template) return null;
 
   return (
     <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/templates?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/templates?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← All templates
         </Link>
       </div>
 
       <div style={{ marginBottom: "1.5rem" }}>
         <h1 style={{ margin: "0 0 4px" }}>{template.title}</h1>
-        <span style={{ fontSize: 12, color: "#6b7280", fontFamily: "monospace" }}>{template.canonical_code}</span>{" "}
+        <span style={{ fontSize: 12, color: "#66768b", fontFamily: "monospace" }}>{template.canonical_code}</span>{" "}
         <StatusBadge status={template.lifecycle_status} />
-        {template.description && <p style={{ color: "#374151", marginTop: 8 }}>{template.description}</p>}
+        {template.description && <p style={{ color: "#314155", marginTop: 8 }}>{template.description}</p>}
       </div>
 
       <section>
         <h2 style={{ fontSize: 16, marginBottom: "0.75rem" }}>Versions ({versions.length})</h2>
-        {versions.length === 0 && <p style={{ color: "#6b7280" }}>No versions found.</p>}
+        {versions.length === 0 && <p style={{ color: "#66768b" }}>No versions found.</p>}
         {versions.map((v) => (
           <VersionRow key={v.public_id} tenantSlug={tenantSlug} templateId={publicId} version={v} onChanged={load} />
         ))}

@@ -82,7 +82,7 @@ function VersionDetailInner() {
   if (error || !version) {
     return (
       <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error ?? "Checklist version not found."}
         </p>
       </main>
@@ -94,7 +94,7 @@ function VersionDetailInner() {
       <h1 style={{ margin: "0 0 0.25rem" }}>Checklist version {version.version_number}</h1>
 
       {version.scope_type === "platform_master" && (
-        <p style={{ fontSize: 12, color: "#92400e", background: "#fffbeb", padding: "6px 10px", borderRadius: 4, marginTop: 0 }}>
+        <p style={{ fontSize: 12, color: "#8a5a10", background: "#fdf9ef", padding: "6px 10px", borderRadius: 4, marginTop: 0 }}>
           This is platform-master content, visible to every tenant. Modifying it
           (lifecycle actions, sections, questions, applicability rules) requires a
           separate, explicit platform-level authorization beyond ordinary permissions
@@ -103,24 +103,24 @@ function VersionDetailInner() {
       )}
 
       <dl style={{ display: "grid", gridTemplateColumns: "220px 1fr", rowGap: 10, fontSize: 14 }}>
-        <dt style={{ color: "#6b7280" }}>Status</dt>
+        <dt style={{ color: "#66768b" }}>Status</dt>
         <dd style={{ margin: 0, fontWeight: 600 }}>{version.status.replace(/_/g, " ")}</dd>
 
-        <dt style={{ color: "#6b7280" }}>Effective date</dt>
+        <dt style={{ color: "#66768b" }}>Effective date</dt>
         <dd style={{ margin: 0 }}>{version.effective_date ?? "not set"}</dd>
 
-        <dt style={{ color: "#6b7280" }}>Submitted by</dt>
+        <dt style={{ color: "#66768b" }}>Submitted by</dt>
         <dd style={{ margin: 0 }}>{version.submitted_by_email ?? "not yet submitted"}</dd>
 
-        <dt style={{ color: "#6b7280" }}>Approved by</dt>
+        <dt style={{ color: "#66768b" }}>Approved by</dt>
         <dd style={{ margin: 0 }}>{version.approved_by_email ?? "not yet approved"}</dd>
 
-        <dt style={{ color: "#6b7280" }}>Activated by</dt>
+        <dt style={{ color: "#66768b" }}>Activated by</dt>
         <dd style={{ margin: 0 }}>{version.activated_by_email ?? "not yet activated"}</dd>
 
         {version.return_reason && (
           <>
-            <dt style={{ color: "#6b7280" }}>Last return reason</dt>
+            <dt style={{ color: "#66768b" }}>Last return reason</dt>
             <dd style={{ margin: 0 }}>{version.return_reason}</dd>
           </>
         )}
@@ -128,14 +128,14 @@ function VersionDetailInner() {
 
       <h2 style={{ fontSize: 16, marginTop: "1.5rem" }}>Sections</h2>
       {!version.sections || version.sections.length === 0 ? (
-        <p style={{ color: "#6b7280", fontSize: 14 }}>No sections defined yet.</p>
+        <p style={{ color: "#66768b", fontSize: 14 }}>No sections defined yet.</p>
       ) : (
         version.sections.map((section) => (
           <div key={section.public_id} style={{ marginBottom: 12 }}>
             <strong style={{ fontSize: 14 }}>
               {section.display_order}. {section.title}
             </strong>
-            <ul style={{ fontSize: 13, color: "#374151" }}>
+            <ul style={{ fontSize: 13, color: "#314155" }}>
               {(section.questions ?? []).map((q) => (
                 <li key={q.public_id}>{q.question_text}</li>
               ))}
@@ -155,7 +155,7 @@ function VersionDetailInner() {
             <button onClick={() => runAction("approve")} disabled={actionBusy} style={buttonStyle}>
               Approve
             </button>
-            <button onClick={() => runAction("reject")} disabled={actionBusy} style={{ ...buttonStyle, background: "#991b1b" }}>
+            <button onClick={() => runAction("reject")} disabled={actionBusy} style={{ ...buttonStyle, background: "#8f2c20" }}>
               Reject
             </button>
           </>
@@ -166,12 +166,12 @@ function VersionDetailInner() {
           </button>
         )}
         {version.status === "active" && (
-          <button onClick={() => runAction("supersede")} disabled={actionBusy} style={{ ...buttonStyle, background: "#6b7280" }}>
+          <button onClick={() => runAction("supersede")} disabled={actionBusy} style={{ ...buttonStyle, background: "#66768b" }}>
             Supersede
           </button>
         )}
         {["draft", "approved", "active", "returned"].includes(version.status) && (
-          <button onClick={() => runAction("retire")} disabled={actionBusy} style={{ ...buttonStyle, background: "#6b7280" }}>
+          <button onClick={() => runAction("retire")} disabled={actionBusy} style={{ ...buttonStyle, background: "#66768b" }}>
             Retire
           </button>
         )}
@@ -184,21 +184,21 @@ function VersionDetailInner() {
             <input
               value={returnReason}
               onChange={(e) => setReturnReason(e.target.value)}
-              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 4, boxSizing: "border-box" }}
+              style={{ display: "block", width: "100%", marginTop: 4, padding: "6px 8px", border: "1px solid #dce7f4", borderRadius: 4, boxSizing: "border-box" }}
             />
           </label>
-          <button onClick={() => runAction("return")} disabled={actionBusy} style={{ ...buttonStyle, background: "#b45309" }}>
+          <button onClick={() => runAction("return")} disabled={actionBusy} style={{ ...buttonStyle, background: "#a8690f" }}>
             Return for edits
           </button>
         </div>
       )}
 
       {actionError && (
-        <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginTop: 8 }}>
+        <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginTop: 8 }}>
           {actionError}
         </p>
       )}
-      <p style={{ fontSize: 12, color: "#6b7280", marginTop: 12 }}>
+      <p style={{ fontSize: 12, color: "#66768b", marginTop: 12 }}>
         This screen governs checklist structure and lifecycle only. It does not present
         or run checklist execution, responses, or calculation outcomes.
       </p>
@@ -207,7 +207,7 @@ function VersionDetailInner() {
 }
 
 const buttonStyle: React.CSSProperties = {
-  background: "#1d4ed8",
+  background: "#045e8f",
   color: "#fff",
   border: "none",
   borderRadius: 6,

@@ -69,7 +69,7 @@ function ReleaseDetailInner() {
   if (error || !release) {
     return (
       <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
-        <p role="alert" style={{ color: "#b91c1c" }}>
+        <p role="alert" style={{ color: "#c0392b" }}>
           {error ?? "Release not found."}
         </p>
       </main>
@@ -79,30 +79,30 @@ function ReleaseDetailInner() {
   return (
     <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
-        <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#1d4ed8", fontSize: 13, textDecoration: "none" }}>
+        <Link href={`/fda-data/releases?tenant=${tenantSlug}`} style={{ color: "#045e8f", fontSize: 13, textDecoration: "none" }}>
           ← FDA releases
         </Link>
       </div>
       <h1 style={{ margin: "0 0 0.25rem" }}>{release.source_name}</h1>
-      <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0 }}>
+      <p style={{ color: "#66768b", fontSize: 13, marginTop: 0 }}>
         {release.dataset_type} · {release.official_source_reference}
       </p>
 
       <dl style={{ display: "grid", gridTemplateColumns: "220px 1fr", rowGap: 10, fontSize: 14 }}>
-        <dt style={{ color: "#6b7280" }}>Status</dt>
+        <dt style={{ color: "#66768b" }}>Status</dt>
         <dd style={{ margin: 0, fontWeight: 600 }}>{release.status.replace(/_/g, " ")}</dd>
 
-        <dt style={{ color: "#6b7280" }}>Publication date</dt>
+        <dt style={{ color: "#66768b" }}>Publication date</dt>
         <dd style={{ margin: 0 }}>
           {release.publication_date ?? "not recorded"} <ProvenanceLabel kind="FDA_SOURCE" />
         </dd>
 
-        <dt style={{ color: "#6b7280" }}>Records imported / extracted</dt>
+        <dt style={{ color: "#66768b" }}>Records imported / extracted</dt>
         <dd style={{ margin: 0 }}>
           {release.record_count_imported} / {release.record_count_extracted} ({release.record_count_failed} failed) <ProvenanceLabel kind="CALCULATED" />
         </dd>
 
-        <dt style={{ color: "#6b7280" }}>Approved by</dt>
+        <dt style={{ color: "#66768b" }}>Approved by</dt>
         <dd style={{ margin: 0 }}>
           {release.approved_by_email ? (
             <>
@@ -113,7 +113,7 @@ function ReleaseDetailInner() {
           )}
         </dd>
 
-        <dt style={{ color: "#6b7280" }}>Activated by</dt>
+        <dt style={{ color: "#66768b" }}>Activated by</dt>
         <dd style={{ margin: 0 }}>
           {release.activated_by_email ? (
             <>
@@ -143,17 +143,17 @@ function ReleaseDetailInner() {
         )}
         <Link
           href={`/fda-data/releases/${release.public_id}/reconciliation?tenant=${tenantSlug}`}
-          style={{ ...buttonStyle, background: "#374151", textDecoration: "none", display: "inline-block" }}
+          style={{ ...buttonStyle, background: "#314155", textDecoration: "none", display: "inline-block" }}
         >
           View reconciliation summary
         </Link>
       </div>
       {actionError && (
-        <p role="alert" style={{ color: "#b91c1c", fontSize: 13, marginTop: 8 }}>
+        <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginTop: 8 }}>
           {actionError}
         </p>
       )}
-      <p style={{ fontSize: 12, color: "#6b7280", marginTop: 12 }}>
+      <p style={{ fontSize: 12, color: "#66768b", marginTop: 12 }}>
         Approving or activating a release is a data-governance action only. It does not
         constitute a regulatory determination about any formulation compared against it.
       </p>
@@ -162,7 +162,7 @@ function ReleaseDetailInner() {
 }
 
 const buttonStyle: React.CSSProperties = {
-  background: "#1d4ed8",
+  background: "#045e8f",
   color: "#fff",
   border: "none",
   borderRadius: 6,

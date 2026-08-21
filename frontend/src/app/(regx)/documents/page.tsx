@@ -15,12 +15,12 @@ const MIME_FOR_TYPE: Record<DocumentType, string> = {
 
 function scanBadge(scan: string) {
   const colours: Record<string, string> = {
-    clean: "#166534",
-    quarantined: "#991b1b",
-    infected: "#991b1b",
-    scan_failed: "#92400e",
-    scanner_unavailable: "#92400e",
-    pending: "#374151",
+    clean: "#1a6b46",
+    quarantined: "#8f2c20",
+    infected: "#8f2c20",
+    scan_failed: "#8a5a10",
+    scanner_unavailable: "#8a5a10",
+    pending: "#314155",
   };
   return (
     <span
@@ -29,7 +29,7 @@ function scanBadge(scan: string) {
         fontWeight: 600,
         padding: "2px 6px",
         borderRadius: 4,
-        background: colours[scan] ?? "#374151",
+        background: colours[scan] ?? "#314155",
         color: "#fff",
         textTransform: "uppercase",
         letterSpacing: "0.05em",
@@ -128,7 +128,7 @@ function DocumentsPageInner() {
         <button
           onClick={() => setShowUpload(true)}
           style={{
-            background: "#1d4ed8",
+            background: "#045e8f",
             color: "#fff",
             border: "none",
             borderRadius: 6,
@@ -142,16 +142,16 @@ function DocumentsPageInner() {
       </div>
 
       {loading && <p>Loading…</p>}
-      {error && <p role="alert" style={{ color: "#b91c1c" }}>{error}</p>}
+      {error && <p role="alert" style={{ color: "#c0392b" }}>{error}</p>}
 
       {!loading && docs.length === 0 && (
-        <p style={{ color: "#6b7280" }}>No documents yet. Upload one to get started.</p>
+        <p style={{ color: "#66768b" }}>No documents yet. Upload one to get started.</p>
       )}
 
       {docs.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
-            <tr style={{ borderBottom: "2px solid #e5e7eb", textAlign: "left" }}>
+            <tr style={{ borderBottom: "2px solid #dce7f4", textAlign: "left" }}>
               <th style={{ padding: "8px 12px" }}>Title</th>
               <th style={{ padding: "8px 12px" }}>Type</th>
               <th style={{ padding: "8px 12px" }}>Status</th>
@@ -164,17 +164,17 @@ function DocumentsPageInner() {
             {docs.map((doc) => (
               <tr
                 key={doc.public_id}
-                style={{ borderBottom: "1px solid #f3f4f6" }}
+                style={{ borderBottom: "1px solid #f4f8fe" }}
               >
                 <td style={{ padding: "10px 12px" }}>
                   <Link
                     href={`/documents/${doc.public_id}?tenant=${tenantSlug}`}
-                    style={{ color: "#1d4ed8", textDecoration: "none", fontWeight: 500 }}
+                    style={{ color: "#045e8f", textDecoration: "none", fontWeight: 500 }}
                   >
                     {doc.title}
                   </Link>
                 </td>
-                <td style={{ padding: "10px 12px", textTransform: "uppercase", fontSize: 12, color: "#6b7280" }}>
+                <td style={{ padding: "10px 12px", textTransform: "uppercase", fontSize: 12, color: "#66768b" }}>
                   {doc.document_type}
                 </td>
                 <td style={{ padding: "10px 12px" }}>
@@ -182,8 +182,8 @@ function DocumentsPageInner() {
                     fontSize: 11,
                     padding: "2px 6px",
                     borderRadius: 4,
-                    background: doc.status === "archived" ? "#f3f4f6" : "#dcfce7",
-                    color: doc.status === "archived" ? "#374151" : "#166534",
+                    background: doc.status === "archived" ? "#e4ecf7" : "#eaf7f0",
+                    color: doc.status === "archived" ? "#314155" : "#1a6b46",
                     fontWeight: 600,
                   }}>
                     {doc.status}
@@ -192,10 +192,10 @@ function DocumentsPageInner() {
                 <td style={{ padding: "10px 12px" }}>
                   {doc.current_version ? scanBadge(doc.current_version.scan_status) : "—"}
                 </td>
-                <td style={{ padding: "10px 12px", color: "#6b7280" }}>
+                <td style={{ padding: "10px 12px", color: "#66768b" }}>
                   {doc.current_version ? processingLabel(doc.current_version.processing_status) : "—"}
                 </td>
-                <td style={{ padding: "10px 12px", color: "#6b7280", fontSize: 12 }}>
+                <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
                   {doc.current_version
                     ? new Date(doc.current_version.uploaded_at).toLocaleDateString()
                     : "—"}
@@ -215,7 +215,7 @@ function DocumentsPageInner() {
           >
             Prev
           </button>
-          <span style={{ fontSize: 13, color: "#6b7280" }}>
+          <span style={{ fontSize: 13, color: "#66768b" }}>
             Page {page} of {totalPages}
           </span>
           <button
@@ -268,7 +268,7 @@ function DocumentsPageInner() {
                     width: "100%",
                     marginTop: 4,
                     padding: "8px 10px",
-                    border: "1px solid #d1d5db",
+                    border: "1px solid #dce7f4",
                     borderRadius: 6,
                     fontSize: 14,
                     boxSizing: "border-box",
@@ -286,7 +286,7 @@ function DocumentsPageInner() {
                     width: "100%",
                     marginTop: 4,
                     padding: "8px 10px",
-                    border: "1px solid #d1d5db",
+                    border: "1px solid #dce7f4",
                     borderRadius: 6,
                     fontSize: 14,
                   }}
@@ -310,7 +310,7 @@ function DocumentsPageInner() {
               </label>
 
               {uploadError && (
-                <p role="alert" style={{ color: "#b91c1c", marginBottom: "0.75rem", fontSize: 13 }}>
+                <p role="alert" style={{ color: "#c0392b", marginBottom: "0.75rem", fontSize: 13 }}>
                   {uploadError}
                 </p>
               )}
@@ -319,7 +319,7 @@ function DocumentsPageInner() {
                 <button
                   type="button"
                   onClick={() => setShowUpload(false)}
-                  style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #d1d5db", cursor: "pointer" }}
+                  style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #dce7f4", cursor: "pointer" }}
                 >
                   Cancel
                 </button>
@@ -330,7 +330,7 @@ function DocumentsPageInner() {
                     padding: "8px 18px",
                     borderRadius: 6,
                     border: "none",
-                    background: uploading ? "#93c5fd" : "#1d4ed8",
+                    background: uploading ? "#35b1f6" : "#045e8f",
                     color: "#fff",
                     fontWeight: 600,
                     cursor: uploading ? "not-allowed" : "pointer",

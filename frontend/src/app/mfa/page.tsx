@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { mfa, ApiError } from "@/lib/api";
+import AuthLayout from "@/components/auth/AuthLayout";
 
 export default function MFAPage() {
   const router = useRouter();
@@ -28,12 +29,24 @@ export default function MFAPage() {
     }
   }
 
+  /*
+   * Presentation only. The heading text, the "OTP Code" label, the form's
+   * accessible name, role="alert", the numeric pattern and the button labels
+   * are all unchanged -- only the surrounding markup and classes are new.
+   */
   return (
-    <main style={{ maxWidth: 400, margin: "4rem auto", padding: "0 1rem" }}>
-      <h1>Two-factor authentication</h1>
-      <p>Enter the 6-digit code from your authenticator app.</p>
+    <AuthLayout
+      title="Two-factor authentication"
+      subtitle="Enter the 6-digit code from your authenticator app."
+    >
       <form onSubmit={handleVerify} aria-label="MFA verification form">
-        <div>
+        {error && (
+          <p role="alert" className="regx-auth__error">
+            {error}
+          </p>
+        )}
+
+        <div className="regx-auth__field regx-auth__field--otp">
           <label htmlFor="otp">OTP Code</label>
           <input
             id="otp"
@@ -43,15 +56,17 @@ export default function MFAPage() {
             maxLength={6}
             autoComplete="one-time-code"
             required
+            placeholder="000000"
+            disabled={loading}
             value={code}
             onChange={(e) => setCode(e.target.value)}
           />
         </div>
-        {error && <p role="alert" style={{ color: "red" }}>{error}</p>}
-        <button type="submit" disabled={loading}>
+
+        <button type="submit" className="regx-auth__button" disabled={loading}>
           {loading ? "Verifying..." : "Verify"}
         </button>
       </form>
-    </main>
+    </AuthLayout>
   );
 }
