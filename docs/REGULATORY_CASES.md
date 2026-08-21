@@ -145,6 +145,34 @@ checklist detail, or any email address.
 > with a caller who genuinely lacks the permission, because a role-based test
 > there would prove nothing.
 
+### Linking is gated the same way as reading
+
+**`regulatory_cases.manage_links` alone is not enough to link anything.** The
+target module's own view permission is required as well, resolved through that
+module's own helper — the same helpers the projection uses, so read and link
+cannot drift apart.
+
+This was a finding from independent review of PR #36, and it was a real one.
+Without the second gate the endpoint was an **existence oracle**: a caller
+holding only `manage_links` could point it at any same-tenant UUID and read the
+answer off the result — success meant the object existed, an error meant it did
+not, for objects they had no permission to see.
+
+The permission is checked **before** the target is resolved, and raises the same
+exception with the same message, so three outcomes are one indistinguishable
+result:
+
+| Situation | Result |
+|---|---|
+| Target exists, caller lacks the module permission | identical |
+| Target does not exist | identical |
+| Target belongs to another tenant | identical |
+
+A refused link emits **no audit event** — a rejected attempt must leave no trace
+suggesting it happened. Tested for each of the three kinds, at the service layer
+and at the HTTP boundary, plus mutation-tested: removing the check turns five
+tests red.
+
 ## 8. Relationships
 
 Three explicit through-models rather than a generic relation: each target needs
@@ -169,6 +197,42 @@ A partial `UniqueConstraint` on `(case, target) WHERE unlinked_at IS NULL`
 permits relinking after an unlink while forbidding duplicates — and makes the
 database the arbiter of concurrent links. A threaded test proves two simultaneous
 links produce exactly one winner.
+
+### Database-level immutability
+
+The manager blocking `update()`, `delete()` and `bulk_update()` is **not
+sufficient**, and independent review of PR #36 was right to say so. None of it
+stops the obvious path:
+
+```python
+link = RegulatoryCaseDocument.objects.get(...)
+link.document = some_other_document
+link.save()
+```
+
+`save()` issues a plain `UPDATE` that never passes through the manager, so a
+governed link could be repointed at another document, moved to a different case
+or tenant, or have its provenance rewritten — outside the service layer and with
+no audit row. Only the database can refuse that.
+
+`0002` installs a PostgreSQL guard on **all three** link tables, following
+`workflows/0005`. Deliberately not a blanket `UPDATE` ban: a link must make
+exactly one transition, active → unlinked, once. So the trigger:
+
+- forbids `DELETE` outright, **including after an unlink**;
+- forbids any `UPDATE` to an already-unlinked row;
+- freezes `id`, `public_id`, `case_id`, `tenant_id`, the target FK,
+  `linked_by_id`, `linked_at`, `label` and `created_at`;
+- requires both unlink stamps to move together;
+- permits `updated_at` to change **only inside that sanctioned transition**, so
+  it cannot become a backdoor for an otherwise-frozen row.
+
+A completeness test reads `information_schema.columns` for each of the three
+tables and asserts every column is either frozen, an unlink stamp, the target, or
+`updated_at` — so a future column cannot silently escape the guard.
+
+Mutation-tested: removing the frozen-column comparison turns six tests red, and
+the migration was restored byte-identical afterwards.
 
 ## 9. Tenant isolation
 
@@ -222,6 +286,10 @@ and rollback risk are different questions.
 | Migration | Forward | Rollback |
 |---|---|---|
 | `0001_initial` | **Class A** — additive, four `CreateModel`s, zero `RunPython`, zero `RunSQL`, zero destructive operations | **CLASS C — DATA RESTORE REQUIRED once any case exists** |
+| `0002_case_link_db_immutability` | **Class A** — additive: two functions, six triggers. No table altered, no row touched | **Class A on its own terms** — `reverse_sql` drops exactly what it created |
+
+> `0002` does **not** make reversing `0001` safe. A rollback that drops the link
+> tables takes the guard down with them, which is the opposite of protection.
 
 > Reversing `0001` drops the case table and all three link tables. That destroys
 > the record of which workflows, documents and checklists a case cited, including
@@ -284,7 +352,7 @@ Empty, loading, restricted, 403, 404 and 409 states are all implemented.
 
 ## 16. Testing
 
-**Backend (60 tests)**: creation, number uniqueness, number concurrency,
+**Backend (112 tests)**: creation, number uniqueness, number concurrency,
 tenant-local numbering, list/detail/update, tenant isolation, cross-tenant
 probing indistinguishability, permissions per role, complete, cancel, terminal
 mutation refusal, link/unlink/duplicate/relink for each kind, ORM bypass refusal,

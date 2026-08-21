@@ -198,11 +198,30 @@ def _resolve_checklist(public_id, tenant):
     return ChecklistExecution.objects.filter(public_id=public_id, tenant=tenant).first()
 
 
+def _may_view_workflows(user, tenant):
+    from .projection import can_view_workflows
+
+    return can_view_workflows(user, tenant)
+
+
+def _may_view_documents(user, tenant):
+    from .projection import can_view_documents
+
+    return can_view_documents(user, tenant)
+
+
+def _may_view_checklists(user, tenant):
+    from .projection import can_view_checklists
+
+    return can_view_checklists(user, tenant)
+
+
 LINK_SPECS = {
     "workflow": {
         "model": RegulatoryCaseWorkflow,
         "field": "workflow_item",
         "resolve": _resolve_workflow,
+        "may_view": _may_view_workflows,
         "linked_event": CaseEvent.WORKFLOW_LINKED,
         "unlinked_event": CaseEvent.WORKFLOW_UNLINKED,
     },
@@ -210,6 +229,7 @@ LINK_SPECS = {
         "model": RegulatoryCaseDocument,
         "field": "document",
         "resolve": _resolve_document,
+        "may_view": _may_view_documents,
         "linked_event": CaseEvent.DOCUMENT_LINKED,
         "unlinked_event": CaseEvent.DOCUMENT_UNLINKED,
     },
@@ -217,6 +237,7 @@ LINK_SPECS = {
         "model": RegulatoryCaseChecklist,
         "field": "checklist_execution",
         "resolve": _resolve_checklist,
+        "may_view": _may_view_checklists,
         "linked_event": CaseEvent.CHECKLIST_LINKED,
         "unlinked_event": CaseEvent.CHECKLIST_UNLINKED,
     },
@@ -224,7 +245,22 @@ LINK_SPECS = {
 
 
 def link_target(*, kind: str, case, target_public_id, actor, tenant, label: str = ""):
-    """Link one workflow item, document or checklist execution to a case."""
+    """Link one workflow item, document or checklist execution to a case.
+
+    TWO authorization gates, both required and checked separately:
+
+      * `regulatory_cases.manage_links` -- may this caller change this case's
+        link set (checked by the view's permission class); and
+      * the TARGET MODULE's own view permission -- may this caller act on that
+        workflow, document or checklist at all.
+
+    Neither implies the other. Without the second gate, `manage_links` alone
+    would turn this endpoint into an existence oracle: link a same-tenant UUID
+    the caller may not see, and a success told them it exists while an error
+    told them it does not. The target permission is resolved through that
+    module's own helper, the same ones the projection layer uses, so read and
+    link cannot drift apart.
+    """
     spec = LINK_SPECS[kind]
     _assert_same_tenant(case, tenant)
 
@@ -234,6 +270,13 @@ def link_target(*, kind: str, case, target_public_id, actor, tenant, label: str 
         locked = RegulatoryCase.objects.select_for_update().get(pk=case.pk)
         _assert_same_tenant(locked, tenant)
         _require_mutable(locked)
+
+        # Checked BEFORE resolving the target, and raising the same exception
+        # with the same message: absent, cross-tenant and unauthorized must be
+        # one indistinguishable outcome. Resolving first would let response
+        # timing separate "does not exist" from "not yours to see".
+        if not spec["may_view"](actor, tenant):
+            raise InvalidLinkTarget(INVALID_TARGET_MESSAGE)
 
         target = spec["resolve"](target_public_id, tenant)
         if target is None:

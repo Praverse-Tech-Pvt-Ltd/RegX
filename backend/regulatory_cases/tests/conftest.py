@@ -190,6 +190,7 @@ def _checklist_execution(tenant, user):
     the same projection path the API uses, and a stub would prove only that the
     stub behaves.
     """
+    import uuid as _uuid
     from decimal import Decimal
 
     from formulations.models import FormulationVersion, ProductDevelopmentRecord
@@ -201,7 +202,7 @@ def _checklist_execution(tenant, user):
 
     product = ProductDevelopmentRecord.objects.create(
         tenant=tenant,
-        product_code=f"RC-PROD-{tenant.pk}",
+        product_code=f"RC-PROD-{_uuid.uuid4().hex[:10]}",
         proposed_product_name="Synthetic Product",
         active_ingredient="Synthetic Ingredient",
         dosage_form="tablet",
@@ -217,7 +218,7 @@ def _checklist_execution(tenant, user):
         created_by=user,
     )
     definition = ChecklistDefinition.objects.create(
-        code=f"RC-CHK-{tenant.pk}",
+        code=f"RC-CHK-{_uuid.uuid4().hex[:10]}",
         title="Synthetic checklist",
         scope_type="tenant",
         execution_scope="formulation_version",
