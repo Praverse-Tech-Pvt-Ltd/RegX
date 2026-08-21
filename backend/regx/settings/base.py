@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "formulations",
     "iid_assessment",
     "iig_checklist",
+    "regulatory_cases",
 ]
 
 MIDDLEWARE = [
