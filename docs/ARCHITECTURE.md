@@ -19,6 +19,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `authorization` | Roles, permissions, RBAC |
 | `audit` | Immutable audit trail |
 | `workflows` | Generic tenant-scoped workflow engine: state machine, append-only transition history, assignment, governed document evidence ([`WORKFLOW_ENGINE.md`](WORKFLOW_ENGINE.md), [`WORKFLOW_EVIDENCE.md`](WORKFLOW_EVIDENCE.md)) |
+| `regulatory_cases` | Case workspace composing workflows, documents and checklists into one governed folder. Owns no content and duplicates no engine ([`REGULATORY_CASES.md`](REGULATORY_CASES.md)) |
 
 ## Key invariants
 
@@ -38,6 +39,11 @@ tenancy → identity (via string FK), common
 authorization → tenancy, identity, common
 audit → no domain imports (self-contained)
 workflows → tenancy, identity, authorization, audit, documents, common
+regulatory_cases → tenancy, identity, authorization, audit, documents,
+                   workflows, iig_checklist, common
+                   Depends on the modules it composes and is depended on by
+                   none of them: the arrow only ever points this way, so a case
+                   can be removed without touching any engine.
 documents ← never imports workflows (evidence deletion protection goes
             through DeletionProtectionRegistry, keeping it one-way)
 ```

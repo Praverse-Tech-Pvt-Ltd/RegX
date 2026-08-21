@@ -1960,3 +1960,191 @@ export const workflowEvidence = {
       { method: "DELETE", headers: { "X-Tenant-Slug": tenantSlug } }
     ),
 };
+
+// ---------------------------------------------------------------------------
+// Regulatory cases (Milestone 8)
+//
+// A case composes work that other modules own. `restricted` on a link row means
+// the caller holds the case permission but not that module's own view
+// permission, so the server sent identity without detail -- see the backend's
+// projection.py. The optional detail objects are absent in that case, which is
+// why every one of them is optional here rather than nullable.
+// ---------------------------------------------------------------------------
+export type CaseStatus = "open" | "on_hold" | "completed" | "cancelled";
+
+export interface RegulatoryCase {
+  public_id: string;
+  case_number: string;
+  title: string;
+  product_name: string;
+  product_code: string;
+  market: string;
+  authority: string;
+  submission_type: string;
+  status: CaseStatus;
+  owner: { public_id: string; full_name: string } | null;
+  target_date: string | null;
+  description: string;
+  created_by: { public_id: string; full_name: string } | null;
+  created_at: string;
+  updated_at: string;
+  is_terminal: boolean;
+}
+
+export interface CasePermissions {
+  can_edit: boolean;
+  can_manage_links: boolean;
+  can_complete: boolean;
+  can_cancel: boolean;
+  can_create: boolean;
+}
+
+interface BaseCaseLink {
+  public_id: string;
+  label: string;
+  linked_at: string;
+  linked_by: { full_name: string } | null;
+  restricted?: true;
+}
+
+export interface CaseWorkflowLink extends BaseCaseLink {
+  workflow_public_id: string;
+  workflow?: {
+    title: string;
+    state: string;
+    is_terminal: boolean;
+    due_at: string | null;
+    is_overdue: boolean;
+  };
+}
+
+export interface CaseDocumentLink extends BaseCaseLink {
+  document_public_id: string;
+  document?: {
+    title: string;
+    document_type: string;
+    status: string;
+    current_version_number: number | null;
+    scan_status: string | null;
+  };
+}
+
+export interface CaseChecklistLink extends BaseCaseLink {
+  execution_public_id: string;
+  checklist?: { status: string; checklist_version_public_id: string };
+}
+
+export interface CaseSummary {
+  // Link counts are case-level: the caller already sees one row per link.
+  documents: number;
+  workflows: number;
+  checklists: number;
+  // Workflow STATE is not. These are null unless the caller independently
+  // holds `workflows.view`, so the summary cannot disclose what the rows
+  // withhold.
+  workflows_open: number | null;
+  workflows_completed: number | null;
+  evidence_links: number | null;
+}
+
+export interface CaseDetail {
+  case: RegulatoryCase;
+  workflows: CaseWorkflowLink[];
+  documents: CaseDocumentLink[];
+  checklists: CaseChecklistLink[];
+  summary: CaseSummary;
+  permissions: CasePermissions;
+}
+
+export interface CaseListResponse {
+  results: RegulatoryCase[];
+  permissions: CasePermissions;
+}
+
+const CASES = "/api/regx/v1/regulatory-cases";
+
+export const regulatoryCases = {
+  list: (tenantSlug: string, params?: { status?: string; search?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.search) q.set("search", params.search);
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return apiRequest<CaseListResponse>(`${CASES}/${suffix}`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    });
+  },
+
+  create: (
+    tenantSlug: string,
+    data: {
+      title: string;
+      product_name: string;
+      market: string;
+      submission_type: string;
+      product_code?: string;
+      authority?: string;
+      target_date?: string | null;
+      description?: string;
+    }
+  ) =>
+    apiRequest<RegulatoryCase>(`${CASES}/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<CaseDetail>(`${CASES}/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  update: (tenantSlug: string, publicId: string, data: Record<string, unknown>) =>
+    apiRequest<RegulatoryCase>(`${CASES}/${publicId}/`, {
+      method: "PATCH",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  complete: (tenantSlug: string, publicId: string, reason?: string) =>
+    apiRequest<RegulatoryCase>(`${CASES}/${publicId}/complete/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { reason: reason ?? "" },
+    }),
+
+  cancel: (tenantSlug: string, publicId: string, reason?: string) =>
+    apiRequest<RegulatoryCase>(`${CASES}/${publicId}/cancel/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: { reason: reason ?? "" },
+    }),
+
+  // The kind is part of the path, matching the backend: a document permission
+  // can never be aimed at a workflow by changing a body field.
+  linkTarget: (
+    tenantSlug: string,
+    publicId: string,
+    kind: "workflows" | "documents" | "checklists",
+    targetPublicId: string,
+    label?: string
+  ) =>
+    apiRequest<CaseWorkflowLink | CaseDocumentLink | CaseChecklistLink>(
+      `${CASES}/${publicId}/${kind}/`,
+      {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { target_public_id: targetPublicId, label: label ?? "" },
+      }
+    ),
+
+  unlinkTarget: (
+    tenantSlug: string,
+    publicId: string,
+    kind: "workflows" | "documents" | "checklists",
+    linkPublicId: string
+  ) =>
+    apiRequest<void>(`${CASES}/${publicId}/${kind}/${linkPublicId}/`, {
+      method: "DELETE",
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+};

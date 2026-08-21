@@ -77,6 +77,12 @@ const REGX_MODULES: Item[] = [
     ],
   },
   {
+    id: "regulatory-cases",
+    href: "/regulatory-cases",
+    label: "Regulatory Cases",
+    icon: "mdi mdi-folder-open-outline",
+  },
+  {
     id: "workflows",
     href: "/workflows",
     label: "Workflows",

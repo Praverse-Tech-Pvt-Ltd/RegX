@@ -19,6 +19,28 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 8 — Regulatory Case / Submission Workspace
+
+**Status: IN REVIEW**
+
+The first object that says *these things belong to the same submission*.
+`RegulatoryCase` is a governed folder that composes workflow items, documents and
+checklist executions; it owns no regulatory content and duplicates no engine.
+Evidence stays owned by `workflows.WorkflowEvidence` and is surfaced through the
+case's linked workflows rather than stored again.
+
+Case permission grants nothing about linked resources: a caller sees document,
+workflow or checklist detail only where they independently hold that module's own
+view permission. See [REGULATORY_CASES.md](REGULATORY_CASES.md).
+
+Case numbers are tenant-local and deliberately internal — RegX assigns no
+agency-meaningful reference. **A case status of COMPLETED is not a regulatory
+approval.**
+
+`regulatory_cases/0001` is **Class C for rollback** once any case exists:
+reversing it destroys the record of what each case cited, and the per-tenant
+number sequence.
+
 ## Milestone 7 — Workflow Evidence and Document Linking
 
 **Status: IN REVIEW**
@@ -268,8 +290,8 @@ Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx
 
 Engineering has since continued on tracks that do not touch the regulatory gate:
 findings F-1 to F-7 (technical readiness, all merged), Milestone 6 (workflow
-engine, merged) and Milestone 7 (workflow evidence, in review). **None of that
-work advances the content gate**, which moves only when a named regulatory
-authority supplies a real approval.
+engine, merged), Milestone 7 (workflow evidence) and Milestone 8 (regulatory case
+workspace). **None of that work advances the content gate**, which moves only
+when a named regulatory authority supplies a real approval.
 
 Milestones 5B–5D are **not scoped**. 5A deliberately records no detailed requirements for them; each needs its own discovery. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration remain unscoped as engineering milestones.
