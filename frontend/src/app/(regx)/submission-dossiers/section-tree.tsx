@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { DossierSection, Readiness, SectionStatus } from "@/lib/api";
+import { buildTreeRows } from "@/lib/tree";
 import { BlockerIndicator, ReadinessBadge, SectionStatusBadge } from "./readiness-badge";
 
 const T = {
@@ -33,30 +34,16 @@ export interface TreeRow {
   hasChildren: boolean;
 }
 
+/**
+ * Kept as the dossier-facing name and signature; the algorithm now lives in
+ * `@/lib/tree` so the blueprint library reuses it instead of growing a second
+ * copy. Milestone 10 extracted it rather than duplicating the tree.
+ */
 export function buildRows(
   sections: DossierSection[],
   collapsed: Set<string>
 ): TreeRow[] {
-  const childrenOf = new Map<string | null, DossierSection[]>();
-  for (const s of sections) {
-    const key = s.parent_public_id;
-    if (!childrenOf.has(key)) childrenOf.set(key, []);
-    childrenOf.get(key)!.push(s);
-  }
-  for (const list of childrenOf.values()) {
-    list.sort((a, b) => a.sequence - b.sequence || a.public_id.localeCompare(b.public_id));
-  }
-
-  const rows: TreeRow[] = [];
-  const walk = (parentId: string | null, depth: number) => {
-    for (const section of childrenOf.get(parentId) ?? []) {
-      const kids = childrenOf.get(section.public_id) ?? [];
-      rows.push({ section, depth, hasChildren: kids.length > 0 });
-      if (!collapsed.has(section.public_id)) walk(section.public_id, depth + 1);
-    }
-  };
-  walk(null, 0);
-  return rows;
+  return buildTreeRows(sections, collapsed);
 }
 
 export function SectionTree({

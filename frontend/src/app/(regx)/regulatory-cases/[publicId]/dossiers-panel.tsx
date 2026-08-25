@@ -120,8 +120,27 @@ export function CaseDossiersPanel({
       >
         <p style={{ margin: 0, fontSize: "0.9rem", color: T.muted, lineHeight: 1.6 }}>
           A dossier is the submission outline for this case: ordered sections with owners, due
-          dates, blockers and internal readiness.
+          dates, blockers and internal readiness. Build one by hand, or start from a blueprint.
         </p>
+        {/* Manual creation stays. Blueprints are a convenience and a control,
+            never a requirement, so removing the manual path would be a
+            regression dressed up as a feature. */}
+        <Link
+          href={`/dossier-blueprints?tenant=${tenantSlug}`}
+          data-testid="create-from-blueprint"
+          style={{
+            padding: "0.45rem 0.9rem",
+            border: `1px solid ${T.line}`,
+            borderRadius: 8,
+            background: "#fff",
+            color: T.blue,
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+            textDecoration: "none",
+          }}
+        >
+          Create from blueprint
+        </Link>
         {canCreate && (
           <button
             type="button"

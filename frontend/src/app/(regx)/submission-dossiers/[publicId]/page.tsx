@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { DossierStatusBadge, ReadinessBadge } from "../readiness-badge";
 import { SectionTree } from "../section-tree";
+import { BlueprintProvenanceLine } from "./blueprint-provenance";
 import { SectionPanel } from "./section-panel";
 
 const T = {
@@ -208,6 +209,7 @@ function DossierInner() {
           }}
         >
           <span style={{ fontSize: "0.8rem", color: T.muted }}>Internal readiness</span>
+          <BlueprintProvenanceLine tenantSlug={tenantSlug} dossierPublicId={publicId} />
           <ReadinessBadge readiness={summary.overall_readiness} />
         </div>
 

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "iig_checklist",
     "regulatory_cases",
     "submission_dossiers",
+    "dossier_blueprints",
 ]
 
 MIDDLEWARE = [

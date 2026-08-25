@@ -19,6 +19,57 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 10 — Dossier Blueprint / Template Library
+
+**Status: IN REVIEW — STACKED ON MILESTONE 9**
+
+Branched from `57c0a1544aa295e582375d824c950f3193bcb09c` and **must not merge
+before Milestone 9**. GitHub Actions is blocked at organisation level by a
+billing/spending limit; that is an infrastructure condition, not a code result,
+and no workflow file was modified to work around it.
+
+Milestone 9 lets a user build a dossier outline by hand. This lets a tenant
+capture that outline once, version it, and stamp it into as many cases as they
+like. **Blueprints define structure; dossiers own execution.** Instantiating a
+version produces ordinary governed `submission_dossiers` records that never read
+back to the blueprint, so publishing version 2 cannot rewrite a dossier built
+from version 1.
+
+`templates_registry` already provides a controlled-template system, and it is
+composed with rather than reused. The decisive reason is semantic: its lifecycle
+has an APPROVED state backed by a real approval trail tied to the regulatory
+content gate, and a tenant's internal dossier outline must not borrow that word.
+Its *patterns* are reused verbatim — version-number uniqueness, the partial
+unique index on the active version, and the locked sibling set during
+activation. See [DOSSIER_BLUEPRINTS.md](DOSSIER_BLUEPRINTS.md) section 4.
+
+A version is DRAFT, ACTIVE or RETIRED, with deliberately no APPROVED. Structure
+is editable only while DRAFT and frozen forever afterwards, enforced by
+`dossier_blueprints/0002` triggers that read the version's own status — no
+sanctioned window is needed here, because unlike a dossier section there is only
+one thing a published version may do. Instantiation is gated three times,
+independently: blueprint instantiate, dossier create, and case view, with the
+target-domain gates checked before the case is resolved so an unauthorised
+caller and a missing case are indistinguishable. It is all-or-nothing in one
+transaction, and provenance is immutable at the database.
+
+**No production regulatory structure ships.** No CTD modules, no CEP, DMF or
+ANDA structures, no country or agency requirements; every test uses generic
+synthetic codes. **ACTIVE means available for internal RegX dossier
+instantiation** — not a regulatory, QA or agency approval, not a validated
+status.
+
+Template upgrades are an explicit non-goal: M10 does not apply a later version
+to an existing dossier, merge changes, or diff sections. That is a future
+milestone.
+
+`dossier_blueprints/0001` is **Class C for rollback** once any governed blueprint
+or instantiation data exists: reversing it destroys blueprint identity, version
+history and — irreplaceably — the record of which dossier came from which
+version, which cannot be reconstructed from a dossier that is deliberately a
+snapshot. `0002` (the triggers) is Class A on its own terms and does not make
+reversing `0001` safe.
+
 ## Milestone 9 — Submission Dossier / Section Readiness Workspace
 
 **Status: IN REVIEW**
@@ -360,9 +411,11 @@ Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx
 Engineering has since continued on tracks that do not touch the regulatory gate:
 findings F-1 to F-7 (technical readiness, all merged), Milestone 6 (workflow
 engine, merged), Milestone 7 (workflow evidence), Milestone 8 (regulatory case
-workspace, merged) and Milestone 9 (submission dossier / section readiness).
-**None of that work advances the content gate**, which moves only when a named
-regulatory authority supplies a real approval. In particular, a dossier section
+workspace, merged), Milestone 9 (submission dossier / section readiness) and
+Milestone 10 (dossier blueprint library, stacked on 9). **None of that work
+advances the content gate**, which moves only when a named regulatory authority
+supplies a real approval. In particular, a blueprint version reading ACTIVE
+means only that RegX will let a tenant create dossiers from it. In particular, a dossier section
 reading READY is an internal readiness signal and is not, and must not be
 presented as, regulatory approval.
 
