@@ -249,10 +249,102 @@ blocker history, and removing the row would strand both. Retirement stamps
 `retired_at` / `retired_by`, refuses while active children exist, and frees the
 section's code and sequence for reuse.
 
+### The gap independent review found
+
+Retirement was enforced in the service layer, and `on_delete=PROTECT` covered a
+section that already held a governed relationship. **Those are not the same
+guarantee.** A section with no children, no blockers and no links had nothing
+protecting it, so all three of these removed the row outright:
+
+```python
+section.delete()
+DossierSection.objects.filter(...).delete()
+```
+```sql
+DELETE FROM submission_dossiers_dossiersection WHERE id = ...;
+```
+
+A section's creation is already auditable history. The row must not simply
+disappear, whether or not anything happens to point at it yet.
+
+Closed at three layers, because each sees something the others cannot:
+
+| Path | Guard |
+|---|---|
+| `section.delete()` | `DossierSection.delete()` raises `DossierMutationForbidden` |
+| `.filter(...).delete()`, `section.children.all().delete()` | `_DossierSectionQuerySet.delete()` raises |
+| raw SQL, psql, a cascade, a migration in a hurry | `0003` trigger `no_delete_dossier_section` |
+
+`update()` and `bulk_update()` are **deliberately left open** on the section
+queryset. `reorder_section` renumbers a sibling group with `.update()` and
+`recalculate_dossier` writes derived readiness with `.bulk_update()`; a blanket
+queryset ban would have broken the two operations that exist to keep the outline
+consistent. Only DELETE is closed, because only the row disappearing is the
+problem.
+
+### Foreign-key protection, unchanged
+
 Every governed FK is `PROTECT` with no `CASCADE`. Deleting a linked document,
-workflow item, checklist execution, a section with links, a dossier with
-sections, a case with dossiers, or a tenant with dossiers all raise
-`ProtectedError`. **Protection survives unlink.**
+workflow item, checklist execution, a dossier with sections, a case with
+dossiers, or a tenant with dossiers all raise `ProtectedError`. **Protection
+survives unlink.**
+
+## 12b. Blocker history governance
+
+Blockers gate readiness directly, so a rewritable blocker is a rewritable
+readiness signal.
+
+The `CheckConstraint` keeps the two resolution halves consistent — open carries
+neither stamp, resolved carries both. **A CHECK constraint evaluates one row at
+one instant and cannot see that row's previous version**, so on its own it
+permitted a resolved blocker being written back to open:
+
+```python
+blocker.status = "open"
+blocker.resolved_at = None
+blocker.resolved_by = None
+blocker.save()          # internally consistent, and therefore accepted
+```
+
+and it permitted rewriting `title`, `description`, `severity`, `section_id`,
+`tenant_id`, `created_by_id`, `public_id` or `created_at` at any time, with no
+audit row.
+
+### The lifecycle, enforced
+
+```
+OPEN ──► RESOLVED ──► immutable forever
+```
+
+`0003` installs `guard_update_section_blocker` and `no_delete_section_blocker`:
+
+| Column | Rule |
+|---|---|
+| `id`, `public_id`, `tenant_id`, `section_id` | frozen |
+| `title`, `description`, `severity` | frozen |
+| `created_by_id`, `created_at` | frozen |
+| `status`, `resolved_by_id`, `resolved_at`, `updated_at` | may move, **only in the resolution** |
+
+- Any `UPDATE` at all is refused once `OLD.status = 'resolved'` — one rule that
+  covers reopening, re-resolving and any later content rewrite.
+- The `UPDATE` must **be** the resolution: `status` must become `resolved` and
+  both stamps must be non-null together. A partial stamp is refused.
+- That same rule is what stops a bare `updated_at` touch on an open row from
+  becoming a backdoor.
+- `DELETE` is refused in **both** states — resolution is not a route to erasure.
+- A legal transition carrying an illegal edit alongside it is rejected whole.
+
+The queryset blocks `update()`, `delete()` and `bulk_update()`; `Model.delete()`
+raises. None of that sees `blocker.save()`, which issues a plain `UPDATE` — which
+is exactly why the trigger exists.
+
+An `information_schema.columns` coverage test asserts that every column on the
+table is classified as frozen or transition-only, so a column added later cannot
+quietly become rewritable.
+
+**The service layer still answers first.** Resolving an already-resolved blocker
+returns a clean `409`, not a database error; the trigger is the floor, not the
+user-facing behaviour.
 
 ## 13. Audit
 
@@ -275,14 +367,20 @@ Per [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) §4.
 |---|---|---|
 | `0001_initial` | **Class A** — six `CreateModel`s, zero `RunPython`/`RunSQL`, zero destructive ops | **CLASS C — DATA RESTORE REQUIRED once any dossier exists** |
 | `0002_section_link_db_immutability` | **Class A** — two functions, six triggers | **Class A on its own terms** |
+| `0003_section_and_blocker_db_governance` | **Class A** — three functions, three triggers; no table altered, no row read or written | **Class A on its own terms** |
 
 > Reversing `0001` destroys the outline itself, the section hierarchy and
 > ordering, the link history including retired links, and the entire blocker
 > history with its resolution provenance. **Do not backward-migrate merely
 > because Django marks `CreateModel` reversible.**
 >
-> `0002` does **not** make reversing `0001` safe — a rollback that drops the link
-> tables takes the guard down with them.
+> Neither `0002` nor `0003` makes reversing `0001` safe. Both reverse cleanly on
+> their own terms — each drops exactly the triggers and functions it created and
+> touches no row — but **removing protection is not the same as making
+> destruction safe**. A rollback that drops the tables takes the guards down with
+> them, which is the opposite of protection. The relationship is one-way: `0003`
+> can be reversed on its own, and `0001` cannot be reversed safely whether or not
+> `0002` and `0003` are still applied.
 
 Both classifications are repeated **inside the migration files**, where an
 operator running `migrate submission_dossiers zero` will actually see them.
@@ -359,19 +457,31 @@ deferred rather than done unsafely.
 
 ## 18. Testing
 
-**Backend (110)**: dossier lifecycle and isolation; hierarchy including
+**Backend (160)**: dossier lifecycle and isolation; hierarchy including
 self-parent, cycle, cross-dossier, cross-tenant, retired parent and depth;
 ordering and reorder; readiness across every branch including child aggregation;
 blockers with database-enforced consistency; two-gate auth per kind with
 indistinguishability and no-audit-on-refusal; safe projection; DB immutability
-across all three tables; deletion protection; audit content and absences; and
-query-cost invariance.
+across all three link tables; section deletion refused through model, queryset
+and raw SQL in both active and retired states; blocker content, provenance and
+lifecycle immutability; `information_schema` column coverage; audit content and
+absences; and query-cost invariance.
 
 **Frontend**: 23 unit, 7 new accessibility checks, 16 Playwright.
 
-**Both guards mutation-tested**: removing the frozen-column comparison turns 6
-tests red; removing the permission gate turns 5 red. Both files restored
-byte-identical.
+**Every guard is mutation-tested**, because a test that passes without the guard
+proves nothing:
+
+| Mutation | Tests turned red |
+|---|---|
+| Link frozen-column comparison removed (`0002`) | 6 |
+| Two-gate permission check removed | 5 |
+| Section DELETE trigger removed (`0003`) | 5 + 1 error |
+| Blocker `already resolved` finality rule removed (`0003`) | 3 |
+| Blocker frozen-column comparison removed (`0003`) | 7 |
+| ORM-level section and blocker `delete()` guards removed | 11 |
+
+Every mutated file was restored and verified byte-identical afterwards.
 
 ## 19. Regulatory boundaries
 

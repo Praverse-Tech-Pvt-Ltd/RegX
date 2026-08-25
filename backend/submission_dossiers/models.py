@@ -158,6 +158,56 @@ class SubmissionDossier(PublicIDModel, TimeStampedModel):
 # ---------------------------------------------------------------------------
 # Section
 # ---------------------------------------------------------------------------
+SECTION_DELETE_MESSAGE = "Dossier sections cannot be deleted; retire the section instead."
+BLOCKER_MUTATION_MESSAGE = (
+    "Blocker history is governed; use submission_dossiers.services to resolve a blocker."
+)
+BLOCKER_DELETE_MESSAGE = "Blocker history cannot be deleted."
+
+
+class _DossierSectionQuerySet(models.QuerySet):
+    """Blocks queryset DELETE only.
+
+    `update()` and `bulk_update()` are deliberately left alone: a section is
+    legitimately mutable. `services.reorder_section` renumbers a whole sibling
+    group with `.update()`, and `services.recalculate_dossier` writes derived
+    readiness with `.bulk_update()`. Banning those would break the two
+    operations that exist precisely to keep the outline consistent.
+
+    What must never happen is the row disappearing -- a section's creation is
+    already governed history, and it can carry link and blocker history that
+    would be stranded.
+    """
+
+    def delete(self):
+        raise DossierMutationForbidden(SECTION_DELETE_MESSAGE)
+
+
+class DossierSectionManager(models.Manager):
+    def get_queryset(self):
+        return _DossierSectionQuerySet(self.model, using=self._db)
+
+
+class _BlockerQuerySet(models.QuerySet):
+    """Blockers are append-once history and gate readiness, so all three bulk
+    paths are closed. Nothing in the service layer uses any of them: resolution
+    goes through a single locked `save()`."""
+
+    def update(self, **kwargs):
+        raise DossierMutationForbidden(BLOCKER_MUTATION_MESSAGE)
+
+    def delete(self):
+        raise DossierMutationForbidden(BLOCKER_DELETE_MESSAGE)
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise DossierMutationForbidden(BLOCKER_MUTATION_MESSAGE)
+
+
+class BlockerManager(models.Manager):
+    def get_queryset(self):
+        return _BlockerQuerySet(self.model, using=self._db)
+
+
 class DossierSection(PublicIDModel, TimeStampedModel):
     """One node of the dossier outline.
 
@@ -165,7 +215,12 @@ class DossierSection(PublicIDModel, TimeStampedModel):
     **Hierarchy comes from `parent`, never from parsing the string.** No CTD
     syntax is enforced and none is assumed; the engine must be able to represent
     those structures without encoding them.
+
+    **Retirement is the only removal path.** See `services.retire_section`, the
+    guards below, and the database triggers in `0003`.
     """
+
+    objects = DossierSectionManager()
 
     tenant = models.ForeignKey(
         "tenancy.Tenant", on_delete=models.PROTECT, related_name="dossier_sections"
@@ -262,6 +317,9 @@ class DossierSection(PublicIDModel, TimeStampedModel):
     def is_retired(self) -> bool:
         return self.retired_at is not None
 
+    def delete(self, using=None, keep_parents=False):
+        raise DossierMutationForbidden(SECTION_DELETE_MESSAGE)
+
 
 # ---------------------------------------------------------------------------
 # Blockers
@@ -272,7 +330,14 @@ class DossierSectionBlocker(PublicIDModel, TimeStampedModel):
     Explicit rather than buried in `notes`, because readiness depends on it: a
     blocker recorded in prose cannot gate a calculation. Resolution stamps and
     is auditable; blocker history is never deleted.
+
+    **Lifecycle: OPEN -> RESOLVED, exactly once, then immutable forever.** The
+    check constraint below keeps the two resolution halves consistent at any
+    instant; it cannot see the previous row, so it permits a resolved blocker
+    being rewritten back to open. The `0003` triggers close that.
     """
+
+    objects = BlockerManager()
 
     tenant = models.ForeignKey(
         "tenancy.Tenant", on_delete=models.PROTECT, related_name="dossier_blockers"
@@ -318,6 +383,9 @@ class DossierSectionBlocker(PublicIDModel, TimeStampedModel):
     @property
     def is_open(self) -> bool:
         return self.status == BlockerStatus.OPEN
+
+    def delete(self, using=None, keep_parents=False):
+        raise DossierMutationForbidden(BLOCKER_DELETE_MESSAGE)
 
 
 # ---------------------------------------------------------------------------

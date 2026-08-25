@@ -46,7 +46,18 @@ Module counts are `null`, never `0`, for callers who cannot see the module.
 
 Section links are governed at the database level from the first migration:
 `submission_dossiers/0002` installs PostgreSQL triggers on all three link tables
-because `link.save()` bypasses the manager. Sections are retired, never deleted.
+because `link.save()` bypasses the manager.
+
+Independent review found two further gaps, both closed in
+`submission_dossiers/0003`. Retirement was the intended removal path for a
+section but was enforced only in services, and `PROTECT` covered only a section
+that already held a governed relationship — a bare section could still be
+hard-deleted by ORM or SQL. And blocker history had a CHECK constraint and
+nothing else, so a resolved blocker could be reopened, re-resolved, or have its
+content and provenance rewritten with no audit row, which matters because
+blockers gate readiness directly. Sections now refuse deletion at model,
+queryset and database level in every state, and a blocker makes exactly one
+transition, OPEN to RESOLVED, and is immutable and undeletable thereafter.
 
 **No CEP, DMF, ANDA or eCTD structure is built in.** `section_code` is display
 metadata; hierarchy comes from `parent`, never from parsing the string. See
@@ -59,8 +70,10 @@ regulatory approval.**
 `submission_dossiers/0001` is **Class C for rollback** once any dossier exists:
 reversing it destroys the outline, the section hierarchy and ordering, the link
 history including retired links, and the whole blocker history with its
-resolution provenance. `0002` (the triggers) is Class A on its own terms and does
-not make reversing `0001` safe.
+resolution provenance. `0002` and `0003` (the triggers) are Class A on their own
+terms — each drops exactly what it created and touches no row — and neither makes
+reversing `0001` safe. Removing protection is not the same as making destruction
+safe.
 
 ## Milestone 8 — Regulatory Case / Submission Workspace
 

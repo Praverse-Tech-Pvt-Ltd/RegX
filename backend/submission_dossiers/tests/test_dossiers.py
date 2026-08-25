@@ -10,6 +10,7 @@ import pytest
 
 from submission_dossiers import services
 from submission_dossiers.models import (
+    DossierMutationForbidden,
     DossierSection,
     DossierSectionBlocker,
     Readiness,
@@ -606,8 +607,14 @@ class TestRetirementAndDeletionProtection:
             document_a.delete()
 
     def test_section_with_links_cannot_be_deleted(self, section_a, tenant_a, doer_a, document_a):
-        from django.db.models import ProtectedError
+        """Now refused by the section guard itself rather than by FK PROTECT.
 
+        PROTECT only ever covered a section that already held a governed
+        relationship, which is exactly the gap independent review found: a bare
+        section had nothing protecting it. The guard fires first and covers
+        both, so this asserts the stronger guarantee. `TestSectionDeletion`
+        proves the bare case, which PROTECT never could.
+        """
         services.link_target(
             kind="document",
             section=section_a,
@@ -615,8 +622,9 @@ class TestRetirementAndDeletionProtection:
             actor=doer_a,
             tenant=tenant_a,
         )
-        with pytest.raises(ProtectedError):
+        with pytest.raises(DossierMutationForbidden):
             section_a.delete()
+        assert DossierSection.objects.filter(pk=section_a.pk).exists()
 
     def test_dossier_with_sections_cannot_be_deleted(self, dossier_a, section_a):
         from django.db.models import ProtectedError
