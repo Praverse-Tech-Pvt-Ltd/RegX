@@ -59,6 +59,18 @@ blockers gate readiness directly. Sections now refuse deletion at model,
 queryset and database level in every state, and a blocker makes exactly one
 transition, OPEN to RESOLVED, and is immutable and undeletable thereafter.
 
+A third pass closed the section UPDATE bypass that closing DELETE had left
+behind. `update()`, `bulk_update()` and `save()` had stayed open so reorder and
+readiness could work, which also let any ORM caller rewrite tenant, dossier,
+parent, readiness or the retirement stamps directly. `submission_dossiers/0004`
+replaces that with a **sanctioned window**: the service layer declares which of
+four operations is running, in a transaction-scoped PostgreSQL parameter, and the
+trigger holds that statement to exactly the columns the operation may touch.
+Identity and provenance are frozen under every window and none; a retired section
+is frozen entirely; and the database independently re-checks self-parent,
+cross-dossier, cross-tenant, retired-parent and cycle. Declaring an operation
+grants nothing on its own.
+
 **No CEP, DMF, ANDA or eCTD structure is built in.** `section_code` is display
 metadata; hierarchy comes from `parent`, never from parsing the string. See
 [SUBMISSION_DOSSIERS.md](SUBMISSION_DOSSIERS.md).
@@ -70,10 +82,10 @@ regulatory approval.**
 `submission_dossiers/0001` is **Class C for rollback** once any dossier exists:
 reversing it destroys the outline, the section hierarchy and ordering, the link
 history including retired links, and the whole blocker history with its
-resolution provenance. `0002` and `0003` (the triggers) are Class A on their own
-terms — each drops exactly what it created and touches no row — and neither makes
-reversing `0001` safe. Removing protection is not the same as making destruction
-safe.
+resolution provenance. `0002`, `0003` and `0004` (the triggers) are Class A on
+their own terms — each drops exactly what it created and touches no row — and
+none of them makes reversing `0001` safe. Removing protection is not the same as
+making destruction safe.
 
 ## Milestone 8 — Regulatory Case / Submission Workspace
 

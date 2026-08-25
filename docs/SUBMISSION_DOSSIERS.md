@@ -275,12 +275,10 @@ Closed at three layers, because each sees something the others cannot:
 | `.filter(...).delete()`, `section.children.all().delete()` | `_DossierSectionQuerySet.delete()` raises |
 | raw SQL, psql, a cascade, a migration in a hurry | `0003` trigger `no_delete_dossier_section` |
 
-`update()` and `bulk_update()` are **deliberately left open** on the section
-queryset. `reorder_section` renumbers a sibling group with `.update()` and
-`recalculate_dossier` writes derived readiness with `.bulk_update()`; a blanket
-queryset ban would have broken the two operations that exist to keep the outline
-consistent. Only DELETE is closed, because only the row disappearing is the
-problem.
+`update()` and `bulk_update()` were originally left open here, because
+`reorder_section` and `recalculate_dossier` genuinely need them. **That was
+itself a finding** — see §12c. They are now closed on the public manager and
+routed through sanctioned windows instead.
 
 ### Foreign-key protection, unchanged
 
@@ -346,6 +344,111 @@ quietly become rewritable.
 returns a clean `409`, not a database error; the trigger is the floor, not the
 user-facing behaviour.
 
+## 12c. Section mutation — the sanctioned window
+
+Closing DELETE was not enough. `update()`, `bulk_update()` and `save()` stayed
+open so that reorder and readiness could work, and independent review found what
+else they permitted:
+
+```python
+DossierSection.objects.filter(pk=s.pk).update(tenant_id=other_tenant.pk)
+DossierSection.objects.filter(pk=s.pk).update(dossier_id=other_dossier.pk)
+DossierSection.objects.filter(pk=s.pk).update(parent_id=its_own_descendant.pk)
+DossierSection.objects.filter(pk=s.pk).update(readiness="ready")
+s.parent = descendant; s.save()
+s.tenant = other_tenant; s.save()
+```
+
+One call each, and each skips hierarchy validation, same-tenant enforcement,
+cross-dossier validation, cycle prevention, derived readiness, terminal-dossier
+gating and audit — leaving no trace.
+
+### Why a blanket ban is the wrong fix
+
+Banning `update()`/`bulk_update()` breaks reorder and readiness. Banning them
+*"except when services call them"* is not expressible in the ORM — and an
+ORM-only rule is not a floor anyway, because a raw cursor, a psql session or a
+migration never passes through Python.
+
+### The window
+
+`governance.section_write(op)` declares **which** operation is running, in a
+place both layers can read:
+
+- **Python** — a thread-local, so the manager and `save()` guards can refuse with
+  a clear `DossierMutationForbidden` instead of a database error;
+- **PostgreSQL** — `set_config('regx.dossier_section_op', op, true)`, i.e.
+  `SET LOCAL`, which the `0004` trigger reads.
+
+`SET LOCAL` is **transaction-scoped**: discarded on COMMIT or ROLLBACK, so a
+window cannot leak into the next request on a pooled connection. `section_write`
+also clears it on the way out, refuses to open outside a transaction, and refuses
+to nest — nesting would make the effective allow-list ambiguous.
+
+**Opening a window grants nothing.** It only selects which narrow allow-list
+applies:
+
+| Window | Columns it may change |
+|---|---|
+| *(none)* | **nothing — every `UPDATE` refused** |
+| `update` | `parent_id`, `section_code`, `title`, `description`, `notes`, `required`, `status`, `owner_id`, `due_date`, `updated_at` |
+| `reorder` | `sequence`, `updated_at` |
+| `recalculate` | `readiness`, `readiness_reason`, `updated_at` |
+| `retire` | `retired_at`, `retired_by_id`, `updated_at` |
+
+Declaring `reorder` and then writing `tenant_id` is refused exactly as firmly as
+declaring nothing, because these are **permanently frozen under every window**:
+
+    id · public_id · tenant_id · dossier_id · created_by_id · created_at
+
+`sequence` is excluded from the `update` window on purpose: ordering has its own
+sanctioned path, and letting a metadata edit renumber siblings would sidestep the
+sibling lock that keeps ordering deterministic.
+
+### Three layers, each seeing what the others cannot
+
+| Path | Guard |
+|---|---|
+| `DossierSection.objects...update()` / `.bulk_update()` | public manager writes nothing at all |
+| `section.save()` | model override — Django resolves `save()` through `_base_manager`, a plain `Manager` Django auto-creates, **not** `objects`, so the manager split can never cover this path |
+| raw SQL, psql, a migration | `0004` trigger — the only layer that holds when Python is not in the path |
+
+### Hierarchy, re-checked at the database
+
+`parent_id` is writable only under the `update` window, and the trigger
+independently re-checks what `services.validate_parent` checks: no self-parent,
+same dossier, same tenant, parent not retired, and **no cycle**. The cycle walk
+climbs the ancestor chain, bounded by `MAX_SECTION_DEPTH + 2` hops — a handful of
+indexed single-row lookups, run only when `parent_id` actually changes. The bound
+does two jobs: it terminates on a pre-existing cycle rather than spinning, and it
+enforces the depth ceiling from below.
+
+Python remains the fuller check — it also measures the depth of the *subtree
+being moved*, which the trigger does not attempt. The trigger is the floor, not a
+replacement.
+
+`INSERT` is checked for the same hierarchy invariants, closing the symmetric hole
+where a raw insert plants a section under a parent in another tenant or dossier.
+
+### Retirement is one-way
+
+Once `retired_at` is set the row is **frozen entirely** — one rule that covers
+unretiring, re-retiring and post-retirement content edits. Retiring itself must
+move `retired_at` and `retired_by_id` together, `NULL` → value.
+
+### Readiness is derived below the serializer too
+
+The serializer has no `readiness` field, and now neither does any reachable ORM
+path. Only `recalculate_dossier`, inside the `recalculate` window, may write it —
+and that window may write nothing else. A readiness claim cannot ride along with
+a metadata edit or a reorder; both are refused whole.
+
+### The terminal-dossier gate is unaffected
+
+`_require_mutable` runs in the service layer above the window and still fires
+first. A completed or cancelled dossier refuses update, reorder and retire with
+`409` — the window did not become a silent bypass of it.
+
 ## 13. Audit
 
 `submission_dossier.{created,updated,completed,cancelled}`,
@@ -368,19 +471,24 @@ Per [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) §4.
 | `0001_initial` | **Class A** — six `CreateModel`s, zero `RunPython`/`RunSQL`, zero destructive ops | **CLASS C — DATA RESTORE REQUIRED once any dossier exists** |
 | `0002_section_link_db_immutability` | **Class A** — two functions, six triggers | **Class A on its own terms** |
 | `0003_section_and_blocker_db_governance` | **Class A** — three functions, three triggers; no table altered, no row read or written | **Class A on its own terms** |
+| `0004_section_update_governance` | **Class A** — three functions, two triggers; no table altered, no row read or written | **Class A on its own terms** |
 
 > Reversing `0001` destroys the outline itself, the section hierarchy and
 > ordering, the link history including retired links, and the entire blocker
 > history with its resolution provenance. **Do not backward-migrate merely
 > because Django marks `CreateModel` reversible.**
 >
-> Neither `0002` nor `0003` makes reversing `0001` safe. Both reverse cleanly on
-> their own terms — each drops exactly the triggers and functions it created and
-> touches no row — but **removing protection is not the same as making
-> destruction safe**. A rollback that drops the tables takes the guards down with
-> them, which is the opposite of protection. The relationship is one-way: `0003`
-> can be reversed on its own, and `0001` cannot be reversed safely whether or not
-> `0002` and `0003` are still applied.
+> None of `0002`, `0003` or `0004` makes reversing `0001` safe. Each reverses
+> cleanly on its own terms — dropping exactly the triggers and functions it
+> created and touching no row — but **removing protection is not the same as
+> making destruction safe**. A rollback that drops the tables takes the guards
+> down with them, which is the opposite of protection. The relationship is
+> one-way: `0004` can be reversed on its own, and `0001` cannot be reversed
+> safely whether or not `0002`, `0003` and `0004` are still applied.
+>
+> Reversing `0004` alone leaves every row intact and re-opens the direct-ORM
+> mutation bypass. It is a protection rollback, not a data rollback, and should
+> be treated as a security change rather than a routine one.
 
 Both classifications are repeated **inside the migration files**, where an
 operator running `migrate submission_dossiers zero` will actually see them.
@@ -457,7 +565,7 @@ deferred rather than done unsafely.
 
 ## 18. Testing
 
-**Backend (160)**: dossier lifecycle and isolation; hierarchy including
+**Backend (203)**: dossier lifecycle and isolation; hierarchy including
 self-parent, cycle, cross-dossier, cross-tenant, retired parent and depth;
 ordering and reorder; readiness across every branch including child aggregation;
 blockers with database-enforced consistency; two-gate auth per kind with
@@ -465,7 +573,11 @@ indistinguishability and no-audit-on-refusal; safe projection; DB immutability
 across all three link tables; section deletion refused through model, queryset
 and raw SQL in both active and retired states; blocker content, provenance and
 lifecycle immutability; `information_schema` column coverage; audit content and
-absences; and query-cost invariance.
+absences; query-cost invariance; and direct-ORM mutation refused through the
+queryset, through `save()` and through a raw cursor for tenant, dossier,
+public_id, created_by, created_at, parent, readiness, readiness_reason and
+unretire, with cross-dossier, cross-tenant, self-parent and cycle re-checked at
+the database.
 
 **Frontend**: 23 unit, 7 new accessibility checks, 16 Playwright.
 
@@ -480,8 +592,18 @@ proves nothing:
 | Blocker `already resolved` finality rule removed (`0003`) | 3 |
 | Blocker frozen-column comparison removed (`0003`) | 7 |
 | ORM-level section and blocker `delete()` guards removed | 11 |
+| Section `no window -> refuse` rule removed (`0004`) | 4 |
+| Section frozen identity/provenance block removed (`0004`) | 3 |
+| Section hierarchy cycle walk removed (`0004`) | 1 |
+| Section retired-row freeze removed (`0004`) | 2 |
+| Public queryset `update()`/`bulk_update()` + `save()` guards removed | 9 |
+| The sanctioned window mechanism neutered entirely | 144 |
 
-Every mutated file was restored and verified byte-identical afterwards.
+The last row is the informative one: without the window nothing works, rather
+than everything being permitted. The mechanism fails closed.
+
+Every mutated file was restored and verified byte-identical afterwards, md5
+compared against a pre-mutation capture.
 
 ## 19. Regulatory boundaries
 

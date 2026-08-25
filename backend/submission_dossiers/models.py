@@ -27,9 +27,11 @@ from django.db import models
 
 from common.models import PublicIDModel, TimeStampedModel
 
+from .governance import DossierMutationForbidden, require_window
 
-class DossierMutationForbidden(Exception):
-    """Raised when a governed dossier row is mutated outside the service layer."""
+#: Re-exported: callers and tests import it from here, and `governance` owns it
+#: so that module can raise it without importing models.
+__all_governance_exceptions__ = (DossierMutationForbidden,)
 
 
 #: Operational ceiling, not a regulatory one. Deep enough for any real
@@ -165,27 +167,87 @@ BLOCKER_MUTATION_MESSAGE = (
 BLOCKER_DELETE_MESSAGE = "Blocker history cannot be deleted."
 
 
+SECTION_BYPASS_MESSAGE = (
+    "Dossier sections are governed; use submission_dossiers.services rather than "
+    "writing rows directly."
+)
+
+
 class _DossierSectionQuerySet(models.QuerySet):
-    """Blocks queryset DELETE only.
+    """The **public** section queryset. Reads freely; writes nothing.
 
-    `update()` and `bulk_update()` are deliberately left alone: a section is
-    legitimately mutable. `services.reorder_section` renumbers a whole sibling
-    group with `.update()`, and `services.recalculate_dossier` writes derived
-    readiness with `.bulk_update()`. Banning those would break the two
-    operations that exist precisely to keep the outline consistent.
+    Milestone 9 originally left `update()` and `bulk_update()` open here,
+    because `reorder_section` and `recalculate_dossier` genuinely need them.
+    Independent review found the consequence: the same two doors let any caller
+    rewrite `tenant_id`, `dossier_id`, `parent_id` or `readiness` directly,
+    skipping hierarchy validation, tenant scoping, cycle prevention, derived
+    readiness, terminal-dossier gating and audit in a single call.
 
-    What must never happen is the row disappearing -- a section's creation is
-    already governed history, and it can carry link and blocker history that
-    would be stranded.
+    The fix is not a blanket ban -- that would break reorder and readiness --
+    but a split. This queryset, reachable from anywhere as
+    `DossierSection.objects`, writes nothing at all. The four sanctioned
+    operations use `DossierSection.governed` from inside a
+    `governance.section_write` window, and the `0004` trigger holds each of
+    them to exactly the columns that operation may touch.
+
+    None of this is the guarantee. A raw cursor never runs a line of it. It
+    exists so the accidental caller gets a clear error naming the service layer
+    instead of a database exception.
     """
 
     def delete(self):
         raise DossierMutationForbidden(SECTION_DELETE_MESSAGE)
 
+    def update(self, **kwargs):
+        raise DossierMutationForbidden(SECTION_BYPASS_MESSAGE)
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise DossierMutationForbidden(SECTION_BYPASS_MESSAGE)
+
+
+class _GovernedSectionQuerySet(models.QuerySet):
+    """The **internal** section queryset, for the four sanctioned operations.
+
+    Permits `update()` and `bulk_update()` only inside a sanctioned window, and
+    still never permits `delete()` -- retirement remains the only removal path,
+    and no operation is allowed to reach past that.
+
+    Reaching this queryset is not permission to write anything: every statement
+    it issues still meets the `0004` trigger, which enforces the per-operation
+    column allow-list and the permanently frozen columns. Its only privilege is
+    not raising in Python first.
+    """
+
+    def delete(self):
+        raise DossierMutationForbidden(SECTION_DELETE_MESSAGE)
+
+    def update(self, **kwargs):
+        require_window("Refusing a direct section update.")
+        return super().update(**kwargs)
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        require_window("Refusing a direct section bulk update.")
+        return super().bulk_update(objs, fields, batch_size=batch_size)
+
 
 class DossierSectionManager(models.Manager):
+    """Public manager: `DossierSection.objects`. Read-only."""
+
     def get_queryset(self):
         return _DossierSectionQuerySet(self.model, using=self._db)
+
+
+class GovernedSectionManager(models.Manager):
+    """Internal manager: `DossierSection.governed`.
+
+    Used only by `submission_dossiers.services`, and only inside a sanctioned
+    window. Declared second so `objects` stays the default manager -- related
+    descriptors, the deletion collector and `refresh_from_db` all keep resolving
+    through the restricted one.
+    """
+
+    def get_queryset(self):
+        return _GovernedSectionQuerySet(self.model, using=self._db)
 
 
 class _BlockerQuerySet(models.QuerySet):
@@ -218,9 +280,18 @@ class DossierSection(PublicIDModel, TimeStampedModel):
 
     **Retirement is the only removal path.** See `services.retire_section`, the
     guards below, and the database triggers in `0003`.
+
+    **Writes go through the service layer.** `objects` reads and never writes;
+    `governed` writes only inside a `governance.section_write` window; `save()`
+    refuses an UPDATE outside one; and `0004` holds every statement to the
+    columns its declared operation may touch. See `governance.py`.
     """
 
+    #: Public and read-only. Default manager, so related descriptors and the
+    #: deletion collector resolve through the restricted queryset.
     objects = DossierSectionManager()
+    #: Internal, for the four sanctioned operations in `services`.
+    governed = GovernedSectionManager()
 
     tenant = models.ForeignKey(
         "tenancy.Tenant", on_delete=models.PROTECT, related_name="dossier_sections"
@@ -319,6 +390,21 @@ class DossierSection(PublicIDModel, TimeStampedModel):
 
     def delete(self, using=None, keep_parents=False):
         raise DossierMutationForbidden(SECTION_DELETE_MESSAGE)
+
+    def save(self, *args, **kwargs):
+        """Refuse an UPDATE outside a sanctioned window.
+
+        INSERT is untouched: `services.create_section` validates the hierarchy
+        before it inserts, and `0004` re-checks the parent on INSERT too.
+
+        `Model.save()` resolves through `_base_manager` -- a plain `Manager`
+        that Django auto-creates, not `objects` -- so restricting the public
+        manager does nothing here. Without this override `s.parent = descendant;
+        s.save()` would sail straight past the queryset guards.
+        """
+        if not self._state.adding and not kwargs.get("force_insert"):
+            require_window("Refusing a direct section save.")
+        return super().save(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------

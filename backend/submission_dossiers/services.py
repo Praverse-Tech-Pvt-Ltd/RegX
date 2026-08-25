@@ -5,6 +5,13 @@ from django.utils import timezone
 
 from . import readiness as readiness_engine
 from .audit_events import DossierEvent, emit
+from .governance import (
+    OP_RECALCULATE,
+    OP_REORDER,
+    OP_RETIRE,
+    OP_UPDATE,
+    section_write,
+)
 from .models import (
     MAX_SECTION_DEPTH,
     BlockerStatus,
@@ -322,7 +329,11 @@ def update_section(*, section, tenant, actor, parent=..., **fields) -> DossierSe
 
     if changed:
         try:
-            locked.save(update_fields=[*changed, "updated_at"])
+            # The window is opened around this one statement, not the whole
+            # function: the narrower it is, the less it can be borrowed by
+            # anything that runs alongside it.
+            with section_write(OP_UPDATE):
+                locked.save(update_fields=[*changed, "updated_at"])
         except IntegrityError as exc:
             raise DuplicateLink(
                 "A section with that code or sequence already exists in this dossier."
@@ -391,10 +402,11 @@ def reorder_section(*, section, tenant, actor, sequence: int) -> DossierSection:
     # violation. The offset is far above any real ordering, and both phases
     # happen inside the same locked transaction, so it is never observable.
     park = _SEQUENCE_PARK_OFFSET
-    for index, sibling in enumerate(others):
-        DossierSection.objects.filter(pk=sibling.pk).update(sequence=park + index)
-    for index, sibling in enumerate(others):
-        DossierSection.objects.filter(pk=sibling.pk).update(sequence=index * 10)
+    with section_write(OP_REORDER):
+        for index, sibling in enumerate(others):
+            DossierSection.governed.filter(pk=sibling.pk).update(sequence=park + index)
+        for index, sibling in enumerate(others):
+            DossierSection.governed.filter(pk=sibling.pk).update(sequence=index * 10)
 
     locked.refresh_from_db()
     emit(
@@ -434,7 +446,8 @@ def retire_section(*, section, tenant, actor) -> DossierSection:
 
     locked.retired_at = timezone.now()
     locked.retired_by = actor
-    locked.save(update_fields=["retired_at", "retired_by", "updated_at"])
+    with section_write(OP_RETIRE):
+        locked.save(update_fields=["retired_at", "retired_by", "updated_at"])
 
     recalculate_dossier(dossier)
     emit(
@@ -528,7 +541,11 @@ def recalculate_dossier(dossier) -> None:
             s.readiness_reason = new_reason
             to_update.append(s)
     if to_update:
-        DossierSection.objects.bulk_update(to_update, ["readiness", "readiness_reason"])
+        # The ONLY path that may write readiness. No API, serializer or view
+        # reaches this: readiness is derived, and the window plus the `0004`
+        # trigger make that true below the serializer layer as well.
+        with section_write(OP_RECALCULATE):
+            DossierSection.governed.bulk_update(to_update, ["readiness", "readiness_reason"])
 
 
 # ---------------------------------------------------------------------------
