@@ -2,13 +2,21 @@
 
 MIGRATION CLASSIFICATION (docs/RELEASE_ROLLBACK_RUNBOOK.md section 4)
 
-    FORWARD:  Class A. Additive only -- five plpgsql functions and eight
+    FORWARD:  Class A. Additive only -- exactly 7 plpgsql functions and 7
               triggers. No table is altered, no column is added or dropped, and
               no row is read or written.
 
-    ROLLBACK: Class A **on its own terms**. `reverse_sql` drops exactly the eight
-              triggers and five functions created here and nothing else. It
+    ROLLBACK: Class A **on its own terms**. `reverse_sql` drops exactly the 7
+              triggers and 7 functions created here and nothing else. It
               destroys no data; it destroys only the protection.
+
+              (An earlier version of this docstring said "five functions and
+              eight triggers". That was wrong in both halves and is corrected
+              here; the SQL below is unchanged. `0003` adds 2 more functions and
+              2 more triggers and states its own counts separately, so the two
+              are never combined ambiguously. A symmetry test now asserts these
+              numbers against the generated SQL so a future drift fails the
+              build rather than the docstring.)
 
 **Removing protection does NOT make reversing `0001` safe.** `0001` remains
 **CLASS C -- DATA RESTORE REQUIRED** once any governed blueprint or
