@@ -61,7 +61,19 @@ Provenance is append-only across versions: an upgrade adds a
 `DossierUpgradeApplication` and never rewrites the instantiation record that
 says how the dossier was originally created. `UpgradeSectionOrigin` exists
 because M10's origin INSERT guard correctly refuses a section from a later
-version. See [DOSSIER_UPGRADES.md](DOSSIER_UPGRADES.md).
+version.
+
+Apply re-proves the version and provenance facts under lock rather than trusting
+them from generation time, because the structural fingerprint cannot see either:
+retiring a blueprint version and advancing the provenance chain both move zero
+dossier sections. The target must still be ACTIVE and still belong to this
+tenant and blueprint, and the dossier's derived provenance must still be the
+plan's source version. `0003` puts a floor under the chain itself — a unique
+index that holds under concurrency, plus a trigger that refuses a link starting
+nowhere — with each half documented for what it does and does not enforce. This
+is the first operation to write across both governed hierarchies, so its lock
+order follows the one each already uses internally: dossier, plan, version rows
+by version_number, section. See [DOSSIER_UPGRADES.md](DOSSIER_UPGRADES.md).
 
 **No regulatory judgement of any kind.** No CTD, CEP, DMF, ANDA or agency rules;
 no regulatory impact assessment; no submission validation. Every test uses
@@ -71,8 +83,9 @@ generic synthetic codes. Applying a plan changes only what a person accepted.
 data exists: reversing it destroys plans, the review decisions recorded on their
 items, applied-upgrade history and upgrade section origins — none of it
 reconstructible, since a dossier deliberately never reads back to its blueprint.
-`0002` (six functions, seven triggers) is Class A on its own terms and does not
-make reversing `0001` safe.
+`0002` (six functions, seven triggers) and `0003` (one unique constraint, one
+function, one trigger) are Class A on their own terms and do not make reversing
+`0001` safe.
 
 ## Milestone 10 — Dossier Blueprint / Template Library
 

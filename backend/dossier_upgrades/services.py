@@ -5,6 +5,31 @@
 Every dossier write goes through `submission_dossiers.services`, so the
 Milestone 9 sanctioned window and its `0004` triggers still hold. Nothing here
 reaches past them.
+
+LOCK ORDER
+----------
+`apply_plan` is the first operation in the codebase to write across both
+governed hierarchies -- the dossier tree and the blueprint tree -- so it has to
+respect the order each already uses internally rather than invent a third:
+
+    1. SubmissionDossier            (M9's root; M9 services re-take it as a
+                                     no-op, so nothing here upgrades a lock)
+    2. DossierUpgradePlan
+    3. DossierBlueprintVersion      (source and target, by version_number --
+                                     the order `activate_version` uses when it
+                                     locks a blueprint's whole sibling set)
+    4. DossierSection               (taken by M9 services, under 1)
+
+The dossier row at step 1 is the serialization point for a dossier's provenance
+chain. Every `DossierUpgradeApplication` is inserted while it is held, so a
+transaction holding it reads a settled chain rather than one another
+transaction is midway through extending. Two applies on one dossier therefore
+serialize even when they are different plans holding different plan rows.
+
+`DossierBlueprint` is deliberately NOT locked. `retire_version` takes
+blueprint-then-version, so taking it after step 3 would invert that order; and
+it buys nothing, because `retire_version` must take the version row that step 3
+already holds.
 """
 
 from datetime import timedelta
@@ -89,6 +114,22 @@ def current_version_for(dossier):
     if instantiation is None:
         return None, None
     return instantiation.blueprint, instantiation.blueprint_version
+
+
+def locked_provenance_for(dossier):
+    """`current_version_for`, re-derived while the dossier row is held.
+
+    A locked variant rather than a stricter default: the ordinary helper is used
+    on read paths that must not take write locks (plan lists, target menus), and
+    weakening it there would put a `FOR UPDATE` behind every page render.
+
+    The caller must already hold `SubmissionDossier` FOR UPDATE. That row is the
+    serialization point for a dossier's provenance chain: every
+    `DossierUpgradeApplication` is inserted under it, so a reader holding it sees
+    a settled chain rather than one another transaction is midway through
+    extending.
+    """
+    return current_version_for(dossier)
 
 
 def _origin_map(dossier):
@@ -540,16 +581,107 @@ def cancel_plan(*, plan, tenant, actor):
 # ---------------------------------------------------------------------------
 # Apply
 # ---------------------------------------------------------------------------
+#: Both messages name what moved and what to do, and nothing else. No public_id,
+#: no version number, no blueprint name: a caller who lost a race learns that
+#: they lost it, not the shape of what won.
+PROVENANCE_MOVED_MESSAGE = (
+    "The dossier's blueprint provenance changed after this plan was generated. Regenerate the plan."
+)
+TARGET_NOT_ACTIVE_MESSAGE = "The target blueprint version is no longer active. Regenerate the plan."
+
+
+def _revalidate_versions(plan, tenant):
+    """Re-read the plan's two version rows under lock and re-prove every fact.
+
+    Generation checked all of this, and none of it stays true on its own: a
+    version can be retired between review and apply, and the structural
+    fingerprint would not notice, because retiring a blueprint version moves no
+    dossier section.
+
+    Locked in `version_number` order, which is what `dossier_blueprints`
+    `activate_version` uses when it locks a blueprint's whole sibling set. Two
+    rows taken in a different order than the module that owns them is how a
+    deadlock gets built. The blueprint row is deliberately NOT locked: taking it
+    after the versions would invert `retire_version`'s blueprint-then-version
+    order, and it buys nothing, since `retire_version` locks the version row
+    this already holds.
+    """
+    from dossier_blueprints.models import BlueprintVersionStatus, DossierBlueprintVersion
+
+    rows = {
+        v.pk: v
+        for v in DossierBlueprintVersion.objects.select_for_update()
+        .filter(pk__in=[plan.source_version_id, plan.target_version_id])
+        .order_by("version_number", "pk")
+    }
+    source = rows.get(plan.source_version_id)
+    target = rows.get(plan.target_version_id)
+    if source is None or target is None:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+
+    # Coherence of the plan's own immutable relationships. The 0002 triggers
+    # freeze these columns, so a divergence here means the rows they point at
+    # moved, not that the plan was edited. Service-level clean failure on top of
+    # the database floor, not instead of it.
+    if source.tenant_id != tenant.pk or target.tenant_id != tenant.pk:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+    if source.blueprint_id != plan.blueprint_id or target.blueprint_id != plan.blueprint_id:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+    if plan.tenant_id != tenant.pk or plan.blueprint.tenant_id != tenant.pk:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+    if target.pk == source.pk:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+
+    if target.status != BlueprintVersionStatus.ACTIVE:
+        # A withdrawn version is not applied. Retirement is a deliberate act,
+        # and honouring a plan against it would let a version keep changing
+        # dossiers after its owner pulled it.
+        raise UpgradeLocked(TARGET_NOT_ACTIVE_MESSAGE)
+
+    return source, target
+
+
+def _assert_provenance_unmoved(dossier, plan):
+    """The dossier must still be at the version this plan compared against.
+
+    Two plans can be generated from v1 -- one to v2, one to v3 -- and both
+    reviewed and marked ready. Once either applies, the other describes a
+    comparison that no longer starts anywhere real, and the structural
+    fingerprint is not a substitute for noticing: an applied plan can leave the
+    section tree byte-identical (every accepted item skipped because the runtime
+    facts moved) while still having advanced the provenance chain.
+
+    Derived from governed history under the dossier lock, never from a cached
+    relation or caller input. Fails closed when provenance is missing or
+    inconsistent.
+    """
+    blueprint, version = locked_provenance_for(dossier)
+    if blueprint is None or version is None:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+    if blueprint.pk != plan.blueprint_id:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+    if version.pk != plan.source_version_id:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
+
+
 @transaction.atomic
 def apply_plan(*, plan, tenant, actor):
     """Write the accepted items, all or nothing.
 
-    FOUR GATES, checked independently:
+    SIX GATES, checked independently:
 
       1. `dossier_upgrades.apply`                  -- checked by the view
       2. `submission_dossiers.manage_sections`     -- this writes sections
       3. the dossier must not be terminal
-      4. the plan must not be stale
+      4. the target version must still be ACTIVE, and still belong to this
+         tenant and this blueprint
+      5. the dossier's derived provenance must still be the plan's source
+         version
+      6. the plan must not be stale
+
+    Gates 4 and 5 exist because gate 6 cannot cover them. The fingerprint hashes
+    the dossier's section tree; a version can be retired, and a sibling plan can
+    advance the provenance chain, without moving a single section.
 
     Gate 2 is checked before anything is resolved, with the same
     indistinguishable message as every other target failure.
@@ -559,6 +691,7 @@ def apply_plan(*, plan, tenant, actor):
     hand-edited dossier. Nothing here writes a section row directly.
     """
     from submission_dossiers import services as dossier_services
+    from submission_dossiers.models import SubmissionDossier
     from submission_dossiers.permissions import PERM_MANAGE_SECTIONS, has_dossier_permission
 
     _assert_tenant(plan, tenant)
@@ -566,14 +699,20 @@ def apply_plan(*, plan, tenant, actor):
     if not has_dossier_permission(actor, tenant, PERM_MANAGE_SECTIONS):
         raise InvalidTarget(INVALID_TARGET_MESSAGE)
 
+    # LOCK ORDER -- see the module docstring. Dossier first, then plan, then the
+    # version rows by version_number.
+    dossier = SubmissionDossier.objects.select_for_update().get(pk=plan.dossier_id)
+    _assert_tenant(dossier, tenant)
+
     locked = DossierUpgradePlan.objects.select_for_update().get(pk=plan.pk)
     _assert_tenant(locked, tenant)
+    if locked.dossier_id != dossier.pk:
+        raise UpgradeLocked(PROVENANCE_MOVED_MESSAGE)
     if locked.status != PlanStatus.READY:
         raise UpgradeLocked(
             f"Only a plan marked ready can be applied; this one is {locked.status}."
         )
 
-    dossier = locked.dossier
     if dossier.is_terminal:
         # A completed or cancelled dossier refuses structural change. M9 would
         # refuse each write anyway; refusing here gives a clean answer instead
@@ -582,6 +721,14 @@ def apply_plan(*, plan, tenant, actor):
 
     if locked.items.filter(status=ItemStatus.BLOCKED).exists():
         raise UpgradeLocked("This plan has blocked items. Resolve or regenerate before applying.")
+
+    # Version and provenance facts are re-derived under the locks, never trusted
+    # from generation time. The structural fingerprint cannot stand in for any
+    # of this: it hashes the dossier's section tree, and a version can be
+    # retired, or another plan can advance the provenance chain, without moving
+    # a single section.
+    source_version, target_version = _revalidate_versions(locked, tenant)
+    _assert_provenance_unmoved(dossier, locked)
 
     # Staleness, checked against the live dossier. Fails closed: a plan that
     # cannot prove the dossier is unchanged is not applied.
@@ -614,10 +761,10 @@ def apply_plan(*, plan, tenant, actor):
         dossier=dossier,
         plan=locked,
         blueprint=locked.blueprint,
-        source_version=locked.source_version,
-        target_version=locked.target_version,
-        source_version_number=locked.source_version.version_number,
-        target_version_number=locked.target_version.version_number,
+        source_version=source_version,
+        target_version=target_version,
+        source_version_number=source_version.version_number,
+        target_version_number=target_version.version_number,
         sections_added=counts["added"],
         sections_retired=counts["retired"],
         sections_updated=counts["updated"],
@@ -644,8 +791,8 @@ def apply_plan(*, plan, tenant, actor):
             "plan_public_id": str(locked.public_id),
             "application_public_id": str(application.public_id),
             "dossier_public_id": str(dossier.public_id),
-            "source_version_public_id": str(locked.source_version.public_id),
-            "target_version_public_id": str(locked.target_version.public_id),
+            "source_version_public_id": str(source_version.public_id),
+            "target_version_public_id": str(target_version.public_id),
             "source_version_number": application.source_version_number,
             "target_version_number": application.target_version_number,
             "sections_added": counts["added"],

@@ -453,6 +453,27 @@ class DossierUpgradeApplication(PublicIDModel, TimeStampedModel):
             models.Index(fields=["tenant"]),
             models.Index(fields=["dossier", "created_at"]),
         ]
+        constraints = [
+            #: A dossier's provenance chain may not fork. Two plans generated
+            #: from the same source version can both be reviewed and marked
+            #: ready; only one may ever be applied, and this says so at the
+            #: database rather than trusting the service to have taken the right
+            #: lock.
+            #:
+            #: Safe because a source version can never repeat: only a DRAFT may
+            #: be activated (`dossier_blueprints.services.activate_version`
+            #: refuses anything else), so a RETIRED version never becomes ACTIVE
+            #: again and the chain only ever moves forward.
+            #:
+            #: This is the half that holds under concurrency. A unique index is
+            #: not snapshot-dependent, so two simultaneous inserts claiming the
+            #: same source cannot both succeed regardless of isolation level or
+            #: lock ordering.
+            models.UniqueConstraint(
+                fields=["dossier", "source_version"],
+                name="unique_upgrade_source_per_dossier",
+            ),
+        ]
 
     def __str__(self):
         return f"v{self.source_version_number}->v{self.target_version_number}"

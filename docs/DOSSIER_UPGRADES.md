@@ -152,6 +152,59 @@ survives.
 
 ## 7. Apply
 
+### Everything is re-proved under lock
+
+Generation checked the target and the provenance. Neither stays true on its
+own, and **the fingerprint cannot stand in for either**: it hashes the dossier's
+section tree, and both of these move without touching a single section.
+
+| Re-proved at apply | Why generation is not enough |
+|---|---|
+| target is still ACTIVE | a version can be retired between review and apply. Honouring the plan anyway would let a withdrawn version keep changing dossiers after its owner pulled it. |
+| target still belongs to this tenant and this blueprint | the plan's columns are frozen by `0002`, so a divergence means the rows they point at moved |
+| target is not the source | the plan's own check constraint says so; re-proved because it is cheap and the alternative is a self-referential upgrade |
+| the dossier's derived provenance is still the plan's source | another plan may have advanced the chain. See §13. |
+
+Provenance is **derived from governed history under the dossier lock** — latest
+`DossierUpgradeApplication`, else the `BlueprintInstantiation` — never from a
+cached relation and never from the caller. It fails closed: a dossier whose
+provenance is missing or inconsistent is not upgraded.
+
+Both refusals name what moved and what to do, and nothing else. No `public_id`,
+no version number, no blueprint name: a caller who lost a race learns that they
+lost it, not the shape of what won.
+
+**Nothing is written before all of it passes** — no section, no item status, no
+plan status, no history row, no origin, no success audit.
+
+### Lock order
+
+`apply_plan` is the first operation in the codebase to write across both
+governed hierarchies, so it takes the order each already uses internally rather
+than inventing a third:
+
+```
+1. SubmissionDossier         M9's root. M9 services re-take it as a no-op,
+                             so nothing here ever upgrades a lock.
+2. DossierUpgradePlan
+3. DossierBlueprintVersion   source and target, by version_number -- the order
+                             activate_version uses on a sibling set.
+4. DossierSection            taken by M9 services, under 1.
+```
+
+The dossier row is the serialization point for the provenance chain. Every
+`DossierUpgradeApplication` is inserted while it is held, so a transaction
+holding it reads a settled chain rather than one another transaction is midway
+through extending — and two applies on one dossier serialize even when they are
+different plans holding different plan rows.
+
+`DossierBlueprint` is deliberately **not** locked. `retire_version` takes
+blueprint-then-version, so taking it after step 3 would invert that order; and
+it buys nothing, because `retire_version` must take the version row step 3
+already holds.
+
+### Order of writes
+
 All-or-nothing, in one transaction, in a safe order:
 
 1. **Additions**, shallowest first — the comparison orders them by depth, so a
@@ -221,7 +274,7 @@ manually-added.
 | Operation | Gates |
 |---|---|
 | generate | `dossier_upgrades.generate` + `submission_dossiers.view` + `dossier_blueprints.view` |
-| apply | `dossier_upgrades.apply` + `submission_dossiers.manage_sections` + non-terminal dossier + not stale |
+| apply | `dossier_upgrades.apply` + `submission_dossiers.manage_sections` + non-terminal dossier + target still ACTIVE + provenance unmoved + not stale |
 
 Target-domain gates are checked **before the target is resolved**, and every
 failure raises the same message, so absent / cross-tenant / unauthorised are one
@@ -265,6 +318,22 @@ That last line is the M10 review lesson applied up front: freezing a row that
 was never checked on the way in does not protect the truth, it preserves
 whatever was written.
 
+`0003` adds the part `0002` cannot see. `0002` proves each history row is
+internally coherent — its tenant, dossier and versions match the plan it names —
+and says nothing about how that row relates to the ones already there.
+
+| Guard | What it holds, and what it does not |
+|---|---|
+| `UNIQUE (dossier, source_version)` | **Holds under concurrency.** A unique index is not snapshot-dependent, so two simultaneous inserts claiming the same source cannot both succeed whatever the isolation level or lock order. Safe because a source version can never repeat: `activate_version` refuses anything but a DRAFT, so a RETIRED version never becomes ACTIVE again. |
+| chain trigger | **Holds against a sequential forged insert** — one that invents a starting point or grafts onto a chain ending elsewhere. It reads committed rows, so two concurrent inserts can both observe the same prior state and both pass; that gap is what the index above closes. |
+
+Neither is sufficient alone and neither is claimed to be. A test drives two
+concurrent forged inserts and asserts the failure comes from the index — the one
+case the trigger provably cannot catch.
+
+Together: a dossier's history is a single chain, each link starts where the
+previous ended, and the first starts at the version it was instantiated from.
+
 `Model.save()` resolves through `_base_manager` — a plain `Manager` Django
 auto-creates, not `objects` — so restricting the public manager cannot cover it,
 and a raw cursor never runs a line of Python. The triggers are the floor.
@@ -273,11 +342,34 @@ and a raw cursor never runs a line of Python. The triggers are the floor.
 
 | Race | Guard |
 |---|---|
-| Two simultaneous applies | plan row `select_for_update` + the DRAFT→READY→APPLIED trigger. Exactly one wins. |
+| Two simultaneous applies | dossier row `select_for_update` + the DRAFT→READY→APPLIED trigger. Exactly one wins. |
 | Two simultaneous generations | `unique_open_upgrade_plan_per_target` partial index. Exactly one open plan. |
 | Edit between ready and apply | the fingerprint check. Refuses rather than writing against moved facts. |
+| Target retired during apply | both transactions take the version row `FOR UPDATE`, so one waits for the other. Either order is valid; applying a RETIRED target is not. |
+| The chain forking | `UNIQUE (dossier, source_version)`. §12. |
 
-Tested with real threads against PostgreSQL.
+Tested with real threads against PostgreSQL, including the apply-versus-retire
+race, whose outcome is genuinely undetermined — the test asserts the safety
+property rather than a timing.
+
+### Why two READY plans cannot both reach the chain
+
+Worth stating plainly, because it decides how much the provenance gate is
+actually carrying:
+
+- only one version per blueprint is ACTIVE — `activate_version` retires the
+  previous one in the same transaction;
+- at most one **open** plan per (dossier, target).
+
+So two open plans must have different targets, and at most one of those targets
+can be ACTIVE. Every reachable sequential attempt to apply a second plan is
+therefore met by the target-ACTIVE gate first.
+
+That makes the service-level provenance gate **defence in depth**, and it earns
+its place on the case those two constraints do not cover: a history row that
+arrived without passing the service at all. A test constructs exactly that — the
+chain advanced by a raw insert, leaving a plan whose target is still perfectly
+ACTIVE — and its counterpart at the database is `0003`.
 
 ## 14. Audit
 
@@ -306,6 +398,7 @@ Per [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) §4.
 |---|---|---|
 | `0001_initial` | **Class A** — four `CreateModel`s, no `RunPython`/`RunSQL`, no existing table altered | **CLASS C — DATA RESTORE REQUIRED once any governed upgrade data exists** |
 | `0002_upgrade_db_governance` | **Class A** — exactly 6 functions and 7 triggers; no table altered, no row read or written | **Class A on its own terms** |
+| `0003_upgrade_provenance_chain` | **Class A** — one unique constraint plus exactly 1 function and 1 trigger. The constraint is validated on apply, so a database already holding a forked chain fails loudly rather than losing a row — correct, because a fork is an integrity incident, not something a migration should paper over. | **Class A on its own terms** |
 
 > Reversing `0001` destroys every plan and the review decisions on its items,
 > the applied-upgrade history, and the upgrade section origins. None of it is
@@ -316,14 +409,15 @@ Per [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) §4.
 > **Removing `0002`'s protection does not make reversing `0001` safe.** The
 > relationship is one-way.
 
-The `0002` counts are asserted against the generated SQL by a symmetry test —
-M10 shipped a docstring claiming five functions and eight triggers where the SQL
-had seven of each, so these numbers are checked by the build rather than by
-proofreading.
+Both migrations' counts are asserted against the generated SQL by a symmetry
+test — M10 shipped a docstring claiming five functions and eight triggers where
+the SQL had seven of each, so these numbers are checked by the build rather than
+by proofreading. (`0002` claimed such a test already covered it; the test lived
+in `dossier_blueprints` and did not, which the review pass caught.)
 
 ## 17. Testing
 
-**Backend (104)**: comparison across every change type; ambiguity and conflict;
+**Backend (129)**: comparison across every change type; ambiguity and conflict;
 retirement safety for each runtime signal; generation rules including
 cross-blueprint, draft and retired targets; review; staleness including the
 deliberate runtime exemption; selective apply; transactional rollback with
@@ -331,7 +425,11 @@ injected failures at two different points; runtime-work preservation both
 across an upgrade and against work recorded after review; provenance
 including sequential upgrades; tenant isolation at both layers; multi-gate
 authorization with indistinguishability; DB governance; real-thread concurrency;
-and query-cost invariance.
+and query-cost invariance; and apply-time revalidation — a target retired after
+review, a chain advanced by an insert that never passed the service, a
+non-instantiated dossier, a cross-blueprint plan, sequential v1→v2→v3, and the
+database chain guards against a fork, a link that starts nowhere and a link
+grafted past the end.
 
 **Frontend**: 25 unit, 19 new accessibility checks (58 → 77), 15 Playwright.
 
@@ -356,6 +454,8 @@ one dossier. The query-cost test caught it at 100 plans.
 | `@transaction.atomic` removed from apply | 2 |
 | Runtime-work retirement blocker neutered (generation) | 7 |
 | Apply-time retirement re-check removed | 2 |
+| Apply-time current-provenance guard removed | 3 |
+| Apply-time target-ACTIVE guard removed | 3 |
 | Provenance/history freeze trigger removed | 2 |
 | Multi-gate apply authorization removed | 2 |
 
