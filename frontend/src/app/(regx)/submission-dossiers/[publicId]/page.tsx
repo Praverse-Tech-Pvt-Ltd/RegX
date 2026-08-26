@@ -13,6 +13,7 @@ import { DossierStatusBadge, ReadinessBadge } from "../readiness-badge";
 import { SectionTree } from "../section-tree";
 import { BlueprintProvenanceLine } from "./blueprint-provenance";
 import { SectionPanel } from "./section-panel";
+import { UpgradePanel } from "./upgrade-panel";
 
 const T = {
   ink: "#001f45",
@@ -392,6 +393,23 @@ function DossierInner() {
           onChanged={() => void load()}
         />
       </div>
+
+      {/* Blueprint upgrades. Below the outline rather than in a tab: a reviewer
+          comparing a proposed change against the dossier wants both on screen,
+          and a tab would hide exactly the context the decision needs. */}
+      <section
+        aria-label="Blueprint upgrade"
+        style={{ marginTop: "2rem", paddingTop: "1.25rem", borderTop: `1px solid ${T.line}` }}
+      >
+        <h2 style={{ margin: "0 0 0.75rem", fontSize: "1.1rem", color: T.ink }}>
+          Blueprint upgrade
+        </h2>
+        <UpgradePanel
+          tenantSlug={tenantSlug}
+          dossierPublicId={publicId}
+          dossierTerminal={dossier.is_terminal}
+        />
+      </section>
     </main>
   );
 }

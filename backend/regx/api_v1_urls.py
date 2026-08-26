@@ -18,4 +18,5 @@ urlpatterns = [
     path("", include("regulatory_cases.urls")),
     path("", include("submission_dossiers.urls")),
     path("", include("dossier_blueprints.urls")),
+    path("", include("dossier_upgrades.urls")),
 ]
