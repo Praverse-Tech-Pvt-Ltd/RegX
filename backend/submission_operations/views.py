@@ -180,15 +180,17 @@ class OperationsDossierListView(APIView):
         if search:
             qs = qs.filter(title__icontains=search)
 
+        # BEFORE pagination. Filtering the page after slicing would make `count`
+        # describe the unfiltered set and hide matches that fall on later pages.
+        readiness = request.query_params.get("internal_readiness")
+        if readiness:
+            _validate_choice(readiness, services.INTERNAL_READINESS_VALUES, "internal_readiness")
+            qs = services.filter_by_internal_readiness(qs, readiness)
+
         qs = qs.order_by("-updated_at", "-id")
         paginator = _Pagination()
         page = paginator.paginate_queryset(qs, request)
         rows = services.dossier_rows(tenant=tenant, visibility=visibility, queryset=page)
-
-        readiness = request.query_params.get("internal_readiness")
-        if readiness:
-            _validate_choice(readiness, services.INTERNAL_READINESS_VALUES, "internal_readiness")
-            rows = [r for r in rows if r["internal_readiness"] == readiness]
 
         return paginator.get_paginated_response(
             OperationsDossierRowSerializer(rows, many=True).data

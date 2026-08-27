@@ -32,7 +32,7 @@ which is worse and much harder to notice.
 
 from datetime import timedelta
 
-from django.db.models import Count, Exists, OuterRef, Q
+from django.db.models import Count, Exists, F, OuterRef, Q
 from django.utils import timezone
 
 from .attention import REASON_SEVERITY, AttentionReason, sort_key
@@ -362,6 +362,62 @@ def _fingerprints_for(dossier_ids, tenant) -> dict:
 # ---------------------------------------------------------------------------
 # Internal readiness -- aggregated from M9, never recomputed
 # ---------------------------------------------------------------------------
+def with_readiness_counts(queryset):
+    """Annotate a dossier queryset with its required-section counts.
+
+    Two aggregates over ONE left join, so this cannot multiply rows the way two
+    counts across two joins would. The predicates mirror `dossier_rows` exactly
+    -- active, required, and M9's stored `readiness` column -- because a filter
+    that disagreed with the rows it returns would be worse than no filter.
+    """
+    from submission_dossiers.models import Readiness
+
+    active_required = Q(sections__retired_at__isnull=True, sections__required=True)
+    return queryset.annotate(
+        _required_total=Count("sections", filter=active_required),
+        _required_complete=Count(
+            "sections", filter=active_required & Q(sections__readiness=Readiness.READY)
+        ),
+    )
+
+
+def filter_by_internal_readiness(queryset, label: str):
+    """Narrow a dossier queryset to one internal-readiness label, in SQL.
+
+    **Before pagination, not after.** Filtering the materialised page instead
+    would make `count` describe the unfiltered set and hide every match that
+    happens to fall on a later page -- a filtered first page could come back
+    empty while the matching dossier sat at position 80, and then appear on page
+    4 as if it had been there all along.
+
+    Expressed as an annotation rather than a Python pass so the paginator counts
+    and slices the filtered set itself. Materialising every dossier to filter in
+    memory would give the right answer and destroy the bounded-query guarantee
+    the rest of this module is built on.
+
+    This is a second expression of the rule in `internal_readiness_label`, which
+    is a real risk: two implementations drift. A differential test asserts the
+    two agree for every dossier in a mixed fixture, so a change to one that is
+    not made to the other turns red.
+    """
+    annotated = with_readiness_counts(queryset)
+    if label == INTERNAL_READINESS_NO_REQUIRED:
+        return annotated.filter(_required_total=0)
+    if label == INTERNAL_READINESS_READY:
+        return annotated.filter(_required_total__gt=0).filter(
+            _required_complete__gte=F("_required_total")
+        )
+    if label == INTERNAL_READINESS_PARTIAL:
+        return annotated.filter(
+            _required_complete__gt=0, _required_complete__lt=F("_required_total")
+        )
+    if label == INTERNAL_READINESS_NOT_READY:
+        return annotated.filter(_required_total__gt=0, _required_complete=0)
+    # Unreachable: the view validates against INTERNAL_READINESS_VALUES first.
+    # Fail closed rather than silently returning everything.
+    return annotated.none()
+
+
 def internal_readiness_label(required_total: int, required_complete: int) -> str:
     """Aggregate M9 readiness into one internal word.
 
@@ -992,19 +1048,35 @@ def owner_workload(*, tenant, visibility: Visibility) -> list[dict]:
 #: them. An allow-list rather than a deny-list: a new event type added by
 #: another milestone appears here only when someone decides it is safe, instead
 #: of appearing automatically and being reviewed never.
+#: Every entry is asserted against the owning app's own event enum by a test.
+#: The first version of this list was written from memory -- `dossier.created`
+#: where the enum says `submission_dossier.created`, `workflow.transitioned`
+#: where there is no such event at all -- and an allow-list of names that match
+#: nothing does not fail, it silently shows an almost-empty feed. A wrong name
+#: is now a test failure rather than a quiet absence.
 ACTIVITY_EVENT_MODULES: dict[str, str] = {
+    # regulatory_cases.audit_events.CaseEvent
     "regulatory_case.created": MODULE_CASES,
     "regulatory_case.completed": MODULE_CASES,
     "regulatory_case.cancelled": MODULE_CASES,
-    "dossier.created": MODULE_DOSSIERS,
-    "dossier.section_created": MODULE_DOSSIERS,
-    "dossier.section_updated": MODULE_DOSSIERS,
-    "dossier.section_retired": MODULE_DOSSIERS,
-    "dossier.blocker_created": MODULE_DOSSIERS,
-    "dossier.blocker_resolved": MODULE_DOSSIERS,
-    "workflow.transitioned": MODULE_WORKFLOWS,
+    # submission_dossiers.audit_events.DossierEvent
+    "submission_dossier.created": MODULE_DOSSIERS,
+    "submission_dossier.completed": MODULE_DOSSIERS,
+    "submission_dossier.cancelled": MODULE_DOSSIERS,
+    "dossier_section.created": MODULE_DOSSIERS,
+    "dossier_section.updated": MODULE_DOSSIERS,
+    "dossier_section.retired": MODULE_DOSSIERS,
+    "dossier_section.blocker_created": MODULE_DOSSIERS,
+    "dossier_section.blocker_resolved": MODULE_DOSSIERS,
+    # workflows.audit_events.WorkflowEvent
+    "workflow.submitted": MODULE_WORKFLOWS,
+    "workflow.approved": MODULE_WORKFLOWS,
+    "workflow.rejected": MODULE_WORKFLOWS,
     "workflow.evidence_linked": MODULE_WORKFLOWS,
+    # dossier_blueprints.audit_events.BlueprintEvent -- instantiation creates a
+    # dossier, so it is gated on dossiers rather than on the blueprint library.
     "dossier_blueprint.instantiated": MODULE_DOSSIERS,
+    # dossier_upgrades.audit_events.UpgradeEvent
     "dossier_upgrade.plan_created": MODULE_UPGRADES,
     "dossier_upgrade.plan_applied": MODULE_UPGRADES,
 }
@@ -1024,6 +1096,18 @@ ACTIVITY_PAYLOAD_KEYS: dict[str, str | None] = {
     "case_public_id": MODULE_CASES,
 }
 
+#: **No actor identity travels with an activity row, deliberately.**
+#:
+#: `AuditEvent.actor_email` is a person's email address, and `Visibility` gates
+#: cases, dossiers, documents, workflows, checklists, blueprints and upgrades --
+#: there is no identity or tenant-member gate among them. Emitting the email
+#: would make permission to see an event's *module* into permission to learn who
+#: performed it, which is a disclosure this projection never agreed to make.
+#:
+#: The repository has no permission designed for viewing tenant-member identity
+#: details, and inventing one to keep a field the dashboard does not need would
+#: be a governance decision smuggled in as a convenience. The operational
+#: question is *what happened to which thing, and when* -- not who.
 ACTIVITY_LIMIT = 50
 
 
@@ -1046,7 +1130,6 @@ def recent_activity(*, tenant, visibility: Visibility, limit: int = ACTIVITY_LIM
             "resource_type": e.resource_type,
             "resource_public_id": e.resource_id,
             "occurred_at": e.created_at,
-            "actor_email": e.actor_email or None,
             "detail": {
                 k: v
                 for k, v in (e.payload or {}).items()

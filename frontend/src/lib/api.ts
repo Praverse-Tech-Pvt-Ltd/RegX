@@ -3021,7 +3021,6 @@ export interface OperationsActivityRow {
   resource_type: string;
   resource_public_id: string;
   occurred_at: string;
-  actor_email: string | null;
   detail: Record<string, string>;
 }
 

@@ -316,6 +316,108 @@ class TestRecentActivityDiscipline:
         assert "Very Secret Case Title" not in str(rows)
         assert "Very Secret Dossier" not in str(rows)
 
+    def test_no_actor_identity_travels_with_an_activity_row(
+        self, client_admin_a, tenant_a, admin_a
+    ):
+        """`Visibility` has no identity gate.
+
+        It covers cases, dossiers, documents, workflows, checklists, blueprints
+        and upgrades -- nothing about people. Emitting `actor_email` would turn
+        permission to see an event's MODULE into permission to learn who
+        performed it, which is a disclosure this projection never agreed to
+        make. The operational question is what happened to which thing, and
+        when.
+        """
+        make_case(tenant_a, admin_a, title="Something happened")
+
+        rows = client_admin_a.get(f"{OPS_API}/recent-activity/").data["results"]
+        assert rows, "precondition: the actor did something auditable"
+        for row in rows:
+            assert "actor_email" not in row
+            assert "actor" not in row
+        assert admin_a.email not in str(rows)
+        assert "@" not in str(rows), "no address of any shape reaches the feed"
+
+    def test_the_serialized_row_carries_exactly_the_intended_fields(
+        self, client_admin_a, tenant_a, admin_a
+    ):
+        make_case(tenant_a, admin_a)
+        row = client_admin_a.get(f"{OPS_API}/recent-activity/").data["results"][0]
+        assert set(row) == {
+            "event_type",
+            "resource_type",
+            "resource_public_id",
+            "occurred_at",
+            "detail",
+        }
+
+    def test_another_tenants_actor_never_appears(
+        self, client_admin_a, tenant_a, admin_a, tenant_b, admin_b
+    ):
+        make_case(tenant_b, admin_b, title="B did something")
+        make_case(tenant_a, admin_a, title="A did something")
+
+        rows = client_admin_a.get(f"{OPS_API}/recent-activity/").data["results"]
+        assert admin_b.email not in str(rows)
+        assert "B did something" not in str(rows)
+
+    def test_the_feed_still_works_without_actor_identity(self, client_admin_a, tenant_a, admin_a):
+        """Removing the field must not empty the panel."""
+        case = make_case(tenant_a, admin_a)
+        dossier = make_dossier(case, tenant_a, admin_a)
+        make_section(dossier, tenant_a, admin_a, "A")
+
+        rows = client_admin_a.get(f"{OPS_API}/recent-activity/").data["results"]
+        assert len(rows) >= 2
+        for row in rows:
+            assert row["event_type"]
+            assert row["resource_public_id"]
+            assert row["occurred_at"]
+
+    def test_every_allow_listed_event_type_is_a_real_event(self):
+        """An allow-list of names that match nothing does not fail loudly.
+
+        The first version of this list was written from memory and named
+        `dossier.created` where the enum says `submission_dossier.created`, so
+        the feed silently carried case events and nothing else. This asserts
+        every entry against the owning app's own enum, which is the only way a
+        typo here becomes visible.
+        """
+        from dossier_blueprints.audit_events import BlueprintEvent
+        from dossier_upgrades.audit_events import UpgradeEvent
+        from regulatory_cases.audit_events import CaseEvent
+        from submission_dossiers.audit_events import DossierEvent
+        from submission_operations.services import ACTIVITY_EVENT_MODULES
+        from workflows.audit_events import WorkflowEvent
+
+        real = set()
+        for enum in (CaseEvent, DossierEvent, WorkflowEvent, BlueprintEvent, UpgradeEvent):
+            real |= {
+                v for k, v in vars(enum).items() if not k.startswith("_") and isinstance(v, str)
+            }
+
+        unknown = set(ACTIVITY_EVENT_MODULES) - real
+        assert unknown == set(), f"allow-listed events that no app emits: {unknown}"
+
+    def test_the_feed_carries_dossier_and_section_events_not_only_cases(
+        self, client_admin_a, tenant_a, admin_a
+    ):
+        """The regression the wrong names caused: a feed that looked alive
+        because cases still appeared."""
+        case = make_case(tenant_a, admin_a)
+        dossier = make_dossier(case, tenant_a, admin_a)
+        section = make_section(dossier, tenant_a, admin_a, "A")
+        add_blocker(section, tenant_a, admin_a)
+
+        types = {
+            row["event_type"]
+            for row in client_admin_a.get(f"{OPS_API}/recent-activity/").data["results"]
+        }
+        assert "regulatory_case.created" in types
+        assert "submission_dossier.created" in types
+        assert "dossier_section.created" in types
+        assert "dossier_section.blocker_created" in types
+
     def test_an_event_type_outside_the_allow_list_never_appears(
         self, client_admin_a, tenant_a, admin_a
     ):

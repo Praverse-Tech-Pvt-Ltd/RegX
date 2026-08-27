@@ -223,16 +223,33 @@ writes nothing** — the repository does not audit reads, and inventing that for
 one screen would both break the convention and bury the write trail under
 dashboard noise.
 
+**What happened to which thing, and when. Never who.**
+
+`AuditEvent.actor_email` is a person's email address, and `Visibility` gates
+cases, dossiers, documents, workflows, checklists, blueprints and upgrades —
+nothing about people. Emitting the actor would make permission to see an event's
+*module* into permission to learn who performed it, a disclosure this projection
+never agreed to make. The repository has no permission designed for viewing
+tenant-member identity, and inventing one to keep a field the dashboard does not
+need would be a governance decision smuggled in as a convenience. So the field
+does not exist — not in the service, the serializer, the schema or the frontend
+type.
+
 Two allow-lists, not deny-lists:
 
 - **Event types** — a new event type from a later milestone appears here when
-  someone decides it is safe, not automatically.
-- **Payload keys** — only `action`, `dossier_public_id`, `case_public_id`.
-  Titles, notes, descriptions, reasons and blueprint names are absent by
-  construction. The feed says *what kind of thing happened to which
-  identifier*, never what it said.
+  someone decides it is safe, not automatically. Every entry is asserted against
+  the owning app's own event enum, because an allow-list of names that match
+  nothing does not fail loudly: the first version of this list was written from
+  memory (`dossier.created` where the enum says `submission_dossier.created`)
+  and the feed silently carried case events and nothing else.
+- **Payload keys** — only `action`, `dossier_public_id`, `case_public_id`, and
+  each gated on the module that *owns* it rather than the one that emitted the
+  event. Titles, notes, descriptions, reasons and blueprint names are absent by
+  construction.
 
-Each event type is gated by the module it belongs to.
+A row therefore carries exactly: `event_type`, `resource_type`,
+`resource_public_id`, `occurred_at`, `detail`.
 
 ## 11. Query strategy
 
@@ -294,6 +311,26 @@ and sort values are validated against enums — an unvalidated filter reaching t
 ORM lets a caller probe fields the API never meant to expose. `page_size` is
 capped, or a bounded-query dashboard becomes a full-table materialisation.
 
+### Filtering happens before pagination
+
+`internal_readiness` narrows the **queryset**, not the materialised page.
+Filtering after slicing makes `count` describe the unfiltered set and hides every
+match that falls on a later page: a filtered first page comes back empty while
+the matching dossier sits at position 80, then appears on page 4 as if it had
+been there all along.
+
+It is expressed as a DB annotation — two aggregates over one left join, mirroring
+`dossier_rows` exactly — so the paginator counts and slices the filtered set
+itself. Materialising every dossier to filter in Python would give the right
+answer and destroy the bounded-query guarantee. Measured: **22 queries flat at 1,
+20, 100 and 500 dossiers, filter on and off** — the filter narrows the same query
+rather than adding one.
+
+That makes the rule exist twice, once in SQL and once in
+`internal_readiness_label`, which is a real drift risk. A differential test
+partitions the whole tenant by the SQL filter and asserts the partition matches
+what the rows themselves say, so changing one without the other turns red.
+
 A caller who may open the dashboard but not see cases gets
 `{"results": null, "count": null, "restricted": true}` — not a 403, because they
 were entitled to ask.
@@ -321,7 +358,7 @@ page body never scrolls sideways at tablet width.
 
 ## 14. Testing
 
-**Backend (75)**: overview across empty/populated tenants; internal readiness
+**Backend (104)**: overview across empty/populated tenants; internal readiness
 including the deliberate M9-disagreement case; due-date boundaries at
 −1/0/+1/+6/+7/+8; retired and terminal exclusions; attention ranking, stability
 and filtering; two-tenant isolation on every surface; permission projection for
@@ -342,7 +379,9 @@ Every guard turned tests red; all files restored md5-identical.
 | Overdue boundary off by one (5 call sites) | 4 |
 | Null replaced by zero | 3 |
 | Attention ranking flattened | 2 |
+| Readiness filter moved back after pagination | 8 |
 | Tenant filter removed | 2 |
+| Unconditional `actor_email` projection restored | 2 |
 
 The tenant-filter mutation turns exactly 2 red, and that is complete rather than
 thin: the overview aggregate and owner workload are the only two places where

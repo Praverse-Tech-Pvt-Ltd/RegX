@@ -182,3 +182,46 @@ class TestUpgradeStalenessIsBatched:
             built = target
             counts[target] = _count(client_admin_a, f"{OPS_API}/dossiers/", {"page_size": 100})
         assert counts[2] == counts[8] == counts[20], counts
+
+
+@pytest.mark.django_db
+class TestReadinessFilterQueryCost:
+    """The filter must not trade a flat query count for a correct answer.
+
+    Pushed into the queryset as an annotation, so the paginator counts and
+    slices the filtered set in SQL. Materialising every dossier to filter in
+    Python would give the same answer and grow with the tenant.
+    """
+
+    def _sizes(self, client, tenant, actor, params):
+        counts = {}
+        built = 0
+        for target in (1, 20, 100, 500):
+            _build(tenant, actor, cases=target - built, sections_per_dossier=2)
+            built = target
+            counts[target] = _count(client, f"{OPS_API}/dossiers/", params)
+        return counts
+
+    def test_flat_with_the_filter_off(self, client_admin_a, tenant_a, admin_a):
+        counts = self._sizes(client_admin_a, tenant_a, admin_a, {"page_size": 25})
+        assert len(set(counts.values())) == 1, counts
+
+    def test_flat_with_the_filter_on(self, client_admin_a, tenant_a, admin_a):
+        counts = self._sizes(
+            client_admin_a,
+            tenant_a,
+            admin_a,
+            {"page_size": 25, "internal_readiness": "internally_not_ready"},
+        )
+        assert len(set(counts.values())) == 1, counts
+
+    def test_the_filter_costs_no_extra_queries(self, client_admin_a, tenant_a, admin_a):
+        """Filtering narrows the same query rather than adding one."""
+        _build(tenant_a, admin_a, cases=60, sections_per_dossier=2)
+        off = _count(client_admin_a, f"{OPS_API}/dossiers/", {"page_size": 25})
+        on = _count(
+            client_admin_a,
+            f"{OPS_API}/dossiers/",
+            {"page_size": 25, "internal_readiness": "internally_not_ready"},
+        )
+        assert on == off, f"filter off={off} on={on}"

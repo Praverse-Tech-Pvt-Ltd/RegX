@@ -59,7 +59,11 @@ soon → not started → informational, with a total order so pagination cannot 
 rows. "Due soon" is a seven-day **display** window with no regulatory meaning.
 
 Aggregation is per page, not per row: query counts are flat from 1 to 100 cases
-on every surface. See
+on every surface. Readiness filtering narrows the queryset in SQL **before**
+pagination, so `count` describes the filtered set and a match on page four is not
+invisible on page one. The activity feed carries what happened to which thing and
+when, never who: `Visibility` has no identity gate, so emitting an actor's email
+would turn module permission into permission to learn who acted. See
 [SUBMISSION_OPERATIONS_DASHBOARD.md](SUBMISSION_OPERATIONS_DASHBOARD.md).
 
 **No regulatory judgement of any kind.** No CTD, eCTD, CEP, DMF, ANDA, USFDA or

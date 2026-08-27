@@ -145,9 +145,15 @@ class OperationsOwnerRowSerializer(serializers.Serializer):
 
 
 class OperationsActivityRowSerializer(serializers.Serializer):
+    """What happened to which thing, and when. Never who.
+
+    No actor field: `Visibility` has no identity gate, so emitting the actor's
+    email would turn permission to see an event's module into permission to
+    learn who acted. See `services.ACTIVITY_LIMIT` for the full reasoning.
+    """
+
     event_type = serializers.CharField()
     resource_type = serializers.CharField()
     resource_public_id = serializers.CharField()
     occurred_at = serializers.DateTimeField()
-    actor_email = serializers.CharField(allow_null=True)
     detail = serializers.DictField()
