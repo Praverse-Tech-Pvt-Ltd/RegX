@@ -1,0 +1,85 @@
+from django.urls import path
+
+from .views import (
+    CasePackageListCreateView,
+    PackageCancelView,
+    PackageCloneView,
+    PackageDetailView,
+    PackageEntryListCreateView,
+    PackageEntryRemoveView,
+    PackageEntryReorderView,
+    PackageExportView,
+    PackageFreezeView,
+    PackageManifestView,
+    PackageReturnToDraftView,
+    PackageSubmitForReviewView,
+    PackageValidateView,
+)
+
+urlpatterns = [
+    path(
+        "regulatory-cases/<uuid:public_id>/packages/",
+        CasePackageListCreateView.as_view(),
+        name="case-packages",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/",
+        PackageDetailView.as_view(),
+        name="package-detail",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/entries/",
+        PackageEntryListCreateView.as_view(),
+        name="package-entries",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/entries/<uuid:entry_public_id>/remove/",
+        PackageEntryRemoveView.as_view(),
+        name="package-entry-remove",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/entries/<uuid:entry_public_id>/reorder/",
+        PackageEntryReorderView.as_view(),
+        name="package-entry-reorder",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/submit-for-review/",
+        PackageSubmitForReviewView.as_view(),
+        name="package-submit-for-review",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/return-to-draft/",
+        PackageReturnToDraftView.as_view(),
+        name="package-return-to-draft",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/freeze/",
+        PackageFreezeView.as_view(),
+        name="package-freeze",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/cancel/",
+        PackageCancelView.as_view(),
+        name="package-cancel",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/clone/",
+        PackageCloneView.as_view(),
+        name="package-clone",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/validate/",
+        PackageValidateView.as_view(),
+        name="package-validate",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/manifest/",
+        PackageManifestView.as_view(),
+        name="package-manifest",
+    ),
+    path(
+        "submission-packages/<uuid:public_id>/export/",
+        PackageExportView.as_view(),
+        name="package-export",
+    ),
+]

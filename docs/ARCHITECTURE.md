@@ -24,6 +24,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `dossier_blueprints` | Reusable, versioned tenant-controlled dossier outlines, and the governed record of which dossier was stamped from which version. Defines structure; owns no execution ([`DOSSIER_BLUEPRINTS.md`](DOSSIER_BLUEPRINTS.md)) |
 | `dossier_upgrades` | Blueprint-to-blueprint change impact, and the only sanctioned path for moving an existing dossier onto a newer version. Proposes; never applies on its own ([`DOSSIER_UPGRADES.md`](DOSSIER_UPGRADES.md)) |
 | `submission_operations` | Read-only operational view across every governed domain. Owns no data, stores nothing and decides nothing ([`SUBMISSION_OPERATIONS_DASHBOARD.md`](SUBMISSION_OPERATIONS_DASHBOARD.md)) |
+| `submission_packages` | Controlled assembly of exact document versions into an internal package, with a frozen manifest and a ZIP export. Binds versions, never documents ([`SUBMISSION_PACKAGES.md`](SUBMISSION_PACKAGES.md)) |
 
 ## Key invariants
 
@@ -43,6 +44,9 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 - The operations dashboard is a read model with no second source of truth: no copied readiness, no cached counts, no stored dashboard state, no model and no migration. Every number is counted at request time from the table that owns it.
 - A dashboard permission is a door, not a key. `submission_operations.view` grants only the right to ask; each module stays behind its own view permission, checked independently per request.
 - On the dashboard, `0` and `null` are different answers: `0` means there are none, `null` means the caller is not entitled to know. A restricted dimension is never rendered as a zero.
+- A submission package binds to an exact `DocumentVersion`, never to a `Document`. Uploading a new version of a cited document changes nothing about any package that already cites an earlier one; the guarantee is a foreign key, not a convention.
+- FROZEN on a package means its manifest can no longer change. It is not QA approval, regulatory approval or agency acceptance, there is no unfreeze, and changing a frozen package means cloning it into a new draft.
+- A package export is all or nothing. A caller who cannot retrieve every cited document is refused the whole archive rather than handed a shorter one, because a ZIP silently missing files looks complete to whoever receives it.
 
 ## Import dependency rules
 
@@ -94,6 +98,16 @@ submission_operations → dossier_upgrades, dossier_blueprints,
                    become a source of truth rather than a view of one, and
                    deleting it stops being free. Enforced by the
                    `nothing-depends-on-submission-operations` contract.
+submission_packages → documents, submission_dossiers, regulatory_cases,
+                   tenancy, identity, authorization, audit, common
+                   Composes the document platform and a case. It stores no file
+                   bytes: the document platform stays the sole owner of stored
+                   content, and a package holds exact references plus an
+                   immutable manifest. Nothing depends on it, so the whole app
+                   can be removed and every document and case still stands.
+                   `documents` never imports it -- the deletion-protection
+                   registry keeps that arrow one-way, exactly as it does for
+                   workflow evidence.
 documents ← never imports workflows (evidence deletion protection goes
             through DeletionProtectionRegistry, keeping it one-way)
 ```

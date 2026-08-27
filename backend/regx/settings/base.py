@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "dossier_blueprints",
     "dossier_upgrades",
     "submission_operations",
+    "submission_packages",
 ]
 
 MIDDLEWARE = [

@@ -33,7 +33,7 @@ known-first-party = ["common", "identity", "tenancy", "authorization", "audit", 
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades", "submission_operations"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades", "submission_operations", "submission_packages"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -139,6 +139,37 @@ forbidden_modules = ["submission_operations"]
 name = "submission-operations-no-legacy-django-apps"
 type = "forbidden"
 source_modules = ["submission_operations"]
+forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
+
+# A package composes the document platform; the document platform must never
+# learn about packages. The deletion-protection registry exists precisely so
+# that arrow stays one-way, and this makes it a build failure rather than a
+# convention.
+[[tool.importlinter.contracts]]
+name = "nothing-depends-on-submission-packages"
+type = "forbidden"
+source_modules = [
+    "common",
+    "identity",
+    "tenancy",
+    "authorization",
+    "audit",
+    "workflows",
+    "documents",
+    "templates_registry",
+    "iig_checklist",
+    "regulatory_cases",
+    "submission_dossiers",
+    "dossier_blueprints",
+    "dossier_upgrades",
+    "submission_operations",
+]
+forbidden_modules = ["submission_packages"]
+
+[[tool.importlinter.contracts]]
+name = "submission-packages-no-legacy-django-apps"
+type = "forbidden"
+source_modules = ["submission_packages"]
 forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
 
 [tool.pytest.ini_options]

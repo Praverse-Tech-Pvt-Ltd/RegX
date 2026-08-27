@@ -20,4 +20,5 @@ urlpatterns = [
     path("", include("dossier_blueprints.urls")),
     path("", include("dossier_upgrades.urls")),
     path("", include("submission_operations.urls")),
+    path("", include("submission_packages.urls")),
 ]

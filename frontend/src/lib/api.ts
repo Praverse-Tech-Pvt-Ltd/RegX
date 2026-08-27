@@ -3096,3 +3096,209 @@ function buildQuery(params: Record<string, string | number | undefined>): string
   const search = new URLSearchParams(entries.map(([k, v]) => [k, String(v)]));
   return `?${search.toString()}`;
 }
+
+
+// ---------------------------------------------------------------------------
+// Submission packages (Milestone 13)
+//
+// A package binds to EXACT document versions. Nothing in this client resolves
+// "latest" -- the caller always names a `document_version_public_id`, because a
+// convenience that picked a version server-side would persist one the user
+// never saw, which is the ambiguity the milestone exists to remove.
+//
+// `document` is nullable on an entry: the entry exists because the package is
+// visible, and the document does not because the caller holds no document
+// permission. Same rule as the operations dashboard -- `null` means *you are
+// not entitled to know*, and is never rendered as a blank or a zero.
+// ---------------------------------------------------------------------------
+export type PackageStatus = "draft" | "in_review" | "frozen" | "cancelled";
+
+export interface PackageDocumentRef {
+  document_public_id: string;
+  document_version_public_id: string;
+  version_number: number;
+  title: string;
+  checksum_sha256: string;
+  size_bytes: number;
+  mime_type: string;
+  scan_status: string;
+}
+
+export interface PackageEntry {
+  public_id: string;
+  sequence: number;
+  logical_path: string;
+  export_filename: string;
+  display_name: string;
+  dossier_section_public_id: string | null;
+  is_active: boolean;
+  added_at: string;
+  /** `null` when the caller lacks `documents.view`. */
+  document: PackageDocumentRef | null;
+}
+
+export interface SubmissionPackage {
+  public_id: string;
+  name: string;
+  description: string;
+  status: PackageStatus;
+  revision_number: number;
+  case_public_id: string | null;
+  source_package_public_id: string | null;
+  entry_count: number;
+  manifest_checksum: string;
+  created_by: { public_id: string; full_name: string } | null;
+  created_at: string;
+  frozen_by: { public_id: string; full_name: string } | null;
+  frozen_at: string | null;
+  cancelled_at: string | null;
+  permissions?: PackagePermissions;
+}
+
+export interface SubmissionPackageDetail extends SubmissionPackage {
+  entries: PackageEntry[];
+}
+
+export interface PackagePermissions {
+  can_view: boolean;
+  can_create: boolean;
+  can_edit: boolean;
+  can_manage_entries: boolean;
+  can_review: boolean;
+  can_freeze: boolean;
+  can_cancel: boolean;
+  can_export: boolean;
+}
+
+export interface PackageIntegrityIssue {
+  code: string;
+  entry_public_id: string | null;
+  detail: string | null;
+}
+
+export interface PackageIntegrity {
+  valid: boolean;
+  issues: PackageIntegrityIssue[];
+  /** Always "internal_package_integrity". Never a regulatory conclusion. */
+  semantics: string;
+}
+
+export interface PackageManifest {
+  manifest_schema_version: number;
+  manifest_checksum: string;
+  entry_count: number;
+  total_bytes: number;
+  frozen_at: string;
+  manifest: Record<string, unknown>;
+}
+
+export interface PackagePage {
+  results: SubmissionPackage[];
+  count: number;
+  next?: string | null;
+  previous?: string | null;
+}
+
+const PACKAGES_V1 = `${DOSSIER_V1}/submission-packages`;
+
+export const submissionPackages = {
+  listForCase: (tenantSlug: string, casePublicId: string) =>
+    apiRequest<PackagePage>(`${DOSSIER_V1}/regulatory-cases/${casePublicId}/packages/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  create: (tenantSlug: string, casePublicId: string, body: { name: string; description?: string }) =>
+    apiRequest<SubmissionPackage>(
+      `${DOSSIER_V1}/regulatory-cases/${casePublicId}/packages/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body }
+    ),
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<SubmissionPackageDetail>(`${PACKAGES_V1}/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  /** The caller names an EXACT version. There is no "latest" option by design. */
+  addEntry: (
+    tenantSlug: string,
+    publicId: string,
+    body: {
+      document_version_public_id: string;
+      logical_path?: string;
+      display_name?: string;
+      dossier_section_public_id?: string;
+    }
+  ) =>
+    apiRequest<PackageEntry>(`${PACKAGES_V1}/${publicId}/entries/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body,
+    }),
+
+  removeEntry: (tenantSlug: string, publicId: string, entryPublicId: string) =>
+    apiRequest<PackageEntry>(
+      `${PACKAGES_V1}/${publicId}/entries/${entryPublicId}/remove/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  reorderEntry: (
+    tenantSlug: string,
+    publicId: string,
+    entryPublicId: string,
+    sequence: number
+  ) =>
+    apiRequest<PackageEntry>(
+      `${PACKAGES_V1}/${publicId}/entries/${entryPublicId}/reorder/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { sequence } }
+    ),
+
+  submitForReview: (tenantSlug: string, publicId: string) =>
+    apiRequest<SubmissionPackage>(`${PACKAGES_V1}/${publicId}/submit-for-review/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  returnToDraft: (tenantSlug: string, publicId: string) =>
+    apiRequest<SubmissionPackage>(`${PACKAGES_V1}/${publicId}/return-to-draft/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  /** Permanent. There is no unfreeze; changing a frozen package means cloning. */
+  freeze: (tenantSlug: string, publicId: string) =>
+    apiRequest<SubmissionPackage>(`${PACKAGES_V1}/${publicId}/freeze/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  cancel: (tenantSlug: string, publicId: string) =>
+    apiRequest<SubmissionPackage>(`${PACKAGES_V1}/${publicId}/cancel/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  clone: (tenantSlug: string, publicId: string, body: { name?: string } = {}) =>
+    apiRequest<SubmissionPackage>(`${PACKAGES_V1}/${publicId}/clone/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body,
+    }),
+
+  /** Internal package integrity only. Not a regulatory validation. */
+  validate: (tenantSlug: string, publicId: string) =>
+    apiRequest<PackageIntegrity>(`${PACKAGES_V1}/${publicId}/validate/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  manifest: (tenantSlug: string, publicId: string) =>
+    apiRequest<PackageManifest>(`${PACKAGES_V1}/${publicId}/manifest/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  /** The browser downloads this; it is a binary archive, not JSON. */
+  exportUrl: (publicId: string) => `${PACKAGES_V1}/${publicId}/export/`,
+};

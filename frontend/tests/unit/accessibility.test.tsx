@@ -1066,3 +1066,109 @@ describe("Accessibility \u2014 operations badge colour contrast", () => {
     expect(contrast(screen.getByTestId("internal-readiness"))).toBeGreaterThanOrEqual(AA);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Milestone 13 -- submission packages: badges, checksums, restricted documents
+// ---------------------------------------------------------------------------
+import {
+  Checksum,
+  FrozenMeansNote,
+  PackageStatusBadge,
+  ScanStatusBadge,
+  Unavailable as PackageUnavailable,
+} from "@/app/(regx)/submission-packages/package-primitives";
+
+describe("Accessibility \u2014 submission package primitives", () => {
+  it("has no serious or critical automated violations", async () => {
+    const { container } = render(
+      <div>
+        <PackageStatusBadge status="draft" />
+        <PackageStatusBadge status="in_review" />
+        <PackageStatusBadge status="frozen" />
+        <PackageStatusBadge status="cancelled" />
+        <ScanStatusBadge status="clean" />
+        <ScanStatusBadge status="quarantined" />
+        <Checksum value={"a".repeat(64)} />
+        <PackageUnavailable />
+        <FrozenMeansNote />
+      </div>
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("package state is never conveyed by colour alone", () => {
+    for (const status of ["draft", "in_review", "frozen", "cancelled"] as const) {
+      const { unmount } = render(<PackageStatusBadge status={status} />);
+      expect(screen.getByTestId("package-status-badge").textContent?.trim().length).toBeGreaterThan(
+        0
+      );
+      unmount();
+    }
+  });
+
+  it("scan state is never conveyed by colour alone", () => {
+    for (const status of ["clean", "pending", "quarantined", "infected"] as const) {
+      const { unmount } = render(<ScanStatusBadge status={status} />);
+      expect(screen.getByTestId("scan-status-badge").textContent?.trim().length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it("a checksum exposes its full value to assistive technology", () => {
+    const full = "d".repeat(64);
+    render(<Checksum value={full} testId="ck" />);
+    expect(screen.getByTestId("ck")).toHaveAttribute("title", full);
+  });
+
+  it("a restricted document reads as words, not an empty cell", () => {
+    render(<PackageUnavailable testId="pu" />);
+    expect(screen.getByTestId("pu")).toHaveTextContent("Unavailable");
+  });
+});
+
+describe("Accessibility \u2014 submission package colour contrast", () => {
+  // axe cannot resolve these pills: the background is set inline on the badge
+  // while the page ground comes from a parent, so the automated check has no
+  // pair to measure. Milestone 9 shipped two real AA failures behind exactly
+  // that silence, so the ratio is computed here rather than trusted.
+  const luminance = (hex: string) => {
+    const v = (i: number) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * v(1) + 0.7152 * v(3) + 0.0722 * v(5);
+  };
+  const toHex = (rgb: string) => {
+    const m = rgb.match(/\d+/g);
+    if (!m) return rgb;
+    return "#" + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+  };
+  const contrast = (el: HTMLElement) => {
+    const s = getComputedStyle(el);
+    const a = luminance(toHex(s.color));
+    const b = luminance(toHex(s.backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const AA = 4.5;
+
+  it.each(["draft", "in_review", "frozen", "cancelled"] as const)(
+    "package status badge %s meets WCAG AA",
+    (status) => {
+      render(<PackageStatusBadge status={status} />);
+      expect(contrast(screen.getByTestId("package-status-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it.each([
+    "clean",
+    "pending",
+    "quarantined",
+    "infected",
+    "scan_failed",
+    "scanner_unavailable",
+  ] as const)("scan status badge %s meets WCAG AA", (status) => {
+    render(<ScanStatusBadge status={status} />);
+    expect(contrast(screen.getByTestId("scan-status-badge"))).toBeGreaterThanOrEqual(AA);
+  });
+});
