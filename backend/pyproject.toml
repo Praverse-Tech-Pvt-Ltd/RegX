@@ -33,7 +33,7 @@ known-first-party = ["common", "identity", "tenancy", "authorization", "audit", 
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades", "submission_operations"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -109,6 +109,36 @@ forbidden_modules = ["dossier_upgrades"]
 name = "dossier-upgrades-no-legacy-django-apps"
 type = "forbidden"
 source_modules = ["dossier_upgrades"]
+forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
+
+# submission_operations is a read model. It depends on every governed domain it
+# aggregates and NOTHING may depend on it: the moment a domain imports the
+# dashboard, the dashboard has become a source of truth rather than a view of
+# one, and deleting it would stop being free.
+[[tool.importlinter.contracts]]
+name = "nothing-depends-on-submission-operations"
+type = "forbidden"
+source_modules = [
+    "common",
+    "identity",
+    "tenancy",
+    "authorization",
+    "audit",
+    "workflows",
+    "documents",
+    "templates_registry",
+    "iig_checklist",
+    "regulatory_cases",
+    "submission_dossiers",
+    "dossier_blueprints",
+    "dossier_upgrades",
+]
+forbidden_modules = ["submission_operations"]
+
+[[tool.importlinter.contracts]]
+name = "submission-operations-no-legacy-django-apps"
+type = "forbidden"
+source_modules = ["submission_operations"]
 forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
 
 [tool.pytest.ini_options]

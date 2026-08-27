@@ -2892,3 +2892,208 @@ export const dossierUpgrades = {
       body: {},
     }),
 };
+
+
+// ---------------------------------------------------------------------------
+// Submission operations dashboard (Milestone 12)
+//
+// `null` and `0` mean different things throughout these types, and the
+// `| null` is load-bearing rather than defensive: `null` says the caller may
+// not know, `0` says there are none. Anything rendering a nullable count must
+// branch on it, and the types force that branch to exist.
+// ---------------------------------------------------------------------------
+export interface OperationsCaseCounts {
+  open: number;
+  on_hold: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface OperationsDossierCounts {
+  open: number;
+  on_hold: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface OperationsSectionCounts {
+  required_total: number;
+  required_complete: number;
+  required_blocked: number;
+  required_overdue: number;
+  required_due_soon: number;
+  required_not_started: number;
+}
+
+export interface OperationsWorkflowCounts {
+  waiting_review: number;
+  rejected: number;
+  overdue: number;
+}
+
+export interface OperationsUpgradeCounts {
+  open: number;
+  blocked: number;
+  stale: number;
+}
+
+export interface OperationsOverview {
+  cases: OperationsCaseCounts | null;
+  dossiers: OperationsDossierCounts | null;
+  sections: OperationsSectionCounts | null;
+  blockers: { open: number } | null;
+  workflows: OperationsWorkflowCounts | null;
+  documents: { linked: number } | null;
+  checklists: { incomplete: number } | null;
+  upgrades: OperationsUpgradeCounts | null;
+  restricted_modules: string[];
+  due_soon_days: number;
+  generated_at: string;
+  semantics: string;
+}
+
+export type AttentionSeverity = "blocked" | "overdue" | "attention" | "informational";
+
+export interface OperationsAttentionRow {
+  reason_code: string;
+  severity: AttentionSeverity;
+  resource_type: string;
+  resource_public_id: string;
+  resource_label: string;
+  case_public_id: string | null;
+  dossier_public_id: string | null;
+  due_date: string | null;
+  operational_state: string;
+}
+
+export interface OperationsCaseRow {
+  public_id: string;
+  case_number: string;
+  title: string;
+  status: string;
+  target_date: string | null;
+  owner: { public_id: string; full_name: string } | null;
+  last_activity_at: string;
+  dossiers: { total: number; open: number } | null;
+  sections: {
+    required_total: number;
+    required_complete: number;
+    blocked: number;
+    overdue: number;
+    due_soon: number;
+  } | null;
+  open_blockers: number | null;
+  internal_readiness: string | null;
+  workflow_attention: number | null;
+  upgrade_attention: number | null;
+}
+
+export interface OperationsDossierRow {
+  public_id: string;
+  title: string;
+  status: string;
+  case_public_id: string | null;
+  case_number: string | null;
+  internal_readiness: string;
+  required_total: number;
+  required_complete: number;
+  blocked_sections: number;
+  overdue_sections: number;
+  due_soon_sections: number;
+  open_blockers: number;
+  target_date: string | null;
+  owner: { public_id: string; full_name: string } | null;
+  last_activity_at: string;
+  upgrade: { open: number; blocked: number; stale: number } | null;
+}
+
+export interface OperationsOwnerRow {
+  owner: { public_id: string; full_name: string } | null;
+  unassigned: boolean;
+  required_total: number;
+  outstanding: number;
+  blocked: number;
+  overdue: number;
+}
+
+export interface OperationsActivityRow {
+  event_type: string;
+  resource_type: string;
+  resource_public_id: string;
+  occurred_at: string;
+  actor_email: string | null;
+  detail: Record<string, string>;
+}
+
+/** A page that the caller is not entitled to see at all: `results` is null,
+ *  which is a different state from an empty array. */
+export interface OperationsRestrictedPage {
+  results: null;
+  count: null;
+  restricted: true;
+}
+
+export interface OperationsPage<T> {
+  results: T[];
+  count: number;
+  next?: string | null;
+  previous?: string | null;
+}
+
+export type OperationsMaybePage<T> = OperationsPage<T> | OperationsRestrictedPage;
+
+export function isRestrictedPage<T>(
+  page: OperationsMaybePage<T>
+): page is OperationsRestrictedPage {
+  return (page as OperationsRestrictedPage).restricted === true;
+}
+
+const OPERATIONS_V1 = `${DOSSIER_V1}/submission-operations`;
+
+export const submissionOperations = {
+  overview: (tenantSlug: string) =>
+    apiRequest<OperationsOverview>(`${OPERATIONS_V1}/overview/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  attention: (tenantSlug: string, params: { severity?: string; page_size?: number } = {}) =>
+    apiRequest<OperationsPage<OperationsAttentionRow> & { truncated: boolean }>(
+      `${OPERATIONS_V1}/attention/${buildQuery(params)}`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  cases: (tenantSlug: string, params: { status?: string; search?: string } = {}) =>
+    apiRequest<OperationsMaybePage<OperationsCaseRow>>(
+      `${OPERATIONS_V1}/cases/${buildQuery(params)}`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  dossiers: (
+    tenantSlug: string,
+    params: { status?: string; internal_readiness?: string; search?: string } = {}
+  ) =>
+    apiRequest<OperationsMaybePage<OperationsDossierRow>>(
+      `${OPERATIONS_V1}/dossiers/${buildQuery(params)}`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  owners: (tenantSlug: string) =>
+    apiRequest<OperationsMaybePage<OperationsOwnerRow>>(`${OPERATIONS_V1}/owners/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  recentActivity: (tenantSlug: string) =>
+    apiRequest<{ results: OperationsActivityRow[]; count: number }>(
+      `${OPERATIONS_V1}/recent-activity/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+};
+
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const entries = Object.entries(params).filter(
+    ([, v]) => v !== undefined && v !== null && v !== ""
+  );
+  if (entries.length === 0) return "";
+  const search = new URLSearchParams(entries.map(([k, v]) => [k, String(v)]));
+  return `?${search.toString()}`;
+}
