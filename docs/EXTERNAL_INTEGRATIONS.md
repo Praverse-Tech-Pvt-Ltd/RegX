@@ -194,9 +194,26 @@ inspection, archive checks, SHA-256 over the real bytes, storage that verifies
 that checksum, and the malware scan all apply. A version arrives `PENDING` and
 the scan is queued, exactly as for a browser upload.
 
-Streamed to a temporary file, never held in memory; the temporary file is closed
-on success and on failure, and the document platform's storage owns the bytes
-from then on. There is no second integration-owned file store.
+Streamed to a temporary file and **handed on as that file**. Everything
+downstream reads with `seek`/`read` in bounded chunks -- the validators, the
+checksum, the storage backend -- so nothing needs the content in memory and
+nothing puts it there. The temporary file is closed on success and on failure,
+and the document platform's storage owns the bytes from then on. There is no
+second integration-owned file store.
+
+> **Review finding (PR #42).** This originally built a `SimpleUploadedFile` from
+> `handle.read()`, which materialised the entire import in the worker and made
+> the temporary file pointless -- a worker-stability risk as soon as two large
+> imports overlapped. Two tests hold it shut: one asserts the object reaching
+> `ingest` has a real file descriptor (a `BytesIO`-backed upload does not), and
+> one watches the temporary handle itself for an unbounded `read()`. The second
+> is watched at the handle rather than inside `ingest`, because the defect read
+> the body *before* handing it on and a downstream watcher would have seen
+> nothing.
+
+The import ceiling is `DOCUMENT_MAX_UPLOAD_BYTES` rather than a number chosen
+here: reading far more than the platform will accept is work a hostile endpoint
+can make the worker throw away, and two numbers that must agree would drift.
 
 #### The same request validation, not just the same pipeline
 
@@ -229,6 +246,26 @@ enumerated `PAYLOAD_INVALID`, not a `KeyError` surfacing as `INTERNAL_ERROR`.
 A parity test asserts
 `set(upload choices) == set(import choices) == set(DocumentType.values)`, so
 drift on *either* side fails and neither side can grow a hand-maintained list.
+
+### The declared content type reaches the worker
+
+> **Review finding (PR #42).** `declared_mime` was accepted by the serializer and
+> then dropped: the view never put it in the request summary, so the worker
+> always fell back to guessing the type from the filename.
+>
+> That is not a cosmetic loss. The document platform stores a *declared* and a
+> *detected* type in order to compare them, and a guess derived from the same
+> filename the detection ran on can never disagree in the way the check exists to
+> catch. A remote system claiming `application/pdf` while serving something else
+> would have passed unnoticed. The value is now carried through, and a test
+> declares a spreadsheet while serving a PDF and requires the import to be
+> refused.
+
+The fallback remains when the caller declares nothing -- a browser derives the
+type from the file too -- so an omitted optional field does not refuse an
+otherwise valid import. A declared type is never *trusted over* the bytes:
+detection still runs, and a macro-bearing archive named `.pdf` is refused however
+it is labelled.
 
 ### `PUSH_FROZEN_PACKAGE`
 
@@ -491,6 +528,8 @@ files were restored md5-identical.
 | Execution uses today's config instead of its snapshot | 1 |
 | Connector import loses the upload path's type constraint | 14 |
 | Worker stops re-checking the document type it was handed | 4 |
+| Import materialises the body instead of streaming | 2 |
+| Declared content type dropped before the worker | 2 |
 | Scan dispatch removed from the document pipeline | 1 |
 
 **Four mutations initially turned nothing red. All four were real defects.**
@@ -525,8 +564,10 @@ files were restored md5-identical.
 A mutation that turns nothing red is a finding about the tests, or about a guard
 that cannot fire. Both were present here.
 
-A fifth defect came from a review rather than a mutation, and it was the most
-serious of the five. Comparing the connector import path against the upload path
+Three further defects came from reviews rather than mutations. Two were raised
+against the pushed code in PR #42 -- the import was not actually streamed end to
+end, and `declared_mime` was accepted and discarded (§8) -- and the third, the
+most serious, came from comparing the shared ingest paths. Comparing the connector import path against the upload path
 it shares `ingest` with showed the connector's *request validation* was not
 merely looser: its default for an omitted `document_type` was `"other"`, a value
 outside `DocumentType`, and `objects.create()` does not enforce `choices`. Every

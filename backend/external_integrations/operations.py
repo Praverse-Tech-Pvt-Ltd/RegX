@@ -36,11 +36,16 @@ import tempfile
 from .netpolicy import DestinationRefused, build_url
 from .transport import TransportError, TransportErrorCode, perform_request
 
+
 #: A ceiling on an imported document, independent of the connector's response
-#: limit. The document platform has its own size rules; this stops a hostile
-#: endpoint making the worker read a very large amount before those rules
-#: get a chance to apply.
-MAX_IMPORT_BYTES = 256 * 1024 * 1024
+#: limit. Taken from the document platform's own upload limit rather than
+#: chosen here: reading far more than the platform will accept means a
+#: hostile endpoint can make the worker do work that is thrown away, and two
+#: numbers that are supposed to agree would drift.
+def max_import_bytes() -> int:
+    from django.conf import settings
+
+    return int(getattr(settings, "DOCUMENT_MAX_UPLOAD_BYTES", 50 * 1024 * 1024))
 
 
 class OperationError(Exception):
@@ -66,8 +71,6 @@ class OperationErrorCode:
 # ---------------------------------------------------------------------------
 def run_import_document(*, execution, connector, config, credential_reference, actor, tenant):
     """Fetch one remote object and turn it into a Document, the normal way."""
-    from django.core.files.uploadedfile import SimpleUploadedFile
-
     from documents.ingest import ingest_new_document
     from documents.models import DocumentType
     from documents.validators import UploadValidationError
@@ -116,7 +119,7 @@ def run_import_document(*, execution, connector, config, credential_reference, a
             url=url,
             headers=headers,
             sink=handle,
-            max_response_bytes=min(config["max_response_bytes"], MAX_IMPORT_BYTES),
+            max_response_bytes=min(config["max_response_bytes"], max_import_bytes()),
         )
         handle.flush()
         size = handle.tell()
@@ -124,23 +127,24 @@ def run_import_document(*, execution, connector, config, credential_reference, a
             raise OperationError(OperationErrorCode.EMPTY_RESPONSE)
         handle.seek(0)
 
-        # A Django file object, so `documents.ingest` receives exactly what the
-        # upload endpoint receives and cannot tell the difference.
+        # The temporary file itself goes to `ingest`, not a copy of its
+        # contents. Everything downstream -- the validators, the checksum,
+        # the storage backend -- reads with `seek`/`read` in chunks, so
+        # nothing needs the bytes in memory and nothing gets them there.
+        #
+        # This previously built a `SimpleUploadedFile` from `handle.read()`,
+        # which materialised the whole import in the worker and made the
+        # temporary file pointless. Streaming is the reason it exists.
         safe_name = _safe_filename(filename)
-        upload = SimpleUploadedFile(
-            name=safe_name,
-            content=handle.read(),
-            content_type=_declared_mime(payload, safe_name),
-        )
-        handle.seek(0)
+        declared_mime = _declared_mime(payload, safe_name)
 
         try:
             document, version = ingest_new_document(
                 tenant=tenant,
                 actor=actor,
-                file_obj=upload,
-                filename=upload.name,
-                declared_mime=upload.content_type,
+                file_obj=handle,
+                filename=safe_name,
+                declared_mime=declared_mime,
                 title=title,
                 document_type=document_type,
             )

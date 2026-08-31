@@ -508,6 +508,11 @@ class ConnectorExecutionListCreateView(APIView):
             "relative_path": payload["relative_path"],
             "title": payload["title"],
             "document_type": payload["document_type"],
+            # Carried through, not dropped. The document platform compares
+            # the declared type against the detected one, so discarding what
+            # the caller declared would silently turn that comparison into
+            # detected-versus-a-guess-from-the-filename.
+            "declared_mime": payload.get("declared_mime", ""),
         }
         return self._create(
             request,
