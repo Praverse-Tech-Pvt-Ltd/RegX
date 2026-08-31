@@ -98,6 +98,7 @@ the scan state of one they cannot see — the Milestone 8 existence-oracle lesso
 | create | `submission_packages.create` + `regulatory_cases.view` |
 | add entry | `submission_packages.manage_entries` + `documents.view` |
 | export | `submission_packages.export` + `documents.view` |
+| manifest | `submission_packages.view` + `documents.view` |
 
 Target-domain gates are checked **before the target is resolved**, so absent /
 cross-tenant / unauthorised are one indistinguishable outcome.
@@ -109,6 +110,22 @@ still appears — the package is theirs to see — and its `document` block is
 `null`: no title, no filename, no checksum, no version, no scan status. `null`
 means *you are not entitled to know*, exactly as on the operations dashboard,
 and the UI renders "Unavailable" rather than a blank cell.
+
+**The manifest endpoint is part of that projection, not an exception to it.**
+The frozen manifest names every cited document, its exact version, its SHA-256
+and its size — the very fields the detail endpoint blanks. Served under package
+permission alone it would have been a way around the projection, so it requires
+`documents.view` as well.
+
+The gate is checked **after** the tenant-scoped lookup. Checking it first would
+answer 403 for a package in another tenant and thereby confirm the package
+exists; a foreign package and a missing one stay one indistinguishable 404 for
+every caller.
+
+The stored snapshot is never redacted to accommodate anyone. A manifest with
+fields removed is a second, differently-hashed document claiming to be the
+manifest, and the checksum is the whole point — so the choice is the real
+manifest or nothing.
 
 ### Export is all or nothing
 
@@ -200,13 +217,22 @@ is the last moment the claim can be checked at all.
 ### Lock order
 
 ```
-1. SubmissionPackage          the serialization point
-2. SubmissionPackageEntry     by pk
-3. DocumentVersion            read; the document platform owns its own locks
+1. SubmissionPackage — family root    clone only; see below
+2. SubmissionPackage — the row itself the serialization point
+3. SubmissionPackageEntry             by pk
+4. DocumentVersion                    read; documents owns its own locks
 ```
 
 The package row is why exactly one freeze can win and why no entry can be added
 into a package mid-freeze.
+
+**Cloning needs a wider lock than that.** Revision numbers are unique per
+*family*, and two clones of two different revisions lock two different package
+rows — so the row lock serialises nothing between them, and both can read the
+same highest revision and claim it. The family root is locked first, and every
+clone in a family resolves to the same root row whichever revision it started
+from. Root-before-source is a total order within a family, so two clones queue
+rather than deadlock.
 
 ## 8. Integrity
 
@@ -237,6 +263,26 @@ that means something to a regulator.
   against the checksum the frozen manifest recorded. If the stored bytes have
   changed, the export fails rather than shipping an archive whose manifest is a
   lie about its own contents. That is a real verification, not a metadata check.
+- **The frozen snapshot is the authority — never the live `DocumentVersion`.**
+  Expected checksum, size, version identity, logical path and export filename all
+  come from `snapshot.manifest`, keyed by entry. The live row is used for exactly
+  one thing, finding the object, and is never trusted to describe it.
+- The entry sets must match: every active entry is named in the manifest exactly
+  once, the manifest names nothing extra, and the count agrees with
+  `snapshot.entry_count`. Any drift fails the export closed.
+
+#### Why that distinction is reachable
+
+`DocumentVersion.sha256_checksum`, `size_bytes` and `storage_key` carry **no**
+database immutability trigger. This app's own tests already rewrite `storage_key`
+with a plain `objects.update()`. If a bug, a migration or a raw cursor rewrote
+all three together after a freeze, an exporter comparing streamed bytes against
+*today's* metadata would find perfect agreement and ship an archive whose files
+contradict the `manifest.json` beside them.
+
+This is **not** a claim that `DocumentVersion` is immutable. The database does
+not prove that today, and the snapshot is treated as the authority precisely
+because the live row cannot be.
 - Archive names are re-checked at write time even though `normalize_logical_path`
   refused all of it at entry time: the value has been through a database
   round-trip and a manifest since, and the cost of being wrong is an archive that
@@ -259,8 +305,49 @@ would be a retention question nobody has answered.
 ## 10. Clone and revision
 
 A frozen package never reopens. `clone` copies it into a new DRAFT: new
-`public_id`, `revision_number + 1`, `source_package` pointing at what it copied,
-and the same **exact** version references.
+`public_id`, the next `revision_number` in the family, `source_package` pointing
+at what it copied, `family_root` naming the package that started the family, and
+the same **exact** version references.
+
+### The revision family
+
+Revision numbers are unique within a family, so "which family" has to be a
+question the database can answer. Two other answers were rejected:
+
+- **`tenant + case + name`.** A package name is display text a user may edit at
+  any time. Keying revisions on it means a rename silently forks one family into
+  two — or merges two and collides their numbers. Identity may not depend on a
+  mutable label.
+- **Walking `source_package` at read time.** Correct but unlockable: a query per
+  hop, and a concurrent clone can extend the chain mid-walk, so two transactions
+  can disagree about the row they are supposed to be serialising on.
+
+`family_root` is written once at insert and frozen by the update guard
+thereafter. A founder stores `NULL` — a row cannot reference its own primary key
+before that key exists — so the family of any package is
+`COALESCE(family_root_id, id)`, and that expression is what both the uniqueness
+index and the clone lock use.
+
+**A rename does not fork the family.** `clone(name=...)` gives the copy different
+display text and leaves it in the same family at the next revision.
+
+### The real topology
+
+```
+source_package : a TREE   two clones of one frozen revision are both legitimate
+revision_number: LINEAR   within a family, and now a unique index
+```
+
+Earlier comments called `source_package` "a chain, not a tree". The schema never
+enforced that, so the claim is withdrawn rather than enforced retroactively —
+adding a constraint to forbid branches would break a working feature to make a
+comment true. What the schema does enforce is
+`unique_revision_per_package_family` over
+`(COALESCE(family_root_id, id), tenant, revision_number)`.
+
+The service takes the family-root lock; the index is the floor under it, and
+holds for a transaction that never took the lock — a raw cursor, a psql session,
+a future code path nobody re-reviewed.
 
 Entry references are copied even when a version would no longer be eligible
 today. That is deliberate — the clone starts as a faithful picture of what was
@@ -274,7 +361,7 @@ external meaning may be read into it; the field is deliberately not called
 
 ## 11. Database governance
 
-`0002` — 7 plpgsql functions, 7 triggers.
+`0002` — 7 plpgsql functions, 7 triggers. `0003` — one added, one replaced.
 
 | Trigger | Enforces |
 |---|---|
@@ -285,6 +372,13 @@ external meaning may be read into it; the field is deliberately not called
 | `guard_delete_package_entry` | entries are retired, never deleted |
 | `guard_insert_package_snapshot` | tenant coherence, checksum shape, entry count matches the package |
 | `freeze_package_snapshot` | a manifest refuses UPDATE and DELETE outright |
+
+`0003` adds one more, and replaces one of the above.
+
+| Trigger | Enforces |
+|---|---|
+| `guard_insert_package` | family coherence on the way in: a founder has no source and is revision 1; a member names both a source and a family; the family root exists, is a root itself, and shares the tenant and the case; the source shares the tenant, the case and the family |
+| `guard_update_package` *(replaced)* | as before, plus `family_root_id` in the immutable set — family membership is provenance, and a row that could change families could change which numbers it collides with |
 
 The insert guards are the Milestone 10 lesson applied up front: freezing a row
 that was never checked on the way in preserves whatever was written, not the
@@ -322,10 +416,18 @@ way it does.
 | Two simultaneous freezes | package row `select_for_update` + the transition trigger. Exactly one wins. |
 | Freeze vs entry add | the package lock. The add lands before the freeze or is refused by it — never inside it. |
 | Duplicate entry / path | partial unique index on `(package, document_version)` where active, plus the collision-key check under the lock |
-| Two simultaneous clones | revision numbers claimed under the source package's lock |
+| Two clones of the same revision | the source row lock |
+| Two clones of **different** revisions of one family | the **family-root** lock, plus `unique_revision_per_package_family` as the floor |
 | Export during a new upload | harmless by construction: the entry binds to an exact version |
+| Export vs a rewritten `DocumentVersion` row | the frozen snapshot is the authority; live metadata is never trusted to describe the bytes |
 
 Tested with real threads against PostgreSQL.
+
+> **The clone race that the source lock did not cover.** Cloning r1 and r2 of
+> the same family locks two *different* rows, so nothing serialised them and
+> both could compute the same next revision. Removing the family-root lock now
+> turns that test red — with a deadlock on the unique index, which is the floor
+> refusing the duplicate the lock exists to prevent in an orderly way.
 
 ## 13. Migration classification
 
@@ -335,6 +437,7 @@ Per [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) §4.
 |---|---|---|
 | `0001_initial` | **Class A** — three `CreateModel`s, no `RunPython`/`RunSQL`, no existing table altered | **CLASS C — DATA RESTORE REQUIRED** once any package data exists |
 | `0002_package_db_governance` | **Class A** — 7 functions, 7 triggers; no table altered, no row read or written | **Class A on its own terms** |
+| `0003_package_revision_family` | **Class A, conditional on the data** — one nullable column, one derivation, two constraints, one replaced and one added trigger function | **Class A** — the reverse restores exactly the prior state |
 
 > Reversing `0001` destroys every package, every entry, and — irreplaceably —
 > every frozen manifest and its checksum. A frozen manifest is the permanent
@@ -351,9 +454,65 @@ ships **with the migration it describes** — M10 shipped a docstring claiming f
 functions and eight triggers where the SQL had seven of each, and M11 claimed a
 test covered its counts when the test lived in another app entirely.
 
+### `0003`, in detail
+
+**The forward condition.** `unique_revision_per_package_family` refuses to build
+if a family already holds two packages with the same `revision_number`. The code
+it replaces keyed revisions on `tenant + case + name`, so a package renamed
+between two clones could have produced exactly that. Check before deploying:
+
+```sql
+SELECT COALESCE(family_root_id, id) AS family, tenant_id, revision_number, count(*)
+  FROM submission_packages_submissionpackage
+ GROUP BY 1, 2, 3 HAVING count(*) > 1;
+```
+
+Empty → Class A. Non-empty → the duplicates must be resolved by hand first;
+which package keeps which number is a decision, not something a migration may
+guess.
+
+**Why a data step is still not class C or D.** The runbook's rule 1 flags
+`RunSQL`/`RunPython` because a data migration usually destroys information a
+restore has to bring back. This one destroys none: `family_root` is *derived*
+from `source_package`, which the migration never touches. The reverse sets it
+back to `NULL` and drops the column — exactly the prior state — and the forward
+step can be recomputed at any time by running it again. A test does precisely
+that: wipe with the reverse SQL, restore with the forward SQL, compare.
+
+**It disarms a trigger, on purpose and by name.** `guard_update_package` refuses
+every UPDATE to a FROZEN or CANCELLED row, so the derivation cannot run while it
+is armed — a database holding one frozen package would fail the migration
+outright. It is disabled by name for the length of the derivation and re-armed
+in the same transaction, which is safe for one specific reason: `family_root_id`
+is not new information, it is computed from `source_package_id`, which the guard
+already holds immutable. The column is being *completed* for rows frozen before
+it existed, not rewritten.
+
+Two tests hold that window shut: one asserts the SQL disables and re-enables
+exactly one trigger in both directions, and one reads `pg_trigger` after
+migration to prove the guard is armed.
+
+> Django declares foreign keys `DEFERRABLE INITIALLY DEFERRED`, and PostgreSQL
+> refuses to `ALTER` a table with pending trigger events — so the re-arm needs a
+> `SET CONSTRAINTS ALL IMMEDIATE` first. Without it the migration fails on any
+> database that actually has clones and succeeds on one that does not, which is
+> worse. The backfill test found this.
+
+**Reversal is deliberately asymmetric.** `0003` *replaces* a function `0002`
+created, so a symmetric reverse would `DROP FUNCTION
+submission_packages_guard_package_update` and take `0002`'s protection with it.
+The reverse restores `0002`'s body instead — imported from `0002` rather than
+retyped, because two hand-maintained copies of the same plpgsql drift and the
+one that drifts is the one nothing runs.
+
+**One new trigger.** `guard_insert_package` checks family coherence on the way
+in: a founder has no source and is revision 1; a member names both a source and
+a family; the family root exists, is a root itself, and shares the tenant and
+the regulatory case; the source shares the tenant, the case and the family.
+
 ## 14. Testing
 
-**Backend (144)**: the exact-version guarantee at the service, the API and
+**Backend (210)**: the exact-version guarantee at the service, the API and
 inside the produced archive; manifest determinism and every way to change it;
 freeze preconditions, transactionality and injected-failure rollback; frozen
 immutability through the service, the ORM, `governed.update()` and raw SQL;
@@ -361,6 +520,13 @@ insert coherence; tenant isolation across every service and endpoint; the
 document projection; path security including Unicode and case collision; export
 integrity, ZIP safety and all-or-nothing authorisation; clone and revision;
 real-thread concurrency; and query-cost invariance.
+
+The review-fix module adds 44 more: the manifest's second gate and what its
+refusal must not say; the frozen snapshot as the export authority, including
+the mirror case where the live row is corrupted and the export must still
+*succeed*; revision families, their database floor, their insert coherence,
+and three real-thread clone races; plus the `0003` migration's own SQL run
+forward and backward against rows the service built.
 
 **Frontend**: 31 unit, 15 new accessibility checks (89 → 104), 16 Playwright.
 
@@ -379,6 +545,11 @@ Every guard turned tests red; all files restored md5-identical.
 | Cross-case section validation removed | 1 |
 | Export authorisation gate removed | 1 |
 | Export checksum verification removed | 1 |
+| **Manifest document gate removed** | 3 |
+| **Export trusts live `DocumentVersion` again** | 2 |
+| **Family-root lock removed from clone** | 1 |
+| **`unique_revision_per_package_family` removed** | 3 |
+| **`guard_insert_package` never attached** | 8 |
 
 Two mutations initially turned **nothing** red, and both were real test defects:
 

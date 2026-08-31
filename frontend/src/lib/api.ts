@@ -3294,6 +3294,17 @@ export const submissionPackages = {
       headers: { "X-Tenant-Slug": tenantSlug },
     }),
 
+  /**
+   * The frozen manifest. Needs TWO permissions: `submission_packages.view` and
+   * `documents.view`.
+   *
+   * It names every cited document, its exact version, its SHA-256 and its size
+   * -- the same fields package detail returns as `document: null` to a caller
+   * without document permission -- so a caller who can see the package but not
+   * its documents gets 403 here. Any UI that calls this must render that
+   * refusal rather than treating it as an error state, and must not fall back
+   * to anything cached from a caller who did have permission.
+   */
   manifest: (tenantSlug: string, publicId: string) =>
     apiRequest<PackageManifest>(`${PACKAGES_V1}/${publicId}/manifest/`, {
       headers: { "X-Tenant-Slug": tenantSlug },

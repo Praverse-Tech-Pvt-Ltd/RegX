@@ -18,13 +18,33 @@ one of ten files is worse than no ZIP at all: it looks complete, and the person
 who receives it has no way to tell. This is also why export authorisation is not
 per-entry -- see `views`.
 
-TRUST BOUNDARY ON BYTES
------------------------
-Every file is hashed as it is streamed and compared against the checksum the
-frozen manifest recorded. That is a real verification, not a metadata check, and
-it costs one pass over content that is being read anyway. If the stored bytes
-have changed since the version was created, the export fails rather than
-producing an archive whose manifest is a lie about its own contents.
+THE FROZEN SNAPSHOT IS THE AUTHORITY
+------------------------------------
+Every expected value -- checksum, size, version identity, path, filename -- is
+read from `snapshot.manifest`, **never** from the live `DocumentVersion` row.
+
+That distinction is the whole guarantee, and it is reachable rather than
+theoretical. `DocumentVersion.sha256_checksum`, `size_bytes` and `storage_key`
+carry no database immutability trigger; this app's own tests already rewrite
+`storage_key` with a plain `objects.update()`. If a bug, a migration or a raw
+cursor rewrote all three together after a freeze, an exporter that compared
+streamed bytes against *today's* metadata would happily agree with itself and
+ship an archive whose files contradict the `manifest.json` sitting beside them.
+
+So the comparison is: stream `entry.document_version.storage_key`, hash it, and
+check the result against what the **frozen manifest** said those bytes were.
+Live metadata is used for exactly one thing -- finding the object -- and is
+never trusted to describe it.
+
+The entry set is checked the same way: every active entry must appear in the
+manifest exactly once, the manifest must contain nothing extra, and each row's
+version identity, logical path and filename must match the live entry. The
+`0002` triggers should already make drift impossible; the exporter fails closed
+anyway, because "should be impossible" is not a property an archive can rely on.
+
+**This is not a claim that `DocumentVersion` is immutable.** The database does
+not prove that today, and nothing here pretends otherwise -- the snapshot is
+treated as the authority precisely because the live row cannot be.
 """
 
 import hashlib
@@ -73,6 +93,44 @@ def _assert_safe(name: str) -> None:
         raise ExportError("Refusing to write a drive-qualified path into the archive.")
 
 
+def _manifest_rows_by_entry(snapshot) -> dict:
+    """The frozen rows, keyed by entry public id.
+
+    A duplicate key would mean the manifest describes one entry twice, which no
+    freeze can produce -- so it is a corrupted snapshot, and the export refuses
+    rather than picking whichever row it saw last.
+    """
+    rows: dict = {}
+    for row in snapshot.manifest.get("entries", []):
+        key = row.get("entry_public_id")
+        if key in rows:
+            raise ExportError("The frozen manifest names an entry more than once.")
+        rows[key] = row
+    return rows
+
+
+def _expected_for(entry, rows: dict) -> dict:
+    """The frozen row for one live entry, with every identity re-proved.
+
+    Drift between the live entry and the snapshot is never accepted quietly. If
+    they disagree, one of them is wrong and the archive cannot say which, so it
+    is not produced.
+    """
+    row = rows.get(str(entry.public_id))
+    if row is None:
+        raise ExportError("A package entry is not named in the frozen manifest.")
+
+    if row.get("document_version_public_id") != str(entry.document_version.public_id):
+        raise ExportError("An entry cites a different version than the frozen manifest.")
+    if row.get("logical_path") != entry.logical_path:
+        raise ExportError("An entry has a different path than the frozen manifest.")
+    if row.get("export_filename") != entry.export_filename:
+        raise ExportError("An entry has a different filename than the frozen manifest.")
+    if not row.get("document_checksum_sha256"):
+        raise ExportError("The frozen manifest has no checksum for an entry.")
+    return row
+
+
 def write_package_zip(*, snapshot, entries, destination) -> dict:
     """Write the archive to `destination` (a binary file object).
 
@@ -87,6 +145,18 @@ def write_package_zip(*, snapshot, entries, destination) -> dict:
 
     from documents.storage import get_storage_backend
 
+    entries = list(entries)
+    rows = _manifest_rows_by_entry(snapshot)
+
+    # The live set and the frozen set must be the same set. Extra live entries
+    # and missing ones are both refusals: an archive that quietly contains more
+    # or less than its manifest describes is worse than no archive.
+    if len(entries) != len(rows) or len(entries) != int(snapshot.entry_count):
+        raise ExportError("The package no longer matches its frozen manifest.")
+    live_keys = {str(e.public_id) for e in entries}
+    if live_keys != set(rows):
+        raise ExportError("The package no longer matches its frozen manifest.")
+
     backend = get_storage_backend()
     written = 0
     total = 0
@@ -99,6 +169,7 @@ def write_package_zip(*, snapshot, entries, destination) -> dict:
         archive.writestr(MANIFEST_NAME, manifest_bytes)
 
         for entry in entries:
+            expected = _expected_for(entry, rows)
             name = archive_name(entry)
             _assert_safe(name)
             # Case-insensitive, because the extractor's filesystem probably is.
@@ -133,13 +204,14 @@ def write_package_zip(*, snapshot, entries, destination) -> dict:
                 if close is not None:
                     close()
 
-            # The manifest claims these bytes. If storage disagrees, the archive
-            # would ship a manifest that describes something it does not
-            # contain, so the export fails instead.
-            if digest.hexdigest() != version.sha256_checksum:
-                raise ExportError("A cited file no longer matches its recorded checksum.")
-            if size != int(version.size_bytes):
-                raise ExportError("A cited file no longer matches its recorded size.")
+            # Compared against the FROZEN manifest, never against the live
+            # DocumentVersion row. Live metadata found the object; only the
+            # snapshot gets to say what the object should be. See the module
+            # docstring for why the difference is reachable.
+            if digest.hexdigest() != expected["document_checksum_sha256"]:
+                raise ExportError("A cited file no longer matches the frozen manifest checksum.")
+            if size != int(expected["file_size_bytes"]):
+                raise ExportError("A cited file no longer matches the frozen manifest size.")
 
             written += 1
             total += size

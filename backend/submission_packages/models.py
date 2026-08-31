@@ -20,6 +20,7 @@ ZIP of files the tenant chose.
 """
 
 from django.db import models
+from django.db.models.functions import Coalesce
 
 from common.models import PublicIDModel, TimeStampedModel
 
@@ -123,12 +124,36 @@ class SubmissionPackage(PublicIDModel, TimeStampedModel):
 
     #: Internal revision within a package family. **Not an agency sequence
     #: number.** It counts how many times this tenant has re-cut this package,
-    #: nothing more, and no external meaning may be read into it.
+    #: nothing more, and no external meaning may be read into it. Unique within
+    #: the family, enforced by `unique_revision_per_package_family`.
     revision_number = models.PositiveIntegerField(default=1)
-    #: The frozen package this one was cloned from, if any. A chain, not a tree:
-    #: each clone points at exactly the package it copied.
+
+    #: Immediate provenance: the frozen package this one was copied from.
+    #:
+    #: **This may branch.** Two clones of the same frozen revision are both
+    #: legitimate -- someone can cut two alternatives from one baseline -- so
+    #: `source_package` forms a tree, not a chain. What is linear is
+    #: `revision_number` within the family, which is a different claim and the
+    #: only one the schema actually enforces.
     source_package = models.ForeignKey(
         "self", on_delete=models.PROTECT, null=True, blank=True, related_name="clones"
+    )
+
+    #: The package that started this revision family, or NULL when this row *is*
+    #: the start of one.
+    #:
+    #: Family identity is deliberately NOT the package name. A name is display
+    #: text a user may edit at any time, and keying revisions on it would mean a
+    #: rename silently forked one family into two -- or worse, merged two into
+    #: one and collided their revision numbers. `family_root` is set once at
+    #: clone time and frozen by the `0002` trigger thereafter.
+    #:
+    #: NULL rather than self-referential because a row cannot point at its own
+    #: primary key before that key exists. The family of any package is
+    #: therefore `COALESCE(family_root_id, id)`, which is what the uniqueness
+    #: constraint and the clone lock both use.
+    family_root = models.ForeignKey(
+        "self", on_delete=models.PROTECT, null=True, blank=True, related_name="family_members"
     )
 
     created_by = models.ForeignKey("identity.User", on_delete=models.PROTECT, related_name="+")
@@ -175,6 +200,25 @@ class SubmissionPackage(PublicIDModel, TimeStampedModel):
             models.CheckConstraint(
                 condition=~models.Q(source_package=models.F("id")),
                 name="package_is_not_its_own_source",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(family_root=models.F("id")),
+                name="package_is_not_its_own_family_root",
+            ),
+            # THE floor under revision assignment. Locking the family root
+            # serializes the ordinary path; this makes a duplicate impossible
+            # even for a transaction that never took the lock -- a raw cursor, a
+            # migration, or a future code path nobody re-reviewed.
+            #
+            # Expressed over COALESCE so a family founder (family_root NULL) and
+            # its clones resolve to the same key. A plain multi-column unique
+            # index cannot do that: NULLs would make every founder distinct from
+            # everything, including its own family.
+            models.UniqueConstraint(
+                Coalesce("family_root", "id"),
+                "tenant",
+                "revision_number",
+                name="unique_revision_per_package_family",
             ),
         ]
 

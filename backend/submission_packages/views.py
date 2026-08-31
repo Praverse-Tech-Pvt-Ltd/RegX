@@ -477,12 +477,47 @@ class PackageValidateView(APIView):
 
 
 class PackageManifestView(APIView):
+    """The frozen manifest, which is **document-bearing information**.
+
+    TWO GATES: `submission_packages.view` (by the permission class) and
+    `documents.view` (here). The manifest names every cited document, its exact
+    version, its SHA-256 and its size -- precisely the fields the package detail
+    endpoint returns as `null` to a caller without document permission. Serving
+    it under package permission alone would make this endpoint a way around the
+    projection the rest of the milestone maintains.
+
+    The stored snapshot is never altered to accommodate a caller. A redacted
+    manifest would be a second, differently-hashed document claiming to be the
+    manifest, and the checksum is the whole point.
+    """
+
     permission_classes = [CanViewPackages]
 
-    @extend_schema(tags=TAGS, responses=PackageManifestSerializer)
+    @extend_schema(
+        tags=TAGS,
+        responses={
+            200: PackageManifestSerializer,
+            403: OpenApiResponse(
+                description=(
+                    "The caller may view the package but not its documents. The "
+                    "manifest names exact document versions and checksums, so it "
+                    "requires `documents.view` as well."
+                )
+            ),
+        },
+    )
     def get(self, request, public_id):
         tenant = _tenant_or_403()
         package = _get_package_or_404(public_id, tenant)
+
+        if not _may_see_documents(request, tenant):
+            # Checked after the 404 lookup, so a cross-tenant package stays
+            # indistinguishable from a missing one rather than answering 403 and
+            # confirming it exists.
+            raise PermissionDenied(
+                "Reading a package manifest requires permission to view its documents."
+            )
+
         snapshot = getattr(package, "snapshot", None)
         if snapshot is None:
             raise NotFound("This package has no frozen manifest.")

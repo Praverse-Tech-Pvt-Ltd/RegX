@@ -23,16 +23,29 @@ way to keep a record that is also useful.
 
 LOCK ORDER
 ----------
-    1. SubmissionPackage
-    2. SubmissionPackageEntry   (by pk, so two transactions agree on an order)
-    3. DocumentVersion          (read; the document platform owns its own locks)
+    1. SubmissionPackage -- family root   (clone only; see below)
+    2. SubmissionPackage -- the row itself
+    3. SubmissionPackageEntry             (by pk, so two transactions agree)
+    4. DocumentVersion                    (read; documents owns its own locks)
 
-The package row is the serialization point: freeze, entry mutation and clone all
-take it first, so exactly one freeze can win and no entry can be added into a
-package that is mid-freeze.
+The package row is the serialization point for everything that touches one
+package: freeze, entry mutation and clone all take it, so exactly one freeze can
+win and no entry can be added into a package that is mid-freeze.
+
+**Cloning needs a wider lock than that.** Revision numbers are unique per
+*family*, and two clones of two different revisions of the same family lock two
+different package rows -- so the row lock serializes nothing between them, and
+both could read the same highest revision and claim it. The family root is
+therefore locked FIRST, before the source, and every clone in a family resolves
+to the same root row whichever revision it started from.
+
+Root-before-source is a total order within a family, so two clones cannot
+deadlock against each other. Nothing else in this module takes a root lock while
+holding a member lock, so no cycle exists with freeze or entry mutation either.
 """
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from .audit_events import PackageEvent, emit
@@ -232,6 +245,17 @@ def update_package(*, package, tenant, actor, **fields):
         payload={"action": "updated", "package_public_id": str(locked.public_id)},
     )
     return locked
+
+
+def _family_root_id(package):
+    """The primary key of this package's revision family.
+
+    A founder is its own family. Read from the stored column rather than walked
+    up `source_package`: a walk costs a query per hop and races with a
+    concurrent clone extending the chain underneath it, which is exactly the bug
+    this replaces.
+    """
+    return package.family_root_id or package.pk
 
 
 def _locked(package, tenant):
@@ -585,21 +609,30 @@ def clone_package(*, package, tenant, actor, name=None):
     replaced. Freeze will refuse until they do, which is the right place for the
     refusal: at the moment something permanent is being written, not at the
     moment someone asked to look.
+
+    **A rename does not fork the family.** The clone may be given a different
+    display name and still belongs to the same revision family, because family
+    identity is `family_root` and not the name. Keying revisions on the name
+    would mean an edit silently started a second family -- or merged two and
+    collided their numbers.
     """
     _assert_tenant(package, tenant)
-    source = _locked(package, tenant)
+
+    # The family root FIRST. Two clones of two different revisions lock two
+    # different source rows and would otherwise read the same highest revision;
+    # they meet here instead. Locking the root before the source is a total
+    # order within the family, so they queue rather than deadlock.
+    root_id = _family_root_id(package)
+    root = SubmissionPackage.objects.select_for_update().get(pk=root_id)
+    _assert_tenant(root, tenant)
+
+    source = _locked(package, tenant) if package.pk != root_id else root
     if source.status != PackageStatus.FROZEN:
         raise PackageLocked("Only a frozen package can be cloned.")
 
-    # Revision numbering is per family, claimed under the source package's lock
-    # so two concurrent clones cannot take the same number.
-    family_root = source
-    while family_root.source_package_id is not None:
-        family_root = family_root.source_package
     highest = (
-        SubmissionPackage.objects.filter(
-            tenant=tenant, regulatory_case=source.regulatory_case, name=source.name
-        )
+        SubmissionPackage.objects.filter(tenant=tenant)
+        .filter(Q(pk=root_id) | Q(family_root_id=root_id))
         .order_by("-revision_number")
         .values_list("revision_number", flat=True)
         .first()
@@ -612,6 +645,7 @@ def clone_package(*, package, tenant, actor, name=None):
         description=source.description,
         revision_number=highest + 1,
         source_package=source,
+        family_root_id=root_id,
         created_by=actor,
     )
     for entry in active_entries(source):
