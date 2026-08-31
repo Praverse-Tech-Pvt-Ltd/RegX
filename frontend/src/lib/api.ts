@@ -3313,3 +3313,198 @@ export const submissionPackages = {
   /** The browser downloads this; it is a binary archive, not JSON. */
   exportUrl: (publicId: string) => `${PACKAGES_V1}/${publicId}/export/`,
 };
+
+// ---------------------------------------------------------------------------
+// External integrations (Milestone 14)
+//
+// A connector is a technical destination a tenant configured. ACTIVE means it
+// is enabled; it is not approval, not validation of the remote system, and a
+// transfer is never a regulatory submission. Nothing in these types carries a
+// secret: a credential is a TYPE and the NAME of an environment variable.
+// ---------------------------------------------------------------------------
+const INTEGRATIONS_V1 = `${DOSSIER_V1}/external-integrations`;
+const INTEGRATION_EXECUTIONS_V1 = `${DOSSIER_V1}/external-integration-executions`;
+
+export type ConnectorStatus = "draft" | "active" | "disabled" | "archived";
+export type ConnectorTestStatus =
+  | "never_tested"
+  | "reachable"
+  | "unreachable"
+  | "unauthorised";
+export type ConnectorOperation = "import_document" | "push_frozen_package";
+export type ExecutionStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+/** The identity of a credential. Never its value -- there is no such field. */
+export interface ConnectorCredential {
+  public_id: string;
+  credential_type: "bearer_token" | "api_key" | "basic_auth";
+  /** What an operator must set in the deployment. A name is not a secret. */
+  environment_variable: string;
+  /** Whether that variable is currently set. Presence only. */
+  is_resolvable: boolean;
+}
+
+export interface Connector {
+  public_id: string;
+  name: string;
+  description: string;
+  connector_type: string;
+  status: ConnectorStatus;
+  configuration: Record<string, unknown>;
+  configuration_version: number;
+  last_tested_at: string | null;
+  last_test_status: ConnectorTestStatus;
+  created_at: string;
+  credential: ConnectorCredential | null;
+  permissions?: {
+    can_edit?: boolean;
+    can_enable?: boolean;
+    can_test?: boolean;
+    can_execute?: boolean;
+  };
+}
+
+/** Technical reachability. Never a remote body, header or server internal. */
+export interface ConnectionTestResult {
+  reachable: boolean;
+  authenticated: boolean;
+  status: ConnectorTestStatus;
+  latency_ms: number | null;
+  error_code: string;
+}
+
+export interface ConnectorExecution {
+  public_id: string;
+  connector_public_id: string;
+  operation: ConnectorOperation;
+  status: ExecutionStatus;
+  resource_type: string;
+  resource_public_id: string;
+  snapshot_public_id: string;
+  manifest_checksum: string;
+  requested_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  attempt_count: number;
+  connector_configuration_version: number;
+  error_code: string;
+  external_reference: string;
+  correlation_id: string;
+  /** Allow-listed summaries. Never a raw remote response. */
+  request_summary: Record<string, unknown>;
+  response_summary: Record<string, unknown>;
+}
+
+export const externalIntegrations = {
+  list: (tenantSlug: string, page = 1) =>
+    apiRequest<PaginatedResponse<Connector>>(`${INTEGRATIONS_V1}/?page=${page}`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<Connector>(`${INTEGRATIONS_V1}/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  create: (
+    tenantSlug: string,
+    body: {
+      name: string;
+      description?: string;
+      connector_type: string;
+      configuration: Record<string, unknown>;
+      credential?: { credential_type: string; reference_name?: string };
+    },
+  ) =>
+    apiRequest<Connector>(`${INTEGRATIONS_V1}/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body,
+    }),
+
+  update: (
+    tenantSlug: string,
+    publicId: string,
+    body: Partial<{ name: string; description: string; configuration: Record<string, unknown> }>,
+  ) =>
+    apiRequest<Connector>(`${INTEGRATIONS_V1}/${publicId}/`, {
+      method: "PATCH",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body,
+    }),
+
+  /** Enabled, not approved. */
+  enable: (tenantSlug: string, publicId: string) =>
+    apiRequest<Connector>(`${INTEGRATIONS_V1}/${publicId}/enable/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  disable: (tenantSlug: string, publicId: string) =>
+    apiRequest<Connector>(`${INTEGRATIONS_V1}/${publicId}/disable/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  /** There is no delete: executions reference the connector as evidence. */
+  archive: (tenantSlug: string, publicId: string) =>
+    apiRequest<Connector>(`${INTEGRATIONS_V1}/${publicId}/archive/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  /** A minimal, non-destructive reachability check. Never a write. */
+  test: (tenantSlug: string, publicId: string) =>
+    apiRequest<ConnectionTestResult>(`${INTEGRATIONS_V1}/${publicId}/test/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  executions: (tenantSlug: string, publicId: string, page = 1) =>
+    apiRequest<PaginatedResponse<ConnectorExecution>>(
+      `${INTEGRATIONS_V1}/${publicId}/executions/?page=${page}`,
+      { headers: { "X-Tenant-Slug": tenantSlug } },
+    ),
+
+  /**
+   * Queue one transfer.
+   *
+   * Needs `external_integrations.execute` AND the target domain's own
+   * permission -- document creation for an import, package export plus document
+   * view for a transfer. A 403 here means the second gate, not the first.
+   *
+   * Repeating an identical request returns the execution that already exists
+   * (200) rather than starting a second one.
+   */
+  execute: (
+    tenantSlug: string,
+    publicId: string,
+    body: { operation: ConnectorOperation; payload: Record<string, unknown> },
+  ) =>
+    apiRequest<ConnectorExecution>(`${INTEGRATIONS_V1}/${publicId}/executions/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body,
+    }),
+
+  execution: (tenantSlug: string, publicId: string) =>
+    apiRequest<ConnectorExecution>(`${INTEGRATION_EXECUTIONS_V1}/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  cancelExecution: (tenantSlug: string, publicId: string) =>
+    apiRequest<ConnectorExecution>(`${INTEGRATION_EXECUTIONS_V1}/${publicId}/cancel/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+};

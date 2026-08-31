@@ -32,6 +32,7 @@ import {
   Unavailable,
   issueLabel,
 } from "../package-primitives";
+import { TransferPanel } from "./transfer-panel";
 
 const cell: React.CSSProperties = {
   padding: "0.5rem 0.65rem",
@@ -257,6 +258,9 @@ function PackagePage() {
               </button>
             )}
           </div>
+          {perms.can_export && (
+            <TransferPanel tenantSlug={tenantSlug} packagePublicId={publicId} />
+          )}
         </section>
       )}
 

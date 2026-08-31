@@ -33,7 +33,7 @@ known-first-party = ["common", "identity", "tenancy", "authorization", "audit", 
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades", "submission_operations", "submission_packages"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades", "submission_operations", "submission_packages", "external_integrations"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -170,6 +170,39 @@ forbidden_modules = ["submission_packages"]
 name = "submission-packages-no-legacy-django-apps"
 type = "forbidden"
 source_modules = ["submission_packages"]
+forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
+
+# External integrations is an EDGE, not a domain. It is allowed to depend on the
+# domains -- it transfers their content -- but nothing may depend on it. A domain
+# that imported the connector layer would acquire an outbound network dependency
+# it never asked for, and the arrow that keeps that from happening should be a
+# build failure rather than a convention.
+[[tool.importlinter.contracts]]
+name = "nothing-depends-on-external-integrations"
+type = "forbidden"
+source_modules = [
+    "common",
+    "identity",
+    "tenancy",
+    "authorization",
+    "audit",
+    "workflows",
+    "documents",
+    "templates_registry",
+    "iig_checklist",
+    "regulatory_cases",
+    "submission_dossiers",
+    "dossier_blueprints",
+    "dossier_upgrades",
+    "submission_operations",
+    "submission_packages",
+]
+forbidden_modules = ["external_integrations"]
+
+[[tool.importlinter.contracts]]
+name = "external-integrations-no-legacy-django-apps"
+type = "forbidden"
+source_modules = ["external_integrations"]
 forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
 
 [tool.pytest.ini_options]

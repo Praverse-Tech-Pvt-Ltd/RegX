@@ -1,0 +1,61 @@
+from django.urls import path
+
+from .views import (
+    ConnectorArchiveView,
+    ConnectorDetailView,
+    ConnectorDisableView,
+    ConnectorEnableView,
+    ConnectorExecutionListCreateView,
+    ConnectorListCreateView,
+    ConnectorTestView,
+    ExecutionCancelView,
+    ExecutionDetailView,
+)
+
+urlpatterns = [
+    path(
+        "external-integrations/",
+        ConnectorListCreateView.as_view(),
+        name="external-connectors",
+    ),
+    path(
+        "external-integrations/<uuid:public_id>/",
+        ConnectorDetailView.as_view(),
+        name="external-connector-detail",
+    ),
+    path(
+        "external-integrations/<uuid:public_id>/enable/",
+        ConnectorEnableView.as_view(),
+        name="external-connector-enable",
+    ),
+    path(
+        "external-integrations/<uuid:public_id>/disable/",
+        ConnectorDisableView.as_view(),
+        name="external-connector-disable",
+    ),
+    path(
+        "external-integrations/<uuid:public_id>/archive/",
+        ConnectorArchiveView.as_view(),
+        name="external-connector-archive",
+    ),
+    path(
+        "external-integrations/<uuid:public_id>/test/",
+        ConnectorTestView.as_view(),
+        name="external-connector-test",
+    ),
+    path(
+        "external-integrations/<uuid:public_id>/executions/",
+        ConnectorExecutionListCreateView.as_view(),
+        name="external-connector-executions",
+    ),
+    path(
+        "external-integration-executions/<uuid:public_id>/",
+        ExecutionDetailView.as_view(),
+        name="external-execution-detail",
+    ),
+    path(
+        "external-integration-executions/<uuid:public_id>/cancel/",
+        ExecutionCancelView.as_view(),
+        name="external-execution-cancel",
+    ),
+]

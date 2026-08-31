@@ -25,6 +25,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `dossier_upgrades` | Blueprint-to-blueprint change impact, and the only sanctioned path for moving an existing dossier onto a newer version. Proposes; never applies on its own ([`DOSSIER_UPGRADES.md`](DOSSIER_UPGRADES.md)) |
 | `submission_operations` | Read-only operational view across every governed domain. Owns no data, stores nothing and decides nothing ([`SUBMISSION_OPERATIONS_DASHBOARD.md`](SUBMISSION_OPERATIONS_DASHBOARD.md)) |
 | `submission_packages` | Controlled assembly of exact document versions into an internal package, with a frozen manifest and a ZIP export. Binds versions, never documents ([`SUBMISSION_PACKAGES.md`](SUBMISSION_PACKAGES.md)) |
+| `external_integrations` | The only outbound edge. Tenant-configured HTTPS destinations, a credential *reference* model, an SSRF-proof transport, and two bounded operations: import a document through the normal pipeline, transfer an exact frozen package. Not an agency gateway ([`EXTERNAL_INTEGRATIONS.md`](EXTERNAL_INTEGRATIONS.md)) |
 
 ## Key invariants
 
@@ -108,6 +109,23 @@ submission_packages → documents, submission_dossiers, regulatory_cases,
                    `documents` never imports it -- the deletion-protection
                    registry keeps that arrow one-way, exactly as it does for
                    workflow evidence.
+external_integrations → documents, submission_packages, tenancy, identity,
+                   authorization, audit, common
+                   An EDGE, not a domain. It is allowed to depend on the
+                   domains -- it moves their content -- and NOTHING may
+                   depend on it: a domain that imported the connector
+                   layer would acquire an outbound network dependency it
+                   never asked for. Enforced by the
+                   `nothing-depends-on-external-integrations` contract.
+                   It owns no content: imported bytes belong to the
+                   document platform, and an outbound archive is built by
+                   `submission_packages.export` into a temporary file.
 documents ← never imports workflows (evidence deletion protection goes
             through DeletionProtectionRegistry, keeping it one-way)
 ```
+
+`documents.ingest` exists because of Milestone 14. The upload pipeline --
+validate, hash, store, version, queue the scan -- lived inside
+`DocumentListCreateView.post`, and a connector that fetched bytes would have
+needed a second copy of it. There is one function instead, and both callers
+use it; there is no `trusted_source` parameter and no way to skip a step.
