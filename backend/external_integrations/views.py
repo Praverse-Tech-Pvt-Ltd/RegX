@@ -16,6 +16,7 @@ enumerate package ids across the deployment.
 
 import os
 
+from django.db import transaction
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status as http_status
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -597,7 +598,11 @@ class ConnectorExecutionListCreateView(APIView):
         except services.ConnectorNotExecutable as exc:
             return Response({"detail": str(exc)}, status=http_status.HTTP_409_CONFLICT)
 
-        run_connector_execution.delay(execution.pk, tenant.pk)
+        # On commit. `create_execution` closes its own transaction, so this is
+        # ordinarily immediate; it matters if this view is ever called inside
+        # one, and a worker that claimed an uncommitted execution would find
+        # nothing and silently do nothing.
+        transaction.on_commit(lambda: run_connector_execution.delay(execution.pk, tenant.pk))
         execution.refresh_from_db()
         return Response(
             ExecutionSerializer(_execution_payload(execution)).data,

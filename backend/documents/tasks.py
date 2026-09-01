@@ -89,7 +89,18 @@ def scan_document_version(self, version_pk: int, tenant_id: int) -> None:
             tenant_id=tenant_id,
             payload={"result": "clean"},
         )
-        # Trigger processing
+        # Dispatched inline, deliberately.
+        #
+        # The status write above is a bare `save()` with no enclosing
+        # transaction, so it is already committed by the time this runs -- there
+        # is nothing to defer to. Milestone 15 added `on_commit` here and then
+        # removed it: no measurement showed a race, and the standard applied to
+        # every other change in that milestone was to change what evidence
+        # justified. A deferral that cannot fire is not defence in depth, it is
+        # a claim that a hazard was addressed when none was found.
+        #
+        # The two paths that *do* defer are the ones a caller can wrap in a
+        # transaction: `documents.ingest` and the two request handlers.
         process_document_version.delay(version_pk, tenant_id)
 
     elif outcome.result == ScanResult.INFECTED:

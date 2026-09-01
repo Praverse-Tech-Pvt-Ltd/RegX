@@ -162,9 +162,18 @@ def ingest_new_document(
         ip_address=ip_address,
     )
 
-    # Queued after the transaction has produced a committed row for the worker
-    # to find. Not optional, and not conditional on where the bytes came from:
-    # a connector is a source of untrusted content exactly like a browser is.
-    scan_document_version.delay(version.pk, tenant.pk)
+    # Queued ON COMMIT, so the worker cannot look up a row that is not there.
+    #
+    # `_persist` closes its own transaction, so in the ordinary call this is
+    # equivalent to dispatching inline -- `on_commit` outside a transaction
+    # runs immediately. It matters when a *caller* holds a transaction, which
+    # is an ordinary thing to do and which this function, being a shared entry
+    # point, cannot see. Measured before this change: dispatch happened once
+    # before commit and zero times after.
+    #
+    # The scan itself is not optional and not conditional on where the bytes
+    # came from: a connector is a source of untrusted content exactly as a
+    # browser is.
+    transaction.on_commit(lambda: scan_document_version.delay(version.pk, tenant.pk))
 
     return document, version

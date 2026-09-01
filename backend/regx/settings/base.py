@@ -115,11 +115,40 @@ DATABASES = {
 # ---------------------------------------------------------------------------
 REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
 
+# Socket bounds for every cache operation, health probes included.
+#
+# Django's built-in RedisCache sets no socket timeout of its own. Against a
+# Redis that accepts the connection and then stops answering -- a black-holed
+# host, a frozen box, a route that went away -- a cache call blocks until the
+# operating system gives up. The readiness probe then hangs instead of
+# returning 503, an orchestrator cannot tell "not ready" from "still
+# thinking", and because each probe holds a web worker for the whole time, a
+# cache outage starves the web process through its own health checks.
+#
+# THE NAMES ARE redis-py's, IN LOWER CASE. Django passes OPTIONS straight into
+# redis.ConnectionPool.from_url, so the upper-case SOCKET_TIMEOUT spelling --
+# which belongs to the third-party django-redis package, not installed here --
+# would not apply. common/tests/test_dependency_timeouts.py asserts on the
+# pool the client actually builds, for exactly that reason.
+#
+# These are a ceiling on hanging, not a latency target. Sessions are
+# cache-backed, so a bound tight enough to trip under ordinary load would log
+# users out; Redis latency in normal operation is sub-millisecond.
+#
+# The Celery broker uses the same URL and deliberately gets no read timeout:
+# an idle worker holds a blocking pop open on purpose.
+REDIS_CONNECT_TIMEOUT_SECONDS = config("REDIS_CONNECT_TIMEOUT_SECONDS", default=2, cast=float)
+REDIS_READ_TIMEOUT_SECONDS = config("REDIS_READ_TIMEOUT_SECONDS", default=2, cast=float)
+
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": REDIS_URL,
         "KEY_PREFIX": "regx",
+        "OPTIONS": {
+            "socket_connect_timeout": REDIS_CONNECT_TIMEOUT_SECONDS,
+            "socket_timeout": REDIS_READ_TIMEOUT_SECONDS,
+        },
     }
 }
 

@@ -24,7 +24,14 @@ from external_integrations.models import ConnectorExecution, ExecutionStatus
 from external_integrations.tests.conftest import INTEGRATIONS_API, PDF_BYTES
 
 
-def _queue(client, connector, **overrides):
+def _queue(post, connector, **overrides):
+    """Queue an import and let the on-commit dispatch actually run.
+
+    `post` is the `run_queued` fixture. The execution task is dispatched with
+    `transaction.on_commit`, so in a non-transactional test nothing would run
+    without it and every assertion below would be about an execution that never
+    started.
+    """
     payload = {
         "external_object_id": "remote-doc-1.pdf",
         "relative_path": "inbox/remote-doc-1.pdf",
@@ -32,10 +39,9 @@ def _queue(client, connector, **overrides):
         "document_type": "pdf",
     }
     payload.update(overrides)
-    return client.post(
+    return post(
         f"{INTEGRATIONS_API}/{connector.public_id}/executions/",
         {"operation": "import_document", "payload": payload},
-        format="json",
     )
 
 
@@ -45,7 +51,7 @@ def _queue(client, connector, **overrides):
 @pytest.mark.django_db
 class TestImportIsStreamed:
     def test_ingest_receives_a_real_file_not_an_in_memory_copy(
-        self, client_admin_a, active_connector, connector_secret, fake_remote, monkeypatch
+        self, queue_post, active_connector, connector_secret, fake_remote, monkeypatch
     ):
         """`fileno()` is the discriminator, and it is not a stylistic one.
 
@@ -71,7 +77,7 @@ class TestImportIsStreamed:
         monkeypatch.setattr(ingest_module, "ingest_new_document", spy)
 
         fake_remote.body = PDF_BYTES
-        response = _queue(client_admin_a, active_connector)
+        response = _queue(queue_post, active_connector)
         assert response.status_code == 201
 
         assert seen, "ingest was never called"
@@ -81,7 +87,7 @@ class TestImportIsStreamed:
         )
 
     def test_the_whole_body_is_never_read_in_one_call(
-        self, client_admin_a, active_connector, connector_secret, fake_remote, monkeypatch
+        self, queue_post, active_connector, connector_secret, fake_remote, monkeypatch
     ):
         """No unbounded `read()` on the temporary file, at any point.
 
@@ -113,14 +119,14 @@ class TestImportIsStreamed:
         )
 
         fake_remote.body = PDF_BYTES * 200
-        response = _queue(client_admin_a, active_connector)
+        response = _queue(queue_post, active_connector)
         assert response.status_code == 201
         assert unbounded == [], (
             "the whole import was read in one call; it is being materialised in memory"
         )
 
     def test_a_large_import_still_succeeds_and_stores_every_byte(
-        self, client_admin_a, active_connector, connector_secret, fake_remote
+        self, queue_post, active_connector, connector_secret, fake_remote
     ):
         """Streaming must not mean truncating. The stored size and checksum are
         checked against the bytes that actually arrived."""
@@ -129,7 +135,7 @@ class TestImportIsStreamed:
         body = PDF_BYTES + b"\n" + (b"A" * 3_000_000)
         fake_remote.body = body
 
-        response = _queue(client_admin_a, active_connector)
+        response = _queue(queue_post, active_connector)
         assert response.status_code == 201
 
         version = DocumentVersion.objects.latest("id")
@@ -151,26 +157,26 @@ class TestImportIsStreamed:
 @pytest.mark.django_db
 class TestDeclaredMimeIsCarried:
     def test_a_declared_type_survives_into_the_request_summary(
-        self, client_admin_a, active_connector, connector_secret, fake_remote
+        self, queue_post, active_connector, connector_secret, fake_remote
     ):
         fake_remote.body = PDF_BYTES
-        response = _queue(client_admin_a, active_connector, declared_mime="application/pdf")
+        response = _queue(queue_post, active_connector, declared_mime="application/pdf")
         assert response.status_code == 201
 
         execution = ConnectorExecution.objects.get(public_id=response.data["public_id"])
         assert execution.request_summary["declared_mime"] == "application/pdf"
 
     def test_the_declared_type_is_what_the_document_records(
-        self, client_admin_a, active_connector, connector_secret, fake_remote
+        self, queue_post, active_connector, connector_secret, fake_remote
     ):
         fake_remote.body = PDF_BYTES
-        _queue(client_admin_a, active_connector, declared_mime="application/pdf")
+        _queue(queue_post, active_connector, declared_mime="application/pdf")
 
         version = DocumentVersion.objects.latest("id")
         assert version.declared_mime_type == "application/pdf"
 
     def test_a_declared_type_that_contradicts_the_bytes_is_refused(
-        self, client_admin_a, active_connector, connector_secret, fake_remote
+        self, queue_post, active_connector, connector_secret, fake_remote
     ):
         """THE contract test.
 
@@ -185,7 +191,7 @@ class TestDeclaredMimeIsCarried:
         """
         fake_remote.body = PDF_BYTES
         response = _queue(
-            client_admin_a,
+            queue_post,
             active_connector,
             declared_mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
@@ -197,20 +203,20 @@ class TestDeclaredMimeIsCarried:
         assert not DocumentVersion.objects.exists()
 
     def test_an_omitted_declared_type_still_falls_back_to_the_filename(
-        self, client_admin_a, active_connector, connector_secret, fake_remote
+        self, queue_post, active_connector, connector_secret, fake_remote
     ):
         """Control. The fallback is legitimate when the caller says nothing --
         a browser derives the type from the file too -- so removing it would
         refuse every import that omitted an optional field."""
         fake_remote.body = PDF_BYTES
-        response = _queue(client_admin_a, active_connector)
+        response = _queue(queue_post, active_connector)
         assert response.status_code == 201
 
         version = DocumentVersion.objects.latest("id")
         assert version.declared_mime_type == "application/pdf"
 
     def test_a_declared_type_is_not_trusted_over_the_bytes(
-        self, client_admin_a, active_connector, connector_secret, fake_remote
+        self, queue_post, active_connector, connector_secret, fake_remote
     ):
         """Declaring the right thing does not make the wrong content acceptable:
         detection still runs against the actual bytes."""
@@ -220,7 +226,7 @@ class TestDeclaredMimeIsCarried:
         fake_remote.body = buffer.getvalue()
 
         response = _queue(
-            client_admin_a,
+            queue_post,
             active_connector,
             external_object_id="thing.pdf",
             declared_mime="application/pdf",

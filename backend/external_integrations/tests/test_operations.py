@@ -58,10 +58,21 @@ def _queue_import(client, connector, **overrides):
     )
 
 
-def _run(execution, tenant):
+def _run(execution, tenant, callbacks=None):
+    """Run the worker for one execution, in-process.
+
+    `callbacks` is `django_capture_on_commit_callbacks`. `documents.ingest`
+    dispatches its scan with `transaction.on_commit`, so under a
+    non-transactional test the deferred work never runs unless something runs
+    it -- which is what a real commit would do.
+    """
     from external_integrations.tasks import run_connector_execution
 
-    run_connector_execution(execution.pk, tenant.pk)
+    if callbacks is None:
+        run_connector_execution(execution.pk, tenant.pk)
+    else:
+        with callbacks(execute=True):
+            run_connector_execution(execution.pk, tenant.pk)
     execution.refresh_from_db()
     return execution
 
@@ -92,7 +103,14 @@ class TestInboundImport:
         assert version.detected_mime_type == "application/pdf"
 
     def test_the_scan_is_queued_and_the_version_is_not_pre_cleared(
-        self, client_admin_a, active_connector, connector_secret, fake_remote, tenant_a, monkeypatch
+        self,
+        client_admin_a,
+        active_connector,
+        connector_secret,
+        fake_remote,
+        tenant_a,
+        monkeypatch,
+        django_capture_on_commit_callbacks,
     ):
         """No "trusted connector" shortcut. A version arrives PENDING and the
         scan task is dispatched, exactly as for a browser upload."""
@@ -104,7 +122,7 @@ class TestInboundImport:
         fake_remote.body = PDF_BYTES
         response = _queue_import(client_admin_a, active_connector)
         execution = ConnectorExecution.objects.get(public_id=response.data["public_id"])
-        _run(execution, tenant_a)
+        _run(execution, tenant_a, django_capture_on_commit_callbacks)
 
         version = DocumentVersion.objects.latest("id")
         assert version.scan_status == ScanStatus.PENDING
@@ -308,7 +326,14 @@ class TestOutboundPackageTransfer:
         assert response.status_code == 409
 
     def test_a_package_whose_file_vanished_fails_before_any_remote_call(
-        self, client_admin_a, active_connector, connector_secret, fake_remote, tenant_a, admin_a
+        self,
+        client_admin_a,
+        active_connector,
+        connector_secret,
+        fake_remote,
+        tenant_a,
+        admin_a,
+        django_capture_on_commit_callbacks,
     ):
         """Milestone 13's exporter refuses, so nothing is sent. The failure is
         local, which is the only place it can safely be detected.
@@ -325,6 +350,7 @@ class TestOutboundPackageTransfer:
 
         response = self._queue(client_admin_a, active_connector, package)
         execution = ConnectorExecution.objects.get(public_id=response.data["public_id"])
+        _run(execution, tenant_a, django_capture_on_commit_callbacks)
 
         assert execution.status == ExecutionStatus.FAILED
         assert execution.error_code == "PACKAGE_INTEGRITY_FAILED"
