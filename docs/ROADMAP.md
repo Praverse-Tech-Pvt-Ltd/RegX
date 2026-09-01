@@ -58,14 +58,24 @@ derived column, re-apply restored them, and no governed row moved. Class C was
 proved through the restore path, not by reversing anything destructive.
 
 **Six defects found, all fixed.** Every one was an inaccurate document or a
-missing guard; none changed runtime behaviour. `TASK_RELIABILITY.md` stated a
-30s retry backoff where the task declares 60s, and still claimed all four
-dispatch sites defer to commit when Milestone 15 had deliberately reverted one
-to inline — a statement that was true for about a day. `external_integrations/0001`
-was the only migration in the stack with no classification block. The runbook's
-migration survey described 23 migrations across 11 apps; there are 44 across 17.
-The regulatory-overclaim guard covered three modules and not five others, all of
-which were clean — a coverage gap, not an overclaim.
+missing guard; none changed runtime behaviour.
+
+`TASK_RELIABILITY.md` stated a 30s retry backoff where the task declares 60s
+(1), and still claimed all four dispatch sites defer to commit when Milestone 15
+had deliberately reverted one to inline (2) — a statement that was true for
+about a day. `external_integrations/0001` was the only migration in the stack
+with no classification block (3). **This roadmap classified
+`submission_packages/0001` and `0002` but not `0003`, and lost that migration's
+required pre-deploy operator action with it (4)** — the classification was never
+wrong, it was absent, and both now live in
+[`MIGRATION_INVENTORY.md`](MIGRATION_INVENTORY.md). The runbook's migration
+survey described 23 migrations across 11 apps; there are 44 across 17 (5). The
+regulatory-overclaim guard covered three modules and not five others, all of
+which were clean — a coverage gap, not an overclaim (6).
+
+Finding 4 was a defect in this file, and the first version of this section then
+omitted it from its own list of six: the count said six and the prose described
+five. Both are corrected here.
 
 Two of those are now held shut by tests that read code and prose and fail when
 they disagree, because a reliability document is not executable and nothing else
