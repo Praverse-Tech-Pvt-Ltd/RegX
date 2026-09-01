@@ -19,9 +19,78 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
-## Milestone 8 — Regulatory Case / Submission Workspace
+## Milestone 9 — Submission Dossier / Section Readiness Workspace
 
 **Status: IN REVIEW**
+
+Milestone 8 gave a case a folder; this gives it an outline. `SubmissionDossier`
+holds an ordered, arbitrarily nested set of `DossierSection`s, each with an
+owner, a due date, structured blockers and a **derived** readiness state. It owns
+structure only: no documents, no workflow items, no checklist executions, no
+second evidence table, and no approval engine.
+
+`readiness` is computed by one authoritative function and is absent from every
+write serializer — a caller states `status`, the system states readiness. The
+calculation deliberately ignores the caller so two users never see contradictory
+states for the same section; the privacy obligation is discharged at the
+*explanation* layer, where reasons are coarse enumerated codes that never name a
+resource the caller may not see. An empty dossier is `NOT_READY`, not vacuously
+`READY`.
+
+Linking requires two independent gates — `submission_dossiers.manage_links` and
+the target module's own view permission, resolved through that module's own
+helper — with the module gate checked *before* the target is resolved, so
+absent / cross-tenant / unauthorized are one indistinguishable outcome. This was
+a MAJOR review finding against Milestone 8 and is built in here from the start.
+Module counts are `null`, never `0`, for callers who cannot see the module.
+
+Section links are governed at the database level from the first migration:
+`submission_dossiers/0002` installs PostgreSQL triggers on all three link tables
+because `link.save()` bypasses the manager.
+
+Independent review found two further gaps, both closed in
+`submission_dossiers/0003`. Retirement was the intended removal path for a
+section but was enforced only in services, and `PROTECT` covered only a section
+that already held a governed relationship — a bare section could still be
+hard-deleted by ORM or SQL. And blocker history had a CHECK constraint and
+nothing else, so a resolved blocker could be reopened, re-resolved, or have its
+content and provenance rewritten with no audit row, which matters because
+blockers gate readiness directly. Sections now refuse deletion at model,
+queryset and database level in every state, and a blocker makes exactly one
+transition, OPEN to RESOLVED, and is immutable and undeletable thereafter.
+
+A third pass closed the section UPDATE bypass that closing DELETE had left
+behind. `update()`, `bulk_update()` and `save()` had stayed open so reorder and
+readiness could work, which also let any ORM caller rewrite tenant, dossier,
+parent, readiness or the retirement stamps directly. `submission_dossiers/0004`
+replaces that with a **sanctioned window**: the service layer declares which of
+four operations is running, in a transaction-scoped PostgreSQL parameter, and the
+trigger holds that statement to exactly the columns the operation may touch.
+Identity and provenance are frozen under every window and none; a retired section
+is frozen entirely; and the database independently re-checks self-parent,
+cross-dossier, cross-tenant, retired-parent and cycle. Declaring an operation
+grants nothing on its own.
+
+**No CEP, DMF, ANDA or eCTD structure is built in.** `section_code` is display
+metadata; hierarchy comes from `parent`, never from parsing the string. See
+[SUBMISSION_DOSSIERS.md](SUBMISSION_DOSSIERS.md).
+
+**READY means internally ready against configured RegX criteria. COMPLETED means
+internal work stopped. Neither is an agency decision, a filing acceptance, or a
+regulatory approval.**
+
+`submission_dossiers/0001` is **Class C for rollback** once any dossier exists:
+reversing it destroys the outline, the section hierarchy and ordering, the link
+history including retired links, and the whole blocker history with its
+resolution provenance. `0002`, `0003` and `0004` (the triggers) are Class A on
+their own terms — each drops exactly what it created and touches no row — and
+none of them makes reversing `0001` safe. Removing protection is not the same as
+making destruction safe.
+
+## Milestone 8 — Regulatory Case / Submission Workspace
+
+**Status: COMPLETE**
+**Merge SHA: `8c4d19d82191be7baa447bfa9d026f7dcb84f25c`** (PR #36)
 
 The first object that says *these things belong to the same submission*.
 `RegulatoryCase` is a governed folder that composes workflow items, documents and
@@ -290,8 +359,11 @@ Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx
 
 Engineering has since continued on tracks that do not touch the regulatory gate:
 findings F-1 to F-7 (technical readiness, all merged), Milestone 6 (workflow
-engine, merged), Milestone 7 (workflow evidence) and Milestone 8 (regulatory case
-workspace). **None of that work advances the content gate**, which moves only
-when a named regulatory authority supplies a real approval.
+engine, merged), Milestone 7 (workflow evidence), Milestone 8 (regulatory case
+workspace, merged) and Milestone 9 (submission dossier / section readiness).
+**None of that work advances the content gate**, which moves only when a named
+regulatory authority supplies a real approval. In particular, a dossier section
+reading READY is an internal readiness signal and is not, and must not be
+presented as, regulatory approval.
 
 Milestones 5B–5D are **not scoped**. 5A deliberately records no detailed requirements for them; each needs its own discovery. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration remain unscoped as engineering milestones.

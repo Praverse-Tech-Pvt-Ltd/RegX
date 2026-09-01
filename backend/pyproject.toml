@@ -29,11 +29,11 @@ ignore = [
 "*/migrations/*" = ["N806", "E501", "RUF012", "I001"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regx"]
+known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "regx"]
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -47,7 +47,8 @@ name = "no-aidatabase-imports-anywhere"
 type = "forbidden"
 source_modules = [
     "common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry",
-    "fda_data", "formulations", "iid_assessment", "iig_checklist"
+    "fda_data", "formulations", "iid_assessment", "iig_checklist",
+    "regulatory_cases", "submission_dossiers"
 ]
 forbidden_modules = ["AIDatabase"]
 
