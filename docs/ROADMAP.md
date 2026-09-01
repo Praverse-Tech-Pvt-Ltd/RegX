@@ -19,6 +19,54 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 15 — Reliability, Performance & Operational Hardening
+
+**Status: IN REVIEW — STACKED ON MILESTONE 14**
+
+Branched from `e7bcc4c599d3b8f42e700a392d1542580802ae80` and **must not merge
+before Milestone 14, which must not merge before 13, 12, 11, 10 and 9 in that
+order**. GitHub Actions remains blocked at organisation level by a
+billing/spending limit; that is an infrastructure condition, not a code
+result, and no workflow file was modified to work around it.
+
+Platform hardening, not feature work. No new endpoints, no dossier semantics,
+no regulatory content. Every change began with a measurement, and the paths
+that measured clean were left alone and recorded as such rather than
+"optimised" on suspicion.
+
+Three defects, each found by measuring rather than reading:
+
+The attention queue's scan cap **never reached SQL** — `add()` received an
+already-evaluated list, so the database returned every candidate row and Python
+built a dict for each one before the cap applied: 1200 dicts to display 500.
+The query count was flat at 9 throughout, so a query-count test called the path
+healthy at every size. Async work was **dispatched before commit** at three
+sites a caller can wrap in a transaction, so a worker could claim a row that
+did not exist yet, log "not found", and silently do nothing. And `readiness`
+both leaked dependency internals from an `AllowAny` endpoint and **could not
+fail**: Django's Redis backend sets no socket timeout, so a Redis that stopped
+answering hung the probe instead of returning 503, starving the web process
+through its own health checks.
+
+A fourth `on_commit` was added and then **removed**: the write above it is a
+bare `save()` outside any transaction, so there was nothing to defer to, and no
+measurement justified keeping it.
+
+**No migrations.** Rollback of this milestone is a plain code revert with no
+schema or data consequence — the only Class A/B/C question it raises is none.
+
+See [PERFORMANCE_BASELINE.md](PERFORMANCE_BASELINE.md),
+[LOCK_ORDER.md](LOCK_ORDER.md), [TASK_RELIABILITY.md](TASK_RELIABILITY.md) and
+[CAPACITY_AND_LIMITS.md](CAPACITY_AND_LIMITS.md).
+
+**Not claimed:** no caching was added, because every read path here is
+authorization-sensitive; no new indexes, because no measured query plan
+justified one; no connection pooler; no automatic stale-work recovery, which
+would replace an honest unknown with a confident falsehood. `LOCK_ORDER.md`
+marks two orderings as verified by code inspection rather than claiming a
+deadlock test that was not built. Nothing here is a validated-system, Part 11,
+or agency-readiness claim.
+
 ## Milestone 14 — Controlled External Integration / Connector Framework
 
 **Status: IN REVIEW — STACKED ON MILESTONE 13**
