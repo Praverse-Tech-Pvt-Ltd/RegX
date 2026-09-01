@@ -11,19 +11,33 @@ cannot be known, this says so rather than picking the comfortable answer.
 | Task | Idempotent | Retry | Attempts | Backoff | Side effect | Failure state |
 |---|---|---|---|---|---|---|
 | `documents.scan_document_version` | yes — returns early if `scan_status` is already CLEAN or QUARANTINED | yes | 3 | 30s | local only (status write) | `SCAN_FAILED`; **never** CLEAN |
-| `documents.process_document_version` | yes — job row keyed on the version | yes | 3 | 30s | local only | `FAILED` on the job |
+| `documents.process_document_version` | yes — job row keyed on the version | yes | 3 | 60s | local only | `FAILED` on the job |
 | `external_integrations.run_connector_execution` | yes — claimed under a row lock | transient failures only | 3 | 30s × attempt | **external** | `FAILED` with an enumerated code |
 
-## Dispatch happens after commit
-
-All four dispatch sites use `transaction.on_commit`:
+## Dispatch happens after commit — at three of the four sites
 
 ```
-documents/ingest.py          scan_document_version
-documents/views.py           scan_document_version   (version upload)
-documents/tasks.py           process_document_version
-external_integrations/views  run_connector_execution
+documents/ingest.py          scan_document_version      on_commit
+documents/views.py           scan_document_version      on_commit  (version upload)
+external_integrations/views  run_connector_execution    on_commit
+documents/tasks.py           process_document_version   inline, deliberately
 ```
+
+The three that defer are the three a *caller* can wrap in a transaction: a
+service function and two request handlers. None of them can see whether an
+outer transaction is open, so each queues its work on commit.
+
+**`documents/tasks.py` dispatches inline on purpose.** The status write above it
+is a bare `save()` with no enclosing transaction, so it is already committed by
+the time the next task is queued — there is nothing to defer to. Milestone 15
+added `on_commit` there and then removed it, because no measurement showed a
+race and a deferral that cannot fire is not defence in depth, it is a claim that
+a hazard was addressed when none was found. The reasoning is repeated at the
+call site.
+
+An earlier version of this section said all four sites deferred. That was true
+for about a day, between the change and its revert, and this document was not
+corrected at the time.
 
 Measured before this changed, with a caller holding a transaction: the scan was
 dispatched **1 time before commit and 0 times after**. A worker picking that

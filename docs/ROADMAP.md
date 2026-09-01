@@ -19,6 +19,72 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 16 — Final Validation, Release Readiness & Controlled Merge Preparation
+
+**Status: IN REVIEW — STACKED ON MILESTONE 15**
+
+Branched from `77b0aeb4396ffe7b9adfd1e42dd8b5c645b5bfb8` and **must not merge
+before Milestone 15, which must not merge before 14, 13, 12, 11, 10 and 9 in
+that order**. GitHub Actions remains blocked at organisation level by a
+billing/spending limit; every gate in this milestone was therefore run locally
+and its exact output recorded. No workflow file was modified to work around it.
+
+No new business domain, no new endpoint, no new regulatory functionality. This
+milestone produces release evidence and closes the gaps that producing it
+exposed.
+
+**What was actually run.** A zero-to-head migration on a genuinely empty
+database (59 migrations). A Milestone 8 database populated using Milestone 8
+code, then migrated forward through all 15 stack migrations, with survival
+checked by identity rather than row count — public IDs, checksum, storage key,
+workflow state and transition history all unchanged. A third migration in
+containers built from this branch with fresh volumes. All three ended with the
+**same governed floor: 57 triggers and 46 functions**, which is the parity worth
+having, because a trigger installed only on new databases is invisible to a
+suite that rebuilds its database every run.
+
+Then the real `scripts/backup.sh` and `scripts/restore.sh` against a disposable
+compose project holding representative M9–M15 data: a document file deleted on
+purpose before the restore and recovered with bytes matching the checksum its
+row asserts, a frozen package whose manifest checksum was identical across
+stored, recomputed and pre-backup values, and a terminal connector execution
+whose raw-SQL UPDATE was still refused **after** the restore. A post-backup
+marker row proved the restore replaced state rather than doing nothing. 23
+checks, all passing. Torn down with `down -v`.
+
+Class A rollback was exercised in both directions on two migrations, including
+the one carrying a data step: reverse dropped exactly its 9 triggers and its
+derived column, re-apply restored them, and no governed row moved. Class C was
+proved through the restore path, not by reversing anything destructive.
+
+**Six defects found, all fixed.** Every one was an inaccurate document or a
+missing guard; none changed runtime behaviour. `TASK_RELIABILITY.md` stated a
+30s retry backoff where the task declares 60s, and still claimed all four
+dispatch sites defer to commit when Milestone 15 had deliberately reverted one
+to inline — a statement that was true for about a day. `external_integrations/0001`
+was the only migration in the stack with no classification block. The runbook's
+migration survey described 23 migrations across 11 apps; there are 44 across 17.
+The regulatory-overclaim guard covered three modules and not five others, all of
+which were clean — a coverage gap, not an overclaim.
+
+Two of those are now held shut by tests that read code and prose and fail when
+they disagree, because a reliability document is not executable and nothing else
+would have noticed.
+
+**No migrations.** Rollback of this milestone is a plain code revert.
+
+See [`RELEASE_VALIDATION.md`](RELEASE_VALIDATION.md),
+[`MIGRATION_INVENTORY.md`](MIGRATION_INVENTORY.md),
+[`STACKED_MERGE_PLAN.md`](STACKED_MERGE_PLAN.md) and
+[`RELEASE_BLOCKERS.md`](RELEASE_BLOCKERS.md).
+
+**Not claimed, and not decided.** Nothing here resolves the 0-of-20 governance
+approvals, Item 1, the owner-policy decisions, or S-1 and S-2, all of which are
+recorded as external constraints and left exactly as they were. No CI ran. No
+load test, no penetration test, no production-scale restore, no failover. The
+merge plan merges nothing. Nothing in this milestone is a validated-system,
+Part 11, or agency-readiness claim.
+
 ## Milestone 15 — Reliability, Performance & Operational Hardening
 
 **Status: IN REVIEW — STACKED ON MILESTONE 14**
