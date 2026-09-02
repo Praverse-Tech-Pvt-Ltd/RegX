@@ -101,15 +101,23 @@ that decides whether a rollback is even possible.
 
 ### The current migration set
 
-23 migrations across 11 apps, surveyed directly:
+**44 migrations across 17 apps**, surveyed directly at the Milestone 15 head
+(`77b0aeb`). Re-surveyed in Milestone 16; the previous figures in this section
+described 23 migrations across 11 apps and predated everything Milestones 9–15
+added.
 
 | Pattern | Count | Note |
 |---|---|---|
 | `RunPython` | **0** | no data migrations exist today |
-| `RunSQL` | 1 | `audit/0001` immutability trigger — **has `reverse_sql`** |
+| `RunSQL` | 14 | governance triggers and one derived column — **every one has `reverse_sql`** |
 | `DeleteModel`, `RemoveField`, `RenameField`, `RenameModel` | 0 | |
 | `RemoveConstraint` | 1 | `iig_checklist/0006` — see below |
-| `AlterField` | 3 | JSONField defaults and a `BigAutoField` id; benign |
+| `AddConstraint` | 15 | uniqueness and check constraints |
+| `AlterField` | 4 | JSONField defaults and a `BigAutoField` id; benign |
+
+Per-migration classification for the Milestone 9–15 stack, including the one
+migration that carries a **required operator action** before deployment, is in
+[`MIGRATION_INVENTORY.md`](MIGRATION_INVENTORY.md).
 
 Structurally this looks entirely reversible. **It is not.**
 
