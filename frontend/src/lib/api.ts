@@ -2426,3 +2426,271 @@ export const submissionDossiers = {
       { method: "DELETE", headers: { "X-Tenant-Slug": tenantSlug } }
     ),
 };
+
+
+// ===========================================================================
+// Milestone 10 -- dossier blueprints
+//
+// Blueprints define structure; dossiers own execution. Instantiating a version
+// produces ordinary governed dossier records that never read back to the
+// blueprint, so publishing a later version cannot rewrite them.
+//
+// ACTIVE means "available for internal RegX dossier instantiation". It is not
+// a regulatory, QA or agency approval, and there is deliberately no APPROVED
+// state to reach.
+// ===========================================================================
+export type BlueprintVersionStatus = "draft" | "active" | "retired";
+
+export interface BlueprintUserRef {
+  public_id: string;
+  full_name: string;
+}
+
+export interface DossierBlueprint {
+  public_id: string;
+  name: string;
+  description: string;
+  owner: BlueprintUserRef | null;
+  created_by: BlueprintUserRef | null;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+  current_version_number?: number | null;
+  current_version_status?: BlueprintVersionStatus | null;
+  current_version_public_id?: string | null;
+  version_count?: number;
+  instantiation_count?: number;
+}
+
+export interface BlueprintVersion {
+  public_id: string;
+  blueprint_public_id: string;
+  version_number: number;
+  status: BlueprintVersionStatus;
+  notes: string;
+  created_by: BlueprintUserRef | null;
+  supersedes_public_id: string | null;
+  activated_at: string | null;
+  retired_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlueprintSection {
+  public_id: string;
+  parent_public_id: string | null;
+  section_code: string;
+  title: string;
+  description: string;
+  sequence: number;
+  required: boolean;
+  default_due_offset_days: number | null;
+  is_retired: boolean;
+}
+
+export interface BlueprintPermissions {
+  can_create: boolean;
+  can_edit: boolean;
+  can_manage_sections: boolean;
+  can_create_version: boolean;
+  can_activate: boolean;
+  can_retire: boolean;
+  can_instantiate: boolean;
+  can_archive: boolean;
+}
+
+export interface BlueprintDetail extends DossierBlueprint {
+  versions: BlueprintVersion[];
+  permissions: BlueprintPermissions;
+}
+
+export interface BlueprintVersionDetail extends BlueprintVersion {
+  blueprint: { public_id: string; name: string };
+  sections: BlueprintSection[];
+  section_count: number;
+  instantiation_count: number;
+  is_editable: boolean;
+  permissions: BlueprintPermissions;
+}
+
+export interface BlueprintInstantiationResult {
+  dossier_public_id: string;
+  case_public_id: string;
+  blueprint_public_id: string;
+  version_public_id: string;
+  version_number: number;
+  section_count: number;
+  dossier_route: string;
+}
+
+/**
+ * What a dossier may say about where it came from.
+ *
+ * `blueprint_name` is present only when the caller independently holds
+ * `dossier_blueprints.view`; otherwise `restricted` is true and the provenance
+ * is still shown, without the tenant-authored name.
+ */
+export interface BlueprintProvenance {
+  instantiated_from_blueprint: boolean;
+  instantiation_public_id?: string;
+  blueprint_public_id?: string;
+  version_public_id?: string;
+  version_number?: number;
+  section_count?: number;
+  instantiated_at?: string;
+  blueprint_name?: string;
+  restricted?: boolean;
+}
+
+export const dossierBlueprints = {
+  list: (tenantSlug: string, params?: { search?: string; includeArchived?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.search) query.set("search", params.search);
+    if (params?.includeArchived) query.set("include_archived", "true");
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return apiRequest<{ results: DossierBlueprint[]; permissions: BlueprintPermissions }>(
+      `${DOSSIER_V1}/dossier-blueprints/${suffix}`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    );
+  },
+
+  create: (
+    tenantSlug: string,
+    data: { name: string; description?: string; owner_public_id?: string | null }
+  ) =>
+    apiRequest<DossierBlueprint>(`${DOSSIER_V1}/dossier-blueprints/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  get: (tenantSlug: string, publicId: string) =>
+    apiRequest<BlueprintDetail>(`${DOSSIER_V1}/dossier-blueprints/${publicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  update: (
+    tenantSlug: string,
+    publicId: string,
+    data: { name?: string; description?: string; owner_public_id?: string | null }
+  ) =>
+    apiRequest<DossierBlueprint>(`${DOSSIER_V1}/dossier-blueprints/${publicId}/`, {
+      method: "PATCH",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: data,
+    }),
+
+  archive: (tenantSlug: string, publicId: string) =>
+    apiRequest<DossierBlueprint>(`${DOSSIER_V1}/dossier-blueprints/${publicId}/archive/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  listVersions: (tenantSlug: string, blueprintPublicId: string) =>
+    apiRequest<{ results: BlueprintVersion[]; permissions: BlueprintPermissions }>(
+      `${DOSSIER_V1}/dossier-blueprints/${blueprintPublicId}/versions/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  /**
+   * Omitting `source_version_public_id` starts an empty draft; supplying it
+   * clones that version's structure. There is deliberately no way to edit an
+   * active version into the next revision.
+   */
+  createVersion: (
+    tenantSlug: string,
+    blueprintPublicId: string,
+    data?: { source_version_public_id?: string | null; notes?: string }
+  ) =>
+    apiRequest<BlueprintVersion>(
+      `${DOSSIER_V1}/dossier-blueprints/${blueprintPublicId}/versions/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data ?? {} }
+    ),
+
+  getVersion: (tenantSlug: string, versionPublicId: string) =>
+    apiRequest<BlueprintVersionDetail>(
+      `${DOSSIER_V1}/dossier-blueprint-versions/${versionPublicId}/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  activateVersion: (tenantSlug: string, versionPublicId: string) =>
+    apiRequest<BlueprintVersion>(
+      `${DOSSIER_V1}/dossier-blueprint-versions/${versionPublicId}/activate/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  retireVersion: (tenantSlug: string, versionPublicId: string) =>
+    apiRequest<BlueprintVersion>(
+      `${DOSSIER_V1}/dossier-blueprint-versions/${versionPublicId}/retire/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  createSection: (
+    tenantSlug: string,
+    versionPublicId: string,
+    data: {
+      section_code: string;
+      title: string;
+      description?: string;
+      parent_public_id?: string | null;
+      required?: boolean;
+      default_due_offset_days?: number | null;
+    }
+  ) =>
+    apiRequest<BlueprintSection>(
+      `${DOSSIER_V1}/dossier-blueprint-versions/${versionPublicId}/sections/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+    ),
+
+  updateSection: (
+    tenantSlug: string,
+    sectionPublicId: string,
+    data: {
+      section_code?: string;
+      title?: string;
+      description?: string;
+      parent_public_id?: string | null;
+      required?: boolean;
+      default_due_offset_days?: number | null;
+    }
+  ) =>
+    apiRequest<BlueprintSection>(
+      `${DOSSIER_V1}/dossier-blueprint-sections/${sectionPublicId}/`,
+      { method: "PATCH", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+    ),
+
+  reorderSection: (tenantSlug: string, sectionPublicId: string, sequence: number) =>
+    apiRequest<BlueprintSection>(
+      `${DOSSIER_V1}/dossier-blueprint-sections/${sectionPublicId}/reorder/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { sequence } }
+    ),
+
+  retireSection: (tenantSlug: string, sectionPublicId: string) =>
+    apiRequest<BlueprintSection>(
+      `${DOSSIER_V1}/dossier-blueprint-sections/${sectionPublicId}/retire/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  /** The version comes from the path; the tenant is never sent by the client. */
+  instantiate: (
+    tenantSlug: string,
+    versionPublicId: string,
+    data: {
+      regulatory_case_public_id: string;
+      title: string;
+      owner_public_id?: string | null;
+      target_date?: string | null;
+    }
+  ) =>
+    apiRequest<BlueprintInstantiationResult>(
+      `${DOSSIER_V1}/dossier-blueprint-versions/${versionPublicId}/instantiate/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+    ),
+
+  provenanceForDossier: (tenantSlug: string, dossierPublicId: string) =>
+    apiRequest<BlueprintProvenance>(
+      `${DOSSIER_V1}/submission-dossiers/${dossierPublicId}/blueprint-provenance/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+};

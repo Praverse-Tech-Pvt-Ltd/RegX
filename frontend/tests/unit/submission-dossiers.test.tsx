@@ -54,6 +54,13 @@ vi.mock("@/lib/api", () => ({
     listForCase: vi.fn(),
     create: vi.fn(),
   },
+  // Milestone 10 added a blueprint provenance line to this page. The mock is an
+  // explicit allow-list, so a client the page genuinely uses has to appear here
+  // or every test in the file fails on the import. Resolving to "not from a
+  // blueprint" keeps these tests about the dossier workspace.
+  dossierBlueprints: {
+    provenanceForDossier: () => Promise.resolve({ instantiated_from_blueprint: false }),
+  },
 }));
 
 const PERMS = {

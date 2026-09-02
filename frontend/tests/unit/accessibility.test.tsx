@@ -683,3 +683,150 @@ describe("Accessibility — readiness badge colour contrast", () => {
     expect(contrast(screen.getByTestId("section-status-badge"))).toBeGreaterThanOrEqual(AA);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Milestone 10 -- blueprint tree, status badges, instantiate dialog
+// ---------------------------------------------------------------------------
+import { BlueprintTree } from "@/app/(regx)/dossier-blueprints/blueprint-tree";
+import {
+  ActiveMeaningNote,
+  ArchivedBadge,
+  RequiredBadge,
+  VersionStatusBadge,
+} from "@/app/(regx)/dossier-blueprints/status-badge";
+
+function blueprintSection(over: Record<string, unknown> = {}) {
+  return {
+    public_id: "bp-1",
+    parent_public_id: null,
+    section_code: "A",
+    title: "Section A",
+    description: "",
+    sequence: 0,
+    required: true,
+    default_due_offset_days: null,
+    is_retired: false,
+    ...over,
+  };
+}
+
+describe("Accessibility \u2014 blueprint section tree", () => {
+  const tree = [
+    blueprintSection(),
+    blueprintSection({ public_id: "bp-2", section_code: "A.1", parent_public_id: "bp-1" }),
+  ];
+
+  it("has no serious or critical automated violations when read-only", async () => {
+    const { container } = render(<BlueprintTree sections={tree as never} editable={false} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no serious or critical automated violations when editable", async () => {
+    const { container } = render(
+      <BlueprintTree
+        sections={tree as never}
+        editable
+        onReorder={() => {}}
+        onRetire={() => {}}
+      />
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("exposes tree, treeitem, level and expanded state", () => {
+    render(<BlueprintTree sections={tree as never} editable={false} />);
+    expect(screen.getByRole("tree", { name: /blueprint sections/i })).toBeInTheDocument();
+    const items = screen.getAllByRole("treeitem");
+    expect(items[0]).toHaveAttribute("aria-level", "1");
+    expect(items[1]).toHaveAttribute("aria-level", "2");
+    expect(items[0]).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("names every control after the section it acts on", () => {
+    render(
+      <BlueprintTree
+        sections={tree as never}
+        editable
+        onReorder={() => {}}
+        onRetire={() => {}}
+      />
+    );
+    expect(screen.getByRole("button", { name: /collapse A$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /move A up/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove A\.1/i })).toBeInTheDocument();
+  });
+
+  it("labels the search field for screen readers", () => {
+    render(<BlueprintTree sections={tree as never} editable={false} />);
+    expect(screen.getByLabelText(/search sections/i)).toBeInTheDocument();
+  });
+});
+
+describe("Accessibility \u2014 blueprint status is never colour alone", () => {
+  it("every version status badge carries a text label", () => {
+    for (const s of ["draft", "active", "retired"] as const) {
+      const { unmount } = render(<VersionStatusBadge status={s} />);
+      const text = screen.getByTestId("version-status-badge").textContent ?? "";
+      expect(text.replace(/[\u25cf\u25d0\u25cb]/g, "").trim().length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it("badges have no automated violations", async () => {
+    const { container } = render(
+      <div>
+        <VersionStatusBadge status="active" />
+        <RequiredBadge required />
+        <RequiredBadge required={false} />
+        <ArchivedBadge />
+        <ActiveMeaningNote />
+      </div>
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+});
+
+describe("Accessibility \u2014 blueprint badge colour contrast", () => {
+  // axe cannot resolve these pills: the background is set inline on the badge
+  // while the page ground comes from a parent, so the automated check has no
+  // pair to measure. Milestone 9 shipped two real AA failures behind exactly
+  // that silence, so the ratio is computed here rather than trusted.
+  const luminance = (hex: string) => {
+    const v = (i: number) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * v(1) + 0.7152 * v(3) + 0.0722 * v(5);
+  };
+  const toHex = (rgb: string) => {
+    const m = rgb.match(/\d+/g);
+    if (!m) return rgb;
+    return "#" + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+  };
+  const contrast = (el: HTMLElement) => {
+    const s = getComputedStyle(el);
+    const a = luminance(toHex(s.color));
+    const b = luminance(toHex(s.backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const AA = 4.5;
+
+  it.each(["draft", "active", "retired"] as const)(
+    "version status badge %s meets WCAG AA",
+    (s) => {
+      render(<VersionStatusBadge status={s} />);
+      expect(contrast(screen.getByTestId("version-status-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it.each([true, false])("required badge (%s) meets WCAG AA", (required) => {
+    render(<RequiredBadge required={required} />);
+    expect(contrast(screen.getByTestId("required-badge"))).toBeGreaterThanOrEqual(AA);
+  });
+
+  it("the archived badge meets WCAG AA", () => {
+    render(<ArchivedBadge />);
+    expect(contrast(screen.getByTestId("archived-badge"))).toBeGreaterThanOrEqual(AA);
+  });
+});
