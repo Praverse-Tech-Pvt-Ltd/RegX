@@ -19,6 +19,57 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 13 — Controlled Submission Package Assembly & Export Manifest
+
+**Status: IN REVIEW — STACKED ON MILESTONE 12**
+
+Branched from `12ea1552e4f88b242c8a6c62b5b76d9f862a7b10` and **must not merge
+before Milestone 12, which must not merge before 11, 10 and 9 in that order**.
+GitHub Actions is blocked at organisation level by a billing/spending limit;
+that is an infrastructure condition, not a code result, and no workflow file was
+modified to work around it.
+
+A package answers one question permanently: *which exact bytes were assembled,
+and when*. Every entry binds to a `DocumentVersion`, never to a `Document`, so
+uploading a new version of a cited document changes nothing about any package
+that already cites an earlier one. The guarantee is a foreign key rather than a
+rule somebody has to remember — the same pattern `workflows.WorkflowEvidence`
+established for citing one exact version, extended to a set of them with a
+manifest over the whole.
+
+**FROZEN is an internal RegX state.** It means the manifest can no longer
+change. It is not QA approval, regulatory approval, agency acceptance or a claim
+that anything is ready to file, and there is deliberately no APPROVED state. A
+manifest that could be reopened would not be a manifest, so there is no unfreeze:
+changing a frozen package means cloning it into a new draft, which leaves the
+original exactly as it was.
+
+Freezing is one transaction that revalidates every cited version — including
+whether its file is still in storage — before it computes the canonical manifest,
+because after freeze the record is permanent and that is the last moment the
+claim can be checked. The manifest is deterministic by construction: sorted keys,
+no whitespace, entries ordered by sequence then public id, and **no timestamp
+inside the hashed bytes**, so the same composition hashes the same way twice.
+
+Export streams the cited versions into an internal ZIP, hashing each file as it
+goes and comparing against the manifest, so an archive whose manifest is a lie
+about its own contents fails rather than ships. It is all or nothing: a caller
+who cannot retrieve every document is refused the whole archive, because one
+silently missing file looks complete to whoever receives it. Logical paths are
+tenant-defined and normalised against traversal, Windows device names, Unicode
+spelling and case collision. See [SUBMISSION_PACKAGES.md](SUBMISSION_PACKAGES.md).
+
+**No agency format ships.** No eCTD, sequence generation, XML backbone, regional
+module, NeeS, ESG or gateway transmission, FDA or EMA validation, completeness
+determination, electronic signature, or Part 11 / GxP claim. Synthetic codes
+throughout, and the ZIP is an internal container.
+
+`submission_packages/0001` is **Class C for rollback** once any package data
+exists: reversing it destroys every frozen manifest and checksum, which is not
+derivable from anything else precisely because it does not change when the
+documents do. `0002` (seven functions, seven triggers) is Class A on its own
+terms and does not make reversing `0001` safe.
+
 ## Milestone 12 — Submission Operations & Internal Readiness Dashboard
 
 **Status: IN REVIEW — STACKED ON MILESTONE 11**
@@ -538,14 +589,16 @@ findings F-1 to F-7 (technical readiness, all merged), Milestone 6 (workflow
 engine, merged), Milestone 7 (workflow evidence), Milestone 8 (regulatory case
 workspace, merged), Milestone 9 (submission dossier / section readiness),
 Milestone 10 (dossier blueprint library, stacked on 9), Milestone 11
-(controlled dossier upgrade planning, stacked on 10) and Milestone 12
-(submission operations dashboard, stacked on 11). **None of that work
+(controlled dossier upgrade planning, stacked on 10), Milestone 12 (submission
+operations dashboard, stacked on 11) and Milestone 13 (controlled submission
+package assembly, stacked on 12). **None of that work
 advances the content gate**, which moves only when a named regulatory authority
 supplies a real approval. In particular, a blueprint version reading ACTIVE
 means only that RegX will let a tenant create dossiers from it, an upgrade plan
 reading READY means only that it has been reviewed inside RegX and may be
 applied, and a dossier section reading READY is an internal readiness signal. The operations
-dashboard reports internal operational status and nothing else. None of these
-is, or may be presented as, regulatory approval.
+dashboard reports internal operational status and nothing else, and a package
+reading FROZEN means only that its internal manifest can no longer change. None
+of these is, or may be presented as, regulatory approval.
 
 Milestones 5B–5D are **not scoped**. 5A deliberately records no detailed requirements for them; each needs its own discovery. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration remain unscoped as engineering milestones.

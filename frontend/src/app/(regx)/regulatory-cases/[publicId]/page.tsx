@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { regulatoryCases, ApiError, type CaseDetail } from "@/lib/api";
 import { CaseStatusBadge } from "../status-badge";
+import { PackagePanel } from "./package-panel";
 import { CaseDossiersPanel } from "./dossiers-panel";
 
 const T = {
@@ -18,7 +19,15 @@ const T = {
   navy: "#003865",
 } as const;
 
-const TABS = ["overview", "documents", "workflows", "checklists", "dossiers", "evidence"] as const;
+const TABS = [
+  "overview",
+  "documents",
+  "workflows",
+  "checklists",
+  "dossiers",
+  "packages",
+  "evidence",
+] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -27,6 +36,7 @@ const TAB_LABELS: Record<Tab, string> = {
   workflows: "Workflow",
   checklists: "Checklists",
   dossiers: "Dossiers",
+  packages: "Packages",
   evidence: "Evidence / Activity",
 };
 
@@ -453,6 +463,20 @@ function CaseDetailInner() {
           casePublicId={publicId}
           caseTerminal={c.is_terminal}
         />
+      )}
+
+      {tab === "packages" && (
+        <section data-testid="tab-panel-packages">
+          {/* A package is a deliberate assembly of exact document versions.
+              Nothing here creates one automatically and nothing syncs dossier
+              contents into one -- that is what makes a frozen manifest mean
+              something. */}
+          <PackagePanel
+            tenantSlug={tenantSlug}
+            casePublicId={publicId}
+            caseTerminal={c.is_terminal}
+          />
+        </section>
       )}
 
       {tab === "evidence" && (
