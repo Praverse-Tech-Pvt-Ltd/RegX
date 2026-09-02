@@ -23,6 +23,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `submission_dossiers` | Ordered, nested section outline inside a case, with blockers and derived internal readiness. Owns structure only; no content, no approval engine ([`SUBMISSION_DOSSIERS.md`](SUBMISSION_DOSSIERS.md)) |
 | `dossier_blueprints` | Reusable, versioned tenant-controlled dossier outlines, and the governed record of which dossier was stamped from which version. Defines structure; owns no execution ([`DOSSIER_BLUEPRINTS.md`](DOSSIER_BLUEPRINTS.md)) |
 | `dossier_upgrades` | Blueprint-to-blueprint change impact, and the only sanctioned path for moving an existing dossier onto a newer version. Proposes; never applies on its own ([`DOSSIER_UPGRADES.md`](DOSSIER_UPGRADES.md)) |
+| `submission_operations` | Read-only operational view across every governed domain. Owns no data, stores nothing and decides nothing ([`SUBMISSION_OPERATIONS_DASHBOARD.md`](SUBMISSION_OPERATIONS_DASHBOARD.md)) |
 
 ## Key invariants
 
@@ -39,6 +40,9 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 - An upgrade never writes a section row itself. Every dossier mutation it performs goes through `submission_dossiers.services`, so the Milestone 9 sanctioned window and its triggers apply exactly as they do to a hand-edited dossier.
 - A plan carries a structural fingerprint of the dossier it described. Apply recomputes it and fails closed: a plan that cannot prove the dossier is unchanged is never applied.
 - Provenance is append-only across versions. An upgrade records a new `DossierUpgradeApplication`; it never rewrites the `BlueprintInstantiation` that says how the dossier was originally created.
+- The operations dashboard is a read model with no second source of truth: no copied readiness, no cached counts, no stored dashboard state, no model and no migration. Every number is counted at request time from the table that owns it.
+- A dashboard permission is a door, not a key. `submission_operations.view` grants only the right to ask; each module stays behind its own view permission, checked independently per request.
+- On the dashboard, `0` and `null` are different answers: `0` means there are none, `null` means the caller is not entitled to know. A restricted dimension is never rendered as a zero.
 
 ## Import dependency rules
 
@@ -80,6 +84,16 @@ dossier_upgrades → dossier_blueprints, submission_dossiers, regulatory_cases,
                    can be removed and every dossier and blueprint still stands.
                    Neither dossier_blueprints nor submission_dossiers may import
                    it: a section knows nothing about being upgraded.
+submission_operations → dossier_upgrades, dossier_blueprints,
+                   submission_dossiers, regulatory_cases, workflows, documents,
+                   iig_checklist, audit, tenancy, identity, authorization,
+                   common
+                   A read model, and now the outermost layer of all. It depends
+                   on every domain it aggregates and NOTHING may depend on it:
+                   the moment a domain imports the dashboard, the dashboard has
+                   become a source of truth rather than a view of one, and
+                   deleting it stops being free. Enforced by the
+                   `nothing-depends-on-submission-operations` contract.
 documents ← never imports workflows (evidence deletion protection goes
             through DeletionProtectionRegistry, keeping it one-way)
 ```

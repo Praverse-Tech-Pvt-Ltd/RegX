@@ -19,6 +19,62 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 12 — Submission Operations & Internal Readiness Dashboard
+
+**Status: IN REVIEW — STACKED ON MILESTONE 11**
+
+Branched from `1cd885a4e44baa1861866ebfc09aa2839c2a0015` and **must not merge
+before Milestone 11, which must not merge before Milestone 10, which must not
+merge before Milestone 9**. GitHub Actions is blocked at organisation level by a
+billing/spending limit; that is an infrastructure condition, not a code result,
+and no workflow file was modified to work around it.
+
+Nine milestones of governed domains, and no single place to see the work. This
+adds one — and adds nothing else. `submission_operations` is a read model: no
+model, no migration, no stored state, no copied readiness, no cached counts.
+Every number is counted at request time from the table that owns it, using that
+module's own status fields. Delete the app and every fact it reports still
+exists where it always was.
+
+**Zero and null are different answers.** `0` means there are none; `null` means
+the caller is not entitled to know. A dashboard rendering `0` for a module the
+caller cannot see is not being cautious, it is lying — and lying in a way that is
+indistinguishable from the truth until the tenant actually has twelve of the
+thing. A frozen `Visibility` type makes this structural rather than a convention
+somebody has to remember.
+
+**The dashboard permission is a door, not a key.** `submission_operations.view`
+grants the right to ask and nothing else; cases, dossiers, documents, workflows,
+checklists, blueprints and upgrades each stay behind their own view permission,
+checked independently on every request through that module's own helper. A
+cross-module dashboard under one permission would be a permission-laundering
+machine. A restricted module contributes no count, no row and no note about how
+many rows were withheld — a count of what was hidden is itself the disclosure.
+
+Readiness is read from Milestone 9, never recomputed, and every label says
+"internally". Retired sections, optional sections and terminal dossiers are all
+excluded from outstanding work. The attention queue emits enumerated reason
+codes rather than generated prose, ranked blocked → overdue → rejected → due
+soon → not started → informational, with a total order so pagination cannot drop
+rows. "Due soon" is a seven-day **display** window with no regulatory meaning.
+
+Aggregation is per page, not per row: query counts are flat from 1 to 100 cases
+on every surface. Readiness filtering narrows the queryset in SQL **before**
+pagination, so `count` describes the filtered set and a match on page four is not
+invisible on page one. The activity feed carries what happened to which thing and
+when, never who: `Visibility` has no identity gate, so emitting an actor's email
+would turn module permission into permission to learn who acted. See
+[SUBMISSION_OPERATIONS_DASHBOARD.md](SUBMISSION_OPERATIONS_DASHBOARD.md).
+
+**No regulatory judgement of any kind.** No CTD, eCTD, CEP, DMF, ANDA, USFDA or
+EMA structure or rules; no completeness engine; no submission validation; no AI
+conclusions. **A green dashboard does not mean a submission is acceptable to
+anyone**, and the screen says so in standing copy.
+
+No new table and no migration, so there is nothing here to classify for
+rollback — the app adds one permission codename, registered through the existing
+`post_migrate` discovery hook.
+
 ## Milestone 11 — Blueprint Change Impact & Controlled Dossier Upgrade Planning
 
 **Status: IN REVIEW — STACKED ON MILESTONE 10**
@@ -481,13 +537,15 @@ Engineering has since continued on tracks that do not touch the regulatory gate:
 findings F-1 to F-7 (technical readiness, all merged), Milestone 6 (workflow
 engine, merged), Milestone 7 (workflow evidence), Milestone 8 (regulatory case
 workspace, merged), Milestone 9 (submission dossier / section readiness),
-Milestone 10 (dossier blueprint library, stacked on 9) and Milestone 11
-(controlled dossier upgrade planning, stacked on 10). **None of that work
+Milestone 10 (dossier blueprint library, stacked on 9), Milestone 11
+(controlled dossier upgrade planning, stacked on 10) and Milestone 12
+(submission operations dashboard, stacked on 11). **None of that work
 advances the content gate**, which moves only when a named regulatory authority
 supplies a real approval. In particular, a blueprint version reading ACTIVE
 means only that RegX will let a tenant create dossiers from it, an upgrade plan
 reading READY means only that it has been reviewed inside RegX and may be
-applied, and a dossier section reading READY is an internal readiness signal.
-None of the three is, or may be presented as, regulatory approval.
+applied, and a dossier section reading READY is an internal readiness signal. The operations
+dashboard reports internal operational status and nothing else. None of these
+is, or may be presented as, regulatory approval.
 
 Milestones 5B–5D are **not scoped**. 5A deliberately records no detailed requirements for them; each needs its own discovery. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration remain unscoped as engineering milestones.
