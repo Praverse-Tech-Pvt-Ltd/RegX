@@ -830,3 +830,117 @@ describe("Accessibility \u2014 blueprint badge colour contrast", () => {
     expect(contrast(screen.getByTestId("archived-badge"))).toBeGreaterThanOrEqual(AA);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Milestone 11 -- upgrade diff, decision controls, blocked and conflict states
+// ---------------------------------------------------------------------------
+import {
+  BlockingReason,
+  ChangeTypeBadge,
+  ItemStatusBadge,
+  PlanStatusBadge,
+  ReadyMeaningNote,
+} from "@/app/(regx)/submission-dossiers/[publicId]/upgrade-badges";
+
+describe("Accessibility \u2014 upgrade badges", () => {
+  it("has no serious or critical automated violations", async () => {
+    const { container } = render(
+      <div>
+        <ChangeTypeBadge changeType="add_section" />
+        <ChangeTypeBadge changeType="retire_section" />
+        <ChangeTypeBadge changeType="conflict" />
+        <ItemStatusBadge status="blocked" />
+        <ItemStatusBadge status="accepted" />
+        <PlanStatusBadge status="ready" />
+        <BlockingReason reason="has_open_blockers" />
+        <ReadyMeaningNote />
+      </div>
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("every change type reads as text with the glyph stripped", () => {
+    const types = [
+      "add_section",
+      "retire_section",
+      "update_title",
+      "move_section",
+      "reorder_section",
+      "no_change",
+      "conflict",
+    ] as const;
+    for (const t of types) {
+      const { unmount } = render(<ChangeTypeBadge changeType={t} />);
+      const text = screen.getByTestId("change-type-badge").textContent ?? "";
+      expect(text.replace(/[+\-~\u2192\u2195=!]/g, "").trim().length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it("a blocked item explains itself in words, not a colour", () => {
+    render(
+      <div>
+        <ItemStatusBadge status="blocked" />
+        <BlockingReason reason="has_resource_links" />
+      </div>
+    );
+    expect(screen.getByTestId("item-status-badge")).toHaveTextContent(/Blocked/);
+    expect(screen.getByTestId("blocking-reason")).toHaveTextContent(/linked documents/i);
+  });
+});
+
+describe("Accessibility \u2014 upgrade badge colour contrast", () => {
+  // axe cannot resolve these pills: the background is set inline on the badge
+  // while the page ground comes from a parent, so the automated check has no
+  // pair to measure. Milestone 9 shipped two real AA failures behind exactly
+  // that silence, so the ratio is computed here rather than trusted.
+  const luminance = (hex: string) => {
+    const v = (i: number) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * v(1) + 0.7152 * v(3) + 0.0722 * v(5);
+  };
+  const toHex = (rgb: string) => {
+    const m = rgb.match(/\d+/g);
+    if (!m) return rgb;
+    return "#" + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+  };
+  const contrast = (el: HTMLElement) => {
+    const s = getComputedStyle(el);
+    const a = luminance(toHex(s.color));
+    const b = luminance(toHex(s.backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const AA = 4.5;
+
+  it.each([
+    "add_section",
+    "retire_section",
+    "update_title",
+    "move_section",
+    "reorder_section",
+    "no_change",
+    "conflict",
+  ] as const)("change badge %s meets WCAG AA", (t) => {
+    render(<ChangeTypeBadge changeType={t} />);
+    expect(contrast(screen.getByTestId("change-type-badge"))).toBeGreaterThanOrEqual(AA);
+  });
+
+  it.each(["proposed", "accepted", "rejected", "blocked", "applied"] as const)(
+    "item status badge %s meets WCAG AA",
+    (s) => {
+      render(<ItemStatusBadge status={s} />);
+      expect(contrast(screen.getByTestId("item-status-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it.each(["draft", "ready", "applied", "cancelled"] as const)(
+    "plan status badge %s meets WCAG AA",
+    (s) => {
+      render(<PlanStatusBadge status={s} />);
+      expect(contrast(screen.getByTestId("plan-status-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+});

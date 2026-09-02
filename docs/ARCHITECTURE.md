@@ -22,6 +22,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `regulatory_cases` | Case workspace composing workflows, documents and checklists into one governed folder. Owns no content and duplicates no engine ([`REGULATORY_CASES.md`](REGULATORY_CASES.md)) |
 | `submission_dossiers` | Ordered, nested section outline inside a case, with blockers and derived internal readiness. Owns structure only; no content, no approval engine ([`SUBMISSION_DOSSIERS.md`](SUBMISSION_DOSSIERS.md)) |
 | `dossier_blueprints` | Reusable, versioned tenant-controlled dossier outlines, and the governed record of which dossier was stamped from which version. Defines structure; owns no execution ([`DOSSIER_BLUEPRINTS.md`](DOSSIER_BLUEPRINTS.md)) |
+| `dossier_upgrades` | Blueprint-to-blueprint change impact, and the only sanctioned path for moving an existing dossier onto a newer version. Proposes; never applies on its own ([`DOSSIER_UPGRADES.md`](DOSSIER_UPGRADES.md)) |
 
 ## Key invariants
 
@@ -34,6 +35,10 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 - READY and COMPLETED are internal states only. Neither asserts regulatory compliance, agency approval, or submission acceptance.
 - A blueprint version ACTIVE means only that it is available for creating dossiers inside RegX. It is not a regulatory, QA or agency approval, and there is deliberately no APPROVED state in `dossier_blueprints`.
 - An instantiated dossier is a snapshot, never a live view of its blueprint. Publishing a later blueprint version cannot change a dossier already built from an earlier one.
+- A dossier moves onto a newer blueprint version only when a person generates a plan, reviews it, and applies it. Generating is not applying, accepting an item is not applying, and a READY plan is an internal review state, not an approval of any kind.
+- An upgrade never writes a section row itself. Every dossier mutation it performs goes through `submission_dossiers.services`, so the Milestone 9 sanctioned window and its triggers apply exactly as they do to a hand-edited dossier.
+- A plan carries a structural fingerprint of the dossier it described. Apply recomputes it and fails closed: a plan that cannot prove the dossier is unchanged is never applied.
+- Provenance is append-only across versions. An upgrade records a new `DossierUpgradeApplication`; it never rewrites the `BlueprintInstantiation` that says how the dossier was originally created.
 
 ## Import dependency rules
 
@@ -58,12 +63,23 @@ submission_dossiers → regulatory_cases, tenancy, identity, authorization,
                    or an engine.
 dossier_blueprints → submission_dossiers, regulatory_cases, tenancy,
                    identity, authorization, audit, common
-                   Now the outermost layer, above submission_dossiers. It reads
+                   Above submission_dossiers. It reads
                    a case, writes dossiers and sections, and is depended on by
                    nothing. Deliberately NOT built inside templates_registry:
                    that app's APPROVED lifecycle belongs to the regulatory
                    content gate, and a tenant's dossier outline must not borrow
                    the word. See DOSSIER_BLUEPRINTS.md section 4.
+dossier_upgrades → dossier_blueprints, submission_dossiers, regulatory_cases,
+                   tenancy, identity, authorization, audit, common
+                   (+ documents, in tests only — a linked document is one of the
+                   runtime signals that blocks a retirement, so a test has to
+                   create one)
+                   Now the outermost layer, above both. It is the only module
+                   that reads a blueprint and writes an existing dossier in the
+                   same operation, and nothing depends on it, so the whole app
+                   can be removed and every dossier and blueprint still stands.
+                   Neither dossier_blueprints nor submission_dossiers may import
+                   it: a section knows nothing about being upgraded.
 documents ← never imports workflows (evidence deletion protection goes
             through DeletionProtectionRegistry, keeping it one-way)
 ```

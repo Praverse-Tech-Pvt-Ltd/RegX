@@ -2694,3 +2694,201 @@ export const dossierBlueprints = {
       { headers: { "X-Tenant-Slug": tenantSlug } }
     ),
 };
+
+
+// ===========================================================================
+// Milestone 11 -- blueprint change impact and controlled dossier upgrades
+//
+// Blueprint change is not dossier change. A plan is a proposal: generating one
+// writes nothing, accepting an item writes nothing, and only `apply` touches
+// the dossier -- with just the accepted items.
+//
+// READY means the plan has been reviewed internally and may be applied. It is
+// not a regulatory, QA or agency approval, and there is deliberately no
+// APPROVED state.
+// ===========================================================================
+export type UpgradePlanStatus = "draft" | "ready" | "applied" | "cancelled";
+
+export type UpgradeChangeType =
+  | "add_section"
+  | "retire_section"
+  | "update_title"
+  | "update_description"
+  | "update_required"
+  | "move_section"
+  | "reorder_section"
+  | "update_due_offset"
+  | "no_change"
+  | "conflict";
+
+export type UpgradeItemStatus =
+  | "proposed"
+  | "accepted"
+  | "rejected"
+  | "blocked"
+  | "applied";
+
+/**
+ * A blueprint version reference.
+ *
+ * `name` is present only when the caller independently holds
+ * `dossier_blueprints.view`; otherwise `restricted` is true and the version
+ * number is still shown. An upgrade permission is not a key to the library.
+ */
+export interface UpgradeVersionRef {
+  public_id: string;
+  version_number: number;
+  status: string;
+  name?: string;
+  restricted?: boolean;
+}
+
+export interface UpgradePlanItem {
+  public_id: string;
+  change_type: UpgradeChangeType;
+  status: UpgradeItemStatus;
+  section_code: string;
+  field_name: string;
+  before_value: string;
+  after_value: string;
+  blocking_reason: string;
+  requires_manual_review: boolean;
+  dossier_section_public_id: string | null;
+  target_section_public_id: string | null;
+  sequence: number;
+}
+
+export interface UpgradePlan {
+  public_id: string;
+  dossier_public_id: string;
+  status: UpgradePlanStatus;
+  notes: string;
+  is_stale: boolean;
+  source_version: UpgradeVersionRef | null;
+  target_version: UpgradeVersionRef | null;
+  total_items: number;
+  actionable_items: number;
+  conflict_items: number;
+  accepted_items: number;
+  rejected_items: number;
+  blocked_items: number;
+  created_by: { public_id: string; full_name: string } | null;
+  created_at: string;
+  reviewed_at: string | null;
+  applied_at: string | null;
+  cancelled_at: string | null;
+}
+
+export interface UpgradePermissions {
+  can_view: boolean;
+  can_generate: boolean;
+  can_review: boolean;
+  can_apply: boolean;
+  can_cancel: boolean;
+}
+
+export interface UpgradePlanDetail extends UpgradePlan {
+  items: UpgradePlanItem[];
+  permissions: UpgradePermissions;
+}
+
+export interface UpgradePlanList {
+  results: UpgradePlan[];
+  current_version: UpgradeVersionRef | null;
+  available_targets: UpgradeVersionRef[];
+  permissions: UpgradePermissions;
+}
+
+export interface UpgradeApplicationResult {
+  public_id: string;
+  plan_public_id: string;
+  dossier_public_id: string;
+  source_version_number: number;
+  target_version_number: number;
+  sections_added: number;
+  sections_retired: number;
+  sections_updated: number;
+  dossier_route: string;
+}
+
+export interface UpgradeHistoryEntry {
+  public_id: string;
+  plan_public_id: string;
+  source_version_number: number;
+  target_version_number: number;
+  sections_added: number;
+  sections_retired: number;
+  sections_updated: number;
+  applied_at: string;
+  applied_by: { public_id: string; full_name: string } | null;
+}
+
+export const dossierUpgrades = {
+  listForDossier: (tenantSlug: string, dossierPublicId: string) =>
+    apiRequest<UpgradePlanList>(
+      `${DOSSIER_V1}/submission-dossiers/${dossierPublicId}/upgrade-plans/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  history: (tenantSlug: string, dossierPublicId: string) =>
+    apiRequest<{ results: UpgradeHistoryEntry[] }>(
+      `${DOSSIER_V1}/submission-dossiers/${dossierPublicId}/upgrade-history/`,
+      { headers: { "X-Tenant-Slug": tenantSlug } }
+    ),
+
+  /** Read-only comparison. Writes nothing to the dossier. */
+  generate: (
+    tenantSlug: string,
+    dossierPublicId: string,
+    data: { target_blueprint_version_public_id: string; notes?: string }
+  ) =>
+    apiRequest<UpgradePlan>(
+      `${DOSSIER_V1}/submission-dossiers/${dossierPublicId}/upgrade-plans/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: data }
+    ),
+
+  get: (tenantSlug: string, planPublicId: string) =>
+    apiRequest<UpgradePlanDetail>(`${DOSSIER_V1}/dossier-upgrade-plans/${planPublicId}/`, {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  regenerate: (tenantSlug: string, planPublicId: string) =>
+    apiRequest<UpgradePlan>(
+      `${DOSSIER_V1}/dossier-upgrade-plans/${planPublicId}/regenerate/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  /** A decision, not an action. Nothing is written to the dossier. */
+  acceptItem: (tenantSlug: string, planPublicId: string, itemPublicId: string) =>
+    apiRequest<UpgradePlanItem>(
+      `${DOSSIER_V1}/dossier-upgrade-plans/${planPublicId}/items/${itemPublicId}/accept/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  rejectItem: (tenantSlug: string, planPublicId: string, itemPublicId: string) =>
+    apiRequest<UpgradePlanItem>(
+      `${DOSSIER_V1}/dossier-upgrade-plans/${planPublicId}/items/${itemPublicId}/reject/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  markReady: (tenantSlug: string, planPublicId: string) =>
+    apiRequest<UpgradePlan>(`${DOSSIER_V1}/dossier-upgrade-plans/${planPublicId}/ready/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+
+  /** The only call that changes the dossier, and only the accepted items. */
+  apply: (tenantSlug: string, planPublicId: string) =>
+    apiRequest<UpgradeApplicationResult>(
+      `${DOSSIER_V1}/dossier-upgrade-plans/${planPublicId}/apply/`,
+      { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+    ),
+
+  cancel: (tenantSlug: string, planPublicId: string) =>
+    apiRequest<UpgradePlan>(`${DOSSIER_V1}/dossier-upgrade-plans/${planPublicId}/cancel/`, {
+      method: "POST",
+      headers: { "X-Tenant-Slug": tenantSlug },
+      body: {},
+    }),
+};

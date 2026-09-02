@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "regulatory_cases",
     "submission_dossiers",
     "dossier_blueprints",
+    "dossier_upgrades",
 ]
 
 MIDDLEWARE = [

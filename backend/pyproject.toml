@@ -33,7 +33,7 @@ known-first-party = ["common", "identity", "tenancy", "authorization", "audit", 
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -81,6 +81,35 @@ name = "iig-checklist-content-is-not-imported-by-governed-domains"
 type = "forbidden"
 source_modules = ["fda_data", "formulations", "iid_assessment", "documents"]
 forbidden_modules = ["iig_checklist"]
+
+# dossier_upgrades is the outermost layer: it reads a blueprint and writes an
+# existing dossier, and nothing may depend on it. A section must not know it can
+# be upgraded, and a blueprint must not know a dossier was moved onto it --
+# otherwise "publishing a version changes no dossier" stops being structural.
+[[tool.importlinter.contracts]]
+name = "dossier-upgrades-is-the-outermost-layer"
+type = "forbidden"
+source_modules = [
+    "common",
+    "identity",
+    "tenancy",
+    "authorization",
+    "audit",
+    "workflows",
+    "documents",
+    "templates_registry",
+    "iig_checklist",
+    "regulatory_cases",
+    "submission_dossiers",
+    "dossier_blueprints",
+]
+forbidden_modules = ["dossier_upgrades"]
+
+[[tool.importlinter.contracts]]
+name = "dossier-upgrades-no-legacy-django-apps"
+type = "forbidden"
+source_modules = ["dossier_upgrades"]
+forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "regx.settings.test"

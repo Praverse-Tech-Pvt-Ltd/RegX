@@ -19,6 +19,74 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 11 — Blueprint Change Impact & Controlled Dossier Upgrade Planning
+
+**Status: IN REVIEW — STACKED ON MILESTONE 10**
+
+Branched from `a6c3e354ca79dd970db387444191d43d31d5b1ae` and **must not merge
+before Milestone 10, which must not merge before Milestone 9**. GitHub Actions
+is blocked at organisation level by a billing/spending limit; that is an
+infrastructure condition, not a code result, and no workflow file was modified
+to work around it.
+
+Milestone 10 made a dossier an independent snapshot, which is right and also
+leaves a gap: there was no way to move one onto a newer outline at all. This
+closes it — explicitly, reviewably, transactionally. **A blueprint change is
+still not a dossier change.** Publishing version 2 changes nothing. An upgrade
+happens only when a person generates a plan, reviews it item by item, and
+applies it; generating is not applying, accepting is not applying, and READY is
+an internal review state with deliberately no APPROVED anywhere in the chain.
+
+`_clone_sections` records no v1→v2 lineage, so matching is derived rather than
+stored, and each hop is backed by a constraint: a dossier section reaches its
+source through the stored `BlueprintSectionOrigin` row, and the source reaches
+the target through `section_code`, which `unique_active_blueprint_section_code`
+makes unique per version. Where that chain does not resolve it **refuses to
+guess**: a hand-added section is left alone if nothing collides, and reported as
+`CONFLICT` for manual review if something does. A changed code is a retirement
+plus an addition, not an inferred rename.
+
+Runtime work is protected rather than overwritten. A proposed retirement is
+BLOCKED if the dossier section has children, open blockers, resource links or
+recorded progress — and those facts are re-checked at apply time, not only at
+generation, because runtime changes deliberately do not stale a plan and the
+window between review and apply is the dangerous one. A manually set due date is
+never overwritten, checked the same way. Plans carry a structural fingerprint and
+apply fails closed if the dossier moved underneath them. Every section write
+goes through `submission_dossiers.services`, so the Milestone 9 sanctioned
+window and its triggers apply unchanged; this module writes no section row
+itself.
+
+Provenance is append-only across versions: an upgrade adds a
+`DossierUpgradeApplication` and never rewrites the instantiation record that
+says how the dossier was originally created. `UpgradeSectionOrigin` exists
+because M10's origin INSERT guard correctly refuses a section from a later
+version.
+
+Apply re-proves the version and provenance facts under lock rather than trusting
+them from generation time, because the structural fingerprint cannot see either:
+retiring a blueprint version and advancing the provenance chain both move zero
+dossier sections. The target must still be ACTIVE and still belong to this
+tenant and blueprint, and the dossier's derived provenance must still be the
+plan's source version. `0003` puts a floor under the chain itself — a unique
+index that holds under concurrency, plus a trigger that refuses a link starting
+nowhere — with each half documented for what it does and does not enforce. This
+is the first operation to write across both governed hierarchies, so its lock
+order follows the one each already uses internally: dossier, plan, version rows
+by version_number, section. See [DOSSIER_UPGRADES.md](DOSSIER_UPGRADES.md).
+
+**No regulatory judgement of any kind.** No CTD, CEP, DMF, ANDA or agency rules;
+no regulatory impact assessment; no submission validation. Every test uses
+generic synthetic codes. Applying a plan changes only what a person accepted.
+
+`dossier_upgrades/0001` is **Class C for rollback** once any governed upgrade
+data exists: reversing it destroys plans, the review decisions recorded on their
+items, applied-upgrade history and upgrade section origins — none of it
+reconstructible, since a dossier deliberately never reads back to its blueprint.
+`0002` (six functions, seven triggers) and `0003` (one unique constraint, one
+function, one trigger) are Class A on their own terms and do not make reversing
+`0001` safe.
+
 ## Milestone 10 — Dossier Blueprint / Template Library
 
 **Status: IN REVIEW — STACKED ON MILESTONE 9**
@@ -60,8 +128,9 @@ instantiation** — not a regulatory, QA or agency approval, not a validated
 status.
 
 Template upgrades are an explicit non-goal: M10 does not apply a later version
-to an existing dossier, merge changes, or diff sections. That is a future
-milestone.
+to an existing dossier, merge changes, or diff sections. Milestone 11 adds that
+as a separate, explicitly reviewed operation — and does not weaken this
+guarantee: publishing a version still changes no dossier by itself.
 
 `dossier_blueprints/0001` is **Class C for rollback** once any governed blueprint
 or instantiation data exists: reversing it destroys blueprint identity, version
@@ -411,12 +480,14 @@ Milestone 4A–4C and Engineering Milestone 4D are technically complete on `regx
 Engineering has since continued on tracks that do not touch the regulatory gate:
 findings F-1 to F-7 (technical readiness, all merged), Milestone 6 (workflow
 engine, merged), Milestone 7 (workflow evidence), Milestone 8 (regulatory case
-workspace, merged), Milestone 9 (submission dossier / section readiness) and
-Milestone 10 (dossier blueprint library, stacked on 9). **None of that work
+workspace, merged), Milestone 9 (submission dossier / section readiness),
+Milestone 10 (dossier blueprint library, stacked on 9) and Milestone 11
+(controlled dossier upgrade planning, stacked on 10). **None of that work
 advances the content gate**, which moves only when a named regulatory authority
 supplies a real approval. In particular, a blueprint version reading ACTIVE
-means only that RegX will let a tenant create dossiers from it. In particular, a dossier section
-reading READY is an internal readiness signal and is not, and must not be
-presented as, regulatory approval.
+means only that RegX will let a tenant create dossiers from it, an upgrade plan
+reading READY means only that it has been reviewed inside RegX and may be
+applied, and a dossier section reading READY is an internal readiness signal.
+None of the three is, or may be presented as, regulatory approval.
 
 Milestones 5B–5D are **not scoped**. 5A deliberately records no detailed requirements for them; each needs its own discovery. Capability areas such as ANDA/DMF scoring, regulatory AI, report generation and Word integration remain unscoped as engineering milestones.
