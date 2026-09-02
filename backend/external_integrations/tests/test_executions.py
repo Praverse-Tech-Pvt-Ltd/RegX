@@ -896,3 +896,33 @@ class TestServiceLevelTenantGate:
                 actor=admin_a,
                 test_status=TestStatus.REACHABLE,
             )
+
+
+@pytest.mark.django_db
+class TestExecutionDispatchWaitsForCommit:
+    """The connector execution is queued on commit, not before.
+
+    A worker that claimed an execution row this request had not committed would
+    find nothing and return silently, leaving a QUEUED execution nobody ever
+    runs. `create_execution` closes its own transaction, so this is ordinarily
+    immediate; it matters if the view is ever called inside one, and a mutation
+    removing it turned nothing red until this test existed.
+    """
+
+    def test_the_task_is_registered_as_an_on_commit_callback(
+        self,
+        client_admin_a,
+        active_connector,
+        connector_secret,
+        fake_remote,
+        django_capture_on_commit_callbacks,
+    ):
+        with django_capture_on_commit_callbacks(execute=True) as callbacks:
+            response = client_admin_a.post(
+                f"{INTEGRATIONS_API}/{active_connector.public_id}/executions/",
+                _import_body(),
+                format="json",
+            )
+
+        assert response.status_code == 201, response.data
+        assert len(callbacks) >= 1, "the execution was dispatched inline instead of on commit"

@@ -745,13 +745,38 @@ def attention_rows(*, tenant, visibility: Visibility) -> tuple[list[dict], bool]
     today = _today()
     soon = today + timedelta(days=DISPLAY_DUE_SOON_DAYS)
 
-    def add(source_rows) -> None:
+    def add(source, build) -> None:
+        """Slice in SQL, then build only what survived the slice.
+
+        `source` is a queryset, deliberately: slicing one emits `LIMIT`, so
+        the database returns at most the cap plus one row. Handing this an
+        already-built list -- which is what it used to receive -- bounds the
+        output and nothing else, so a tenant with twelve hundred candidate
+        sections fetched twelve hundred rows and allocated twelve hundred
+        dicts in order to display five hundred.
+
+        The one extra row is how truncation is detected: asking for one more
+        than the cap separates "exactly at the cap" from "more than we will
+        show" without a second COUNT.
+        """
         nonlocal truncated
-        materialised = list(source_rows[: ATTENTION_SCAN_LIMIT + 1])
+        materialised = list(source[: ATTENTION_SCAN_LIMIT + 1])
         if len(materialised) > ATTENTION_SCAN_LIMIT:
             truncated = True
             materialised = materialised[:ATTENTION_SCAN_LIMIT]
-        rows.extend(materialised)
+        rows.extend(build(obj) for obj in materialised)
+
+    def add_prebuilt(built_rows, was_truncated) -> None:
+        """For a branch that had to bound itself.
+
+        Only the upgrade-plan branch uses this, because whether a plan is
+        *stale* is a comparison against the dossier's current fingerprint
+        rather than a column, so it cannot be a filter. That branch bounds
+        its candidates in SQL and reports what it did.
+        """
+        nonlocal truncated
+        rows.extend(built_rows)
+        truncated = truncated or was_truncated
 
     if visibility.allows(MODULE_DOSSIERS):
         base = (
@@ -762,32 +787,30 @@ def attention_rows(*, tenant, visibility: Visibility) -> tuple[list[dict], bool]
 
         blocked = base.filter(status=SectionStatus.BLOCKED)
         add(
-            [_section_row(s, AttentionReason.REQUIRED_SECTION_BLOCKED, visibility) for s in blocked]
+            blocked,
+            lambda s: _section_row(s, AttentionReason.REQUIRED_SECTION_BLOCKED, visibility),
         )
 
         overdue = base.filter(due_date__lt=today).exclude(
             Q(readiness=Readiness.READY) | Q(status=SectionStatus.BLOCKED)
         )
         add(
-            [_section_row(s, AttentionReason.OVERDUE_REQUIRED_SECTION, visibility) for s in overdue]
+            overdue,
+            lambda s: _section_row(s, AttentionReason.OVERDUE_REQUIRED_SECTION, visibility),
         )
 
         due_soon = base.filter(due_date__gte=today, due_date__lte=soon).exclude(
             Q(readiness=Readiness.READY) | Q(status=SectionStatus.BLOCKED)
         )
         add(
-            [
-                _section_row(s, AttentionReason.DUE_SOON_REQUIRED_SECTION, visibility)
-                for s in due_soon
-            ]
+            due_soon,
+            lambda s: _section_row(s, AttentionReason.DUE_SOON_REQUIRED_SECTION, visibility),
         )
 
         not_started = base.filter(status=SectionStatus.NOT_STARTED, due_date__isnull=True)
         add(
-            [
-                _section_row(s, AttentionReason.REQUIRED_SECTION_NOT_STARTED, visibility)
-                for s in not_started
-            ]
+            not_started,
+            lambda s: _section_row(s, AttentionReason.REQUIRED_SECTION_NOT_STARTED, visibility),
         )
 
         blockered = (
@@ -796,13 +819,13 @@ def attention_rows(*, tenant, visibility: Visibility) -> tuple[list[dict], bool]
             .exclude(section__dossier__status__in=TERMINAL_DOSSIER_STATUSES)
             .order_by("-created_at", "-id")
         )
-        add([_blocker_row(b, visibility) for b in blockered])
+        add(blockered, lambda b: _blocker_row(b, visibility))
 
     if visibility.allows(MODULE_WORKFLOWS):
-        add(_workflow_rows(tenant, visibility))
+        add(_workflow_source(tenant), lambda item: _workflow_row(item, visibility))
 
     if visibility.allows(MODULE_UPGRADES):
-        add(_upgrade_plan_rows(tenant, visibility))
+        add_prebuilt(*_upgrade_plan_rows(tenant, visibility))
 
     if visibility.allows(MODULE_CASES):
         from regulatory_cases.models import CaseStatus
@@ -814,45 +837,33 @@ def attention_rows(*, tenant, visibility: Visibility) -> tuple[list[dict], bool]
             .filter(n=0)
             .order_by("-updated_at", "-id")
         )
-        add(
-            [
-                {
-                    "reason_code": AttentionReason.CASE_WITH_NO_DOSSIER,
-                    "severity": REASON_SEVERITY[AttentionReason.CASE_WITH_NO_DOSSIER],
-                    "resource_type": "regulatory_case",
-                    "resource_public_id": c.public_id,
-                    "resource_label": c.case_number,
-                    "case_public_id": c.public_id,
-                    "dossier_public_id": None,
-                    "due_date": c.target_date,
-                    "operational_state": c.status,
-                    "_sort_updated_desc": -c.updated_at.timestamp(),
-                }
-                for c in empty_cases
-            ]
-        )
+        add(empty_cases, lambda c: _case_row(c, AttentionReason.CASE_WITH_NO_DOSSIER))
 
         on_hold = _cases(tenant).filter(status=CaseStatus.ON_HOLD).order_by("-updated_at", "-id")
-        add(
-            [
-                {
-                    "reason_code": AttentionReason.DOSSIER_ON_HOLD,
-                    "severity": REASON_SEVERITY[AttentionReason.DOSSIER_ON_HOLD],
-                    "resource_type": "regulatory_case",
-                    "resource_public_id": c.public_id,
-                    "resource_label": c.case_number,
-                    "case_public_id": c.public_id,
-                    "dossier_public_id": None,
-                    "due_date": c.target_date,
-                    "operational_state": c.status,
-                    "_sort_updated_desc": -c.updated_at.timestamp(),
-                }
-                for c in on_hold
-            ]
-        )
+        add(on_hold, lambda c: _case_row(c, AttentionReason.DOSSIER_ON_HOLD))
 
     rows.sort(key=sort_key)
     return rows, truncated
+
+
+def _case_row(case, reason) -> dict:
+    """A case-level attention row.
+
+    Extracted from two identical inline literals so the scan can build rows
+    one at a time, for objects that survived the cap.
+    """
+    return {
+        "reason_code": reason,
+        "severity": REASON_SEVERITY[reason],
+        "resource_type": "regulatory_case",
+        "resource_public_id": case.public_id,
+        "resource_label": case.case_number,
+        "case_public_id": case.public_id,
+        "dossier_public_id": None,
+        "due_date": case.target_date,
+        "operational_state": case.status,
+        "_sort_updated_desc": -case.updated_at.timestamp(),
+    }
 
 
 def _section_row(section, reason, visibility) -> dict:
@@ -894,10 +905,11 @@ def _blocker_row(blocker, visibility) -> dict:
     }
 
 
-def _workflow_rows(tenant, visibility) -> list[dict]:
+def _workflow_source(tenant):
+    """The candidate queryset, unsliced. `add` applies the cap in SQL."""
     from workflows.models import WorkflowItem
 
-    items = WorkflowItem.objects.filter(
+    return WorkflowItem.objects.filter(
         tenant=tenant,
         state__in=[
             WorkflowItem.State.REJECTED,
@@ -906,34 +918,46 @@ def _workflow_rows(tenant, visibility) -> list[dict]:
         ],
     ).order_by("-updated_at", "-id")
 
-    rows = []
-    for item in items:
-        reason = (
-            AttentionReason.WORKFLOW_REJECTED
-            if item.state == WorkflowItem.State.REJECTED
-            else AttentionReason.WORKFLOW_WAITING_REVIEW
-        )
-        rows.append(
-            {
-                "reason_code": reason,
-                "severity": REASON_SEVERITY[reason],
-                "resource_type": "workflow_item",
-                "resource_public_id": item.public_id,
-                "resource_label": item.title,
-                "case_public_id": None,
-                "dossier_public_id": None,
-                "due_date": item.due_at.date() if item.due_at else None,
-                "operational_state": item.state,
-                "_sort_updated_desc": -item.updated_at.timestamp(),
-            }
-        )
-    return rows
+
+def _workflow_row(item, visibility) -> dict:
+    from workflows.models import WorkflowItem
+
+    reason = (
+        AttentionReason.WORKFLOW_REJECTED
+        if item.state == WorkflowItem.State.REJECTED
+        else AttentionReason.WORKFLOW_WAITING_REVIEW
+    )
+    return {
+        "reason_code": reason,
+        "severity": REASON_SEVERITY[reason],
+        "resource_type": "workflow_item",
+        "resource_public_id": item.public_id,
+        "resource_label": item.title,
+        "case_public_id": None,
+        "dossier_public_id": None,
+        "due_date": item.due_at.date() if item.due_at else None,
+        "operational_state": item.state,
+        "_sort_updated_desc": -item.updated_at.timestamp(),
+    }
 
 
-def _upgrade_plan_rows(tenant, visibility) -> list[dict]:
+def _upgrade_plan_rows(tenant, visibility) -> tuple[list[dict], bool]:
+    """Bounded candidates, then the staleness comparison over that bound.
+
+    Whether a plan is stale is `plan.dossier_fingerprint` against the
+    dossier's current fingerprint -- a comparison, not a column, so it cannot
+    be pushed into the filter. The candidate set is therefore capped in SQL
+    first and the comparison runs over the capped set.
+
+    Stated rather than hidden: with more candidate plans than the cap, a
+    stale plan below the cut is not surfaced. That is the same bound every
+    other branch of the scan has, and the alternative is reading every plan
+    in the tenant to rank a list that shows at most `ATTENTION_SCAN_LIMIT`
+    rows.
+    """
     from dossier_upgrades.models import DossierUpgradePlan, ItemStatus, PlanStatus
 
-    plans = list(
+    candidates = list(
         DossierUpgradePlan.objects.filter(
             tenant=tenant, status__in=[PlanStatus.DRAFT, PlanStatus.READY]
         )
@@ -945,10 +969,12 @@ def _upgrade_plan_rows(tenant, visibility) -> list[dict]:
                 )
             )
         )
-        .order_by("-updated_at", "-id")
+        .order_by("-updated_at", "-id")[: ATTENTION_SCAN_LIMIT + 1]
     )
+    truncated = len(candidates) > ATTENTION_SCAN_LIMIT
+    plans = candidates[:ATTENTION_SCAN_LIMIT]
     if not plans:
-        return []
+        return [], truncated
     fingerprints = _fingerprints_for({p.dossier_id for p in plans}, tenant)
 
     rows = []
@@ -988,7 +1014,7 @@ def _upgrade_plan_rows(tenant, visibility) -> list[dict]:
                 "_sort_updated_desc": -plan.updated_at.timestamp(),
             }
         )
-    return rows
+    return rows, truncated
 
 
 # ---------------------------------------------------------------------------

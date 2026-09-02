@@ -312,3 +312,35 @@ def make_frozen_package(tenant, actor, *, name="Transfer package"):
     )
     package = package_services.submit_for_review(package=package, tenant=tenant, actor=actor)
     return package_services.freeze_package(package=package, tenant=tenant, actor=actor)
+
+
+@pytest.fixture
+def run_queued(django_capture_on_commit_callbacks):
+    """Post a request and let its on-commit work run.
+
+    `run_connector_execution` is dispatched with `transaction.on_commit`, so the
+    row a worker needs is committed before the worker is told about it. Under a
+    non-transactional `django_db` test the surrounding transaction is rolled
+    back and the callback would never fire, so an end-to-end test would see the
+    execution queued and nothing happen.
+
+    This does what a real commit does: run the callbacks. Tests that care about
+    the deferral *itself* assert on it directly instead -- see
+    `test_execution_concurrency.py` and the dispatch tests in `documents`.
+    """
+
+    def _post(client, url, body):
+        with django_capture_on_commit_callbacks(execute=True):
+            return client.post(url, body, format="json")
+
+    return _post
+
+
+@pytest.fixture
+def queue_post(client_admin_a, run_queued):
+    """`run_queued` already bound to the tenant-admin client."""
+
+    def _post(url, body):
+        return run_queued(client_admin_a, url, body)
+
+    return _post

@@ -302,7 +302,9 @@ class DocumentVersionListCreateView(APIView):
             ip_address=request.META.get("REMOTE_ADDR"),
         )
 
-        scan_document_version.delay(version.pk, tenant.pk)
+        # On commit, for the same reason as `documents.ingest`: the worker must
+        # not be able to reach a row this request has not committed.
+        transaction.on_commit(lambda: scan_document_version.delay(version.pk, tenant.pk))
 
         return Response(DocumentVersionSerializer(version).data, status=status.HTTP_201_CREATED)
 

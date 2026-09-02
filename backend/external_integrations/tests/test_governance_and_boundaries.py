@@ -290,19 +290,29 @@ class TestMigrations:
 @pytest.mark.django_db
 class TestAudit:
     def test_the_lifecycle_is_audited(
-        self, client_admin_a, tenant_a, admin_a, active_connector, connector_secret, fake_remote
+        self,
+        client_admin_a,
+        tenant_a,
+        admin_a,
+        active_connector,
+        connector_secret,
+        fake_remote,
+        django_capture_on_commit_callbacks,
     ):
         from audit.models import AuditEvent
 
         package = make_frozen_package(tenant_a, admin_a)
-        client_admin_a.post(
-            f"{INTEGRATIONS_API}/{active_connector.public_id}/executions/",
-            {
-                "operation": "push_frozen_package",
-                "payload": {"package_public_id": str(package.public_id)},
-            },
-            format="json",
-        )
+        # The execution task is dispatched on commit, so the deferred work has
+        # to be run for the started/succeeded events to exist at all.
+        with django_capture_on_commit_callbacks(execute=True):
+            client_admin_a.post(
+                f"{INTEGRATIONS_API}/{active_connector.public_id}/executions/",
+                {
+                    "operation": "push_frozen_package",
+                    "payload": {"package_public_id": str(package.public_id)},
+                },
+                format="json",
+            )
         events = set(
             AuditEvent.objects.filter(resource_type="external_integration").values_list(
                 "event_type", flat=True
