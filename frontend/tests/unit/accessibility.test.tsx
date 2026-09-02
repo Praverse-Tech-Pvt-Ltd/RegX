@@ -1172,3 +1172,93 @@ describe("Accessibility \u2014 submission package colour contrast", () => {
     expect(contrast(screen.getByTestId("scan-status-badge"))).toBeGreaterThanOrEqual(AA);
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// Milestone 14 -- connector, test and execution badges; the connector form
+// ---------------------------------------------------------------------------
+import {
+  ConnectorStatusBadge,
+  EnabledMeansNote,
+  ExecutionStatusBadge,
+  TestStatusBadge,
+  errorLabel,
+} from "@/app/(regx)/external-integrations/integration-primitives";
+
+describe("Accessibility — external integration badges", () => {
+  const luminance = (hex: string) => {
+    const v = (i: number) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * v(1) + 0.7152 * v(3) + 0.0722 * v(5);
+  };
+  const toHex = (rgb: string) => {
+    const m = rgb.match(/\d+/g);
+    if (!m) return rgb;
+    return "#" + m.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("");
+  };
+  const contrast = (el: HTMLElement) => {
+    const s = getComputedStyle(el);
+    const a = luminance(toHex(s.color));
+    const b = luminance(toHex(s.backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
+  const AA = 4.5;
+
+  it.each(["draft", "active", "disabled", "archived"] as const)(
+    "connector status badge %s meets WCAG AA",
+    (status) => {
+      render(<ConnectorStatusBadge status={status} />);
+      expect(contrast(screen.getByTestId("connector-status-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it.each(["never_tested", "reachable", "unreachable", "unauthorised"] as const)(
+    "connection test badge %s meets WCAG AA",
+    (status) => {
+      render(<TestStatusBadge status={status} />);
+      expect(contrast(screen.getByTestId("connector-test-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it.each(["queued", "running", "succeeded", "failed", "cancelled"] as const)(
+    "execution status badge %s meets WCAG AA",
+    (status) => {
+      render(<ExecutionStatusBadge status={status} />);
+      expect(contrast(screen.getByTestId("execution-status-badge"))).toBeGreaterThanOrEqual(AA);
+    }
+  );
+
+  it.each(["draft", "active", "disabled", "archived"] as const)(
+    "connector status %s is never conveyed by colour alone",
+    (status) => {
+      render(<ConnectorStatusBadge status={status} />);
+      // A word, not just a swatch: colour perception is not a prerequisite.
+      expect(screen.getByTestId("connector-status-badge").textContent?.trim()).toBeTruthy();
+    }
+  );
+
+  it.each(["queued", "running", "succeeded", "failed", "cancelled"] as const)(
+    "execution status %s is never conveyed by colour alone",
+    (status) => {
+      render(<ExecutionStatusBadge status={status} />);
+      expect(screen.getByTestId("execution-status-badge").textContent?.trim()).toBeTruthy();
+    }
+  );
+
+  it("says what Enabled does and does not mean", () => {
+    render(<EnabledMeansNote />);
+    const note = screen.getByTestId("enabled-means-note").textContent ?? "";
+    expect(note).toMatch(/not approval/i);
+    expect(note).toMatch(/not a regulatory submission/i);
+  });
+
+  it("renders an enumerated failure code as a sentence, never the raw code", () => {
+    expect(errorLabel("DNS_BLOCKED")).toBe("The destination is not permitted");
+    expect(errorLabel("AUTH_FAILED")).toBe("Authentication was rejected by the endpoint");
+    // An unknown code degrades to readable text rather than shouting.
+    expect(errorLabel("SOMETHING_NEW")).toBe("something new");
+    expect(errorLabel("")).toBe("");
+  });
+});

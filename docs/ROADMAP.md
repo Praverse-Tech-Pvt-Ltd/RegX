@@ -19,6 +19,39 @@ generic UI. See [WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md).
 reversing it destroys append-only history. `workflows/0003` (the trigger) is
 Class A on its own terms and does not make reversing `0002` safe.
 
+## Milestone 14 — Controlled External Integration / Connector Framework
+
+**Status: IN REVIEW — STACKED ON MILESTONE 13**
+
+Branched from `9ebfbbae572332f2de78b7588c2bcaded7b9a0af` and **must not merge
+before Milestone 13, which must not merge before 12, 11, 10 and 9 in that
+order**. GitHub Actions remains blocked at organisation level by a
+billing/spending limit; that is an infrastructure condition, not a code
+result, and no workflow file was modified to work around it.
+
+A reusable framework for moving content between RegX and systems nobody in
+RegX controls, with two bounded operations on top of it: import a document,
+and transfer an exact frozen package. **`GENERIC_HTTPS` only** — SFTP was
+scoped and dropped rather than shipped with `AutoAddPolicy`, and vendor names
+are absent rather than stubbed.
+
+The security case is the milestone. A connector lets a tenant user cause the
+server to make an outbound request, so every destination is resolved and every
+answer classified before a socket opens, the checked address is *pinned* for
+the connection while TLS still validates the hostname, redirects are refused
+outright, and a mixed DNS answer refuses the whole destination rather than
+picking the public one. Secrets are stored as the *name* of an environment
+variable; the model has no column that could hold a value.
+
+`external_integrations/0001` is **Class C for rollback** once execution history
+exists — reversing it destroys the record that content left this deployment.
+`0002` (8 functions, 9 triggers) is Class A on its own terms and does not make
+reversing `0001` safe. See [EXTERNAL_INTEGRATIONS.md](EXTERNAL_INTEGRATIONS.md).
+
+**Not claimed:** no agency gateway, no submission, no exactly-once delivery
+unless the remote endpoint honours the idempotency key it is offered, no proof
+a remote system stored anything, and not a validated production interface.
+
 ## Milestone 13 — Controlled Submission Package Assembly & Export Manifest
 
 **Status: IN REVIEW — STACKED ON MILESTONE 12**

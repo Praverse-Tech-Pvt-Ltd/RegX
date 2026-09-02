@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "dossier_upgrades",
     "submission_operations",
     "submission_packages",
+    "external_integrations",
 ]
 
 MIDDLEWARE = [
@@ -184,6 +185,10 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
     "EXCEPTION_HANDLER": "common.exceptions.regx_exception_handler",
+    # Scoped only. No default throttle class is set, so no existing endpoint
+    # changes behaviour; the one scope below applies to queueing a connector
+    # execution, where a client loop would otherwise become outbound traffic.
+    "DEFAULT_THROTTLE_RATES": {"external_execution_create": "60/min"},
 }
 
 # ---------------------------------------------------------------------------

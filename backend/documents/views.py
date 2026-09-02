@@ -26,6 +26,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .audit_events import DocumentEvent, emit
+from .ingest import ingest_new_document
 from .models import (
     Document,
     DocumentDuplicateLink,
@@ -132,12 +133,20 @@ class DocumentListCreateView(APIView):
         filename = file_obj.name
         declared_mime = file_obj.content_type or ""
 
-        # Validate upload
+        # The pipeline lives in `ingest` so that it is the same pipeline
+        # wherever bytes come from. Milestone 14 fetches documents from external
+        # connectors and calls exactly this function; there is no second path,
+        # and therefore no "trusted source" shortcut for one of them to acquire.
         try:
-            validation_meta = validate_upload(
+            doc, _version = ingest_new_document(
+                tenant=tenant,
+                actor=request.user,
                 file_obj=file_obj,
                 filename=filename,
                 declared_mime=declared_mime,
+                title=serializer.validated_data["title"],
+                document_type=serializer.validated_data["document_type"],
+                ip_address=request.META.get("REMOTE_ADDR"),
             )
         except UploadValidationError as exc:
             emit(
@@ -152,84 +161,6 @@ class DocumentListCreateView(APIView):
                 {"code": exc.safe_code, "detail": exc.safe_message},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
-
-        sha256 = compute_sha256(file_obj)
-        storage = get_storage_backend()
-
-        with transaction.atomic():
-            doc = Document.objects.create(
-                tenant=tenant,
-                title=serializer.validated_data["title"],
-                document_type=serializer.validated_data["document_type"],
-                created_by=request.user,
-            )
-
-            # Check for duplicate within tenant (no cross-tenant info)
-            existing_duplicate = (
-                DocumentVersion.objects.for_tenant(tenant).filter(sha256_checksum=sha256).first()
-            )
-
-            storage_key = storage.store(
-                tenant_id=tenant.pk,
-                file_obj=file_obj,
-                expected_sha256=sha256,
-                content_type=validation_meta.get("detected_mime_type", declared_mime),
-                original_filename=filename,
-            )
-
-            version = DocumentVersion.objects.create(
-                document=doc,
-                version_number=1,
-                original_filename=filename,
-                normalized_filename=_normalize_filename(filename),
-                extension=validation_meta["extension"],
-                declared_mime_type=declared_mime,
-                detected_mime_type=validation_meta.get("detected_mime_type", ""),
-                size_bytes=validation_meta["size_bytes"],
-                sha256_checksum=sha256,
-                storage_key=storage_key,
-                uploaded_by=request.user,
-            )
-
-            doc.current_version = version
-            doc.save(update_fields=["current_version"])
-
-            if existing_duplicate:
-                DocumentDuplicateLink.objects.get_or_create(
-                    tenant=tenant,
-                    source_version=version,
-                    matching_version=existing_duplicate,
-                    defaults={
-                        "checksum": sha256,
-                        "relationship_type": "exact",
-                    },
-                )
-                emit(
-                    event_type=DocumentEvent.DUPLICATE_DETECTED,
-                    resource_id=str(version.public_id),
-                    tenant_id=tenant.pk,
-                    payload={"matching_version": str(existing_duplicate.public_id)},
-                )
-
-        emit(
-            event_type=DocumentEvent.DOCUMENT_CREATED,
-            resource_id=str(doc.public_id),
-            actor_id=request.user.pk,
-            actor_email=request.user.email,
-            tenant_id=tenant.pk,
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
-        emit(
-            event_type=DocumentEvent.VERSION_CREATED,
-            resource_id=str(version.public_id),
-            actor_id=request.user.pk,
-            actor_email=request.user.email,
-            tenant_id=tenant.pk,
-            payload={"version_number": 1, "document_public_id": str(doc.public_id)},
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
-
-        scan_document_version.delay(version.pk, tenant.pk)
 
         return Response(DocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
 

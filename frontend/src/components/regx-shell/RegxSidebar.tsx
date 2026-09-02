@@ -95,6 +95,12 @@ const REGX_MODULES: Item[] = [
     icon: "mdi mdi-swap-horizontal",
   },
   {
+    id: "external-integrations",
+    href: "/external-integrations",
+    label: "External Integrations",
+    icon: "mdi mdi-lan-connect",
+  },
+  {
     id: "templates",
     label: "Templates",
     icon: "mdi mdi-file-multiple-outline",
