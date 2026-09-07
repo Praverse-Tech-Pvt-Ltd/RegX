@@ -15,9 +15,14 @@ may not decide them.
 
 **None found by Milestone 16.**
 
-Every defect this milestone found was an inaccuracy in documentation or a gap in
-test coverage. None changed a runtime behaviour, and all are fixed on this
-branch — see NON-BLOCKING below for what they were.
+Six of the seven defects this milestone found were an inaccuracy in
+documentation or a gap in test coverage. The seventh was a deployment-routing
+gap that **would have been release-blocking had it shipped** — six RegX page
+prefixes were absent from the nginx configuration, so pages that worked were
+unreachable behind the reverse proxy. It is fixed and verified on this branch,
+which is why this section is empty rather than because nothing serious was
+found. None of the seven changed runtime behaviour; all are fixed here — see
+NON-BLOCKING below.
 
 That is a statement about what was validated, not a claim that the platform is
 defect-free. What was actually exercised: a zero-to-head migration on a fresh
@@ -40,6 +45,16 @@ Found and fixed on this branch.
 | 4 | `ROADMAP.md` classified `submission_packages/0001` and `0002` but not `0003` — and with it lost the **required pre-deploy operator action** | `docs/ROADMAP.md` | recorded in `MIGRATION_INVENTORY.md`, where the query now lives |
 | 5 | The runbook's migration survey described **23 migrations across 11 apps** with `RunSQL: 1`. The tree holds **44 across 17**, with 14 `RunSQL` — every one reversible | `docs/RELEASE_ROLLBACK_RUNBOOK.md` §4 | survey re-run and corrected; its conclusions were unaffected |
 | 6 | The regulatory-overclaim guard existed for three modules and **not** for `submission_dossiers`, `dossier_blueprints`, `dossier_upgrades`, `regulatory_cases` or `workflows`. All five were clean — this was a coverage gap, not an overclaim | `backend/common/tests/test_regulatory_claim_guard.py` | one cross-module guard covering all nine governed modules, plus a test that fails when a new governed app is added and not covered |
+| 7 | **Six RegX page prefixes were missing from `infra/nginx/nginx.conf`**, so `/regulatory-cases`, `/submission-dossiers`, `/dossier-blueprints`, `/submission-operations`, `/submission-packages` and `/external-integrations` fell through to the company site and answered 404 in the deployed stack. The pages themselves worked — they were reachable only on the frontend container's own port | `infra/nginx/nginx.conf` | six `location ^~` entries added; verified through nginx |
+
+**Finding 7 corrects this milestone's own report.** Milestone 16 recorded
+FRONTEND ROUTES as PASS on the strength of the route inventory and permission
+alignment, and never checked that nginx *serves* those routes. Playwright drives
+the Next.js server directly and never crosses nginx, and the container checks
+covered `/`, `/healthz`, the health endpoints and `/ratools/` — not the feature
+paths. The gap sat exactly between the two, and was found by opening the
+application rather than by any test. A comment at the nginx location block now
+says why an omission there is invisible to the suite.
 
 ### Recorded, deliberately not changed
 

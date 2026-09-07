@@ -57,8 +57,9 @@ the one carrying a data step: reverse dropped exactly its 9 triggers and its
 derived column, re-apply restored them, and no governed row moved. Class C was
 proved through the restore path, not by reversing anything destructive.
 
-**Six defects found, all fixed.** Every one was an inaccurate document or a
-missing guard; none changed runtime behaviour.
+**Seven defects found, all fixed.** Six were an inaccurate document or a missing
+guard; the seventh was a deployment-routing gap, and none changed runtime
+behaviour.
 
 `TASK_RELIABILITY.md` stated a 30s retry backoff where the task declares 60s
 (1), and still claimed all four dispatch sites defer to commit when Milestone 15
@@ -71,11 +72,16 @@ wrong, it was absent, and both now live in
 [`MIGRATION_INVENTORY.md`](MIGRATION_INVENTORY.md). The runbook's migration
 survey described 23 migrations across 11 apps; there are 44 across 17 (5). The
 regulatory-overclaim guard covered three modules and not five others, all of
-which were clean — a coverage gap, not an overclaim (6).
+which were clean — a coverage gap, not an overclaim (6). Six RegX page prefixes
+were missing from `infra/nginx/nginx.conf`, so pages that worked were
+unreachable in the deployed stack, answering 404 from the company site (7).
 
-Finding 4 was a defect in this file, and the first version of this section then
-omitted it from its own list of six: the count said six and the prose described
-five. Both are corrected here.
+Findings 4 and 7 were both defects in this milestone's own record. The first
+version of this section said six and described five. Finding 7 is worse: this
+milestone reported FRONTEND ROUTES as PASS having checked the route inventory
+and permission alignment but never that nginx serves those routes — Playwright
+drives the Next.js server directly and never crosses nginx. It was found by
+opening the application, not by any test.
 
 Two of those are now held shut by tests that read code and prose and fail when
 they disagree, because a reliability document is not executable and nothing else
