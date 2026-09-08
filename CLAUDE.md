@@ -74,8 +74,8 @@ groups; `clear_summary_checkpoint()` resets it. This module reads `OPENAI_API_KE
 
 ## Local test accounts
 
-`ra_admin` / `ra_doer` / `ra_checker` (password `Test@1234`) exist in the local
-`db.sqlite3` only. Roles matter: most tool views branch on `company_user` /
+`ra_admin` / `ra_doer` / `ra_checker` exist in the local `db.sqlite3` only; their
+password is not recorded here (use `manage.py changepassword <user>` to set one). Roles matter: most tool views branch on `company_user` /
 `company_checker` and 5 checks on `admin`, so use `ra_doer` or `ra_checker` to
 exercise the checklists. Each needs an `AssignChecker` row — several views call
 `AssignChecker.objects.get(user=...)` with no `try/except` and 500 without one.
