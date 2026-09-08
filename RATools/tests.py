@@ -480,3 +480,46 @@ class GapAnalysisHttpTests(TestCase):
         response = self.client.get("/ratools/audit-trail/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Gap Analysis Generated")
+
+
+class CheckerHasOpenReviewTests(TestCase):
+    """
+    Guard around the workflow-status lookup in the checker branch.
+
+    `statues` is None until the doer submits, and the per-level / per-user keys
+    appear only as the workflow reaches them, so the original chained lookup
+    raised TypeError/KeyError for a checker opening an unsubmitted checklist.
+    """
+
+    class _Record:
+        def __init__(self, statues):
+            self.statues = statues
+
+    class _User:
+        id = 7
+        first_name = "Asha"
+
+    def _check(self, statues, level):
+        from RATools.views import checker_has_open_review
+        return checker_has_open_review(self._Record(statues), self._User(), level)
+
+    def test_open_review_at_the_users_level_is_true(self):
+        self.assertTrue(self._check({"Checker Level 1 Status": {"7": {"Asha": "In Review"}}}, 1))
+        self.assertTrue(self._check({"Checker Level 3 Status": {"7": {"Asha": "In Review"}}}, 3))
+
+    def test_unsubmitted_checklist_has_no_statuses(self):
+        self.assertFalse(self._check(None, 1))
+        self.assertFalse(self._check({}, 1))
+
+    def test_level_not_yet_reached(self):
+        self.assertFalse(self._check({"Your Status": {}}, 1))
+
+    def test_user_is_not_a_checker_on_this_report(self):
+        # get_checker_level() returns None in that case.
+        self.assertFalse(self._check({"Checker Level 1 Status": {"7": {"Asha": "In Review"}}}, None))
+
+    def test_a_different_checker_holds_the_level(self):
+        self.assertFalse(self._check({"Checker Level 1 Status": {"9": {"Asha": "In Review"}}}, 1))
+
+    def test_already_actioned_is_not_an_open_review(self):
+        self.assertFalse(self._check({"Checker Level 1 Status": {"7": {"Asha": "Approved"}}}, 1))

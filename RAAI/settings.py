@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 
 
 
@@ -20,21 +21,41 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def env(key, default, cast=None):
+    """
+    decouple.config, but a present-but-blank value counts as unset.
+
+    .env.example ships blank placeholders (SECRET_KEY=, EMAIL_HOST_USER=, ...).
+    Plain config() returns "" for those rather than the declared default, which
+    silently produces an empty SECRET_KEY (every signing call then raises
+    ImproperlyConfigured) and an empty ALLOWED_HOSTS (every request 400s).
+    """
+    raw = config(key, default="")
+    if isinstance(raw, str) and not raw.strip():
+        return default
+    # Re-read through decouple so its cast is used: bool("False") is True,
+    # decouple's boolean cast correctly reads "False"/"0"/"no" as False.
+    return config(key, cast=cast) if cast is not None else raw
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config(
-    "SECRET_KEY",
-    default="django-insecure-@p+gqd5klb7_e&nd7cpt)hhbbb1wbuua(^h82+7mc9oijp-15m",
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", cast=bool, default=True)
+DEBUG = env("DEBUG", True, cast=bool)
 
-ALLOWED_HOSTS = config(
+# SECURITY WARNING: keep the secret key used in production secret!
+DEV_SECRET_KEY = "django-insecure-@p+gqd5klb7_e&nd7cpt)hhbbb1wbuua(^h82+7mc9oijp-15m"
+SECRET_KEY = env("SECRET_KEY", DEV_SECRET_KEY)
+if not DEBUG and SECRET_KEY == DEV_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "SECRET_KEY must be set to a real value when DEBUG is False. "
+        "Set it in the environment (Render generates one via render.yaml)."
+    )
+
+ALLOWED_HOSTS = env(
     "ALLOWED_HOSTS",
-    default="*",
+    ["*"],
     cast=lambda v: [h.strip() for h in v.split(",") if h.strip()],
 )
 
@@ -149,12 +170,12 @@ AUTH_USER_MODEL = 'AdminMaster.CustomUser'
 # EMAIL_HOST_USER = "ayushimistry03@gmail.com"
 # EMAIL_HOST_PASSWORD = "***REMOVED-SECRET***"
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = config("EMAIL_HOST", default="smtp.office365.com")
-EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool, default=True)
-EMAIL_USE_SSL = config("EMAIL_USE_SSL", cast=bool, default=False)
-EMAIL_PORT = config("EMAIL_PORT", cast=int, default=587)
-EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_HOST = env("EMAIL_HOST", "smtp.office365.com")
+EMAIL_USE_TLS = env("EMAIL_USE_TLS", True, cast=bool)
+EMAIL_USE_SSL = env("EMAIL_USE_SSL", False, cast=bool)
+EMAIL_PORT = env("EMAIL_PORT", 587, cast=int)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -162,11 +183,11 @@ CORS_ALLOW_ALL_ORIGINS = True
 # emails (rich HTML + inline logo + .ics attachment) instead of plain SMTP.
 # All blank by default; RATools/graph_email.py raises a clear error at send
 # time if these aren't configured, rather than failing at import/startup.
-AZURE_TENANT_ID = config("AZURE_TENANT_ID", default="")
-AZURE_CLIENT_ID = config("AZURE_CLIENT_ID", default="")
-AZURE_CLIENT_SECRET = config("AZURE_CLIENT_SECRET", default="")
-BOOKING_EMAIL_HOST_USER = config("BOOKING_EMAIL_HOST_USER", default="")
-BOOKING_HOST_EMAIL = config("BOOKING_HOST_EMAIL", default="inquiry@icretegy.com")
+AZURE_TENANT_ID = env("AZURE_TENANT_ID", "")
+AZURE_CLIENT_ID = env("AZURE_CLIENT_ID", "")
+AZURE_CLIENT_SECRET = env("AZURE_CLIENT_SECRET", "")
+BOOKING_EMAIL_HOST_USER = env("BOOKING_EMAIL_HOST_USER", "")
+BOOKING_HOST_EMAIL = env("BOOKING_HOST_EMAIL", "inquiry@icretegy.com")
 
 
 # Static files (CSS, JavaScript, Images)
@@ -223,6 +244,35 @@ CKEDITOR_CONFIGS = {
 # broker is required. Useful for free-tier hosting where a Redis add-on
 # isn't available; set to False (and provide CELERY_BROKER_URL) once a
 # broker is provisioned.
-CELERY_TASK_ALWAYS_EAGER = config("CELERY_TASK_ALWAYS_EAGER", cast=bool, default=True)
-CELERY_BROKER_URL = config("CELERY_BROKER_URL", default="redis://127.0.0.1:6379/0")
-CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="redis://127.0.0.1:6379/0")
+# Generating FDA 483 observation summaries calls OpenAI once per observation
+# block (~8k in the bundled workbook) and, with CELERY_TASK_ALWAYS_EAGER, does
+# it synchronously inside a page request. Opt in explicitly.
+ENABLE_OBSERVATION_SUMMARIES = env("ENABLE_OBSERVATION_SUMMARIES", False, cast=bool)
+
+CELERY_TASK_ALWAYS_EAGER = env("CELERY_TASK_ALWAYS_EAGER", True, cast=bool)
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", "redis://127.0.0.1:6379/0")
+
+
+# --- Transport / cookie security -------------------------------------------
+# Only the settings whose Django default is wrong for a production deployment.
+# Everything else Django already ships correctly (HttpOnly sessions, SameSite
+# Lax, nosniff, X-Frame-Options DENY) and is deliberately not restated here.
+#
+# SECURE_PROXY_SSL_HEADER is not optional on Render (or any TLS-terminating
+# proxy): the proxy speaks HTTPS to the client but plain HTTP to gunicorn, so
+# without it Django sees every request as insecure and SECURE_SSL_REDIRECT
+# redirects forever.
+_IN_PRODUCTION = not DEBUG
+
+SESSION_COOKIE_SECURE = env("SESSION_COOKIE_SECURE", _IN_PRODUCTION, cast=bool)
+CSRF_COOKIE_SECURE = env("CSRF_COOKIE_SECURE", _IN_PRODUCTION, cast=bool)
+SECURE_SSL_REDIRECT = env("SECURE_SSL_REDIRECT", _IN_PRODUCTION, cast=bool)
+
+if SECURE_SSL_REDIRECT:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# HSTS cannot be withdrawn early -- browsers honour max-age for its full
+# duration. Starts at 1 hour so a misconfiguration expires quickly; raise to
+# 31536000 once HTTPS is confirmed stable on the real domain.
+SECURE_HSTS_SECONDS = env("SECURE_HSTS_SECONDS", 3600 if _IN_PRODUCTION else 0, cast=int)

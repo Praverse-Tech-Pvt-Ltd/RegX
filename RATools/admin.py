@@ -56,3 +56,60 @@ admin.site.register(models.DMFCAAnswer)
 
 
 admin.site.register(models.DemoRequest)
+
+
+# Regulatory Technical Tools AI
+# RegulatoryRole had no admin registration, so there was no way to grant anyone
+# the doer/reviewer/vp role -- which left the whole review-gate flow unreachable.
+@admin.register(models.RegulatoryRole)
+class RegulatoryRoleAdmin(admin.ModelAdmin):
+    list_display = ("user", "role", "created_at")
+    list_filter = ("role",)
+    search_fields = ("user__username", "user__email")
+
+
+class _ReadOnlyModelAdmin(admin.ModelAdmin):
+    """
+    View-only admin, used here for two distinct reasons:
+
+    1. The model rejects mutation outright (RegulatoryAuditTrail,
+       RegulatoryGapAnalysisReport raise from save()/delete()), so editable
+       controls would only ever produce a ValueError.
+    2. The model must only be mutated through a path that writes an audit
+       entry (RegulatoryReviewGate). ModelAdmin.save_model() calls save()
+       directly and would leave no RegulatoryAuditTrail record, which defeats
+       the 21 CFR Part 11 trail these models exist to provide.
+    """
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+# Gates are created by RATools.gap_analysis and advanced only by
+# RATools.views.review_gate_action, which logs every transition via
+# audit.log_event(). Nothing legitimately edits one by hand, so this stays
+# view-only rather than offering an unaudited way to flip `status`.
+@admin.register(models.RegulatoryReviewGate)
+class RegulatoryReviewGateAdmin(_ReadOnlyModelAdmin):
+    list_display = ("id", "content_type", "object_id", "status", "doer", "reviewer", "vp", "version")
+    list_filter = ("status",)
+
+
+@admin.register(models.RegulatoryAuditTrail)
+class RegulatoryAuditTrailAdmin(_ReadOnlyModelAdmin):
+    list_display = ("created_at", "user", "role_at_time", "action_type", "content_type", "object_id")
+    list_filter = ("action_type",)
+    search_fields = ("user__username", "reason")
+    date_hierarchy = "created_at"
+
+
+@admin.register(models.RegulatoryGapAnalysisReport)
+class RegulatoryGapAnalysisReportAdmin(_ReadOnlyModelAdmin):
+    list_display = ("id", "source_type", "object_id", "version", "gap_count", "answered_count", "created_at")
+    list_filter = ("source_type",)

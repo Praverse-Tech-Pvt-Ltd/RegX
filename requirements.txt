@@ -12,7 +12,7 @@ django-multiselectfield==0.1.13
 django-richtextfield==1.6.2
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
-openai
+openai>=1.0,<4
 pandas
 seaborn
 matplotlib
