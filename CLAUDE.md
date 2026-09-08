@@ -14,6 +14,9 @@ Routing is clean per app in `RAAI/urls.py` (`/ratools/`, `/aidatabase/`, `/admin
 
 ## Commands
 
+**Setting up on a new machine? Follow `SETUP.md` instead of improvising** — the database
+step is easy to get wrong in a way that looks like broken code (see Database, below).
+
 ```bash
 python -m venv .venv && .venv/Scripts/activate     # Windows; repo's .claude/launch.json expects .venv/Scripts/python.exe
 pip install -r requirements.txt
@@ -37,7 +40,13 @@ Bulk data importers live in `AIDatabase/management/commands/` (`import_form_483`
 
 ## Database — read this before touching models
 
-- `settings.DATABASES` points at `db.sqlite3`, which is **gitignored**. The repo ships snapshots (`db_17_1_2.sqlite3`, `db_old.sqlite3`, `db_corrupted.sqlite3`); local dev works by copying `db_17_1_2.sqlite3` to `db.sqlite3`.
+- `settings.DATABASES` points at `db.sqlite3`, which is **gitignored**. The repo ships snapshots
+  (`db_17_1_2.sqlite3`, `db_old.sqlite3`, `db_corrupted.sqlite3`). **Do not copy a snapshot to
+  `db.sqlite3`** — all three are 24 tables and 135 columns behind the current models, so login
+  and every authenticated page fail with
+  `OperationalError: no such column: AdminMaster_customuser.subscription_end_date`.
+  Build a fresh database instead and seed the reference data: see **`SETUP.md`** (steps 5-7).
+  The snapshots remain the only source of the checklist question banks, so keep them.
 - **Only `RATools` has migrations** (`0001_initial`, `0002_regulatorygapanalysisreport`). `AdminMaster/migrations/` and `AIDatabase/migrations/` are gitignored and absent — those apps' tables exist only in the sqlite snapshot. Their schema has drifted from `models.py`; generating fresh migrations against the snapshot has previously failed on a FK mismatch.
 - Consequence: any new model needs a migration, and it must be verified against the real snapshot DB, not just a fresh one. Do not run `makemigrations` for `AdminMaster`/`AIDatabase` casually.
 
