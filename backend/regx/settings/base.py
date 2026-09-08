@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "common",
     "documents",
     "templates_registry",
+    "deficiencies",
     "fda_data",
     "formulations",
     "iid_assessment",

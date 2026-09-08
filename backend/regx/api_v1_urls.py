@@ -10,6 +10,7 @@ urlpatterns = [
     path("mfa/", include("identity.mfa_urls")),
     path("documents/", include("documents.urls")),
     path("", include("templates_registry.urls")),
+    path("", include("deficiencies.urls")),
     path("", include("fda_data.urls")),
     path("", include("formulations.urls")),
     path("", include("iid_assessment.urls")),
