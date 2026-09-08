@@ -125,3 +125,6 @@ Thumbs.db
 # Visual-review captures from e2e/screenshots.spec.ts -- regenerated on demand,
 # not source.
 frontend/screenshots/
+
+# Client contract documents — not for the repo
+SOW - Praverse*.pdf
