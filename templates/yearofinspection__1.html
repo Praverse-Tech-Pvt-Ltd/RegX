@@ -2356,7 +2356,7 @@ function getCSRFToken() {
       requestBody.end_month_year = endMonthYear;
     }
 
-    const fetchPromise = fetch('{{BASE_URL}}/aidatabase/company_object/', {
+    const fetchPromise = fetch('{{ base_url }}/aidatabase/company_object/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

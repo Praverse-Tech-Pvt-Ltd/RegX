@@ -4,9 +4,32 @@ from .models import *
 from django import forms
 from django import forms
 from django_filters import DateFilter
+import logging
 import openai
 import json
 import re
+
+logger = logging.getLogger(__name__)
+
+_openai_client = None
+
+
+def _get_openai_client():
+    """
+    Lazily build an openai>=1.0 client.
+
+    The module-level openai.api_key assignment below is the legacy (<1.0) way
+    of configuring the SDK and does nothing for the current client; read it
+    here so the configured key is still honoured without changing where the
+    key comes from.
+    """
+    global _openai_client
+    if _openai_client is None:
+        api_key = getattr(openai, "api_key", None)
+        if not api_key:
+            return None
+        _openai_client = openai.OpenAI(api_key=api_key)
+    return _openai_client
 
 # openai.api_key = "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"
 # openai.api_key = "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"
@@ -38,7 +61,12 @@ def get_synonyms_from_chatgpt(query):
             """
 
     try:
-        response = openai.ChatCompletion.create(
+        client = _get_openai_client()
+        if client is None:
+            logger.warning("OpenAI API key is not configured; skipping synonym expansion.")
+            return [], [], [], [], [], []
+
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=150,
@@ -85,10 +113,8 @@ def get_synonyms_from_chatgpt(query):
             # print("No JSON object found in response")
             return [],[],[],[],[],[]
 
-    except Exception as e:
-        # print("Exception.....")
-        print(f"Error in getting synonyms: {str(e)}")
-        # print(f"Full response content: {content if 'content' in locals() else 'No content'}")
+    except Exception:
+        logger.exception("Failed to expand search query via OpenAI; falling back to literal search.")
         return [],[],[],[],[],[]
 
 # class ANDAFilter(django_filters.FilterSet):
@@ -928,12 +954,16 @@ class Form483Filter(django_filters.FilterSet):
         if not value:
             return queryset
 
-        # Get synonyms and related terms from ChatGPT
-        search_terms = get_synonyms_from_chatgpt(value)
+        # get_synonyms_from_chatgpt returns six lists; only the first (keywords
+        # + synonyms + related terms) applies to observation content.
+        search_terms, *_ = get_synonyms_from_chatgpt(value)
 
-        # Create Q objects for each search term
+        # Always include the literal query, and fall back to it alone when the
+        # expansion is unavailable -- an empty Q() would match every row.
+        terms = [value] + [t for t in search_terms if t]
+
         q_objects = Q()
-        for term in search_terms:
+        for term in terms:
             q_objects |= Q(form483system__form483observation__form483obeservationcontent__content__icontains=term)
 
         # Return filtered queryset with distinct results

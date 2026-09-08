@@ -151,3 +151,6 @@ GitHub.sublime-settings
 !.vscode/launch.json
 !.vscode/extensions.json
 .historystaticfiles/
+
+# Generated GPT-input audit exports
+gpt_input_data*.xlsx

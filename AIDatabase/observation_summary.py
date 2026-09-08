@@ -43,6 +43,35 @@ SUMMARY_MAX_COMPLETION_TOKENS = 2000
 SUMMARY_MAX_ATTEMPTS = 3
 SUMMARY_RETRY_DELAY_SECONDS = 1
 
+SUMMARY_SYSTEM_PROMPT = (
+    "You are an expert FDA GMP compliance summarizer specializing in FDA 483 observations.\n"
+    "STRICT RULES:\n"
+    "1. Use ONLY the provided text.\n"
+    "2. DO NOT add assumptions, interpretations, or external information.\n"
+    "3. Preserve critical regulatory terminology exactly as written whenever important.\n"
+    "4. Retain key factual evidence, examples, systems, process names, counts, years, and operational failures when they are important to understanding the observation.\n"
+    "5. Clearly describe what failed, where it failed, and why it is a GMP/compliance risk.\n"
+    "6. Keep important data integrity, contamination, documentation, validation, and procedural control issues.\n"
+    "7. Remove only repetitive wording and unnecessary background, but preserve important examples, counts, years, systems, SOP references, and factual evidence supporting the observation.\n"
+    "8. Write in concise FDA/regulatory language suitable for audit and CAPA review.\n"
+    "9. Keep the summary fact-based, precise, and traceable to the original observation.\n"
+    "10. Output one concise paragraph with meaningful compliance detail.\n"
+    "11. Keep the summary BETWEEN 20% AND 35% of the original word count.\n"
+    "12. Prefer completeness of critical compliance details over excessive shortening.\n"
+    "13. Preserve important numerical details, years, counts, examples, and documented evidence whenever they support the compliance concern.\n"
+    )
+
+SUMMARY_USER_PROMPT_TEMPLATE = (
+    "Summarize the following FDA observation.\n"
+    "Original length: {original_words} words.\n"
+    "Required summary length: {min_words}-{max_words} words.\n"
+    "Target length: about {target_words} words.\n"
+    "Hard limit: do not exceed {max_words} words.\n\n"
+    "{prepared_text}"
+    )
+
+
+
 # --- Checkpoint / Resume ---
 # Summaries are written here immediately after generation so that if the
 # process is interrupted the already-completed work is not lost.
@@ -296,32 +325,14 @@ def generate_summary(text):
         return None
 
     word_limits = _build_summary_word_limits(prepared_text)
-    system_prompt = (
-        "You are an expert FDA GMP compliance summarizer specializing in FDA 483 observations.\n"
-        "STRICT RULES:\n"
-        "1. Use ONLY the provided text.\n"
-        "2. DO NOT add assumptions, interpretations, or external information.\n"
-        "3. Preserve critical regulatory terminology exactly as written whenever important.\n"
-        "4. Retain key factual evidence, examples, systems, process names, counts, years, and operational failures when they are important to understanding the observation.\n"
-        "5. Clearly describe what failed, where it failed, and why it is a GMP/compliance risk.\n"
-        "6. Keep important data integrity, contamination, documentation, validation, and procedural control issues.\n"
-        "7. Remove only repetitive wording and unnecessary background, but preserve important examples, counts, years, systems, SOP references, and factual evidence supporting the observation.\n"
-        "8. Write in concise FDA/regulatory language suitable for audit and CAPA review.\n"
-        "9. Keep the summary fact-based, precise, and traceable to the original observation.\n"
-        "10. Output one concise paragraph with meaningful compliance detail.\n"
-        "11. Keep the summary BETWEEN 20% AND 35% of the original word count.\n"
-        "12. Prefer completeness of critical compliance details over excessive shortening.\n"
-        "13. Preserve important numerical details, years, counts, examples, and documented evidence whenever they support the compliance concern.\n"
-        )
-    user_prompt = (
-        f"Summarize the following FDA observation.\n"
-        f"Original length: {word_limits['original_words']} words.\n"
-        f"Required summary length: {word_limits['min_words']}-{word_limits['max_words']} words.\n"
-        f"Target length: about {word_limits['target_words']} words.\n"
-        f"Hard limit: do not exceed {word_limits['max_words']} words.\n\n"
-        f"{prepared_text}"
+    system_prompt = SUMMARY_SYSTEM_PROMPT
+    user_prompt = SUMMARY_USER_PROMPT_TEMPLATE.format(
+        original_words=word_limits["original_words"],
+        min_words=word_limits["min_words"],
+        max_words=word_limits["max_words"],
+        target_words=word_limits["target_words"],
+        prepared_text=prepared_text,
     )
-
     for attempt in range(1, SUMMARY_MAX_ATTEMPTS + 1):
         try:
             client = _get_openai_client()
@@ -392,6 +403,17 @@ def process_observation_summary(df, previous_df=None):
     df = df.copy()
     if SUMMARY_COLUMN not in df.columns:
         df[SUMMARY_COLUMN] = None
+
+    # Refreshing the Excel cache reaches here on an ordinary page view, and any
+    # block without a summary costs one OpenAI call -- ~8k blocks in the bundled
+    # workbook. Off by default so nothing bills unattended; summaries already
+    # present in the sheet are still read and served either way.
+    if not getattr(settings, "ENABLE_OBSERVATION_SUMMARIES", False):
+        logger.info(
+            "[SUMMARY] ENABLE_OBSERVATION_SUMMARIES is off; serving existing "
+            "summaries without generating new ones."
+        )
+        return df
 
     generated_count, skipped_count, failed_count = 0, 0, 0
 
