@@ -108,6 +108,19 @@ def module_view(request):
         parent_path = path.rsplit("/", 1)[0] if "/" in path else ""
 
     files = []
+    # The module library lives under MEDIA_ROOT/Module_Simplification, which is
+    # content rather than code and is absent from a fresh checkout. os.listdir
+    # on a missing directory raises FileNotFoundError, which took the whole page
+    # down with a 500 -- a missing library should render as an empty library.
+    if not os.path.isdir(current_path):
+        return render(request, "RATools/Module.html", {
+            "files": [],
+            "path": path,
+            "parent_path": parent_path,
+            "first_folder": first_folder,
+            "library_missing": True,
+        })
+
     items = sorted(
     os.listdir(current_path),
     key=lambda x: (
@@ -524,6 +537,12 @@ def show_anda_microsphere_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -699,6 +718,11 @@ def show_anda_microsphere_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Rest of your existing view code for GET requests
     questions = ANDAReportQuestions.objects.filter(
@@ -908,6 +932,12 @@ def show_anda_liposome_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -1083,6 +1113,11 @@ def show_anda_liposome_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Rest of your existing view code for GET requests
     questions = ANDAReportQuestions.objects.filter(
@@ -1292,6 +1327,12 @@ def show_anda_mdi_and_dpi_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -1467,6 +1508,11 @@ def show_anda_mdi_and_dpi_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Rest of your existing view code for GET requests
     questions = ANDAReportQuestions.objects.filter(
@@ -1677,6 +1723,12 @@ def show_anda_nasalspray_inhalation_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -1839,6 +1891,11 @@ def show_anda_nasalspray_inhalation_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     questions = ANDAReportQuestions.objects.filter(
         report_name="Nasal Spray  & Inhalation Dosage"
@@ -2046,6 +2103,12 @@ def show_anda_parenteral_dosage_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -2208,6 +2271,11 @@ def show_anda_parenteral_dosage_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
 
     questions = ANDAReportQuestions.objects.filter(
@@ -2413,6 +2481,12 @@ def show_anda_transdermal_dosage_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -2578,6 +2652,11 @@ def show_anda_transdermal_dosage_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     questions = ANDAReportQuestions.objects.filter(report_name="Transdermal")
 
@@ -2779,6 +2858,12 @@ def show_anda_general_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -2950,6 +3035,11 @@ def show_anda_general_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     questions = ANDAReportQuestions.objects.filter(report_name="General ANDA")
 
@@ -3156,6 +3246,12 @@ def show_anda_ophthalmic_dosage_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -3318,6 +3414,11 @@ def show_anda_ophthalmic_dosage_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     questions = ANDAReportQuestions.objects.filter(
         report_name="Ophthalmic Dosage"
@@ -3520,6 +3621,12 @@ def show_anda_semi_solid_topical_dosage_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -3682,6 +3789,11 @@ def show_anda_semi_solid_topical_dosage_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
 
     questions = ANDAReportQuestions.objects.filter(
@@ -3887,6 +3999,12 @@ def show_anda_solid_oral_dosage_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ANDAUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ANDAForm(
@@ -4050,6 +4168,11 @@ def show_anda_solid_oral_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Rest of your existing view code for GET requests
     questions = ANDAReportQuestions.objects.filter(
@@ -4722,6 +4845,11 @@ def show_dmf_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
     # --------------------------------
 
     dmf_ca_answers = {}
@@ -4940,6 +5068,12 @@ def show_dmf_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = DMFChecklistUser.objects.all()
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         context = {
@@ -5379,6 +5513,11 @@ def show_iig_proportionality_clearance_report(request, id):
             return redirect(back_to_list)
 
         flag = checklist.statues.get(f"Checker Level {current_level} Status", {}).get(str(user.id), {}).get(user.first_name) == "In Review"
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     multi_data = IIGTableRowsAnswers.objects.filter(static_rel=static_data).prefetch_related('snapshots')
     static_snapshots = IIGAnswerSnapshot.objects.filter(iig_answer=static_data)
@@ -5775,6 +5914,12 @@ def show_iig_liposome(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -5931,6 +6076,12 @@ def show_iig_microsphere(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
 
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
@@ -6085,6 +6236,12 @@ def show_iig_dpi(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -6239,6 +6396,12 @@ def show_iig_inhalation_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -6391,6 +6554,12 @@ def show_iig_liquidoral_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -6543,6 +6712,12 @@ def show_iig_injection_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -6695,6 +6870,12 @@ def show_iig_mdi_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -6847,6 +7028,12 @@ def show_iig_semisolid_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -7000,6 +7187,12 @@ def show_iig_nasal_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -7152,6 +7345,12 @@ def show_iig_tablet_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -7304,6 +7503,12 @@ def show_iig_topical_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -7456,6 +7661,12 @@ def show_iig_transdermal_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = IIGChecklistUser.objects.filter(report=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -7762,6 +7973,10 @@ def size_shape_score_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': only `flag` is unbound (tablet/capsule are
+        # pre-initialised to None above). Read-only, no approve/reject.
+        flag = False
 
     context = {
         "comparison": comparison,
@@ -7871,6 +8086,12 @@ def show_sss(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        record = ProductComparison.objects.all()
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         return render(
             request,
@@ -8147,6 +8368,12 @@ def show_api_validation_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ValidationUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ValidationForm(
             user=user,
@@ -8304,6 +8531,11 @@ def show_api_validation_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = ValidationReportQuestions.objects.filter(
@@ -8513,6 +8745,12 @@ def show_api_verification_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ValidationUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ValidationForm(
             user=user,
@@ -8668,6 +8906,11 @@ def show_api_verification_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = ValidationReportQuestions.objects.filter(
@@ -8879,6 +9122,12 @@ def show_drug_product_validation_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = ValidationUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = ValidationForm(
             user=user,
@@ -9034,6 +9283,11 @@ def show_drug_product_validation_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = ValidationReportQuestions.objects.filter(
@@ -9340,6 +9594,12 @@ def show_vp_microsphere_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=user,
@@ -9494,6 +9754,11 @@ def show_vp_microsphere_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     questions = VPReportQuestions.objects.filter(report_name=report_type)
     user_answers = {}
@@ -9702,6 +9967,12 @@ def show_vp_liposome_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=user,
@@ -9857,6 +10128,11 @@ def show_vp_liposome_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     questions = VPReportQuestions.objects.filter(report_name=report_type)
     user_answers = {}
@@ -10063,6 +10339,12 @@ def show_vp_mdi_and_dpi_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=user,
@@ -10223,6 +10505,11 @@ def show_vp_mdi_and_dpi_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Rest of the view remains unchanged
     questions = VPReportQuestions.objects.filter(report_name=report_type)
@@ -10431,6 +10718,12 @@ def show_vp_nasal_inhalation_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
 
         form = VPForm(
@@ -10589,6 +10882,11 @@ def show_vp_nasal_inhalation_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = VPReportQuestions.objects.filter(report_name=report_type)
@@ -10799,6 +11097,12 @@ def show_vp_ophthalmic_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=user,
@@ -10952,6 +11256,11 @@ def show_vp_ophthalmic_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
     # Get all questions
     questions = VPReportQuestions.objects.filter(report_name=report_type)
 
@@ -11161,6 +11470,12 @@ def show_vp_liquidorals_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=user,
@@ -11316,6 +11631,11 @@ def show_vp_liquidorals_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = VPReportQuestions.objects.filter(report_name=report_type)
@@ -11527,6 +11847,12 @@ def show_vp_parenteral_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=request.user,
@@ -11683,6 +12009,11 @@ def show_vp_parenteral_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
     # Get all questions
     questions = VPReportQuestions.objects.filter(report_name=report_type)
 
@@ -11892,6 +12223,12 @@ def show_vp_solidoral_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=request.user,
@@ -12045,6 +12382,11 @@ def show_vp_solidoral_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = VPReportQuestions.objects.filter(report_name=report_type)
@@ -12255,6 +12597,12 @@ def show_vp_topical_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=request.user,
@@ -12410,6 +12758,11 @@ def show_vp_topical_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = VPReportQuestions.objects.filter(report_name=report_type)
@@ -12620,6 +12973,12 @@ def show_vp_transdermal_table(request):
             | checklists_as_checker_6
             | checklists_as_checker_7
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        reports = VPUserReports.objects.filter(report_name__report_name=report_name)
+        view_sample = False
     if report_name in assigns.assigned_report or user.role == "company_checker":
         form = VPForm(
             user=request.user,
@@ -12776,6 +13135,11 @@ def show_vp_transdermal_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     # Get all questions
     questions = VPReportQuestions.objects.filter(report_name=report_type)
@@ -13463,6 +13827,11 @@ def general_white_paper_report(request, id):
             flag = True
         else:
             flag = False
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        flag = False
 
     questions = GeneralReportQuestions.objects.all()
     user_answers = {}
@@ -13628,6 +13997,12 @@ def general_white_paper_table(request):
             | checklists_as_checker_6
             | checklists_as_head
         )
+    else:
+        # role == 'admin': the chain above binds nothing, so these
+        # names were unbound and every admin request raised
+        # UnboundLocalError. Read-only oversight.
+        checklist = GeneralChecklistUSer.objects.all()
+        view_sample = False
 
     if report_name in assignments.assigned_report or user.role == "company_checker":
         form = GeneralForm(user=request.user)

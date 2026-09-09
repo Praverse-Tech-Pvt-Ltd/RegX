@@ -47,6 +47,14 @@ GOVERNED_MODULES = (
     "external_integrations",
     "workflows",
     "iig_checklist",
+    # Ported from the legacy monolith. Guarded rather than exempted as
+    # foundation data: all four render FDA-derived content -- deficiency text,
+    # 483 observations, correspondence guidance -- which is exactly the material
+    # where "FDA compliant" reaches a UI string without anyone deciding it should.
+    "deficiencies",
+    "inspections",
+    "controlled_correspondence",
+    "product_comparison",
 )
 
 #: Phrases that assert an outside body has accepted, approved or validated

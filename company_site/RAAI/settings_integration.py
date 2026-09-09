@@ -75,3 +75,33 @@ DATABASES = {
 # keeps the module importable and correct if one is ever run.
 CELERY_BROKER_URL = config("COMPANY_REDIS_URL", default="redis://redis:6379/1")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+
+
+# ---------------------------------------------------------------------------
+# Trailing-slash tolerance
+# ---------------------------------------------------------------------------
+# APPEND_SLASH is False in the company settings and every route accepts exactly
+# one form: 188 require a trailing slash, 154 refuse one, with no pattern a user
+# could learn. A wrong slash returns a 404 that reads as "no such page".
+#
+# SlashToleranceMiddleware makes both forms work by redirecting a 404 to the
+# other form when that one resolves. Appended last so it sees the final
+# response, and it only ever turns a 404 into a working page -- it cannot create
+# one. RAAI/settings.py stays unedited, per this module's contract.
+MIDDLEWARE = MIDDLEWARE + [  # noqa: F405
+    "RAAI.slash_tolerance.SlashToleranceMiddleware",
+]
+
+
+# ---------------------------------------------------------------------------
+# Shared sign-in
+# ---------------------------------------------------------------------------
+# The company login posts its credentials to REGX and mirrors the resulting
+# identity into a CustomUser, so one email and password opens both
+# applications. See AdminMaster.regx_auth for why this is an API call and not a
+# shared session cookie.
+#
+# Blank disables it and the login falls back to checking passwords locally,
+# which is the behaviour this application had before. Points at the backend
+# container, not the nginx origin: this is server-to-server traffic.
+REGX_AUTH_URL = config("REGX_AUTH_URL", default="")

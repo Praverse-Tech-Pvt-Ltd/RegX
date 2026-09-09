@@ -104,26 +104,88 @@ to the company login.
 Note that pages are inconsistent about which status triggers the bounce —
 some use 401, some 403. That predates this work and was left alone.
 
-## The honest cost: two logins
+## One sign-in, delegated to REGX
 
-A user who works with both the legacy company tools and the new REGX modules
-signs in twice — once at `/adminmaster/login/`, once at `/signin`. This is
-visible, not hidden: unauthenticated access to a REGX operational route
-redirects to `/signin` exactly as it does today, and the company tools
-redirect to the company login exactly as they do today.
+A user signs in once, with their REGX email and password, at either
+`/adminmaster/login/` or `/signin`. The company login no longer checks the
+password itself: it posts the submitted credentials to REGX's auth API
+(`POST /api/regx/v1/auth/login/`), and on success looks up or creates the
+`AdminMaster.CustomUser` that mirrors that REGX identity. REGX stays the sole
+authority on who a person is and what their password is.
 
-Unifying them into real single sign-on would mean either mapping
-`AdminMaster.CustomUser` onto `identity.User` or introducing a shared identity
-provider. Both change the REGX identity model, which Phase 15 puts off-limits
-without prior approval, and both risk weakening the MFA/tenancy guarantees
-that the REGX side exists to enforce. It is therefore recorded here as
-follow-up work rather than attempted as part of a visual integration.
+This replaces the two-login arrangement that was recorded here as the honest
+cost of the first integration pass. What it does *not* do is share a session:
+each application still issues its own cookie over its own session store, for
+the reason given below.
 
-### If SSO is pursued later
+### How the pieces fit
 
-The lowest-risk sketch, for whoever picks this up: keep `identity.User`
-authoritative, add an OIDC/SAML provider in front of both applications, and
-reduce the company site's login to a thin shim that trusts the provider.
-Do not attempt to share a session cookie between the two Django apps — they
-sign with different `SECRET_KEY`s over different session stores, and making
-them agree would mean weakening one side's configuration to match the other.
+| | |
+|---|---|
+| Credential check | REGX `identity.User`, over the internal network |
+| Company session | This application's own cookie, unchanged |
+| Local `CustomUser` | A mirror, created on first sign-in, keyed on the REGX email |
+| Local password | Set unusable, so it can never be an alternative way in |
+| Roles | Read from `GET /api/regx/v1/permissions/mine/` and mapped |
+
+`REGX_AUTH_URL` (see `compose.yaml`) turns this on and points at the backend
+container. Set it blank and the login reverts to checking passwords locally,
+which is exactly the behaviour this application had before.
+
+### Role mapping
+
+REGX's role model is the richer of the two, so the mapping collapses it:
+
+| REGX role | Legacy role | Why |
+|---|---|---|
+| `tenant_admin` | `admin` | Administers users on both sides |
+| `platform_support` | `admin` | Praverse staff; needs the admin console |
+| `doer` | `company_user` | Prepares work |
+| `reviewer` | `company_checker` | Reviews work |
+| `vp` | `company_checker` | Approves work but does not administer users |
+
+A REGX identity holding several roles gets the most privileged result. A role
+this application has no equivalent for — including any added to REGX later —
+falls back to `company_user`, the least privileged of the three.
+
+The mirrored account also gets an `AssignChecker` row. That is not cosmetic:
+several RATools views call `AssignChecker.objects.get(user=...)` unguarded and
+return 500 without one.
+
+`GET /api/regx/v1/permissions/mine/` was added for this. Neither
+`/permissions/roles/` (which roles exist) nor `/permissions/effective/` (what
+the caller may do) answers "which role am I", and inferring it back from a
+permission set breaks the moment a role's permissions are edited.
+
+### What is deliberately still separate
+
+**Sessions.** The two Django apps sign with different `SECRET_KEY`s over
+different session stores, and making one cookie work in both would mean
+weakening one side's configuration to match the other. Only the credential
+check is shared; each application issues its own session as it always did.
+
+**The local password check**, which remains as a fallback for the accounts
+REGX does not know — the Django superuser and any pre-existing company
+account — and for the case where REGX is unreachable, so an outage does not
+lock out the accounts this application can still verify on its own. It cannot
+be used to get around REGX: mirrored accounts are saved with an unusable
+password, so the local check can never succeed for one.
+
+**MFA.** If REGX reports `mfa_required` for an account, the company login
+refuses it rather than granting a session. That page collects a password and
+nothing else, and letting it through would make it the weaker of the two doors
+into the same identity.
+
+Worth knowing, and out of scope here: `mfa_required` is set when a user
+enrols, but nothing in REGX currently *checks* it — there is no permission
+class or middleware gating protected operations on it. The refusal above is
+therefore stricter than REGX itself is today, which is the right direction for
+it to err in, but the enforcement gap on the REGX side is real and unfixed.
+
+### If this is taken further
+
+The remaining step, for whoever picks it up, is an OIDC/SAML provider in front
+of both applications, which would remove the password from this application's
+hands entirely rather than merely forwarding it. The delegation above is a
+smaller change that does not touch `identity.User`, which Phase 15 puts
+off-limits without prior approval.
