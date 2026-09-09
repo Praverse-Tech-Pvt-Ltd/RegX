@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "csp",
     "drf_spectacular",
+    "drf_spectacular_sidecar",
     # REGX domains
     "identity",
     "tenancy",
@@ -248,6 +249,13 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
     "SCHEMA_PATH_PREFIX": r"/api/regx/v1/",
     "COMPONENT_SPLIT_REQUEST": True,
+    # Serve Swagger UI from our own static files rather than jsdelivr. The CSP
+    # below is 'self' for scripts, styles and images, so CDN-hosted assets are
+    # blocked and the docs page renders blank. drf-spectacular-sidecar ships the
+    # same assets to be collected by collectstatic.
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
+    "REDOC_DIST": "SIDECAR",
 }
 
 # ---------------------------------------------------------------------------

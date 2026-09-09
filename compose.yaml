@@ -220,6 +220,10 @@ services:
       - backend
     ports:
       - "8080:8080"
+      # Admin listener, deliberately a separate published port so it can be
+      # dropped from a deployment, bound to an internal interface, or put
+      # behind a different firewall rule without touching 8080.
+      - "8090:8090"
     healthcheck:
       # 127.0.0.1, not localhost: busybox wget resolves localhost to ::1
       # first, and nginx listens on 0.0.0.0 only, so the check reported the
