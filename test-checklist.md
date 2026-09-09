@@ -364,37 +364,81 @@ Re-running is safe. Already applied on this machine; expect
 
 ---
 
-## 6. Backend test suite — not yet run, highest-value next step
+## 6. Backend test suite
 
-`pytest` is **not** in the runtime image. Install the dev requirements into the
-container first, and pass `--no-cov` — coverage cannot write to the read-only
-`/app`, and the `INTERNALERROR` it raises is not a test failure.
+`pytest` is **not** in the runtime image — it is a dev dependency. Three things
+about getting it running, each of which fails in a way that does not name its
+own cause:
 
-```bash
-MSYS_NO_PATHCONV=1 docker compose exec -T backend pip install -q -r requirements/dev.txt
-MSYS_NO_PATHCONV=1 docker compose exec -T backend python -m pytest -q --no-cov
+**Install as root.** The container runs as a non-root user whose `HOME` is
+`/nonexistent`, so a plain `pip install` dies on a path that has nothing to do
+with what you asked for:
+
+```
+ERROR: Could not install packages due to an OSError:
+[Errno 13] Permission denied: '/nonexistent'
 ```
 
-Known-good app suites when last run:
+```bash
+MSYS_NO_PATHCONV=1 docker compose exec -T -u root backend pip install -q -r requirements/dev.txt
+MSYS_NO_PATHCONV=1 docker compose exec -T backend python -m pytest --version
+```
+
+Expect `pytest 8.3.5`. This installs into the **running container**, not the
+image, so it is undone by `docker compose up -d --force-recreate backend` and
+has to be redone after any rebuild.
+
+**Pass `--no-cov` and `-p no:cacheprovider`.** `/app` is read-only: coverage
+cannot write there, and the `INTERNALERROR` it raises is not a test failure.
+The cache provider fails the same way, more noisily
+(`could not create cache path /app/.pytest_cache/...`).
+
+**Run one pytest at a time.** Every run builds the same `test_regx` database.
+A second concurrent run fails at *setup*, before any test executes:
+
+```
+psycopg.errors.DuplicateDatabase: database "test_regx" already exists
+psycopg.errors.ObjectInUse: database "test_regx" is being accessed by other users
+```
+
+Every test in the second run reports `ERROR`, including ones that have nothing
+to do with your change. **This is not a regression** — it means another run is
+still going. Wait for it and re-run.
+
+### Running it
+
+```bash
+MSYS_NO_PATHCONV=1 docker compose exec -T backend python -m pytest -q --no-cov -p no:cacheprovider
+```
+
+3,807 tests collected. It takes a while; redirect to a file rather than
+watching it scroll.
+
+### The sign-in tests specifically
+
+The five `TestMyRolesView` tests added with the shared sign-in are the cheapest
+check on that change. Run them **only when no other pytest is running**, per the
+note above:
+
+```bash
+MSYS_NO_PATHCONV=1 docker compose exec -T backend python -m pytest authorization/tests/test_authorization.py -q --no-cov -p no:cacheprovider
+```
+
+Nine tests: four pre-existing for `TestEffectivePermissionsView`, five new for
+`TestMyRolesView`. If **all nine** error at setup, re-read the concurrency note
+— that pattern is the shared test database, not your code.
+
+### Status
 
 | Suite | Result |
 |---|---|
 | `deficiencies/` | 22 passed |
 | `regulatory_cases/ fda_data/ formulations/` | 274 passed |
-| `authorization/tests/test_authorization.py` | **never executed** |
+| Full suite (3,807 tests) | **run in progress at time of writing — result not yet recorded here** |
 
-The five `TestMyRolesView` tests added this session have never run — the
-endpoint is verified only by live HTTP (§3). **Run these first**; they are the
-cheapest way to catch a regression in the sign-in change:
-
-```bash
-MSYS_NO_PATHCONV=1 docker compose exec -T backend \
-  python -m pytest authorization/tests/test_authorization.py -q --no-cov
-```
-
-The full suite is 126 files and roughly 2,965 test functions, and has not run
-since the six feature ports landed. Nothing outside the spot-checked apps is
-confirmed unregressed.
+Nothing outside the spot-checked apps was confirmed unregressed when this was
+written. **Update this table with the real number once the full run finishes**,
+rather than leaving it to be rediscovered.
 
 ---
 

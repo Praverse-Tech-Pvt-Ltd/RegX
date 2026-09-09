@@ -121,10 +121,16 @@ behind 8090.
   twice this session.
 - **On Windows, prefix container commands with `MSYS_NO_PATHCONV=1`.** Git Bash
   rewrites `/tmp/x` into a Windows path before Docker sees it.
-- **`pytest` is not in the runtime image.** It is a dev dependency. Install
-  `requirements/dev.txt` into the container first, and pass `--no-cov` — coverage
-  cannot write to the read-only `/app`, and the `INTERNALERROR` it raises is not
-  a test failure.
+- **`pytest` is not in the runtime image.** It is a dev dependency, and
+  installing it needs `-u root` — the container's user has `HOME=/nonexistent`,
+  so a plain `pip install` fails on a path unrelated to what you asked for.
+  Pass `--no-cov -p no:cacheprovider` when running: `/app` is read-only, and
+  the `INTERNALERROR` coverage raises is not a test failure. See
+  `test-checklist.md` §6.
+- **Only one pytest run at a time.** Every run builds the same `test_regx`
+  database, so a second concurrent run errors at setup on *every* test —
+  including ones unrelated to your change. That pattern means another run is
+  going, not a regression.
 
 ### Unverified
 
