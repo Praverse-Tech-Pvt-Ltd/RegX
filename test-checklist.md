@@ -426,43 +426,42 @@ Every test in the second run reports `ERROR`, including ones that have nothing
 to do with your change. **This is not a regression** — it means another run is
 still going. Wait for it and re-run.
 
+### The docs mount
+
+`common/tests/test_task_reliability_doc.py` checks that
+`docs/TASK_RELIABILITY.md` still describes the tasks the code declares. It
+resolves that file as `parents[3]` of the test — in a source checkout,
+`<repo>/docs`.
+
+The image copies only `backend/`, so `/app` is the container's `<repo>/backend`
+and `/` is its `<repo>`. That makes `/docs` the correct path; it was simply
+empty, and all six document-reading tests failed with:
+
+```
+FileNotFoundError: [Errno 2] No such file or directory: '/docs/TASK_RELIABILITY.md'
+```
+
+`compose.yaml` now mounts `./docs:/docs:ro` into the backend service, so the
+container matches the source layout and the tests run. Documentation stays out
+of the image; the mount is read-only.
+
+If those six fail again, check the mount before the tests:
+
+```bash
+MSYS_NO_PATHCONV=1 docker compose exec -T backend ls /docs/TASK_RELIABILITY.md
+```
+
+A container started before this mount existed will not have it — recreate it
+with `docker compose up -d backend`.
+
 ### Running it
 
 ```bash
 MSYS_NO_PATHCONV=1 docker compose exec -T -e DJANGO_SETTINGS_MODULE=regx.settings.test backend python -m pytest -q --no-cov -p no:cacheprovider
 ```
 
-3,807 tests collected, roughly 14 minutes. Redirect to a file rather than
+3,811 tests collected, roughly 15 minutes. Redirect to a file rather than
 watching it scroll.
-
-### Six failures you cannot fix from inside the container
-
-`common/tests/test_task_reliability_doc.py` reads
-`docs/TASK_RELIABILITY.md`, resolved as `parents[3]` from the test file. The
-image copies only `backend/`, so inside the container that resolves to
-`/docs/TASK_RELIABILITY.md`, which does not exist:
-
-```
-FileNotFoundError: [Errno 2] No such file or directory: '/docs/TASK_RELIABILITY.md'
-```
-
-Six of the eight tests in that file fail this way; the other two do not read
-the document. They are documentation-consistency checks written to run from a
-source checkout, where `docs/` sits beside `backend/`. Run them on the host, or
-with the repository mounted — **not** by editing the path out of the test, which
-would disable a check that is currently passing.
-
-To confirm they pass rather than assuming it:
-
-```bash
-MSYS_NO_PATHCONV=1 docker compose exec -T -u root backend mkdir -p /docs
-docker cp docs/TASK_RELIABILITY.md "$(docker compose ps -q backend)":/docs/TASK_RELIABILITY.md
-MSYS_NO_PATHCONV=1 docker compose exec -T -e DJANGO_SETTINGS_MODULE=regx.settings.test backend python -m pytest common/tests/test_task_reliability_doc.py -q --no-cov -p no:cacheprovider
-MSYS_NO_PATHCONV=1 docker compose exec -T -u root backend rm -rf /docs
-```
-
-Expect `8 passed`. Remove `/docs` afterwards, as above — leaving it behind makes
-later runs pass for a reason that is not in the image.
 
 ### The sign-in tests specifically
 
@@ -478,43 +477,56 @@ Nine tests: four pre-existing for `TestEffectivePermissionsView`, five new for
 `TestMyRolesView`. If **all nine** error at setup, re-read the concurrency note
 — that pattern is the shared test database, not your code.
 
-### Status — full suite run 2026-09-09
+### Status — full suite, 2026-09-09
 
 ```
-6 failed, 3804 passed, 1 skipped, 5 warnings in 921.72s (0:15:21)
+3810 passed, 1 skipped, 5 warnings in 840.84s (0:14:00)
 ```
 
-**All six failures are the `docs/` path problem above.** Copying
-`docs/TASK_RELIABILITY.md` to `/docs/` inside the container and re-running gives
-`8 passed`, so the documentation itself is correct and nothing is drifting —
-the file simply is not in the image. **There are no real failures on this
-branch.**
+**Green, with no failures to explain away.** That last part is the point: a
+suite that always ends with a handful of red lines someone has learned to
+ignore is a suite that will not stop the next real regression. It ends clean, so
+anything red is worth reading.
 
 | Suite | Result |
 |---|---|
-| Full suite | 3,804 passed, 6 failed (all `docs/` path), 1 skipped |
-| `common/tests/test_task_reliability_doc.py` with docs present | 8 passed |
-| `external_integrations/` | 48 passed — **with the correct settings module** |
+| Full suite | **3,810 passed, 0 failed, 1 skipped** |
+| `common/tests/test_task_reliability_doc.py` | 8 passed (needs the `/docs` mount) |
+| `external_integrations/` | 48 passed (needs the test settings module) |
 | `authorization/tests/test_authorization.py` | 9 passed |
 | `deficiencies/` | 22 passed |
 
-Test count rose from 3,807 to 3,811 because `test_regulatory_claim_guard` is
-parametrised over `GOVERNED_MODULES`, and four ported apps were added to it.
+The one skip is pre-existing and not related to this branch.
 
-**What the first run of this suite found.** `test_the_guard_covers_every_module_that_has_migrations`
-failed with:
+### What it took to get there, and what the suite caught
+
+It took three runs, and only the third was trustworthy. Worth reading before
+you trust your own first run:
+
+**Run 1 — 14 failed.** Seven were the settings module and six were the `docs/`
+path: eleven of the fourteen were the environment, not the code. Both are fixed
+now, but this is why the two notes at the top of this section exist.
+
+**The one real finding**, which the suite earned its keep for:
 
 ```
 governed app(s) not covered by the regulatory claim guard:
 controlled_correspondence, deficiencies, inspections, product_comparison
 ```
 
-A real gap, and the reason that test exists: the four ported apps had
-migrations but were in nobody's list, so nothing was scanning them for phrases
-claiming an FDA verdict. They were added to `GOVERNED_MODULES` rather than
-exempted as `foundation` — all four render FDA-derived text, which is exactly
-where "FDA compliant" reaches a UI string without anyone deciding it should.
-No offending phrase was present; this closed a coverage gap, not a defect.
+The four ported apps had migrations but were in no module's regulatory-claim
+guard, so nothing was scanning them for phrases asserting an FDA verdict. They
+are now in `GOVERNED_MODULES` rather than exempted as `foundation`: all four
+render FDA-derived text, which is exactly where "FDA compliant" reaches a UI
+string without anyone deciding it should. No offending phrase was present — a
+coverage gap, not a defect, which is the case that guard's docstring was
+written for.
+
+**Run 2 — 6 failed**, all the `docs/` path. **Run 3 — clean**, after
+`compose.yaml` gained the `/docs` mount.
+
+Test count went 3,807 → 3,811 because `test_regulatory_claim_guard` is
+parametrised over `GOVERNED_MODULES` and gained four modules.
 
 ---
 

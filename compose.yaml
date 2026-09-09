@@ -52,6 +52,15 @@ services:
       REGX_SERVICE_NAME: backend
     volumes:
       - document_storage:/app/document_storage
+      # common/tests/test_task_reliability_doc.py checks that
+      # docs/TASK_RELIABILITY.md still describes the tasks the code declares. It
+      # resolves the file as parents[3] of the test, which in a source checkout
+      # is <repo>/docs. The image copies only backend/, so /app is the
+      # equivalent of <repo>/backend and / is the equivalent of <repo> -- which
+      # makes /docs the right path, just an empty one. Mounting the real
+      # directory there read-only lets those six tests run in the container
+      # without putting documentation into the image.
+      - ./docs:/docs:ro
     depends_on:
       postgres:
         condition: service_healthy

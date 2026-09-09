@@ -144,25 +144,24 @@ behind 8090.
 - The deficiency import was verified against the legacy sqlite snapshot only;
   the `--xlsx` path has no test coverage.
 
-### Test suite — run 2026-09-09
+### Test suite — 2026-09-09
 
 ```
-6 failed, 3804 passed, 1 skipped in 921.72s (0:15:21)
+3810 passed, 1 skipped, 5 warnings in 840.84s (0:14:00)
 ```
 
-**No real failures.** All six are `common/tests/test_task_reliability_doc.py`,
-which reads `docs/TASK_RELIABILITY.md` at a path the image does not contain —
-only `backend/` is copied in. Placing the file at `/docs/` and re-running gives
-`8 passed`, so the documentation is correct and nothing is drifting. Details and
-the command to confirm it: `test-checklist.md` §6.
+**Green, with nothing to explain away.** Two environment fixes were needed to
+get an honest run, both now in place: `compose.yaml` mounts `./docs:/docs:ro`
+so the documentation-consistency tests can find their file, and every pytest
+invocation must pass `-e DJANGO_SETTINGS_MODULE=regx.settings.test`.
 
-The first attempt at this run reported 14 failures. Seven were mine — the wrong
-settings module, see the note above. One was a genuine gap the suite caught:
-`test_the_guard_covers_every_module_that_has_migrations` found that the four
-ported apps had migrations but were in no module's regulatory-claim guard, so
-nothing was scanning them for phrases asserting an FDA verdict. They are now in
-`GOVERNED_MODULES`. No offending phrase was present — this closed a coverage
-gap, not a defect.
+The suite caught one real gap on the way — the four ported apps had migrations
+but were in no module's regulatory-claim guard, so nothing was scanning them for
+phrases asserting an FDA verdict. Now in `GOVERNED_MODULES`. No offending
+phrase was present; this closed a coverage gap, not a defect.
+
+Full detail, including what the first two runs got wrong and why:
+`test-checklist.md` §6.
 
 ## 3. Active Files
 
@@ -282,12 +281,11 @@ weakening the setting.
 1. **Run `test-checklist.md` end to end.** It is written to be executed top to
    bottom by someone who has not seen this code.
 
-2. **Get `docs/` into the backend image, or run the doc tests on the host.**
-   Six documentation-consistency tests cannot pass in-container because the
-   image copies only `backend/`. They pass when the file is present, so this is
-   packaging, not drift. Until it is fixed, every full-suite run ends with six
-   red lines that have to be explained away — which is how a real failure gets
-   missed. `test-checklist.md` §6.
+2. **Keep the suite green.** It ends clean as of 2026-09-09, which is worth
+   protecting: a suite with a few permanently-red lines is one whose next real
+   failure nobody notices. If something goes red, check the two environment
+   notes in `test-checklist.md` §6 before reading application code — eleven of
+   the first run's fourteen failures were the environment, not the code.
 
 3. **Decide the MFA question.** REGX sets `mfa_required` and never checks it.
    Either wire enforcement into the permission layer or record deliberately that
