@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "templates_registry",
     "deficiencies",
     "fda_data",
+    "inspections",
     "formulations",
     "iid_assessment",
     "iig_checklist",
