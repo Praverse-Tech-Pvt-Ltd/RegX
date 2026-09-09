@@ -25,6 +25,14 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
+Picking up in-progress work on this branch: start with
+[`test-checklist.md`](test-checklist.md), then [`handoff.md`](handoff.md),
+[`constraints.md`](constraints.md) and [`decisions.md`](decisions.md).
+
+One account signs in to both applications — the legacy company login delegates
+to REGX auth. See
+[docs/COMPANY_SITE_AUTH_INTEGRATION.md](docs/COMPANY_SITE_AUTH_INTEGRATION.md).
+
 ## Security baseline
 
 See [docs/SECURITY_BASELINE.md](docs/SECURITY_BASELINE.md).
