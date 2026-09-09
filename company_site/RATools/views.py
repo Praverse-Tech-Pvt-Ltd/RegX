@@ -108,6 +108,19 @@ def module_view(request):
         parent_path = path.rsplit("/", 1)[0] if "/" in path else ""
 
     files = []
+    # The module library lives under MEDIA_ROOT/Module_Simplification, which is
+    # content rather than code and is absent from a fresh checkout. os.listdir
+    # on a missing directory raises FileNotFoundError, which took the whole page
+    # down with a 500 -- a missing library should render as an empty library.
+    if not os.path.isdir(current_path):
+        return render(request, "RATools/Module.html", {
+            "files": [],
+            "path": path,
+            "parent_path": parent_path,
+            "first_folder": first_folder,
+            "library_missing": True,
+        })
+
     items = sorted(
     os.listdir(current_path),
     key=lambda x: (
