@@ -364,7 +364,38 @@ Re-running is safe. Already applied on this machine; expect
 
 ---
 
-## 6. Backend test suite
+## 6. Lint — run this before you push, not after
+
+CI's first job is `ruff check` then `ruff format --check`. Both must pass, and
+`check` failing stops the job before `format` ever reports, so a clean `check`
+does not mean you are done.
+
+Neither is in the runtime image, and neither can lint the container's baked
+copy of the source — you need the working tree. Run ruff against a mounted
+host checkout:
+
+```bash
+docker run --rm -u root -v "$PWD/backend:/src" -w /src regx-backend   sh -c "pip install -q ruff==0.11.13; ruff check --output-format=concise . && ruff format --check ."
+```
+
+Expect `All checks passed!` and `N files already formatted`.
+
+`ruff check --fix` handles a minority automatically; the rest need edits. Before
+silencing anything with `noqa`, read it — one `S608` in this codebase is a
+genuine false positive (constants interpolated into a SQLite identifier, which
+cannot be parameterised) and carries a comment saying so. Most are not.
+
+Two ways to get this wrong, both hit here:
+
+- A `# noqa` must sit on the line ruff reports, which for a wrapped call is the
+  string, not the opening parenthesis.
+- A comment beginning `# noqa` is parsed as a directive even mid-sentence. Write
+  the explanation as ordinary prose and put the real directive at the end of the
+  offending line.
+
+---
+
+## 7. Backend test suite
 
 `pytest` is **not** in the runtime image — it is a dev dependency. Three things
 about getting it running, each of which fails in a way that does not name its
@@ -530,12 +561,13 @@ parametrised over `GOVERNED_MODULES` and gained four modules.
 
 ---
 
-## 7. Before calling anything done
+## 8. Before calling anything done
 
 - [ ] §2 passes in full, including every negative case in 2.5
 - [ ] `usable_pw=False` for all mirrored accounts (2.4)
 - [ ] Legitimate requests succeed, not just bad ones refused (§3)
-- [ ] Full backend suite run at least once (§6)
+- [ ] `ruff check` **and** `ruff format --check` both clean (§6)
+- [ ] Full backend suite run at least once (§7)
 - [ ] You can state, in your own words, what `_authenticate()` does and why the
       local fallback cannot be used to bypass REGX
 

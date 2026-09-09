@@ -126,13 +126,17 @@ behind 8090.
   so a plain `pip install` fails on a path unrelated to what you asked for.
   Pass `--no-cov -p no:cacheprovider` when running: `/app` is read-only, and
   the `INTERNALERROR` coverage raises is not a test failure. See
-  `test-checklist.md` §6.
+  `test-checklist.md` §7.
 - **Force `-e DJANGO_SETTINGS_MODULE=regx.settings.test` on every pytest run.**
   `pyproject.toml` sets it, but the container's environment sets
   `regx.settings.production` and the environment wins. Production has no
   `CELERY_TASK_ALWAYS_EAGER`, so queued tasks never run and 7
   `external_integrations` tests fail in ways that read like real bugs. They
   pass with the right settings. This one costs an hour if you trust the output.
+- **Run `ruff check` and `ruff format --check` before pushing.** CI's first job
+  runs both, and neither is in the runtime image. Seventeen commits reached CI
+  before anyone ran them, and the job failed on 34 errors plus 26 unformatted
+  files. `test-checklist.md` §6 has the one-line command.
 - **Only one pytest run at a time.** Every run builds the same `test_regx`
   database, so a second concurrent run errors at setup on *every* test —
   including ones unrelated to your change. That pattern means another run is
@@ -161,7 +165,7 @@ phrases asserting an FDA verdict. Now in `GOVERNED_MODULES`. No offending
 phrase was present; this closed a coverage gap, not a defect.
 
 Full detail, including what the first two runs got wrong and why:
-`test-checklist.md` §6.
+`test-checklist.md` §7.
 
 ## 3. Active Files
 
@@ -300,7 +304,7 @@ weakening the setting.
 2. **Keep the suite green.** It ends clean as of 2026-09-09, which is worth
    protecting: a suite with a few permanently-red lines is one whose next real
    failure nobody notices. If something goes red, check the two environment
-   notes in `test-checklist.md` §6 before reading application code — eleven of
+   notes in `test-checklist.md` §7 before reading application code — eleven of
    the first run's fourteen failures were the environment, not the code.
 
 3. **Decide the MFA question.** REGX sets `mfa_required` and never checks it.

@@ -127,6 +127,11 @@ class read `request.tenant`, which does not exist, so every endpoint returned
 403 while looking like correct fail-closed behaviour. Always verify that a
 legitimate request *succeeds*, not only that a bad one fails.
 
+**Lint before you push.** CI runs `ruff check` then `ruff format --check`, and
+the second never reports if the first fails — a clean `check` is not a clean
+job. Seventeen commits reached CI here without either being run once. Command in
+`test-checklist.md` §6.
+
 **Show the real diff, not a summary of it.** Nobody should have to trust a prose
 description of what changed.
 
