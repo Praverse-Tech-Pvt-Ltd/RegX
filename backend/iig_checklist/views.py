@@ -53,6 +53,7 @@ from .permissions import (
     CanReviewChecklist,
     CanSubmitChecklistReview,
     CanViewChecklistDefinition,
+    CanViewExecution,
     can_create_definition_for_scope,
     can_mutate_definition_scope,
     has_iig_checklist_permission,
@@ -1727,3 +1728,26 @@ class ChecklistReviewerConclusionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(ChecklistResponseSerializer(response).data)
+
+
+# ---------------------------------------------------------------------------
+# Gap analysis -- a read-model over an execution's responses.
+# ---------------------------------------------------------------------------
+
+
+class ExecutionGapAnalysisView(APIView):
+    """Score one execution: gaps, completeness, and a per-section breakdown.
+
+    Computed on demand rather than stored. The legacy implementation persisted
+    each run as an immutable report, which let a score be read long after the
+    answers behind it had changed.
+    """
+
+    permission_classes = [CanViewExecution]
+
+    def get(self, request, public_id):
+        from .gap_analysis import analyse_execution
+
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+        return Response(analyse_execution(execution))

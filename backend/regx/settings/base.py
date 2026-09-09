@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     "common",
     "documents",
     "templates_registry",
+    "controlled_correspondence",
+    "product_comparison",
     "deficiencies",
     "fda_data",
     "inspections",
