@@ -127,6 +127,12 @@ behind 8090.
   Pass `--no-cov -p no:cacheprovider` when running: `/app` is read-only, and
   the `INTERNALERROR` coverage raises is not a test failure. See
   `test-checklist.md` §6.
+- **Force `-e DJANGO_SETTINGS_MODULE=regx.settings.test` on every pytest run.**
+  `pyproject.toml` sets it, but the container's environment sets
+  `regx.settings.production` and the environment wins. Production has no
+  `CELERY_TASK_ALWAYS_EAGER`, so queued tasks never run and 7
+  `external_integrations` tests fail in ways that read like real bugs. They
+  pass with the right settings. This one costs an hour if you trust the output.
 - **Only one pytest run at a time.** Every run builds the same `test_regx`
   database, so a second concurrent run errors at setup on *every* test —
   including ones unrelated to your change. That pattern means another run is
@@ -135,13 +141,28 @@ behind 8090.
 ### Unverified
 
 - Nothing here has run outside local Docker.
-- **The full backend suite (126 files, ~2,965 test functions) has not been run
-  since the ports landed.** Individual app suites passed. This is the single
-  highest-value thing the next person can do — see `test-checklist.md` §6.
-- The five tests added for `/permissions/mine/` have **never executed**, for the
-  pytest reason above. The endpoint itself is verified by live HTTP.
 - The deficiency import was verified against the legacy sqlite snapshot only;
   the `--xlsx` path has no test coverage.
+
+### Test suite — run 2026-09-09
+
+```
+6 failed, 3804 passed, 1 skipped in 921.72s (0:15:21)
+```
+
+**No real failures.** All six are `common/tests/test_task_reliability_doc.py`,
+which reads `docs/TASK_RELIABILITY.md` at a path the image does not contain —
+only `backend/` is copied in. Placing the file at `/docs/` and re-running gives
+`8 passed`, so the documentation is correct and nothing is drifting. Details and
+the command to confirm it: `test-checklist.md` §6.
+
+The first attempt at this run reported 14 failures. Seven were mine — the wrong
+settings module, see the note above. One was a genuine gap the suite caught:
+`test_the_guard_covers_every_module_that_has_migrations` found that the four
+ported apps had migrations but were in no module's regulatory-claim guard, so
+nothing was scanning them for phrases asserting an FDA verdict. They are now in
+`GOVERNED_MODULES`. No offending phrase was present — this closed a coverage
+gap, not a defect.
 
 ## 3. Active Files
 
@@ -261,8 +282,12 @@ weakening the setting.
 1. **Run `test-checklist.md` end to end.** It is written to be executed top to
    bottom by someone who has not seen this code.
 
-2. **Run the full backend suite once.** Nothing outside the spot-checked apps
-   has been confirmed unregressed since the ports landed. `test-checklist.md` §6.
+2. **Get `docs/` into the backend image, or run the doc tests on the host.**
+   Six documentation-consistency tests cannot pass in-container because the
+   image copies only `backend/`. They pass when the file is present, so this is
+   packaging, not drift. Until it is fixed, every full-suite run ends with six
+   red lines that have to be explained away — which is how a real failure gets
+   missed. `test-checklist.md` §6.
 
 3. **Decide the MFA question.** REGX sets `mfa_required` and never checks it.
    Either wire enforcement into the permission layer or record deliberately that

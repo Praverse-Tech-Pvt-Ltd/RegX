@@ -388,6 +388,27 @@ Expect `pytest 8.3.5`. This installs into the **running container**, not the
 image, so it is undone by `docker compose up -d --force-recreate backend` and
 has to be redone after any rebuild.
 
+**Force the test settings module.** This one produces *plausible failures*
+rather than an error, which makes it the most expensive mistake on this page.
+
+`pyproject.toml` sets `DJANGO_SETTINGS_MODULE = "regx.settings.test"`, but the
+container's environment sets `regx.settings.production`, and the environment
+wins. Production has no `CELERY_TASK_ALWAYS_EAGER`, so every task dispatched
+through `transaction.on_commit(... .delay(...))` is queued and never runs.
+
+The result is **7 failures in `external_integrations`** that read exactly like
+real bugs — `ingest was never called`, `DocumentVersion matching query does not
+exist`, `assert 'queued' == ExecutionStatus.FAILED`. Nothing is wrong with the
+code. Pass the settings module explicitly:
+
+```
+-e DJANGO_SETTINGS_MODULE=regx.settings.test
+```
+
+With it, those 48 tests pass. If you see failures clustered in
+`external_integrations` and they all involve work that was supposed to happen
+asynchronously, check this before reading any application code.
+
 **Pass `--no-cov` and `-p no:cacheprovider`.** `/app` is read-only: coverage
 cannot write there, and the `INTERNALERROR` it raises is not a test failure.
 The cache provider fails the same way, more noisily
@@ -408,11 +429,40 @@ still going. Wait for it and re-run.
 ### Running it
 
 ```bash
-MSYS_NO_PATHCONV=1 docker compose exec -T backend python -m pytest -q --no-cov -p no:cacheprovider
+MSYS_NO_PATHCONV=1 docker compose exec -T -e DJANGO_SETTINGS_MODULE=regx.settings.test backend python -m pytest -q --no-cov -p no:cacheprovider
 ```
 
-3,807 tests collected. It takes a while; redirect to a file rather than
+3,807 tests collected, roughly 14 minutes. Redirect to a file rather than
 watching it scroll.
+
+### Six failures you cannot fix from inside the container
+
+`common/tests/test_task_reliability_doc.py` reads
+`docs/TASK_RELIABILITY.md`, resolved as `parents[3]` from the test file. The
+image copies only `backend/`, so inside the container that resolves to
+`/docs/TASK_RELIABILITY.md`, which does not exist:
+
+```
+FileNotFoundError: [Errno 2] No such file or directory: '/docs/TASK_RELIABILITY.md'
+```
+
+Six of the eight tests in that file fail this way; the other two do not read
+the document. They are documentation-consistency checks written to run from a
+source checkout, where `docs/` sits beside `backend/`. Run them on the host, or
+with the repository mounted — **not** by editing the path out of the test, which
+would disable a check that is currently passing.
+
+To confirm they pass rather than assuming it:
+
+```bash
+MSYS_NO_PATHCONV=1 docker compose exec -T -u root backend mkdir -p /docs
+docker cp docs/TASK_RELIABILITY.md "$(docker compose ps -q backend)":/docs/TASK_RELIABILITY.md
+MSYS_NO_PATHCONV=1 docker compose exec -T -e DJANGO_SETTINGS_MODULE=regx.settings.test backend python -m pytest common/tests/test_task_reliability_doc.py -q --no-cov -p no:cacheprovider
+MSYS_NO_PATHCONV=1 docker compose exec -T -u root backend rm -rf /docs
+```
+
+Expect `8 passed`. Remove `/docs` afterwards, as above — leaving it behind makes
+later runs pass for a reason that is not in the image.
 
 ### The sign-in tests specifically
 
@@ -421,24 +471,50 @@ check on that change. Run them **only when no other pytest is running**, per the
 note above:
 
 ```bash
-MSYS_NO_PATHCONV=1 docker compose exec -T backend python -m pytest authorization/tests/test_authorization.py -q --no-cov -p no:cacheprovider
+MSYS_NO_PATHCONV=1 docker compose exec -T -e DJANGO_SETTINGS_MODULE=regx.settings.test backend python -m pytest authorization/tests/test_authorization.py -q --no-cov -p no:cacheprovider
 ```
 
 Nine tests: four pre-existing for `TestEffectivePermissionsView`, five new for
 `TestMyRolesView`. If **all nine** error at setup, re-read the concurrency note
 — that pattern is the shared test database, not your code.
 
-### Status
+### Status — full suite run 2026-09-09
+
+```
+6 failed, 3804 passed, 1 skipped, 5 warnings in 921.72s (0:15:21)
+```
+
+**All six failures are the `docs/` path problem above.** Copying
+`docs/TASK_RELIABILITY.md` to `/docs/` inside the container and re-running gives
+`8 passed`, so the documentation itself is correct and nothing is drifting —
+the file simply is not in the image. **There are no real failures on this
+branch.**
 
 | Suite | Result |
 |---|---|
+| Full suite | 3,804 passed, 6 failed (all `docs/` path), 1 skipped |
+| `common/tests/test_task_reliability_doc.py` with docs present | 8 passed |
+| `external_integrations/` | 48 passed — **with the correct settings module** |
+| `authorization/tests/test_authorization.py` | 9 passed |
 | `deficiencies/` | 22 passed |
-| `regulatory_cases/ fda_data/ formulations/` | 274 passed |
-| Full suite (3,807 tests) | **run in progress at time of writing — result not yet recorded here** |
 
-Nothing outside the spot-checked apps was confirmed unregressed when this was
-written. **Update this table with the real number once the full run finishes**,
-rather than leaving it to be rediscovered.
+Test count rose from 3,807 to 3,811 because `test_regulatory_claim_guard` is
+parametrised over `GOVERNED_MODULES`, and four ported apps were added to it.
+
+**What the first run of this suite found.** `test_the_guard_covers_every_module_that_has_migrations`
+failed with:
+
+```
+governed app(s) not covered by the regulatory claim guard:
+controlled_correspondence, deficiencies, inspections, product_comparison
+```
+
+A real gap, and the reason that test exists: the four ported apps had
+migrations but were in nobody's list, so nothing was scanning them for phrases
+claiming an FDA verdict. They were added to `GOVERNED_MODULES` rather than
+exempted as `foundation` — all four render FDA-derived text, which is exactly
+where "FDA compliant" reaches a UI string without anyone deciding it should.
+No offending phrase was present; this closed a coverage gap, not a defect.
 
 ---
 
