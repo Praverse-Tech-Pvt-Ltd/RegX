@@ -8,6 +8,61 @@ Newest first. Model tag noted because this project spans sessions and models.
 
 ---
 
+## 2026-09-09 — The four ported apps go under the regulatory claim guard
+
+*Claude Opus 5*
+
+**Decided:** `deficiencies`, `inspections`, `controlled_correspondence` and
+`product_comparison` added to `GOVERNED_MODULES` in
+`common/tests/test_regulatory_claim_guard.py`.
+
+**Alternative:** add them to `foundation`, the exemption list for data apps that
+carry no regulatory workflow claims — where `fda_data` already sits, and which
+`deficiencies` and `inspections` closely resemble.
+
+**Why this won:** all four render FDA-derived text — deficiency bodies, 483
+observations, correspondence guidance. That is precisely the material where a
+phrase like "FDA compliant" reaches a UI string or a docstring without anyone
+deciding it should. Being scanned costs nothing; the exemption is the choice
+that needs justifying, and none of the four had one.
+
+**How it surfaced:** the first honest full-suite run failed
+`test_the_guard_covers_every_module_that_has_migrations`. The four apps had
+migrations but were in nobody's list, so nothing was scanning them. No
+offending phrase was actually present — this closed a **coverage** gap, not a
+defect, which is the case that guard's own docstring was written for.
+
+---
+
+## 2026-09-09 — `docs/` mounted into the backend container, test left alone
+
+*Claude Opus 5*
+
+**Decided:** `compose.yaml` mounts `./docs:/docs:ro` into the backend service.
+
+**Alternatives:** teach `test_task_reliability_doc.py` to find the file
+somewhere else or skip when it is absent; or copy `docs/` into the image.
+
+**Why this won:** the test's path was already right. The image copies only
+`backend/` to `/app`, so `/app` is the container's `<repo>/backend` and `/` is
+its `<repo>` — which makes `/docs` correct and merely empty. Mounting the real
+directory makes the container match the source layout, keeps documentation out
+of the image, and is read-only.
+
+Editing the test was the tempting option and the wrong one. It is passing and
+catching real drift between the document and the declared Celery tasks;
+loosening its path resolution to accommodate a packaging gap would have
+weakened a working guard to remove a red line. Skipping would have been worse —
+a check that quietly does nothing.
+
+**The wider reason it was worth fixing at all:** the suite had been ending with
+six failures that had to be explained away on every run. Of the first run's
+fourteen failures, eleven were environmental and one was the genuine coverage
+gap above — which the noise made easy to dismiss. A suite that habitually ends
+red is one whose next real failure nobody reads.
+
+---
+
 ## 2026-09-09 — One sign-in, by delegation rather than shared identity
 
 *Claude Opus 5*

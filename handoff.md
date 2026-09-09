@@ -1,7 +1,7 @@
 # Project Handoff — REGX
 
 Session date: 2026-09-09. Repo: `Praverse-Tech-Pvt-Ltd/RegX`, branch
-`regx/feat/legacy-port-and-sso` (off `regx-main`, 13 commits, 78 files, +5,547).
+`regx/feat/legacy-port-and-sso` (off `regx-main`, 17 commits, 87 files, +8,004).
 
 > **Read this first.** The repo contains **two unrelated codebases with no common
 > git ancestor**. `main` is the legacy iPharmaAI Django monolith; `regx-main` is
@@ -48,7 +48,7 @@ it is**; legacy patterns were converted to REGX conventions, not imported.
 
 ## 2. Current State
 
-**Branch:** `regx/feat/legacy-port-and-sso`, 13 commits ahead of `regx-main`.
+**Branch:** `regx/feat/legacy-port-and-sso`, 17 commits ahead of `regx-main`, open as PR #49.
 **Stack:** `docker compose`, 7 services — backend, frontend, company_site,
 nginx, postgres, redis, celery.
 
@@ -173,9 +173,16 @@ Full detail, including what the first two runs got wrong and why:
 | `company_site/AdminMaster/views.py` | Modified | `_authenticate()` — REGX first, local fallback. `login()` otherwise unchanged |
 | `backend/authorization/views.py` | Modified | `my_roles_view` — the caller's own role names |
 | `backend/authorization/urls.py` | Modified | Routed `/permissions/mine/` |
-| `backend/authorization/tests/test_authorization.py` | Modified | 5 tests for the above (**not yet executed**) |
+| `backend/authorization/tests/test_authorization.py` | Modified | 5 tests for the above. 9 passed |
 | `company_site/RAAI/settings_integration.py` | Modified | `REGX_AUTH_URL`; blank disables delegation |
 | `compose.yaml` | Modified | Passes `REGX_AUTH_URL` to company_site |
+
+### Test suite (this session)
+
+| File | Status | Purpose |
+|---|---|---|
+| `backend/common/tests/test_regulatory_claim_guard.py` | Modified | Four ported apps added to `GOVERNED_MODULES` — they were under no guard |
+| `compose.yaml` | Modified | Mounts `./docs:/docs:ro` so the doc-consistency tests can find their file |
 
 ### Ported features
 
@@ -240,6 +247,15 @@ workers. Database-backed here.
 ## 5. Failed Attempts
 
 Recorded so they are not repeated.
+
+**0. Ran the full test suite against the wrong settings module.**
+`pyproject.toml` sets `regx.settings.test`, but the container's environment sets
+`regx.settings.production` and the environment wins. Production has no
+`CELERY_TASK_ALWAYS_EAGER`, so queued tasks never ran and 7
+`external_integrations` tests failed with messages that read like genuine bugs
+(`ingest was never called`, `DocumentVersion matching query does not exist`).
+Nearly reported them as pre-existing failures. **Establish that the harness is
+right before drawing any conclusion from what it reports.**
 
 **1. Splitting the admin surface onto its own listener — failed three times.**
 Splitting the whole `/adminmaster/` prefix broke login; narrowing it 404'd the

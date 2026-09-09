@@ -105,6 +105,18 @@ rows and none can edit them. Do not add a tenant FK to one of these.
 
 ## Process
 
+**Never report a test result without checking the harness first.** A full-suite
+run against the wrong settings module produced seven failures that read as real
+bugs, and six more from a file the image does not contain. Eleven of fourteen
+failures were the environment. Before concluding anything from red output,
+confirm `-e DJANGO_SETTINGS_MODULE=regx.settings.test`, the `/docs` mount, and
+that no other pytest run is holding `test_regx`.
+
+**Do not edit a passing test to make a red line go away.** The documentation
+tests were failing on a path the image lacked; the fix was to mount the
+directory, not to loosen the test's path resolution or let it skip. A guard
+that is quietly disabled is worse than one that is loudly failing.
+
 **A 200 is not a passing test.** Two bugs this session returned HTTP 200
 throughout: a dropped report-type filter that bled data across reports, and a
 facets endpoint returning 7,458 rows instead of the distinct set. Check the
