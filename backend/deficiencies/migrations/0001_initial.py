@@ -6,34 +6,69 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('fda_data', '0003_substancesynonymmapping_rejected_by_and_more'),
+        ("fda_data", "0003_substancesynonymmapping_rejected_by_and_more"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='DeficiencyRecord',
+            name="DeficiencyRecord",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('public_id', models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, unique=True)),
-                ('corpus', models.CharField(choices=[('anda', 'ANDA Deficiency Roadmap'), ('major_cr', 'Major CR Roadmap')], db_index=True, max_length=20)),
-                ('main_category', models.CharField(db_index=True, max_length=500)),
-                ('dosage_form', models.CharField(db_index=True, max_length=500)),
-                ('cmc_section', models.CharField(db_index=True, max_length=500)),
-                ('deficiency_type', models.CharField(blank=True, max_length=500)),
-                ('category_of_deficiency', models.CharField(blank=True, max_length=500)),
-                ('deficiency', models.TextField(blank=True)),
-                ('source_row_number', models.PositiveIntegerField(blank=True, null=True)),
-                ('source_release', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='deficiency_records', to='fda_data.fdadatasourcerelease')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "public_id",
+                    models.UUIDField(
+                        db_index=True, default=uuid.uuid4, editable=False, unique=True
+                    ),
+                ),
+                (
+                    "corpus",
+                    models.CharField(
+                        choices=[
+                            ("anda", "ANDA Deficiency Roadmap"),
+                            ("major_cr", "Major CR Roadmap"),
+                        ],
+                        db_index=True,
+                        max_length=20,
+                    ),
+                ),
+                ("main_category", models.CharField(db_index=True, max_length=500)),
+                ("dosage_form", models.CharField(db_index=True, max_length=500)),
+                ("cmc_section", models.CharField(db_index=True, max_length=500)),
+                ("deficiency_type", models.CharField(blank=True, max_length=500)),
+                ("category_of_deficiency", models.CharField(blank=True, max_length=500)),
+                ("deficiency", models.TextField(blank=True)),
+                ("source_row_number", models.PositiveIntegerField(blank=True, null=True)),
+                (
+                    "source_release",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="deficiency_records",
+                        to="fda_data.fdadatasourcerelease",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['corpus', 'main_category', 'cmc_section', 'id'],
-                'indexes': [models.Index(fields=['corpus', 'main_category'], name='deficiencie_corpus_8c0a70_idx'), models.Index(fields=['corpus', 'dosage_form'], name='deficiencie_corpus_a59ff2_idx')],
+                "ordering": ["corpus", "main_category", "cmc_section", "id"],
+                "indexes": [
+                    models.Index(
+                        fields=["corpus", "main_category"], name="deficiencie_corpus_8c0a70_idx"
+                    ),
+                    models.Index(
+                        fields=["corpus", "dosage_form"], name="deficiencie_corpus_a59ff2_idx"
+                    ),
+                ],
             },
         ),
     ]

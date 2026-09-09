@@ -58,9 +58,7 @@ def my_roles_view(request):
     could not already infer about itself.
     """
     names = (
-        MembershipRole.objects.filter(
-            membership__user=request.user, membership__is_active=True
-        )
+        MembershipRole.objects.filter(membership__user=request.user, membership__is_active=True)
         .values_list("role__name", flat=True)
         .distinct()
     )

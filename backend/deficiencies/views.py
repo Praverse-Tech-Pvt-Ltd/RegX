@@ -11,14 +11,14 @@ recorded checksum, not by API writes.
 from django.db.models import Q
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.exceptions import NotFound
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from rest_framework.pagination import PageNumberPagination
 
 from .models import DeficiencyRecord
 from .permissions import CanViewDeficiencies
 from .serializers import DeficiencyFacetsSerializer, DeficiencyRecordSerializer
+
 
 class DeficiencyPagination(PageNumberPagination):
     """Same shape as FormulationsPagination: caller-controllable page size with
@@ -59,15 +59,20 @@ class DeficiencyListView(APIView):
             OpenApiParameter(name=f, description=f"Exact match on {f}", required=False, type=str)
             for f in FILTERS
         ]
-        + [OpenApiParameter(name="search", description="Free text over the deficiency body and classification", required=False, type=str)],
+        + [
+            OpenApiParameter(
+                name="search",
+                description="Free text over the deficiency body and classification",
+                required=False,
+                type=str,
+            )
+        ],
         responses=DeficiencyRecordSerializer(many=True),
     )
     def get(self, request):
         paginator = DeficiencyPagination()
         page = paginator.paginate_queryset(_filtered_queryset(request), request, view=self)
-        return paginator.get_paginated_response(
-            DeficiencyRecordSerializer(page, many=True).data
-        )
+        return paginator.get_paginated_response(DeficiencyRecordSerializer(page, many=True).data)
 
 
 class DeficiencyDetailView(APIView):

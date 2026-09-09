@@ -86,9 +86,7 @@ class CorrespondenceDraft(PublicIDModel, TimeStampedModel):
     company_logo_document = models.UUIDField(null=True, blank=True)
     signature_document = models.UUIDField(null=True, blank=True)
 
-    created_by = models.ForeignKey(
-        "identity.User", on_delete=models.PROTECT, related_name="+"
-    )
+    created_by = models.ForeignKey("identity.User", on_delete=models.PROTECT, related_name="+")
 
     class Meta:
         ordering = ["-created_at", "id"]

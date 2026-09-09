@@ -73,14 +73,42 @@ def corpus(db):
     from deficiencies.models import DeficiencyCorpus, DeficiencyRecord
 
     rows = [
-        ("anda", "Solid Oral-Deficiency", "Tablet", "Drug Product", "Dissolution",
-         "Minor", "Dissolution profile was not provided for the 25 mg strength."),
-        ("anda", "Solid Oral-Deficiency", "Capsule", "Drug Substance", "Impurities",
-         "Major", "Specification for total impurities is not justified."),
-        ("anda", "Injectable - General Deficiency", "Injection", "Microbiology",
-         "Sterility", "Major", "Sterility assurance data are incomplete."),
-        ("major_cr", "Topicals-Deficiency", "Cream", "Drug Product", "Packaging",
-         "Minor", "Container closure integrity testing was not submitted."),
+        (
+            "anda",
+            "Solid Oral-Deficiency",
+            "Tablet",
+            "Drug Product",
+            "Dissolution",
+            "Minor",
+            "Dissolution profile was not provided for the 25 mg strength.",
+        ),
+        (
+            "anda",
+            "Solid Oral-Deficiency",
+            "Capsule",
+            "Drug Substance",
+            "Impurities",
+            "Major",
+            "Specification for total impurities is not justified.",
+        ),
+        (
+            "anda",
+            "Injectable - General Deficiency",
+            "Injection",
+            "Microbiology",
+            "Sterility",
+            "Major",
+            "Sterility assurance data are incomplete.",
+        ),
+        (
+            "major_cr",
+            "Topicals-Deficiency",
+            "Cream",
+            "Drug Product",
+            "Packaging",
+            "Minor",
+            "Container closure integrity testing was not submitted.",
+        ),
     ]
     for c, cat, form, section, dtype, dcat, body in rows:
         DeficiencyRecord.objects.create(

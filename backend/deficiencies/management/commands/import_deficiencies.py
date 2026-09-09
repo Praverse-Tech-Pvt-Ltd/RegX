@@ -51,24 +51,22 @@ class Command(BaseCommand):
             raise CommandError("--xlsx requires --corpus.")
 
         batches = (
-            self._read_sqlite(o["sqlite"]) if o["sqlite"] else self._read_xlsx(o["xlsx"], o["corpus"])
+            self._read_sqlite(o["sqlite"])
+            if o["sqlite"]
+            else self._read_xlsx(o["xlsx"], o["corpus"])
         )
 
         for corpus, rows in batches:
             existing = DeficiencyRecord.objects.filter(corpus=corpus).count()
             if o["dry_run"]:
-                self.stdout.write(
-                    f"  {corpus:10} would replace {existing} with {len(rows)} rows"
-                )
+                self.stdout.write(f"  {corpus:10} would replace {existing} with {len(rows)} rows")
                 continue
             with transaction.atomic():
                 DeficiencyRecord.objects.filter(corpus=corpus).delete()
                 DeficiencyRecord.objects.bulk_create(
                     [DeficiencyRecord(corpus=corpus, **r) for r in rows], batch_size=500
                 )
-            self.stdout.write(
-                self.style.SUCCESS(f"  {corpus:10} {existing} -> {len(rows)} rows")
-            )
+            self.stdout.write(self.style.SUCCESS(f"  {corpus:10} {existing} -> {len(rows)} rows"))
 
     def _read_sqlite(self, path):
         conn = sqlite3.connect(path)
@@ -76,7 +74,13 @@ class Command(BaseCommand):
         out = []
         for table, corpus in LEGACY_TABLES.items():
             try:
-                cursor = conn.execute(f"select {','.join(LEGACY_COLUMNS)} from {table}")
+                # Both interpolated values are module-level constants
+                # (LEGACY_TABLES, LEGACY_COLUMNS) and no caller input reaches
+                # them. SQLite cannot parameterise a table or column
+                # identifier, so this is the only way to write it.
+                cursor = conn.execute(
+                    f"select {','.join(LEGACY_COLUMNS)} from {table}"  # noqa: S608
+                )
             except sqlite3.OperationalError as exc:
                 self.stderr.write(f"  skipping {table}: {exc}")
                 continue
@@ -123,10 +127,7 @@ class Command(BaseCommand):
         rows = []
         for n, (_, r) in enumerate(df.iterrows(), start=1):
             rows.append(
-                {
-                    k: ("" if r[src] is None else str(r[src]).strip())
-                    for k, src in mapping.items()
-                }
+                {k: ("" if r[src] is None else str(r[src]).strip()) for k, src in mapping.items()}
                 | {"source_row_number": n}
             )
         return [(corpus, rows)]

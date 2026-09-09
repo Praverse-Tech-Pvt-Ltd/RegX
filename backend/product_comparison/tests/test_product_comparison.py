@@ -85,6 +85,7 @@ def _make(client, **overrides):
 # Tenant isolation
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_a_comparison_is_invisible_to_another_tenant(alpha, beta):
     _make(alpha["client"])
@@ -111,6 +112,7 @@ def test_another_tenant_cannot_delete(alpha, beta):
 # Access control
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_anonymous_is_refused(db):
     assert APIClient().get(LIST).status_code in (401, 403)
@@ -135,6 +137,7 @@ def test_write_is_a_tenant_capability_not_platform_only():
 # Attributes and the matrix
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_setting_an_attribute_twice_updates_rather_than_duplicating(alpha):
     """(attribute, source) is unique per comparison, so PUT is an upsert. A
@@ -142,8 +145,12 @@ def test_setting_an_attribute_twice_updates_rather_than_duplicating(alpha):
     already filled."""
     created = _make(alpha["client"]).json()
     url = f"{LIST}{created['id']}/attributes/"
-    alpha["client"].put(url, {"attribute": "shape", "source": "rld", "value": "Round"}, format="json")
-    alpha["client"].put(url, {"attribute": "shape", "source": "rld", "value": "Oval"}, format="json")
+    alpha["client"].put(
+        url, {"attribute": "shape", "source": "rld", "value": "Round"}, format="json"
+    )
+    alpha["client"].put(
+        url, {"attribute": "shape", "source": "rld", "value": "Oval"}, format="json"
+    )
     stored = ComparisonAttribute.objects.filter(attribute="shape", source="rld")
     assert stored.count() == 1
     assert stored.first().value == "Oval"

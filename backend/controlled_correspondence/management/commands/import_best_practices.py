@@ -25,17 +25,16 @@ class Command(BaseCommand):
         try:
             conn = sqlite3.connect(options["sqlite"])
         except sqlite3.OperationalError as exc:
-            raise CommandError("Cannot open %s: %s" % (options["sqlite"], exc))
+            raise CommandError(f"Cannot open {options['sqlite']}: {exc}") from exc
         conn.row_factory = sqlite3.Row
         try:
             rows = conn.execute("select * from RATools_ccbestpractice").fetchall()
         except sqlite3.OperationalError as exc:
-            raise CommandError("Source table not readable: %s" % exc)
+            raise CommandError(f"Source table not readable: {exc}") from exc
 
         if options["dry_run"]:
             self.stdout.write(
-                "  best practices would replace %d with %d"
-                % (BestPractice.objects.count(), len(rows))
+                f"  best practices would replace {BestPractice.objects.count()} with {len(rows)}"
             )
             return
 
@@ -53,5 +52,5 @@ class Command(BaseCommand):
                 batch_size=500,
             )
         self.stdout.write(
-            self.style.SUCCESS("  best practices %d entries" % BestPractice.objects.count())
+            self.style.SUCCESS(f"  best practices {BestPractice.objects.count()} entries")
         )

@@ -83,7 +83,9 @@ def _draft_or_404(public_id):
 
 class DraftListView(APIView):
     def get_permissions(self):
-        return [CanManageCorrespondence()] if self.request.method == "POST" else [CanViewCorrespondence()]
+        if self.request.method == "POST":
+            return [CanManageCorrespondence()]
+        return [CanViewCorrespondence()]
 
     @extend_schema(responses=CorrespondenceDraftSerializer(many=True))
     def get(self, request):
@@ -92,9 +94,7 @@ class DraftListView(APIView):
             qs = qs.filter(status=request.query_params["status"])
         paginator = CorrespondencePagination()
         page = paginator.paginate_queryset(qs, request, view=self)
-        return paginator.get_paginated_response(
-            CorrespondenceDraftSerializer(page, many=True).data
-        )
+        return paginator.get_paginated_response(CorrespondenceDraftSerializer(page, many=True).data)
 
     @extend_schema(
         request=CorrespondenceDraftWriteSerializer, responses=CorrespondenceDraftSerializer
@@ -112,7 +112,9 @@ class DraftListView(APIView):
 
 class DraftDetailView(APIView):
     def get_permissions(self):
-        return [CanViewCorrespondence()] if self.request.method == "GET" else [CanManageCorrespondence()]
+        if self.request.method == "GET":
+            return [CanViewCorrespondence()]
+        return [CanManageCorrespondence()]
 
     @extend_schema(responses=CorrespondenceDraftSerializer)
     def get(self, request, public_id):

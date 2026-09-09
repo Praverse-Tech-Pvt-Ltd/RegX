@@ -1,7 +1,7 @@
 """REGX root URL configuration."""
 
-from django.urls import include, path
 from csp.decorators import csp_update
+from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 urlpatterns = [

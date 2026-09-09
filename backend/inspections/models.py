@@ -73,9 +73,7 @@ class Form483System(PublicIDModel, TimeStampedModel):
 class Form483Observation(PublicIDModel, TimeStampedModel):
     """A numbered observation under a system."""
 
-    system = models.ForeignKey(
-        Form483System, on_delete=models.CASCADE, related_name="observations"
-    )
+    system = models.ForeignKey(Form483System, on_delete=models.CASCADE, related_name="observations")
     observation_number = models.PositiveIntegerField()
 
     #: Narrative text. Held on the observation rather than in a separate content

@@ -46,13 +46,28 @@ class AttributeSource(models.TextChoices):
 #: keeps a comparison readable without a join and lets a tenant record an
 #: attribute this list does not yet name.
 TABLET_ATTRIBUTES = [
-    "shape", "color", "scoring", "score_depth", "avg_thickness", "avg_width",
-    "avg_length", "largest_dimension", "volume", "surface_area",
-    "cross_sectional_area", "picture",
+    "shape",
+    "color",
+    "scoring",
+    "score_depth",
+    "avg_thickness",
+    "avg_width",
+    "avg_length",
+    "largest_dimension",
+    "volume",
+    "surface_area",
+    "cross_sectional_area",
+    "picture",
 ]
 CAPSULE_ATTRIBUTES = [
-    "shape", "color", "size", "length", "external_diameter", "volume",
-    "surface_area", "picture",
+    "shape",
+    "color",
+    "size",
+    "length",
+    "external_diameter",
+    "volume",
+    "surface_area",
+    "picture",
 ]
 
 
@@ -71,9 +86,7 @@ class ProductComparison(PublicIDModel, TimeStampedModel):
     company_product_name = models.CharField(max_length=255, blank=True)
     notes = models.TextField(blank=True)
 
-    created_by = models.ForeignKey(
-        "identity.User", on_delete=models.PROTECT, related_name="+"
-    )
+    created_by = models.ForeignKey("identity.User", on_delete=models.PROTECT, related_name="+")
 
     class Meta:
         ordering = ["-created_at", "id"]
@@ -81,11 +94,7 @@ class ProductComparison(PublicIDModel, TimeStampedModel):
 
     @property
     def known_attributes(self):
-        return (
-            TABLET_ATTRIBUTES
-            if self.product_type == ProductType.TABLET
-            else CAPSULE_ATTRIBUTES
-        )
+        return TABLET_ATTRIBUTES if self.product_type == ProductType.TABLET else CAPSULE_ATTRIBUTES
 
     def __str__(self):
         return f"{self.rld_product_name} vs {self.company_product_name or 'company product'}"

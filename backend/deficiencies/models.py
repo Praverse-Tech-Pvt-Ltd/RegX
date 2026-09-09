@@ -39,9 +39,7 @@ class DeficiencyRecord(PublicIDModel, TimeStampedModel):
     siblings are the sanctioned mechanism when that work happens.
     """
 
-    corpus = models.CharField(
-        max_length=20, choices=DeficiencyCorpus.choices, db_index=True
-    )
+    corpus = models.CharField(max_length=20, choices=DeficiencyCorpus.choices, db_index=True)
     main_category = models.CharField(max_length=500, db_index=True)
     dosage_form = models.CharField(max_length=500, db_index=True)
     cmc_section = models.CharField(max_length=500, db_index=True)

@@ -67,9 +67,7 @@ class TestMyRolesView:
         other = get_user_model().objects.create_user(
             email="other@roles.test", password="TestPass1234!", full_name="Other"
         )
-        other_membership = TenantMembership.objects.create(
-            tenant=membership.tenant, user=other
-        )
+        other_membership = TenantMembership.objects.create(tenant=membership.tenant, user=other)
         role = Role.objects.create(name=Role.BuiltIn.VP, tenant=membership.tenant)
         MembershipRole.objects.create(membership=other_membership, role=role)
 

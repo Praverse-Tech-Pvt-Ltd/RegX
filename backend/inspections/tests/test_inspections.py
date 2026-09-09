@@ -6,8 +6,6 @@ instead of values, and the observation-count annotation double-counting across a
 join.
 """
 
-from datetime import date
-
 import pytest
 from rest_framework.test import APIClient
 
@@ -25,6 +23,7 @@ LETTERS = "/api/regx/v1/inspections/warning-letters/"
 # --------------------------------------------------------------------------
 # Access control
 # --------------------------------------------------------------------------
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("url", [F483, FACETS, OBS, LETTERS])
@@ -65,6 +64,7 @@ def test_only_platform_support_may_import():
 # --------------------------------------------------------------------------
 # Form 483 list, filters, counts
 # --------------------------------------------------------------------------
+
 
 @pytest.mark.django_db
 def test_lists_every_inspection(corpus, client):
@@ -126,6 +126,7 @@ def test_undated_inspection_reports_no_year_rather_than_failing(client, db):
 # Detail
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_detail_nests_systems_and_observations(corpus, client):
     listed = client.get(F483 + "?company_name=Acme").json()["results"][0]
@@ -160,6 +161,7 @@ def test_response_exposes_public_id_and_never_the_pk(corpus, client):
 # Observation search
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_search_matches_observation_text(corpus, client):
     body = client.get(OBS + "?search=sterility").json()
@@ -188,6 +190,7 @@ def test_observation_filters_combine(corpus, client):
 # Warning letters
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_warning_letters_list_and_filter(corpus, client):
     assert client.get(LETTERS).json()["count"] == 1
@@ -199,6 +202,7 @@ def test_warning_letters_list_and_filter(corpus, client):
 # --------------------------------------------------------------------------
 # Facets
 # --------------------------------------------------------------------------
+
 
 @pytest.mark.django_db
 def test_facets_are_distinct_values_not_rows(corpus, client):
@@ -224,6 +228,7 @@ def test_facets_are_derived_from_the_data(client, db):
 # --------------------------------------------------------------------------
 # Model constraint
 # --------------------------------------------------------------------------
+
 
 @pytest.mark.django_db
 def test_observation_number_is_unique_per_system(corpus):

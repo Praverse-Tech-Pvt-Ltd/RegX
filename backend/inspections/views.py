@@ -91,9 +91,7 @@ class Form483ListView(APIView):
 
         paginator = InspectionsPagination()
         page = paginator.paginate_queryset(qs, request, view=self)
-        return paginator.get_paginated_response(
-            Form483InspectionSerializer(page, many=True).data
-        )
+        return paginator.get_paginated_response(Form483InspectionSerializer(page, many=True).data)
 
 
 class Form483DetailView(APIView):
@@ -145,9 +143,7 @@ class ObservationSearchView(APIView):
 
         paginator = InspectionsPagination()
         page = paginator.paginate_queryset(qs, request, view=self)
-        return paginator.get_paginated_response(
-            Form483ObservationSerializer(page, many=True).data
-        )
+        return paginator.get_paginated_response(Form483ObservationSerializer(page, many=True).data)
 
 
 class WarningLetterListView(APIView):
@@ -200,9 +196,7 @@ class InspectionFacetsView(APIView):
             # .order_by() first: Meta.ordering otherwise joins the SELECT and
             # DISTINCT then applies to the tuple, returning one entry per row.
             return sorted(
-                v
-                for v in model.objects.order_by().values_list(field, flat=True).distinct()
-                if v
+                v for v in model.objects.order_by().values_list(field, flat=True).distinct() if v
             )
 
         years = sorted(
@@ -226,4 +220,3 @@ class InspectionFacetsView(APIView):
                 }
             ).data
         )
-

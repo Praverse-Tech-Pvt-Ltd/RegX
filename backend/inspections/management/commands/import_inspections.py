@@ -40,7 +40,7 @@ class Command(BaseCommand):
         try:
             conn = sqlite3.connect(options["sqlite"])
         except sqlite3.OperationalError as exc:
-            raise CommandError("Cannot open %s: %s" % (options["sqlite"], exc))
+            raise CommandError(f"Cannot open {options['sqlite']}: {exc}") from exc
         conn.row_factory = sqlite3.Row
 
         wanted = {options["only"]} if options["only"] else {"form483", "warning_letters"}
@@ -54,7 +54,7 @@ class Command(BaseCommand):
         try:
             masters = conn.execute("select * from AIDatabase_form483master").fetchall()
         except sqlite3.OperationalError as exc:
-            self.stderr.write("  form483: skipped (%s)" % exc)
+            self.stderr.write(f"  form483: skipped ({exc})")
             return
 
         if dry_run:
@@ -62,8 +62,8 @@ class Command(BaseCommand):
                 "select count(*) from AIDatabase_form483observation"
             ).fetchone()[0]
             self.stdout.write(
-                "  form483         would replace %d inspections with %d (%d observations)"
-                % (Form483Inspection.objects.count(), len(masters), observations)
+                f"  form483         would replace {Form483Inspection.objects.count()} "
+                f"inspections with {len(masters)} ({observations} observations)"
             )
             return
 
@@ -100,8 +100,8 @@ class Command(BaseCommand):
                         # rest are reported rather than silently dropped.
                         if number in seen_numbers:
                             self.stderr.write(
-                                "    duplicate observation %s under system %s (%s) - skipped"
-                                % (number, system.system, inspection.company_name)
+                                f"    duplicate observation {number} under system "
+                                f"{system.system} ({inspection.company_name}) - skipped"
                             )
                             continue
                         seen_numbers.add(number)
@@ -114,15 +114,13 @@ class Command(BaseCommand):
                             system=system,
                             observation_number=number,
                             content="\n\n".join(
-                                _text(part["content"])
-                                for part in parts
-                                if _text(part["content"])
+                                _text(part["content"]) for part in parts if _text(part["content"])
                             ),
                         )
         self.stdout.write(
             self.style.SUCCESS(
-                "  form483         %d inspections, %d observations"
-                % (Form483Inspection.objects.count(), Form483Observation.objects.count())
+                f"  form483         {Form483Inspection.objects.count()} inspections, "
+                f"{Form483Observation.objects.count()} observations"
             )
         )
 
@@ -131,13 +129,12 @@ class Command(BaseCommand):
         try:
             rows = conn.execute("select * from AIDatabase_warningletter").fetchall()
         except sqlite3.OperationalError as exc:
-            self.stderr.write("  warning_letters: skipped (%s)" % exc)
+            self.stderr.write(f"  warning_letters: skipped ({exc})")
             return
 
         if dry_run:
             self.stdout.write(
-                "  warning_letters would replace %d with %d"
-                % (WarningLetter.objects.count(), len(rows))
+                f"  warning_letters would replace {WarningLetter.objects.count()} with {len(rows)}"
             )
             return
 
@@ -162,5 +159,5 @@ class Command(BaseCommand):
                 batch_size=500,
             )
         self.stdout.write(
-            self.style.SUCCESS("  warning_letters %d letters" % WarningLetter.objects.count())
+            self.style.SUCCESS(f"  warning_letters {WarningLetter.objects.count()} letters")
         )

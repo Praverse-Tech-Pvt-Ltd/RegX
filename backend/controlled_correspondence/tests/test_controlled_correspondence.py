@@ -99,6 +99,7 @@ def _make_draft(client, **overrides):
 # Best practices: published guidance, read-only
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_anonymous_is_refused(guidance):
     assert APIClient().get(PRACTICES).status_code in (401, 403)
@@ -135,6 +136,7 @@ def test_categories_are_distinct_values_not_rows(guidance, alpha):
 # Drafts: tenant work product
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_a_draft_is_invisible_to_another_tenant(alpha, beta):
     _make_draft(alpha["client"])
@@ -156,9 +158,7 @@ def test_draft_defaults_to_draft_status(alpha):
 @pytest.mark.django_db
 def test_draft_can_be_updated_and_filtered_by_status(alpha):
     created = _make_draft(alpha["client"]).json()
-    alpha["client"].patch(
-        f"{DRAFTS}{created['id']}/", {"status": "submitted"}, format="json"
-    )
+    alpha["client"].patch(f"{DRAFTS}{created['id']}/", {"status": "submitted"}, format="json")
     assert alpha["client"].get(DRAFTS + "?status=submitted").json()["count"] == 1
     assert alpha["client"].get(DRAFTS + "?status=draft").json()["count"] == 0
 

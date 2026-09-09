@@ -66,9 +66,9 @@ def analyse_execution(execution: ChecklistExecution) -> dict:
     """
     responses = {
         response.question_id: response
-        for response in ChecklistResponse.objects.filter(
-            execution=execution
-        ).select_related("question", "question__section")
+        for response in ChecklistResponse.objects.filter(execution=execution).select_related(
+            "question", "question__section"
+        )
     }
     questions = (
         ChecklistQuestion.objects.filter(section__checklist_version=execution.checklist_version)
@@ -84,8 +84,14 @@ def analyse_execution(execution: ChecklistExecution) -> dict:
         section_name = question.section.title
         bucket = sections.setdefault(
             section_name,
-            {"section": section_name, "answered": 0, "gaps": 0, "unanswered": 0,
-             "not_applicable": 0, "score_percent": None},
+            {
+                "section": section_name,
+                "answered": 0,
+                "gaps": 0,
+                "unanswered": 0,
+                "not_applicable": 0,
+                "score_percent": None,
+            },
         )
 
         response = responses.get(question.id)

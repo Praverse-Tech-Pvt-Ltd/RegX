@@ -21,6 +21,7 @@ FACETS = "/api/regx/v1/deficiencies/facets/"
 # Access control
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_anonymous_is_refused(corpus):
     assert APIClient().get(LIST).status_code in (401, 403)
@@ -56,7 +57,7 @@ def test_the_corpus_is_read_only_over_http(corpus, client):
 
 def test_only_platform_support_may_import():
     """A tenant cannot edit FDA reference material, however senior."""
-    for role, perms in ROLE_PERMISSIONS.items():
+    for perms in ROLE_PERMISSIONS.values():
         assert PERM_VIEW in perms
     assert PERM_IMPORT in ROLE_PERMISSIONS["platform_support"]
     for role in ("doer", "reviewer", "vp", "tenant_admin"):
@@ -66,6 +67,7 @@ def test_only_platform_support_may_import():
 # --------------------------------------------------------------------------
 # Filtering
 # --------------------------------------------------------------------------
+
 
 @pytest.mark.django_db
 def test_lists_the_whole_corpus_by_default(corpus, client):
@@ -111,6 +113,7 @@ def test_search_matching_nothing_returns_empty_not_everything(corpus, client):
 # Facets
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.django_db
 def test_facets_are_distinct_values_not_rows(corpus, client):
     """Regression: Meta.ordering leaks into SELECT DISTINCT, so an unguarded
@@ -133,6 +136,7 @@ def test_facets_are_derived_from_the_data(client, db):
 # --------------------------------------------------------------------------
 # Serialisation
 # --------------------------------------------------------------------------
+
 
 @pytest.mark.django_db
 def test_response_exposes_public_id_and_never_the_pk(corpus, client):

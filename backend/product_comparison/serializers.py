@@ -20,8 +20,14 @@ class ProductComparisonSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductComparison
         fields = [
-            "id", "product_type", "rld_product_name", "company_product_name",
-            "notes", "known_attributes", "attributes", "created_at",
+            "id",
+            "product_type",
+            "rld_product_name",
+            "company_product_name",
+            "notes",
+            "known_attributes",
+            "attributes",
+            "created_at",
         ]
         read_only_fields = ["id", "known_attributes", "attributes", "created_at"]
 

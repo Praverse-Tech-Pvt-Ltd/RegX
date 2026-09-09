@@ -40,9 +40,7 @@ def _tenant():
 def _get_or_404(public_id):
     """Scope by tenant before identity: another tenant's comparison must be
     indistinguishable from one that does not exist."""
-    comparison = ProductComparison.objects.filter(
-        public_id=public_id, tenant=_tenant()
-    ).first()
+    comparison = ProductComparison.objects.filter(public_id=public_id, tenant=_tenant()).first()
     if comparison is None:
         raise NotFound("Comparison not found.")
     return comparison
@@ -50,7 +48,9 @@ def _get_or_404(public_id):
 
 class ComparisonListView(APIView):
     def get_permissions(self):
-        return [CanManageProductComparisons()] if self.request.method == "POST" else [CanViewProductComparisons()]
+        if self.request.method == "POST":
+            return [CanManageProductComparisons()]
+        return [CanViewProductComparisons()]
 
     @extend_schema(responses=ProductComparisonSerializer(many=True))
     def get(self, request):
@@ -59,13 +59,9 @@ class ComparisonListView(APIView):
             qs = qs.filter(product_type=request.query_params["product_type"])
         paginator = ComparisonPagination()
         page = paginator.paginate_queryset(qs, request, view=self)
-        return paginator.get_paginated_response(
-            ProductComparisonSerializer(page, many=True).data
-        )
+        return paginator.get_paginated_response(ProductComparisonSerializer(page, many=True).data)
 
-    @extend_schema(
-        request=ProductComparisonWriteSerializer, responses=ProductComparisonSerializer
-    )
+    @extend_schema(request=ProductComparisonWriteSerializer, responses=ProductComparisonSerializer)
     def post(self, request):
         serializer = ProductComparisonWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -80,20 +76,18 @@ class ComparisonListView(APIView):
 
 class ComparisonDetailView(APIView):
     def get_permissions(self):
-        return [CanViewProductComparisons()] if self.request.method == "GET" else [CanManageProductComparisons()]
+        if self.request.method == "GET":
+            return [CanViewProductComparisons()]
+        return [CanManageProductComparisons()]
 
     @extend_schema(responses=ProductComparisonSerializer)
     def get(self, request, public_id):
         return Response(ProductComparisonSerializer(_get_or_404(public_id)).data)
 
-    @extend_schema(
-        request=ProductComparisonWriteSerializer, responses=ProductComparisonSerializer
-    )
+    @extend_schema(request=ProductComparisonWriteSerializer, responses=ProductComparisonSerializer)
     def patch(self, request, public_id):
         comparison = _get_or_404(public_id)
-        serializer = ProductComparisonWriteSerializer(
-            comparison, data=request.data, partial=True
-        )
+        serializer = ProductComparisonWriteSerializer(comparison, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(ProductComparisonSerializer(comparison).data)
@@ -141,14 +135,10 @@ class ComparisonMatrixView(APIView):
     @extend_schema(responses=ComparisonMatrixSerializer)
     def get(self, request, public_id):
         comparison = _get_or_404(public_id)
-        stored = {
-            (a.attribute, a.source): a for a in comparison.attributes.all()
-        }
+        stored = {(a.attribute, a.source): a for a in comparison.attributes.all()}
         sources = [s.value for s in AttributeSource]
         # Known attributes first, then anything the tenant added beyond the list.
-        extra = sorted(
-            {a for a, _ in stored} - set(comparison.known_attributes)
-        )
+        extra = sorted({a for a, _ in stored} - set(comparison.known_attributes))
         rows = []
         for attribute in list(comparison.known_attributes) + extra:
             row = {"attribute": attribute}

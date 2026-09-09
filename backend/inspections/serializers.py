@@ -35,9 +35,16 @@ class Form483InspectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Form483Inspection
         fields = [
-            "id", "company_name", "city", "state", "country",
-            "type_of_establishment", "date_of_inspection", "year_of_inspection",
-            "investigator_name", "observation_count",
+            "id",
+            "company_name",
+            "city",
+            "state",
+            "country",
+            "type_of_establishment",
+            "date_of_inspection",
+            "year_of_inspection",
+            "investigator_name",
+            "observation_count",
         ]
         read_only_fields = fields
 
@@ -46,7 +53,7 @@ class Form483InspectionDetailSerializer(Form483InspectionSerializer):
     systems = Form483SystemSerializer(many=True, read_only=True)
 
     class Meta(Form483InspectionSerializer.Meta):
-        fields = Form483InspectionSerializer.Meta.fields + ["systems"]
+        fields = [*Form483InspectionSerializer.Meta.fields, "systems"]
         read_only_fields = fields
 
 
@@ -56,9 +63,17 @@ class WarningLetterSerializer(serializers.ModelSerializer):
     class Meta:
         model = WarningLetter
         fields = [
-            "id", "company_name", "recipient_name", "date_of_issue", "location",
-            "city_state", "country", "date_of_inspection", "investigator_names",
-            "body", "summary",
+            "id",
+            "company_name",
+            "recipient_name",
+            "date_of_issue",
+            "location",
+            "city_state",
+            "country",
+            "date_of_inspection",
+            "investigator_names",
+            "body",
+            "summary",
         ]
         read_only_fields = fields
 
