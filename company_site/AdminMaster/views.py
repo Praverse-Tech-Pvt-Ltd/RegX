@@ -10,6 +10,11 @@ import uuid
 
 from django.shortcuts import render, redirect, get_object_or_404
 from decouple import config
+import logging
+
+from . import regx_auth
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 def homepage(request):
@@ -57,6 +62,32 @@ def adminbase(request):
 
 
 
+def _authenticate(username, password):
+    """Check credentials against REGX first, then against this application.
+
+    REGX is the authority: a person with a REGX account signs in here with the
+    same email and password they use at /signin, and gets a `CustomUser`
+    mirroring their REGX role. See `AdminMaster.regx_auth`.
+
+    The local check stays as a fallback for the accounts REGX does not know --
+    the Django superuser and any pre-existing company account -- and for the
+    case where REGX is unreachable. It cannot be used to bypass REGX: mirrored
+    accounts are saved with an unusable password, so `auth.authenticate` can
+    never succeed for one.
+    """
+    try:
+        user = regx_auth.authenticate(username, password)
+    except regx_auth.RegxUnavailable as exc:
+        # An outage must not lock out the accounts this application can still
+        # verify on its own, so fall through rather than fail the login.
+        logger.warning("REGX auth unavailable, falling back to local: %s", exc)
+    else:
+        if user is not None:
+            return user
+
+    return auth.authenticate(username=username, password=password)
+
+
 def login(request):
     if request.method == "GET":
         return render(request, "AdminMaster/login.html")
@@ -64,7 +95,7 @@ def login(request):
     elif request.method == "POST":
         username = request.POST["username"]
         password = request.POST["password"]
-        user = auth.authenticate(username=username, password=password)
+        user = _authenticate(username, password)
 
         if user is not None:
             cookie_token = request.COOKIES.get("device_token")

@@ -40,3 +40,28 @@ def effective_permissions_view(request):
         .order_by("codename")
     )
     return Response(list(perms))
+
+
+@extend_schema(tags=["authorization"])
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def my_roles_view(request):
+    """Return the caller's own role names, across every active membership.
+
+    `role_list_view` lists the roles that exist and `effective_permissions_view`
+    lists what the caller may do; neither answers "which role am I". A relying
+    application that has to translate a REGX identity into its own role model
+    needs exactly that, and inferring it back from a permission set is guesswork
+    the moment a role's permissions are edited.
+
+    Read-only and scoped to `request.user`, so it discloses nothing the caller
+    could not already infer about itself.
+    """
+    names = (
+        MembershipRole.objects.filter(
+            membership__user=request.user, membership__is_active=True
+        )
+        .values_list("role__name", flat=True)
+        .distinct()
+    )
+    return Response({"roles": sorted(set(names))})

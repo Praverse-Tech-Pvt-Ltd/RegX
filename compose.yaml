@@ -184,6 +184,11 @@ services:
       # on their device-token second step for non-internal users. Left
       # overridable so a real deployment can opt into the stricter path.
       SERVER: ${COMPANY_SERVER_MODE:-LOCAL}
+      # Makes the company login delegate to REGX, so one credential set opens
+      # both applications. Container-to-container, so it names the backend
+      # service rather than the nginx origin. Blank disables the delegation and
+      # the login checks passwords locally, as it did before.
+      REGX_AUTH_URL: ${REGX_AUTH_URL:-http://backend:8000}
     volumes:
       # The SQLite file lives in a named volume so company logins, demo
       # bookings and session rows survive an image rebuild. docker-entrypoint.sh

@@ -91,3 +91,17 @@ CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 MIDDLEWARE = MIDDLEWARE + [  # noqa: F405
     "RAAI.slash_tolerance.SlashToleranceMiddleware",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Shared sign-in
+# ---------------------------------------------------------------------------
+# The company login posts its credentials to REGX and mirrors the resulting
+# identity into a CustomUser, so one email and password opens both
+# applications. See AdminMaster.regx_auth for why this is an API call and not a
+# shared session cookie.
+#
+# Blank disables it and the login falls back to checking passwords locally,
+# which is the behaviour this application had before. Points at the backend
+# container, not the nginx origin: this is server-to-server traffic.
+REGX_AUTH_URL = config("REGX_AUTH_URL", default="")
