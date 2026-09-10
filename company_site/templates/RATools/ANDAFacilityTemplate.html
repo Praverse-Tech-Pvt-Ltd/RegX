@@ -4,11 +4,10 @@
 <div class="card">
   {% if show_flag %}
   <div style="display: flex; justify-content: right; align-items: center; height: 10vh; margin-right: 20px;">
-    <button style="background-color: #007bff; color: white; border-radius: 5px; padding: 10px 20px; border: none;">
-      <a href="{% url 'download_document' 'ANDAFacilityTemplate' %}" style="color: white; text-decoration: none; font-weight: bold;">
+    <a href="{% url 'download_document' 'ANDAFacilityTemplate' %}"
+       style="display: inline-block; background-color: #007bff; color: white; border-radius: 5px; padding: 10px 20px; border: none; text-decoration: none; font-weight: bold;">
         Download Document
-      </a>
-    </button>
+    </a>
   </div>
   {% endif %}
     <div class="card-body-main">

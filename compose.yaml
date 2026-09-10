@@ -180,7 +180,12 @@ services:
       DEBUG: "False"
       SECRET_KEY: ${COMPANY_SECRET_KEY:?COMPANY_SECRET_KEY is required}
       ALLOWED_HOSTS: localhost,127.0.0.1,company_site,nginx
-      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+      # 8090 is a separate browser origin from 8080. nginx forwards
+      # `Host $$host` without the port, so Django cannot match the POST's
+      # Origin against the request host and falls through to this list.
+      # Omitting 8090 makes every POST on the admin listener -- the login
+      # included -- fail CSRF with a 403 while GETs still return 200.
+      CSRF_TRUSTED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost:8090,http://127.0.0.1:8090
       COMPANY_REDIS_URL: redis://redis:6379/1
       COMPANY_DB_PATH: /app/data/db.sqlite3
       # Required by AIDatabase.context_processors.base_url, which runs on

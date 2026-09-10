@@ -2,8 +2,16 @@
 # assets that the application process never opens.
 
 # nginx serves /static/ straight off the host tree (see compose.yaml), and
-# Django only ever builds {% static %} URLs — it never reads these files.
+# Django only builds {% static %} URLs for the rest of this tree.
 static/
+
+# ...with one exception. RATools.views.download_document OPENS these files
+# from STATICFILES_DIRS[0], so they have to exist inside the container:
+#   /ratools/download/ANDAFacilityTemplate/
+#   /ratools/download/TemplateforAPIFacilitydetails/
+#   /ratools/download/Controlled Correspondences Templates/
+# Excluding them made all three Download Document buttons return 404. ~4.4 MB.
+!static/documents/
 
 # media/ is bind-mounted read-write instead of baked in, so that uploads made
 # by the running app and the files nginx serves are the same bytes.
