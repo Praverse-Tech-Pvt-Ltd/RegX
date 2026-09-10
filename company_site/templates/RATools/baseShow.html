@@ -6,6 +6,26 @@
         border: 1px solid black;
     }
 
+    /* Every block on this page began at x=270px, exactly where the fixed
+       sidebar ends, so the home icon, the Add Checklist button and the table
+       card were all touching it. A gutter on the wrapper moves them together
+       and keeps them aligned with each other.
+       !important because RAToolsBase sets `padding: 0` inline on this
+       element, and an inline style beats a stylesheet rule.
+       Scoped to this file, so the landing page's full-bleed hero is
+       untouched -- baseShow.html is not rendered there. */
+    #tt-main {
+        padding-left: 28px !important;
+        padding-right: 28px !important;
+    }
+
+    @media (max-width: 991px) {
+        #tt-main {
+            padding-left: 16px !important;
+            padding-right: 16px !important;
+        }
+    }
+
     /* ---- Toolbar ------------------------------------------------------ */
     .tt-search { position: relative; max-width: 340px; margin-left: auto; }
     .tt-search-icon {
