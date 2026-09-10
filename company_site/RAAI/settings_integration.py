@@ -39,7 +39,14 @@ ALLOWED_HOSTS = config(
 # browser's origin (the nginx port) differs from the container's own host.
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
-    default="http://localhost:8080,http://127.0.0.1:8080",
+    default=(
+        "http://localhost:8080,http://127.0.0.1:8080,"
+        # The 8090 admin listener is a separate browser origin, so it needs
+        # its own entry: nginx forwards `Host $host` without the port, which
+        # makes every POST here fall through to this list. Without it the
+        # admin login and every admin form fail CSRF with a 403.
+        "http://localhost:8090,http://127.0.0.1:8090"
+    ),
     cast=Csv(),
 )
 
