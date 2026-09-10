@@ -53,6 +53,15 @@ USAGE
 
 Idempotent: run it as often as you like. Every object is looked up before it is
 created, and a second run reports zeros.
+
+WHY THIS LIVES IN `iig_checklist`
+---------------------------------
+It seeds tenants and accounts too, so `common` looked like the natural home.
+It is not: the `common-has-no-domain-imports` import-linter contract forbids
+`common` from importing any domain app, and this command needs iig_checklist,
+formulations, tenancy, identity and authorization. `iig_checklist` already
+depends on all of those, and nothing may import it back, so it is the correct
+layer for a command that composes them.
 """
 
 from __future__ import annotations
