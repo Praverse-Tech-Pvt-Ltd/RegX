@@ -884,6 +884,14 @@
       text-align: center;
     }
 
+    /* These two rules hide every section until an IntersectionObserver adds
+       `.in`. That makes the animation load-bearing: with no JavaScript the
+       class never arrives and the whole page -- hero, all nine tool cards,
+       every section -- stays blank. The <noscript> block in <head> covers
+       that case. It does NOT cover JS that loads and then throws before the
+       observer is wired up; the observer currently sits in the same IIFE as
+       the Lenis setup, so an exception there takes the page's visibility with
+       it. Worth separating, but that needs a browser that renders to test. */
     .reveal {
       opacity: 0;
       transform: translateY(28px);
@@ -893,6 +901,41 @@
     .reveal.in {
       opacity: 1;
       transform: translateY(0);
+    }
+
+    /* Readers who ask for less motion get the content, not the choreography. */
+    @media (prefers-reduced-motion: reduce) {
+      .reveal {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+    }
+
+    /* Keyboard users need to see where they are, and to be able to jump the
+       sidebar's 30-odd links to reach the page itself. */
+    .tt-skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      z-index: 1100;
+      padding: 10px 16px;
+      background: #023e5f;
+      color: #fff;
+      border-radius: 0 0 6px 0;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .tt-skip-link:focus {
+      left: 0;
+    }
+
+    .dashboard-sidebar-link:focus-visible,
+    .sidebar-toggle-btn:focus-visible,
+    .tt-card a:focus-visible {
+      outline: 3px solid #0b7fc7;
+      outline-offset: 2px;
     }
 
     @media (max-width: 1080px) {
@@ -1048,6 +1091,16 @@
       overflow-y: auto !important;
 
       z-index: 998 !important;
+    }
+
+    /* Only while the sidebar has somewhere to scroll. Reaching its top or
+       bottom otherwise hands the leftover wheel delta to the page, so the
+       main content lurches with the pointer still over the sidebar. Applying
+       this unconditionally would be worse: with the accordions collapsed the
+       sidebar fits, and the wheel would do nothing at all over it. The class
+       is toggled in script, below. */
+    .dashboard-sidebar.is-scrollable {
+      overscroll-behavior: contain !important;
     }
 
     /* INNER */
@@ -1311,19 +1364,35 @@
       width:145px !important;
     }
   </style>
+  <noscript>
+    <style>
+      /* Without JavaScript nothing ever adds `.in`, so the reveal styles would
+         leave this page permanently blank. Show everything instead. */
+      .reveal {
+        opacity: 1 !important;
+        transform: none !important;
+      }
+    </style>
+  </noscript>
 </head>
 
 <body>
   <div class="tt-shell">
+    <a class="tt-skip-link" href="#tt-main">Skip to main content</a>
     {% include 'navbar.html' %}
 
     <div class="container-fluid page-body-wrapper dashboard-page-body dashboard-layout" id="dashboardLayout">
+      <!-- data-lenis-prevent is added by script whenever this sidebar
+           actually overflows: Lenis captures wheel events for the whole
+           document, so without it scrolling over the sidebar scrolled the
+           main page instead of the sidebar's own content. -->
       <nav class="dashboard-sidebar" id="sidebar">
 
         <div class="dashboard-sidebar-inner">
 
           <div class="sidebar-toggle-row">
-            <button type="button" class="sidebar-toggle-btn" id="sidebarToggle">
+            <button type="button" class="sidebar-toggle-btn" id="sidebarToggle"
+              aria-label="Collapse tool sidebar" aria-expanded="true" aria-controls="sidebar">
 
               <i class="mdi mdi-dock-left"></i>
 
@@ -1621,7 +1690,7 @@
 
       <div class="main-panel dashboard-main-panel"
         style="margin-left:270px; transition: margin-left 0.3s ease, width 0.3s ease;">
-        <div class="content-wrapper"
+        <div class="content-wrapper" id="tt-main" role="main" tabindex="-1"
           style="padding: 0; background: transparent; display: flex; flex-direction: column; min-height: calc(100vh - 70px); flex-grow: 1;">
           {% block content %}
           <section class="tt-hero">
@@ -1812,12 +1881,45 @@
   <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
+    // Keep the sidebar's scroll ownership in step with whether it overflows.
+    // The accordions change its height, so this cannot be decided once.
+    (function () {
+      const sidebar = document.getElementById('sidebar');
+      if (!sidebar) return;
+
+      function syncScrollOwnership() {
+        const overflows = sidebar.scrollHeight > sidebar.clientHeight + 1;
+        sidebar.classList.toggle('is-scrollable', overflows);
+        if (overflows) {
+          sidebar.setAttribute('data-lenis-prevent', '');
+        } else {
+          sidebar.removeAttribute('data-lenis-prevent');
+        }
+      }
+
+      syncScrollOwnership();
+      window.addEventListener('resize', syncScrollOwnership);
+      // Bootstrap fires these as the accordion groups open and close.
+      ['shown.bs.collapse', 'hidden.bs.collapse'].forEach((evt) =>
+        sidebar.addEventListener(evt, syncScrollOwnership)
+      );
+      if ('ResizeObserver' in window) {
+        new ResizeObserver(syncScrollOwnership).observe(sidebar);
+        const inner = sidebar.querySelector('.dashboard-sidebar-inner');
+        if (inner) new ResizeObserver(syncScrollOwnership).observe(inner);
+      }
+    })();
+
     document.querySelectorAll('#sidebarToggle').forEach(btn => {
       btn.addEventListener('click', function () {
         const layout = document.getElementById('dashboardLayout');
         const collapsed = layout.classList.toggle('sidebar-collapsed');
         const icon = this.querySelector('i');
         if (icon) icon.className = collapsed ? 'mdi mdi-dock-right' : 'mdi mdi-dock-left';
+        // The button is icon-only, so its name and state are the only thing a
+        // screen reader has to go on. Both have to track the actual state.
+        this.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        this.setAttribute('aria-label', collapsed ? 'Expand tool sidebar' : 'Collapse tool sidebar');
       });
     });
 
@@ -1903,25 +2005,18 @@
     });
   </script>
   <script>
+    // The reveal setup runs FIRST and on its own. It used to share an IIFE
+    // with the Lenis smooth-scroll setup below, which meant anything thrown
+    // while constructing Lenis -- a CDN that served an error page, a future
+    // breaking change in its API -- skipped the observer entirely and left
+    // every section of this page stuck at opacity 0. Whether the page is
+    // readable must not depend on whether a scrolling library loaded.
     (function () {
-      if (window.Lenis) {
-        const lenis = new Lenis({
-          duration: 2,
-          smoothWheel: true,
-          wheelMultiplier: 0.9,
-        });
-
-        function raf(time) {
-          lenis.raf(time);
-          requestAnimationFrame(raf);
-        }
-
-        requestAnimationFrame(raf);
-
-        lenis.on("scroll", ({ scroll }) => {
-          const nav = document.getElementById("mainNav");
-          if (nav) nav.classList.toggle("scrolled", scroll > 60);
-        });
+      // No IntersectionObserver (or it throws): show everything rather than
+      // animate nothing.
+      if (!("IntersectionObserver" in window)) {
+        document.querySelectorAll(".reveal").forEach((el) => el.classList.add("in"));
+        return;
       }
 
       const revealObserver = new IntersectionObserver(
@@ -1939,6 +2034,34 @@
         el.style.transitionDelay = Math.min(index * 45, 260) + "ms";
         revealObserver.observe(el);
       });
+    })();
+
+    // Smooth scrolling is presentation, so it is allowed to fail on its own.
+    (function () {
+      try {
+        if (!window.Lenis) return;
+
+        const lenis = new Lenis({
+          duration: 2,
+          smoothWheel: true,
+          wheelMultiplier: 0.9,
+        });
+
+        function raf(time) {
+          lenis.raf(time);
+          requestAnimationFrame(raf);
+        }
+
+        requestAnimationFrame(raf);
+
+        lenis.on("scroll", ({ scroll }) => {
+          const nav = document.getElementById("mainNav");
+          if (nav) nav.classList.toggle("scrolled", scroll > 60);
+        });
+      } catch (err) {
+        // Native scrolling is a perfectly good fallback.
+        console.warn("Lenis smooth scroll unavailable:", err);
+      }
     })();
 
     function initModuleHomeParticles(canvasId, heroSelector) {

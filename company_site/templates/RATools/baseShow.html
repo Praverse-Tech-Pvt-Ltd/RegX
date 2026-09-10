@@ -5,6 +5,235 @@
     .form-control{
         border: 1px solid black;
     }
+
+    /* ---- Toolbar ------------------------------------------------------ */
+    .tt-search { position: relative; max-width: 340px; margin-left: auto; }
+    .tt-search-icon {
+        position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+        color: #6b7280; font-size: 18px; pointer-events: none;
+    }
+    .tt-search-input { padding-left: 38px !important; border-radius: 8px !important; }
+    .tt-search-input:focus {
+        border-color: #0b7fc7 !important;
+        box-shadow: 0 0 0 3px rgba(11, 127, 199, 0.18) !important;
+    }
+
+    /* ---- Table -------------------------------------------------------- */
+    .tt-table-wrap { border-radius: 10px; overflow: auto; border: 1px solid #e5e7eb; }
+    .tt-table { margin-bottom: 0; width: 100%; }
+    /* The old header put near-black text on a mid-blue gradient. */
+    .tt-table thead th {
+        background: #0b4f78;
+        color: #ffffff;
+        font-weight: 600;
+        border: none;
+        padding: 14px 16px;
+        white-space: nowrap;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+    .tt-table tbody td {
+        padding: 14px 16px;
+        vertical-align: middle;
+        border-top: 1px solid #eef2f6;
+        color: #1f2937;
+    }
+    .tt-table tbody tr:nth-child(even) td { background: #fbfcfe; }
+    .tt-table tbody tr.tablehover:hover td { background: #eaf4fb; }
+
+    /* ---- Actions ------------------------------------------------------ */
+    .tt-action-btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        white-space: nowrap; color: #fff; font-weight: 600;
+        border-radius: 8px; padding: 9px 16px; text-decoration: none;
+    }
+    .tt-action-btn:hover, .tt-action-btn:focus { color: #fff; filter: brightness(1.06); }
+    /* Replaces `<p style="margin-top:11px">` used to centre these icons. */
+    .tt-icon-btn {
+        display: inline-flex !important; align-items: center; justify-content: center;
+        width: 38px; height: 38px; padding: 0 !important; margin-right: 6px;
+    }
+    .tt-icon-btn i { margin: 0; font-size: 15px; line-height: 1; }
+    .tt-action-btn:focus-visible, .tt-icon-btn:focus-visible,
+    .tt-pager-controls .btn:focus-visible {
+        outline: 3px solid #0b7fc7; outline-offset: 2px;
+    }
+
+    /* ---- Empty state -------------------------------------------------- */
+    .tt-empty-row td { padding: 42px 16px !important; background: #fbfcfe; }
+    .tt-empty-icon { display: block; font-size: 34px; color: #9aa8b8; margin-bottom: 8px; }
+    .tt-empty-title { display: block; color: #64748b; font-weight: 600; }
+
+    /* ---- Pager -------------------------------------------------------- */
+    .tt-pager {
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: 12px;
+    }
+    .tt-result-count { color: #64748b; font-size: 0.875rem; }
+    .tt-pager-controls { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+    .tt-page-indicator { color: #475569; font-size: 0.875rem; white-space: nowrap; }
+    .tt-pager-controls .btn { display: inline-flex; align-items: center; gap: 4px; border-radius: 8px; }
+    .tt-pager-controls .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* The overview text arrives as one unformatted blob from the view, so
+       give it readable measure, spacing and list styling. */
+    .tt-modal .tt-prose {
+        color: #334155;
+        font-size: 0.95rem;
+        line-height: 1.65;
+    }
+    .tt-modal .tt-prose p { margin-bottom: 12px; }
+    .tt-modal .tt-prose ul,
+    .tt-modal .tt-prose ol { margin: 0 0 12px 1.25rem; }
+    .tt-modal .tt-prose li { margin-bottom: 6px; }
+    .tt-modal .tt-prose > *:last-child { margin-bottom: 0; }
+
+    /* ---- Add Checklist modal ------------------------------------------ */
+    /* With five or more fields this dialog grew taller than the viewport and
+       the footer -- Cancel and Save -- was cut off the bottom of the screen,
+       with nothing able to scroll.
+       `.modal-dialog-scrollable` on the dialog is what fixes it: Bootstrap
+       gives the dialog a DEFINITE height and caps .modal-content at 100% of
+       it, and a definite height is what lets the body flex-shrink and scroll.
+       Do not add a viewport-based max-height to .modal-content here -- that
+       made the content taller than its own dialog, the flex chain stopped
+       resolving, and the footer rendered outside the clipped box again. */
+    .tt-modal .modal-content {
+        border: none;
+        border-radius: 14px;
+        box-shadow: 0 24px 60px rgba(15, 40, 70, 0.22);
+        overflow: hidden;
+    }
+    /* Wrapping header/body/footer in the <form> (so the markup nests legally)
+       leaves .modal-content with a single child, and Bootstrap's scrollable
+       layout expects those three to be its direct flex children. Without this
+       the form was one 724px block inside a 560px box: nothing could shrink,
+       so the body never scrolled and the footer fell off the screen. Carry
+       the flex column through the form. */
+    .tt-modal .modal-content > form {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 100%;
+    }
+
+    /* Only the body scrolls; the title and the actions stay put. */
+    .tt-modal .modal-header,
+    .tt-modal .modal-footer { flex-shrink: 0; }
+    .tt-modal .modal-header {
+        background: #0b4f78;
+        color: #fff;
+        border-bottom: none;
+        padding: 18px 24px;
+    }
+    .tt-modal .modal-title { font-weight: 600; letter-spacing: 0.01em; }
+    /* Bootstrap's close glyph is black; on this header it was invisible. */
+    .tt-modal .modal-header .btn-close {
+        filter: invert(1) grayscale(1) brightness(2);
+        opacity: 0.9;
+    }
+    /* The app stylesheet sets .modal-body to display:flex, which turned each
+       field wrapper into a flex item that shrank to ~26px wide regardless of
+       the width set on the input. Fields stack in a dialog. */
+    .tt-modal .modal-body {
+        padding: 24px;
+        display: block !important;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        /* Keeps the wheel inside the dialog rather than scrolling the page
+           behind it once the field list reaches its end. */
+        overscroll-behavior: contain;
+    }
+
+    /* Django renders {{ form }} as bare <div><label><input class="w-50">.
+       Left-aligned labels with a half-width input left a ragged column and a
+       gap down the middle of the dialog. Stack them instead. */
+    .tt-modal .modal-body form > div,
+    .tt-modal .modal-body > div {
+        display: block !important;
+        width: 100% !important;
+        margin-bottom: 16px;
+    }
+    .tt-modal .modal-body label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+    .tt-modal .modal-body .form-control,
+    .tt-modal .modal-body input[type="text"],
+    .tt-modal .modal-body input[type="number"],
+    .tt-modal .modal-body select,
+    .tt-modal .modal-body textarea {
+        width: 100% !important;   /* overrides the w-50 Django emits */
+        max-width: 100% !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 8px !important;
+        padding: 10px 12px !important;
+        background: #fff;
+    }
+    .tt-modal .modal-body .form-control:focus,
+    .tt-modal .modal-body input:focus,
+    .tt-modal .modal-body select:focus,
+    .tt-modal .modal-body textarea:focus {
+        border-color: #0b7fc7 !important;
+        box-shadow: 0 0 0 3px rgba(11, 127, 199, 0.18) !important;
+        outline: none;
+    }
+    .tt-modal .modal-body .helptext { display: block; font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+    .tt-modal .modal-body ul.errorlist {
+        list-style: none; padding: 0; margin: 6px 0 0;
+        color: #b42318; font-size: 0.85rem;
+    }
+
+    .tt-modal .modal-footer {
+        border-top: 1px solid #eef2f6;
+        padding: 16px 24px;
+        gap: 10px;
+    }
+    /* Was btn-primary, which renders violet in this theme and matched nothing
+       else on the page. */
+    .tt-btn-save {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: #0b4f78; color: #fff; font-weight: 600;
+        border: none; border-radius: 8px; padding: 10px 20px;
+    }
+    .tt-btn-save:hover, .tt-btn-save:focus { background: #0d5f8f; color: #fff; }
+    .tt-modal .modal-footer .btn:focus-visible {
+        outline: 3px solid #0b7fc7; outline-offset: 2px;
+    }
+
+    @media (max-width: 576px) {
+        .tt-search { max-width: none; margin-left: 0; }
+        .tt-pager { justify-content: center; }
+        .tt-pager-controls { margin-left: 0; }
+    }
+
+    /* This was a bare <span> with a gradient background and a home icon: it
+       read as a button, was the only home affordance on every checklist page,
+       and did nothing when clicked. It is an <a> now. These rules only stop
+       the anchor picking up link underline/colour so it looks as it did. */
+    .page-title .page-title-home {
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .page-title .page-title-home:hover,
+    .page-title .page-title-home:focus {
+        color: #fff;
+        text-decoration: none;
+        filter: brightness(1.08);
+    }
+
+    .page-title .page-title-home:focus-visible {
+        outline: 3px solid #0b7fc7;
+        outline-offset: 2px;
+    }
 </style>
 <div class="page-header">
     <div class="d-flex justify-content-space-around">
@@ -12,9 +241,10 @@
     <h3 class="page-title">
     <div class="d-flex">
         <div>
-        <span class="page-title-icon bg-gradient-primary text-white me-2">
+        <a href="/ratools/" class="page-title-icon page-title-home bg-gradient-primary text-white me-2"
+           aria-label="Back to RegX home" title="Back to RegX home">
             <i class="mdi mdi-home"></i>
-        </span>
+        </a>
     </div>
     <div>
         <div>{{ main_folder }}</div>
@@ -46,14 +276,18 @@
         <button class="btn btn-gradient-info hoverReport btn-fw" data-bs-toggle="modal" data-bs-target="#addreportmodal">Add Checklist</button>
     {% endif %}
     </div>
-    <div class="col-md-6 text-end">
-        <input
-            type="text"
-            id="searchInput"
-            placeholder="Search..."
-            class="form-control"
-            style="width: auto; display: inline-block;  "
-        />
+    <div class="col-md-6">
+        <div class="tt-search">
+            <label class="visually-hidden" for="searchInput">Search reports</label>
+            <i class="mdi mdi-magnify tt-search-icon" aria-hidden="true"></i>
+            <input
+                type="search"
+                id="searchInput"
+                placeholder="Search reports..."
+                class="form-control tt-search-input"
+                aria-describedby="tt-result-count"
+            />
+        </div>
     </div>
 </div>
 
@@ -62,7 +296,10 @@
 <div class="container bg-light shadow rounded p-4">
     <div class="row">
         <div class="col-md-12">
-            <table id="customTable" class="table table-bordered    ">
+            <!-- Some of these tables carry eight columns; without this they
+                 push the whole page sideways instead of scrolling. -->
+            <div class="table-responsive tt-table-wrap">
+            <table id="customTable" class="table tt-table">
                 <thead>
                     <tr class=" headingRow" >
                         {% for header in table_headers %}
@@ -75,11 +312,9 @@
                         {% if controlled_reports %}
                             <tr class="tablehover">
                                 <td>{{ report }}</td>
-                                <td><button class="btn btn-gradient-success" style="color: white; border-radius: 5px; padding: 10px 20px; border: none;">
-                                    <a href="{% url 'download_document' report %}" style="color: white; text-decoration: none; font-weight: bold;">
-                                      Download Document
-                                    </a>
-                                  </button></td>
+                                <td><a class="btn btn-gradient-info tt-action-btn" href="{% url 'download_document' report %}">
+                                      <i class="mdi mdi-download" aria-hidden="true"></i> Download Document
+                                    </a></td>
                             </tr>
                         {% else %}
                         <tr class="tablehover">
@@ -116,66 +351,96 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="{{ edit_url }}/{{report.id}}/" onclick="prventReload(e)" class="btn btn-gradient-success btn-rounded btn-icon">
-                                    <p style="margin-top: 11px;"><i class="fa fa-pencil"></i></p>
+                                <a href="{{ edit_url }}/{{report.id}}/"
+                                   class="btn btn-gradient-success btn-rounded btn-icon tt-icon-btn"
+                                   aria-label="Edit this checklist" title="Edit">
+                                    <i class="fa fa-pencil" aria-hidden="true"></i>
                                 </a>
-                                 <a href="{{ delete_url }}/{{report.id}}" id="DeleteBtn" class="btn btn-gradient-danger btn-rounded btn-icon">
-                                    <p style="margin-top: 11px;"><i class="fa fa-trash"></i></p>
+                                <a href="{{ delete_url }}/{{report.id}}" id="DeleteBtn"
+                                   class="btn btn-gradient-danger btn-rounded btn-icon tt-icon-btn"
+                                   aria-label="Delete this checklist" title="Delete">
+                                    <i class="fa fa-trash" aria-hidden="true"></i>
                                 </a>
                             </td>
                         </tr>
                         {% endif %}
                     {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center">No checklist available</td>
+                        <tr class="tt-empty-row">
+                            <td colspan="{{ table_headers|length|default:'4' }}" class="text-center">
+                                <i class="mdi mdi-clipboard-text-outline tt-empty-icon" aria-hidden="true"></i>
+                                <span class="tt-empty-title">No checklist available</span>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
-        <div class="col-md-12 text-start mt-3 text-end">
-            <button id="prevPage" class="badge badge-danger">Previous</button>
-            <span id="currentPage">1</span>
-            <button id="nextPage" class="badge badge-danger">Next</button>
+        <!-- These were `badge badge-danger`: not buttons, and coloured as an
+             error. They also stayed active on a single page of results. -->
+        <div class="col-md-12 mt-3 tt-pager">
+            <span class="tt-result-count" id="tt-result-count" aria-live="polite"></span>
+            <div class="tt-pager-controls">
+                <button type="button" id="prevPage" class="btn btn-sm btn-outline-primary">
+                    <i class="mdi mdi-chevron-left" aria-hidden="true"></i> Previous
+                </button>
+                <span class="tt-page-indicator">
+                    Page <span id="currentPage">1</span> of <span id="totalPages">1</span>
+                </span>
+                <button type="button" id="nextPage" class="btn btn-sm btn-outline-primary">
+                    Next <i class="mdi mdi-chevron-right" aria-hidden="true"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="modal" tabindex="-1" id="addreportmodal">
-    <div class="modal-dialog " style="top:10%" >
-      <div class="modal-content modalContent border border-dark">
-        <div class="modal-header">
-          <h5 class="modal-title">Add Checklist</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-            <form method="post" action="{{ action }}">
-                {% csrf_token %}
-                {{ form }}
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="btn btn-primary">Save changes</button>
+<!-- The <form> used to open inside .modal-body and close inside
+     .modal-footer, crossing both element boundaries. Browsers repair that by
+     closing the form at the end of the body, and the submit button kept
+     working only because the parser still assigns it the form it was open
+     inside. That is error recovery, not correctness. The form now wraps the
+     body and the footer, so the structure says what it means. -->
+<div class="modal fade tt-modal" tabindex="-1" id="addreportmodal"
+     aria-labelledby="addreportmodalLabel" aria-hidden="true" data-lenis-prevent>
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content modalContent">
+        <form method="post" action="{{ action }}">
+          {% csrf_token %}
+          <div class="modal-header">
+            <h5 class="modal-title" id="addreportmodalLabel">Add Checklist</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            {{ form }}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn tt-btn-save">
+              <i class="mdi mdi-content-save-outline" aria-hidden="true"></i> Save checklist
+            </button>
+          </div>
         </form>
-        </div>
       </div>
     </div>
 </div>
 
-<div class="modal fade" id="overViewModal"  tabindex="-1"  aria-hidden="true">
-    <div class="modal-dialog">
+<!-- data-lenis-prevent: Lenis captures wheel events for the whole document,
+     so the wheel never reached this dialog and its overview text could not be
+     scrolled at all. Same opt-out as the tool sidebar uses. -->
+<div class="modal fade tt-modal" id="overViewModal" tabindex="-1"
+     aria-labelledby="overViewModalLabel" aria-hidden="true" data-lenis-prevent>
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content modalContent">
         <div class="modal-header">
-          <h1 class="modal-title fs-5" id="staticBackdropLabel"> {{modal_title}}</h1>
+          <h5 class="modal-title" id="overViewModalLabel">{{ modal_title }}</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body tt-prose">
             {{ modal_body_content }}
         </div>
-        <div class="modal-footer">
-          {% comment %} <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> {% endcomment %}
-
-        </div>
+        <!-- The footer held a single commented-out Close button, so it rendered
+             as an empty bar. The header's X already dismisses this. -->
       </div>
     </div>
 </div>
@@ -231,9 +496,14 @@
     }
 </style>
 <script>
-    prventReload(e){
-        e.preventDefault()
-    }
+// `prventReload(e){...}` used to sit here. It was a bare method-style
+// declaration with no `function` keyword, i.e. a SyntaxError, so the browser
+// discarded THIS ENTIRE SCRIPT: table pagination, the search filter and the
+// delete confirmation all silently did nothing on every checklist page.
+// It is not restored, only removed. Its body called e.preventDefault() on the
+// edit link, which would stop that link navigating; the edit button works
+// today precisely because the function never existed. See the onclick removed
+// from the edit anchor below.
 document.addEventListener("DOMContentLoaded", () => {
     const rowsPerPage = 7;
     let currentPage = 1;
@@ -242,22 +512,79 @@ document.addEventListener("DOMContentLoaded", () => {
     const rows = Array.from(table.getElementsByTagName("tbody")[0].rows);
     const searchInput = document.getElementById("searchInput");
 
-    const updateTable = () => {
-        const searchTerm = searchInput.value.toLowerCase();
-        const filteredRows = rows.filter((row) =>
-            Array.from(row.cells).some((cell) =>
-                cell.textContent.toLowerCase().includes(searchTerm)
-            )
+    const prevBtn = document.getElementById("prevPage");
+    const nextBtn = document.getElementById("nextPage");
+    const totalPagesEl = document.getElementById("totalPages");
+    const resultCountEl = document.getElementById("tt-result-count");
+    // The "no rows" placeholder must not be filtered or counted as a report.
+    // Django only renders one when the report list is empty, so a search that
+    // matches nothing would otherwise leave a silent, blank table. Build one
+    // when it is missing. It is appended after `rows` was captured, so the
+    // filter never sees it.
+    let emptyRow = document.querySelector(".tt-empty-row");
+    if (!emptyRow && table.tBodies[0]) {
+        const colCount =
+            table.tHead && table.tHead.rows[0] ? table.tHead.rows[0].cells.length : 1;
+        emptyRow = document.createElement("tr");
+        emptyRow.className = "tt-empty-row";
+        emptyRow.innerHTML =
+            '<td colspan="' + colCount + '" class="text-center">' +
+            '<i class="mdi mdi-magnify tt-empty-icon" aria-hidden="true"></i>' +
+            '<span class="tt-empty-title"></span></td>';
+        emptyRow.style.display = "none";
+        table.tBodies[0].appendChild(emptyRow);
+    }
+
+    const matching = (term) =>
+        rows.filter(
+            (row) =>
+                !row.classList.contains("tt-empty-row") &&
+                Array.from(row.cells).some((cell) =>
+                    cell.textContent.toLowerCase().includes(term)
+                )
         );
 
-        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
+    const updateTable = () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filteredRows = matching(searchTerm);
+
+        const totalPages = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage));
+        if (currentPage > totalPages) currentPage = totalPages;
+
         document.getElementById("currentPage").textContent = currentPage;
+        if (totalPagesEl) totalPagesEl.textContent = totalPages;
 
         rows.forEach((row) => (row.style.display = "none"));
 
         filteredRows
             .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
             .forEach((row) => (row.style.display = ""));
+
+        // Say when a search returned nothing, rather than showing a blank table.
+        if (emptyRow) {
+            const noReports = rows.every((r) => r.classList.contains("tt-empty-row"));
+            emptyRow.style.display =
+                noReports || filteredRows.length === 0 ? "" : "none";
+            const title = emptyRow.querySelector(".tt-empty-title");
+            if (title) {
+                title.textContent = searchTerm
+                    ? 'No reports match “' + searchInput.value + '”'
+                    : "No checklist available";
+            }
+        }
+
+        if (resultCountEl) {
+            const n = filteredRows.length;
+            resultCountEl.textContent = n
+                ? "Showing " + Math.min((currentPage - 1) * rowsPerPage + 1, n) +
+                  "-" + Math.min(currentPage * rowsPerPage, n) + " of " + n +
+                  (n === 1 ? " report" : " reports")
+                : "";
+        }
+
+        // Dead controls should look dead.
+        if (prevBtn) prevBtn.disabled = currentPage <= 1;
+        if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
     };
 
     document.getElementById("prevPage").addEventListener("click", () => {
@@ -268,14 +595,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("nextPage").addEventListener("click", () => {
-        const searchTerm = searchInput.value.toLowerCase();
-        const filteredRows = rows.filter((row) =>
-            Array.from(row.cells).some((cell) =>
-                cell.textContent.toLowerCase().includes(searchTerm)
-            )
+        const totalPages = Math.max(
+            1,
+            Math.ceil(matching(searchInput.value.toLowerCase()).length / rowsPerPage)
         );
-
-        const totalPages = Math.ceil(filteredRows.length / rowsPerPage);
         if (currentPage < totalPages) {
             currentPage++;
             updateTable();
