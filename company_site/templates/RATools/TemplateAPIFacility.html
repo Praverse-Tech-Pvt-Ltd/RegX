@@ -10,22 +10,21 @@
       margin-right: 20px;
     "
   >
-    <button
+    <a
+      href="{% url 'download_document' 'TemplateforAPIFacilitydetails' %}"
       style="
+        display: inline-block;
         background-color: #007bff;
         color: white;
         border-radius: 5px;
         padding: 10px 20px;
         border: none;
+        text-decoration: none;
+        font-weight: bold;
       "
     >
-      <a
-        href="{% url 'download_document' 'TemplateforAPIFacilitydetails' %}"
-        style="color: white; text-decoration: none; font-weight: bold"
-      >
-        Download Document
-      </a>
-    </button>
+      Download Document
+    </a>
   </div>
   {% endif %}
   <div class="card-body-main">
