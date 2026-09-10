@@ -38,6 +38,16 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: regx.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      # Malware scanning. This stack runs regx.settings.production, which
+      # refuses to start on the stub scanner unless the escape hatch below is
+      # set. LOCAL DEVELOPMENT ONLY -- remove DOCUMENT_SCANNER_ALLOW_STUB from
+      # any deployed environment, and set DOCUMENT_SCANNER_BACKEND=clamav.
+      # For real scanning locally: docker compose --profile scanning up -d
+      # then set DOCUMENT_SCANNER_BACKEND=clamav here.
+      DOCUMENT_SCANNER_BACKEND: ${DOCUMENT_SCANNER_BACKEND:-stub}
+      DOCUMENT_SCANNER_ALLOW_STUB: ${DOCUMENT_SCANNER_ALLOW_STUB:-true}
+      DOCUMENT_CLAMAV_HOST: ${DOCUMENT_CLAMAV_HOST:-clamav}
+      DOCUMENT_CLAMAV_PORT: ${DOCUMENT_CLAMAV_PORT:-3310}
       DB_HOST: postgres
       DB_NAME: regx
       DB_USER: regx
@@ -83,6 +93,16 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: regx.settings.production
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      # Malware scanning. This stack runs regx.settings.production, which
+      # refuses to start on the stub scanner unless the escape hatch below is
+      # set. LOCAL DEVELOPMENT ONLY -- remove DOCUMENT_SCANNER_ALLOW_STUB from
+      # any deployed environment, and set DOCUMENT_SCANNER_BACKEND=clamav.
+      # For real scanning locally: docker compose --profile scanning up -d
+      # then set DOCUMENT_SCANNER_BACKEND=clamav here.
+      DOCUMENT_SCANNER_BACKEND: ${DOCUMENT_SCANNER_BACKEND:-stub}
+      DOCUMENT_SCANNER_ALLOW_STUB: ${DOCUMENT_SCANNER_ALLOW_STUB:-true}
+      DOCUMENT_CLAMAV_HOST: ${DOCUMENT_CLAMAV_HOST:-clamav}
+      DOCUMENT_CLAMAV_PORT: ${DOCUMENT_CLAMAV_PORT:-3310}
       DB_HOST: postgres
       DB_NAME: regx
       DB_USER: regx
@@ -251,6 +271,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+
+  # Real malware scanning. Behind a profile because the image pulls a large
+  # signature database and takes minutes to become healthy -- adding that to
+  # the default stack would slow every developer start and the CI compose job
+  # for a service most local work never exercises.
+  #   docker compose --profile scanning up -d clamav
+  # Then set DOCUMENT_SCANNER_BACKEND=clamav for backend and celery.
+  clamav:
+    image: clamav/clamav:1.3
+    profiles: ["scanning"]
+    restart: unless-stopped
+    healthcheck:
+      # clamdcheck talks to the running daemon; freshclam must finish first,
+      # hence the long start_period.
+      test: ["CMD-SHELL", "clamdcheck.sh || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
 
 volumes:
   postgres_data:
