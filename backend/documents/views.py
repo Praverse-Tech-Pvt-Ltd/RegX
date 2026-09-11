@@ -306,6 +306,17 @@ class DocumentVersionListCreateView(APIView):
         # not be able to reach a row this request has not committed.
         transaction.on_commit(lambda: scan_document_version.delay(version.pk, tenant.pk))
 
+        # Same reason as documents.ingest: the request for a scan is recorded
+        # separately from its outcome.
+        emit(
+            event_type=DocumentEvent.SCAN_QUEUED,
+            resource_id=str(version.public_id),
+            tenant_id=tenant.pk,
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            payload={"source": "upload"},
+        )
+
         return Response(DocumentVersionSerializer(version).data, status=status.HTTP_201_CREATED)
 
 
