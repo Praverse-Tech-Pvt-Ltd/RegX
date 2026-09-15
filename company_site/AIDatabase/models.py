@@ -108,13 +108,6 @@ class MajorCR(models.Model):
 
 
 
-class ChatMessage(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="chat_sessions")
-    chat_id = models.IntegerField()
-    user_message = models.TextField(blank=True, null=True)
-    bot_response = RichTextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
 class WarningLetter(models.Model):
     company_name = models.CharField(max_length=2000,blank=True, null=True)
     recipient_name = models.CharField(max_length=2000,blank=True, null=True)
@@ -129,16 +122,6 @@ class WarningLetter(models.Model):
     warning_letter = RichTextField(blank=True, null=True)
 
 
-
-class ChatHistory(models.Model):
-    session_id = models.CharField(max_length=100,unique=True)
-    chat =  models.JSONField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    summary_history = models.JSONField(null=True, blank=True)
-
-
-    def __str__(self):
-        return f"ChatHistory(session_id={self.session_id}, created_at={self.created_at})"
 
 def observation_image_upload_path(instance, filename):
     """

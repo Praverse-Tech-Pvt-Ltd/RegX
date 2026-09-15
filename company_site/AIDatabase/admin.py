@@ -21,7 +21,6 @@ admin.site.register(models.Form483ObeservationContent)
 admin.site.register(models.UserCheckedUpdate)
 # admin.site.register(models.Announcement)
 
-admin.site.register(models.ChatMessage)
 # admin.site.register(models.WarningLetter)
 @admin.register(models.ObservationImage)
 class ObservationImageAdmin(admin.ModelAdmin):
