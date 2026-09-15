@@ -17,8 +17,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import importer, lifecycle
-from .adapters import fda_iid_adapter, orange_book_products_adapter
 from .audit_events import FdaDataEvent, emit
+from .dispatch import SUPPORTED_IMPORTERS, UnsupportedDatasetType, resolve_importer
 from .mapping_transitions import MappingAction
 from .models import (
     ControlledDosageForm,
@@ -116,6 +116,24 @@ class FdaReleaseListView(APIView):
         serializer = ReleaseRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
+        # Resolved BEFORE anything is written. An unsupported dataset type
+        # used to reach this point, register a release and return 201 with
+        # zero rows imported -- a success response for work that did not
+        # happen. Nothing is created unless an importer actually exists.
+        try:
+            adapter, import_rows = resolve_importer(data["dataset_type"])
+        except UnsupportedDatasetType as exc:
+            return Response(
+                {
+                    "error_code": "unsupported_dataset_type",
+                    "dataset_type": exc.dataset_type,
+                    "detail": exc.reason,
+                    "supported_dataset_types": sorted(SUPPORTED_IMPORTERS),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         rows = data["rows"]
         payload_bytes = json.dumps(rows, sort_keys=True, default=str).encode("utf-8")
         file_obj = io.BytesIO(payload_bytes)
@@ -132,12 +150,12 @@ class FdaReleaseListView(APIView):
             imported_by=request.user,
         )
 
-        if data["dataset_type"].startswith("orange_book"):
-            neutral = orange_book_products_adapter(rows)
-            importer.import_orange_book_rows(release, neutral, request.user)
-        elif data["dataset_type"] == "fda_iid":
-            neutral = fda_iid_adapter(rows)
-            importer.import_iid_rows(release, neutral, request.user)
+        # Explicit, resolved above. The previous
+        # `dataset_type.startswith("orange_book")` routed patents and
+        # exclusivity through the PRODUCTS adapter, which turned a patent row
+        # into an OrangeBookProduct with an empty ingredient and strength and
+        # counted it as imported.
+        import_rows(release, adapter(rows), request.user)
 
         release.refresh_from_db()
         return Response(

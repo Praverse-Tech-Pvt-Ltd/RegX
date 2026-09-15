@@ -74,7 +74,31 @@ class FDADataSourceRelease(PublicIDModel, TimeStampedModel):
     # directly in API responses; view_raw-gated like templates_registry's
     # source_path_or_reference.
     storage_key = models.CharField(max_length=500, blank=True)
+    #: SHA-256 of the exact bytes that were handed to `register_release`.
+    #:
+    #: Which bytes those are depends on the caller, and the distinction
+    #: matters:
+    #:   * `import_fda_release` supplies the original FDA file or ZIP, so this
+    #:     is the checksum of the published artifact.
+    #:   * `POST /fda-data/releases/` supplies canonical JSON rows, so this is
+    #:     the checksum of that payload -- it says nothing about any file.
+    #:
+    #: Unchanged in meaning by P5: it has always been "the bytes supplied".
+    #: `normalized_payload_sha256` below is the new, separate value.
     source_checksum_sha256 = models.CharField(max_length=64, db_index=True)
+    #: SHA-256 of the canonical normalized rows, independent of how they
+    #: arrived. Two different source files that normalize identically share
+    #: this value while keeping distinct `source_checksum_sha256`, so the
+    #: provenance stays distinguishable.
+    normalized_payload_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    #: Size of the supplied source bytes. Recorded alongside the checksum
+    #: because a length mismatch is the cheapest first signal that a file is
+    #: not the one somebody believes it is.
+    source_file_size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    #: Which parser produced the rows, e.g. "orange_book_products_txt:1".
+    #: Blank for releases registered through the JSON API, where no parser
+    #: ran and the caller normalized the data themselves.
+    parser_identifier = models.CharField(max_length=100, blank=True)
     schema_version = models.CharField(max_length=50, blank=True)
     publication_date = models.DateField(null=True, blank=True)
     retrieved_at = models.DateTimeField(null=True, blank=True)

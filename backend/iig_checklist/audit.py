@@ -49,6 +49,73 @@ class IigChecklistEvent:
     #: the plain response.entered/updated events so an override is never
     #: mistaken for an ordinary edit in the trail.
     ANSWER_OVERRIDDEN = "iig_checklist.answer.overridden"
+    #: Gap analysis is computed on demand and never stored, so the audit row is
+    #: the only record that a score was ever produced, for whom, and what it
+    #: said at that moment. Emitted on the read path because that is where the
+    #: analysis happens -- see the payload allow-list below for why the result
+    #: detail does not travel with it.
+    GAP_ANALYSIS_GENERATED = "iig_checklist.gap_analysis.generated"
+
+
+#: Payload keys permitted for the event types introduced or corrected in P2.
+#:
+#: Scoped per event type rather than domain-wide on purpose. A single
+#: domain-wide allow-list, as `workflows` uses, would silently drop keys that
+#: this domain's twenty-odd existing events already record -- an unreviewed
+#: change to the historical shape of the trail. New and corrected events start
+#: constrained; the rest keep the payloads they were written with until each is
+#: reviewed on its own.
+#:
+#: An allow-list, not a filter: a caller cannot add a key, so governed answer
+#: content, narratives, credentials and request bodies are structurally
+#: excluded rather than merely discouraged.
+_PAYLOAD_ALLOW_LISTS: dict[str, frozenset[str]] = {
+    # Counts and percentages only. `analyse_execution` also returns `gaps`,
+    # which carries `question_text` and the answer itself, and `sections`,
+    # which names each section. Neither may enter the audit row: the trail
+    # records THAT a score was produced and what it totalled, never the
+    # governed content behind it. `section_count` is derived here for that
+    # reason instead of passing `sections` through.
+    IigChecklistEvent.GAP_ANALYSIS_GENERATED: frozenset(
+        {
+            "execution_public_id",
+            "checklist_version_public_id",
+            "total_questions",
+            "answered",
+            "unanswered",
+            "not_applicable",
+            "gap_count",
+            "score_percent",
+            "completeness_percent",
+            "section_count",
+        }
+    ),
+    # Field NAMES only. The values are draft regulatory text -- change_summary
+    # and regulatory_basis in particular -- and recording them would put the
+    # content of an unapproved draft into an append-only table that cannot
+    # later be redacted.
+    IigChecklistEvent.VERSION_UPDATED: frozenset(
+        {
+            "version_public_id",
+            "definition_public_id",
+            "version_number",
+            "status",
+            "fields_changed",
+        }
+    ),
+}
+
+
+def _restrict(event_type: str, payload: dict | None) -> dict:
+    """Drop anything the event type is not permitted to record.
+
+    Events with no entry keep their payload untouched, so this narrows the
+    events P2 touches without rewriting the domain's audit contract.
+    """
+    allowed = _PAYLOAD_ALLOW_LISTS.get(event_type)
+    if allowed is None:
+        return payload or {}
+    return {k: v for k, v in (payload or {}).items() if k in allowed}
 
 
 def emit(
@@ -68,5 +135,5 @@ def emit(
         event_type=event_type,
         resource_type=resource_type,
         resource_id=resource_id,
-        payload=payload or {},
+        payload=_restrict(event_type, payload),
     )

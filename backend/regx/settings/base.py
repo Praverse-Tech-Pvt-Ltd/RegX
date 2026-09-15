@@ -58,6 +58,10 @@ INSTALLED_APPS = [
     "submission_operations",
     "submission_packages",
     "external_integrations",
+    # Composition root for demo/handoff setup: management commands only, no
+    # models, no URLs, no runtime behaviour. It is last because it is allowed
+    # to import every domain above it and nothing may import it back.
+    "demo_seed",
 ]
 
 MIDDLEWARE = [
