@@ -56,11 +56,27 @@ def register_release(
     schema_version: str = "",
     publication_date=None,
     imported_by=None,
+    normalized_payload_sha256: str = "",
+    parser_identifier: str = "",
 ) -> FDADataSourceRelease:
     """Idempotent by (dataset_type, checksum): re-registering the exact
-    same file for the same dataset_type returns the existing release
-    rather than creating a duplicate."""
+    same bytes for the same dataset_type returns the existing release
+    rather than creating a duplicate.
+
+    `source_checksum_sha256` is the checksum of `file_obj` -- the bytes the
+    caller actually supplied. For `import_fda_release` that is the published
+    FDA file or ZIP; for the JSON API it is the canonical rows payload. The
+    field has always meant this, and P5 does not change it.
+
+    `normalized_payload_sha256` is separate and optional: the checksum of the
+    canonical rows after parsing. Two different source files that normalize
+    to identical rows share it while keeping distinct source checksums, so
+    the provenance distinction survives.
+    """
     checksum = compute_sha256(file_obj)
+    file_obj.seek(0, 2)
+    size_bytes = file_obj.tell()
+    file_obj.seek(0)
     existing = FDADataSourceRelease.objects.filter(
         dataset_type=dataset_type, source_checksum_sha256=checksum
     ).first()
@@ -81,6 +97,9 @@ def register_release(
         media_type=media_type,
         storage_key=storage_key,
         source_checksum_sha256=checksum,
+        normalized_payload_sha256=normalized_payload_sha256,
+        source_file_size_bytes=size_bytes,
+        parser_identifier=parser_identifier,
         schema_version=schema_version,
         publication_date=publication_date,
         retrieved_at=timezone.now(),

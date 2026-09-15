@@ -87,6 +87,18 @@ _GENERATED_PASSWORD_BYTES = 12
 
 ROLES = ("doer", "reviewer", "vp", "tenant_admin")
 
+#: A minimal, valid PDF. Generated here rather than committed as a binary
+#: fixture so the repository carries no opaque file, and so it is obvious that
+#: the demo document contains nothing.
+_MINIMAL_PDF = (
+    b"%PDF-1.4\n"
+    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+    b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
+    b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
+    b"trailer<</Root 1 0 R>>\n"
+    b"%%EOF\n"
+)
+
 
 class Command(BaseCommand):
     help = "Seed a clearly-labelled demo tenant, roles, checklist and formulation."
@@ -174,6 +186,26 @@ class Command(BaseCommand):
         self.stdout.write(f"  formulation        {summary['formulation_status']}")
         if summary["execution_public_id"]:
             self.stdout.write(f"  sample execution   {summary['execution_public_id']}")
+        self.stdout.write(f"  regulatory case    {summary['case_number']}")
+        self.stdout.write(f"  workflow           {summary['workflow_state']}")
+        self.stdout.write(f"  blueprint version  {summary['blueprint_version_status']}")
+        self.stdout.write(f"  dossier            {summary['dossier_public_id'] or 'not created'}")
+        self.stdout.write(
+            f"  package            {summary['package_status'] or 'not created'} (internal)"
+        )
+        self.stdout.write(f"  connector          {summary['connector_status'] or 'not created'}")
+
+        scan = summary["document_scan_status"]
+        self.stdout.write(f"  document scan      {scan or 'not created'}")
+        if scan == "clean":
+            # Said out loud because CLEAN from the stub looks identical to
+            # CLEAN from a real scanner, and this is demo data.
+            self.stdout.write(
+                self.style.WARNING(
+                    "  NOTE: a CLEAN result under StubScanner means nothing was "
+                    "inspected. See docs/MALWARE_SCANNING.md."
+                )
+            )
 
     def _seed(self, slug: str, password: str) -> dict:
         from authorization.models import MembershipRole, Role
@@ -226,11 +258,364 @@ class Command(BaseCommand):
             tenant, users["doer"], checklist["version"], formulation["version"]
         )
 
+        # The governed chain. The order is a real dependency chain, not a
+        # preference: a dossier needs an ACTIVE blueprint version and a case,
+        # and a package entry needs a document version that already exists.
+        case = self._seed_case(tenant, users["doer"])
+        workflow_state = self._seed_workflow(tenant, users)
+        document = self._seed_document(tenant, users["doer"])
+        blueprint = self._seed_blueprint(tenant, users)
+        dossier = self._seed_dossier(tenant, users["doer"], blueprint["version"], case)
+        package = self._seed_package(tenant, users["doer"], case, document)
+        connector = self._seed_connector(tenant, users["doer"])
+
         return {
             "version_status": checklist["version"].status,
             "formulation_status": formulation["version"].status,
             "execution_public_id": execution_public_id,
+            "case_number": case.case_number,
+            "workflow_state": workflow_state,
+            "document_scan_status": document["scan_status"] if document else None,
+            "blueprint_version_status": blueprint["version"].status,
+            "dossier_public_id": str(dossier.public_id) if dossier else None,
+            "package_status": package.status if package else None,
+            "connector_status": connector.status if connector else None,
         }
+
+    # -- regulatory case -------------------------------------------------
+
+    def _seed_case(self, tenant, actor):
+        from regulatory_cases.models import RegulatoryCase
+        from regulatory_cases.services import create_case
+
+        self.stdout.write(self.style.MIGRATE_HEADING("Regulatory case"))
+        title = f"{DEMO_PREFIX}Demonstration Tablet 100 mg (synthetic)"
+        existing = RegulatoryCase.objects.filter(tenant=tenant, title=title).first()
+        if existing is not None:
+            self._note(False, f"regulatory case {existing.case_number}")
+            return existing
+
+        # create_case claims the next tenant-local case number under lock and
+        # emits regulatory_case.created. Creating the row directly would skip
+        # both.
+        case = create_case(
+            tenant=tenant,
+            actor=actor,
+            title=title,
+            product_name=f"{DEMO_PREFIX}Demonstration Tablet",
+            product_code=f"{DEMO_PREFIX}TAB-100",
+            market="DEMO market -- not a real jurisdiction",
+            submission_type="DEMO submission type",
+            description=(
+                "Synthetic case created by seed_regx_demo. Not a real "
+                "submission and not derived from any regulatory source."
+            ),
+        )
+        self._note(True, f"regulatory case {case.case_number}")
+        return case
+
+    # -- workflow --------------------------------------------------------
+
+    def _seed_workflow(self, tenant, users) -> str:
+        """One workflow item, moved once through a real transition.
+
+        Submitted rather than left in DRAFT so the handoff demo has something
+        a Reviewer can act on, and so the seed exercises the transition path
+        rather than only the create path.
+        """
+        from workflows.models import WorkflowItem
+        from workflows.services import create_item, perform_transition
+
+        self.stdout.write(self.style.MIGRATE_HEADING("Workflow"))
+        title = f"{DEMO_PREFIX}Review excipient rationale"
+        item = WorkflowItem.objects.filter(tenant=tenant, title=title).first()
+        if item is not None:
+            self._note(False, f"workflow item ({item.state})")
+            return item.state
+
+        item = create_item(
+            tenant=tenant,
+            actor=users["doer"],
+            title=title,
+            description="Synthetic workflow item created by seed_regx_demo.",
+        )
+        self._note(True, "workflow item")
+
+        # Through the sanctioned transition service: it validates the move,
+        # writes WorkflowTransition history and emits workflow.submitted.
+        perform_transition(item=item, action="submit", actor=users["doer"], tenant=tenant)
+        item.refresh_from_db()
+        self._note(True, f"workflow submit -> {item.state}")
+        return item.state
+
+    # -- document --------------------------------------------------------
+
+    def _seed_document(self, tenant, actor):
+        """One governed document through the real ingest path.
+
+        `scan_status` is never written here. `ingest_new_document` validates
+        the bytes, stores them, versions them and queues the real scan task,
+        so the resulting status is whatever the configured scanner returns.
+
+        THAT MATTERS FOR THE DEMO: the local compose stack runs StubScanner
+        (DOCUMENT_SCANNER_ALLOW_STUB=true), which reports CLEAN without
+        inspecting anything. A CLEAN result here is not evidence of malware
+        inspection, which is why this document is labelled synthetic and why
+        the package below is deliberately left in DRAFT rather than frozen on
+        the strength of it.
+        """
+        import io as _io
+
+        from documents.ingest import ingest_new_document
+        from documents.models import Document, DocumentType
+
+        self.stdout.write(self.style.MIGRATE_HEADING("Governed document"))
+        title = f"{DEMO_PREFIX}Synthetic excipient rationale (demo only)"
+        existing = Document.objects.filter(tenant=tenant, title=title).first()
+        if existing is not None:
+            version = existing.versions.order_by("version_number").last()
+            self._note(False, f"document ({version.scan_status})")
+            return {
+                "document": existing,
+                "version": version,
+                "scan_status": version.scan_status,
+            }
+
+        try:
+            document, version = ingest_new_document(
+                tenant=tenant,
+                actor=actor,
+                file_obj=_io.BytesIO(_MINIMAL_PDF),
+                filename="demo-excipient-rationale.pdf",
+                declared_mime="application/pdf",
+                title=title,
+                document_type=DocumentType.PDF,
+            )
+        except Exception as exc:  # validation, storage or scanner wiring
+            self.stdout.write(
+                self.style.WARNING(f"  skipped  document ({type(exc).__name__}: {exc})")
+            )
+            return None
+
+        version.refresh_from_db()
+        self._note(True, f"document + version 1 (scan: {version.scan_status})")
+        return {
+            "document": document,
+            "version": version,
+            "scan_status": version.scan_status,
+        }
+
+    # -- dossier blueprint -----------------------------------------------
+
+    def _seed_blueprint(self, tenant, users) -> dict:
+        from dossier_blueprints.models import DossierBlueprint
+        from dossier_blueprints.services import (
+            activate_version,
+            create_blueprint,
+            create_section,
+            create_version,
+        )
+
+        self.stdout.write(self.style.MIGRATE_HEADING("Dossier blueprint"))
+        name = f"{DEMO_PREFIX}Generic submission outline"
+        blueprint = DossierBlueprint.objects.filter(tenant=tenant, name=name).first()
+        if blueprint is None:
+            blueprint = create_blueprint(
+                tenant=tenant,
+                actor=users["doer"],
+                name=name,
+                description=(
+                    "Synthetic blueprint created by seed_regx_demo. Not a CTD "
+                    "outline and not derived from any regulatory source."
+                ),
+            )
+            self._note(True, "blueprint")
+        else:
+            self._note(False, "blueprint")
+
+        version = blueprint.versions.order_by("version_number").last()
+        if version is None:
+            version = create_version(
+                blueprint=blueprint,
+                tenant=tenant,
+                actor=users["doer"],
+                notes="Demo v1",
+            )
+            for sequence, (code, section_title) in enumerate(
+                [
+                    ("S1", "Product overview"),
+                    ("S2", "Formulation and composition"),
+                    ("S3", "Supporting evidence"),
+                ],
+                start=1,
+            ):
+                create_section(
+                    version=version,
+                    tenant=tenant,
+                    actor=users["doer"],
+                    section_code=code,
+                    title=section_title,
+                    sequence=sequence,
+                )
+            self._note(True, "blueprint version 1 + 3 sections")
+        else:
+            self._note(False, f"blueprint version {version.version_number}")
+
+        version.refresh_from_db()
+        if version.status != "active":
+            # Through the sanctioned service: it enforces the draft->active
+            # gate and emits dossier_blueprint.version_activated.
+            activate_version(version=version, tenant=tenant, actor=users["vp"])
+            version.refresh_from_db()
+            self._note(True, f"blueprint version activate -> {version.status}")
+        else:
+            self._note(False, "blueprint version already active")
+
+        return {"blueprint": blueprint, "version": version}
+
+    # -- dossier ---------------------------------------------------------
+
+    def _seed_dossier(self, tenant, actor, blueprint_version, case):
+        """Instantiated from the ACTIVE blueprint version, keeping provenance.
+
+        Readiness is derived by the dossier domain from its sections; nothing
+        here sets or forces it.
+        """
+        from dossier_blueprints.services import instantiate_version
+        from submission_dossiers.models import SubmissionDossier
+
+        self.stdout.write(self.style.MIGRATE_HEADING("Dossier"))
+        title = f"{DEMO_PREFIX}Demonstration dossier"
+        existing = SubmissionDossier.objects.filter(regulatory_case=case, title=title).first()
+        if existing is not None:
+            self._note(False, "dossier")
+            return existing
+
+        try:
+            dossier = instantiate_version(
+                version=blueprint_version,
+                tenant=tenant,
+                actor=actor,
+                case_public_id=str(case.public_id),
+                title=title,
+            )
+        except Exception as exc:
+            self.stdout.write(
+                self.style.WARNING(f"  skipped  dossier ({type(exc).__name__}: {exc})")
+            )
+            return None
+
+        self._note(True, "dossier instantiated from blueprint version")
+        return dossier
+
+    # -- submission package ----------------------------------------------
+
+    def _seed_package(self, tenant, actor, case, document):
+        """An INTERNAL package, left in DRAFT on purpose.
+
+        Internal means internal: a ZIP of exact document versions for transfer
+        between systems. It is not an eCTD sequence, an agency filing or a
+        gateway submission, and nothing in this seed makes it one.
+
+        Left DRAFT rather than frozen because its only evidence is the
+        synthetic document above, which on a local stack was "scanned" by
+        StubScanner. Freezing would present an inspected, immutable artifact
+        built on a scan that never happened.
+        """
+        from submission_packages.models import SubmissionPackage
+        from submission_packages.services import add_entry, create_package
+
+        self.stdout.write(self.style.MIGRATE_HEADING("Submission package (internal)"))
+        name = f"{DEMO_PREFIX}Internal transfer package"
+        existing = SubmissionPackage.objects.filter(regulatory_case=case, name=name).first()
+        if existing is not None:
+            self._note(False, f"package ({existing.status})")
+            return existing
+
+        try:
+            package = create_package(
+                case_public_id=str(case.public_id),
+                tenant=tenant,
+                actor=actor,
+                name=name,
+                description=(
+                    "Synthetic INTERNAL package created by seed_regx_demo. Not "
+                    "an eCTD sequence, an agency filing or a gateway submission."
+                ),
+            )
+        except Exception as exc:
+            self.stdout.write(
+                self.style.WARNING(f"  skipped  package ({type(exc).__name__}: {exc})")
+            )
+            return None
+
+        self._note(True, f"package ({package.status})")
+
+        if document is not None:
+            try:
+                add_entry(
+                    package=package,
+                    tenant=tenant,
+                    actor=actor,
+                    document_version_public_id=str(document["version"].public_id),
+                    display_name="Synthetic excipient rationale",
+                )
+                self._note(True, "package entry (1 document version)")
+            except Exception as exc:
+                self.stdout.write(
+                    self.style.WARNING(f"  skipped  package entry ({type(exc).__name__}: {exc})")
+                )
+        return package
+
+    # -- external connector ----------------------------------------------
+
+    def _seed_connector(self, tenant, actor):
+        """One DISABLED connector, so the integrations screen is not empty.
+
+        No credential reference, no secret, no execution, and a documentation
+        host rather than anything private or routable inside this network.
+        """
+        from external_integrations.models import Connector
+        from external_integrations.services import create_connector
+
+        self.stdout.write(self.style.MIGRATE_HEADING("External connector"))
+        name = f"{DEMO_PREFIX}Example inbound connector (disabled)"
+        existing = Connector.objects.filter(tenant=tenant, name=name).first()
+        if existing is not None:
+            self._note(False, f"connector ({existing.status})")
+            return existing
+
+        try:
+            connector = create_connector(
+                tenant=tenant,
+                actor=actor,
+                name=name,
+                connector_type="generic_https",
+                configuration={
+                    # example.invalid is reserved by RFC 2606 and never
+                    # resolves, so this cannot reach anything -- and it is
+                    # public, so it trips none of the SSRF/private-IP guards
+                    # by being a loopback or RFC 1918 address.
+                    "base_url": "https://example.invalid/",
+                    "allowed_path_prefix": "/regx/",
+                    "health_path": "health",
+                    "connect_timeout_seconds": 5,
+                    "read_timeout_seconds": 30,
+                    "verify_tls": True,
+                },
+                description=(
+                    "Synthetic connector created by seed_regx_demo. It stays "
+                    "DRAFT, holds no credential reference and performs no I/O."
+                ),
+            )
+        except Exception as exc:
+            self.stdout.write(
+                self.style.WARNING(f"  skipped  connector ({type(exc).__name__}: {exc})")
+            )
+            return None
+
+        self._note(True, f"connector ({connector.status})")
+        return connector
 
     # -- checklist -------------------------------------------------------
 
