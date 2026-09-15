@@ -40,6 +40,15 @@ PERM_EXPORT_CHECKLIST = "iig_checklist.export_checklist"
 #: review authority must never implicitly confer it.
 PERM_OVERRIDE_EXECUTION = "iig_checklist.override_execution"
 
+#: P7. Writing a durable, immutable analysis record is an act, not a read, so it
+#: gets its own codename on the same principle as PERM_EXPORT_CHECKLIST: holding
+#: view_execution must never by itself confer authority to create a governed
+#: record. It is granted more widely than export, though, because a gap analysis
+#: is an operational working artifact rather than a checksummed regulatory
+#: artifact -- whoever runs or reviews the checklist needs to see what is
+#: outstanding.
+PERM_GENERATE_GAP_ANALYSIS = "iig_checklist.generate_gap_analysis"
+
 # Deliberately NOT granted to any built-in role below. Platform-master
 # checklist definitions are globally visible to every tenant, so
 # authoring them requires a distinct, explicit platform-level grant --
@@ -64,6 +73,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_SUBMIT_EXECUTION,
         PERM_CANCEL_EXECUTION,
         PERM_VIEW_EXECUTION,
+        # P7
+        PERM_GENERATE_GAP_ANALYSIS,
     ],
     Role.BuiltIn.REVIEWER: [
         PERM_VIEW_DEFINITION,
@@ -72,6 +83,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         # 4D-2
         PERM_REVIEW_EXECUTION,
         PERM_VIEW_EXECUTION,
+        # P7
+        PERM_GENERATE_GAP_ANALYSIS,
         # 4D-4 §AC.3 (`4D4-DEC-011`).
         PERM_OVERRIDE_EXECUTION,
     ],
@@ -86,6 +99,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         PERM_APPROVE_EXECUTION,
         PERM_SUPERSEDE_EXECUTION,
         PERM_VIEW_EXECUTION,
+        # P7
+        PERM_GENERATE_GAP_ANALYSIS,
         # 4D-4 §17. Granted to VP only, matching the established
         # templates_registry/fda_data export convention where Doer can run the
         # work and Reviewer can view it, but neither may emit the artifact.
@@ -289,3 +304,7 @@ class CanSupersedeExecution(_IigChecklistPermissionBase):
 
 class CanViewExecution(_IigChecklistPermissionBase):
     required_codename = PERM_VIEW_EXECUTION
+
+
+class CanGenerateGapAnalysis(_IigChecklistPermissionBase):
+    required_codename = PERM_GENERATE_GAP_ANALYSIS

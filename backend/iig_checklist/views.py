@@ -31,6 +31,7 @@ from .models import (
     ChecklistResponse,
     ChecklistSection,
     ChecklistVersion,
+    GapAnalysis,
 )
 from .permissions import (
     PERM_APPROVE_EXECUTION,
@@ -49,6 +50,7 @@ from .permissions import (
     CanCreateExecution,
     CanDeleteChecklistDraft,
     CanEditChecklistDraft,
+    CanGenerateGapAnalysis,
     CanRetireChecklist,
     CanReviewChecklist,
     CanSubmitChecklistReview,
@@ -70,6 +72,8 @@ from .serializers import (
     ChecklistVersionSerializer,
     CloneDefinitionSerializer,
     EmptyActionSerializer,
+    GapAnalysisDetailSerializer,
+    GapAnalysisSerializer,
     ReturnSerializer,
     ReviewerConclusionSerializer,
     VersionActionSerializer,
@@ -1807,6 +1811,11 @@ class ExecutionGapAnalysisView(APIView):
                 "total_questions": result.get("total_questions"),
                 "answered": result.get("answered"),
                 "unanswered": result.get("unanswered"),
+                # P7 split review-required out of `unanswered`. Recording it
+                # keeps this row consistent with the corrected
+                # classification rather than under-reporting by the
+                # difference.
+                "review_required": result.get("review_required"),
                 "not_applicable": result.get("not_applicable"),
                 "gap_count": result.get("gap_count"),
                 "score_percent": result.get("score_percent"),
@@ -1815,3 +1824,78 @@ class ExecutionGapAnalysisView(APIView):
             },
         )
         return Response(result)
+
+
+class ExecutionGapAnalysisSnapshotView(APIView):
+    """Immutable gap-analysis snapshots for one execution.
+
+    GET lists them, newest first, and reports whether the newest still matches
+    the execution's current answers. POST takes one.
+
+    Reading is `view_execution`; taking one is `generate_gap_analysis`, because
+    writing a durable record is an act rather than a read. Both are resolved
+    against the execution's own tenant, so there is no cross-tenant path.
+    """
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [CanGenerateGapAnalysis()]
+        return [CanViewExecution()]
+
+    def get(self, request, public_id):
+        from .gap_snapshots import analyses_for, current_input_hash
+
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+        analyses = list(
+            analyses_for(execution, tenant).select_related("checklist_version", "generated_by")
+        )
+        current = current_input_hash(execution)
+        return Response(
+            {
+                "current_input_hash": current,
+                # Whether the newest snapshot still describes today's answers.
+                # Cheap because it is a hash comparison, not a recomputed diff.
+                "latest_is_current": bool(analyses) and analyses[0].input_hash == current,
+                "results": GapAnalysisSerializer(analyses, many=True).data,
+            }
+        )
+
+    def post(self, request, public_id):
+        from .gap_snapshots import generate
+
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+        analysis, created = generate(execution=execution, tenant=tenant, actor=request.user)
+        analysis = (
+            GapAnalysis.objects.select_related("checklist_version", "generated_by")
+            .prefetch_related("items__question__section")
+            .get(pk=analysis.pk)
+        )
+        # 201 for a new snapshot, 200 when identical inputs returned the
+        # existing one. The caller can tell the difference without guessing.
+        return Response(
+            GapAnalysisDetailSerializer(analysis).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class GapAnalysisDetailView(APIView):
+    """One snapshot, with its items. Read-only: a snapshot is immutable."""
+
+    permission_classes = [CanViewExecution]
+
+    def get(self, request, public_id, analysis_public_id):
+        from rest_framework.exceptions import NotFound
+
+        tenant = _require_tenant()
+        execution = _get_execution_or_404(public_id, tenant)
+        try:
+            analysis = (
+                GapAnalysis.objects.select_related("checklist_version", "generated_by")
+                .prefetch_related("items__question__section")
+                .get(public_id=analysis_public_id, tenant=tenant, execution=execution)
+            )
+        except GapAnalysis.DoesNotExist:
+            raise NotFound() from None
+        return Response(GapAnalysisDetailSerializer(analysis).data)

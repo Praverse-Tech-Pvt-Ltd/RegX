@@ -49,11 +49,19 @@ class IigChecklistEvent:
     #: the plain response.entered/updated events so an override is never
     #: mistaken for an ordinary edit in the trail.
     ANSWER_OVERRIDDEN = "iig_checklist.answer.overridden"
-    #: Gap analysis is computed on demand and never stored, so the audit row is
-    #: the only record that a score was ever produced, for whom, and what it
-    #: said at that moment. Emitted on the read path because that is where the
-    #: analysis happens -- see the payload allow-list below for why the result
-    #: detail does not travel with it.
+    #: Two actions share this name, deliberately -- both are "a gap analysis was
+    #: produced", and splitting them would make the trail harder to read rather
+    #: than easier.
+    #:
+    #: P2 emits it on the on-demand GET: that analysis is computed and never
+    #: stored, so the audit row is the only record it ever existed.
+    #: P7 emits it when an immutable snapshot is written, where the snapshot
+    #: itself is the record and the row points at it.
+    #:
+    #: They are told apart by `resource_type` -- `iig_checklist_execution` for
+    #: the read, `iig_checklist` for the snapshot -- and by the presence of
+    #: `analysis_public_id` and `input_hash`, which only a snapshot has.
+    #: See the payload allow-list below for what each may record.
     GAP_ANALYSIS_GENERATED = "iig_checklist.gap_analysis.generated"
 
 
@@ -70,14 +78,24 @@ class IigChecklistEvent:
 #: content, narratives, credentials and request bodies are structurally
 #: excluded rather than merely discouraged.
 _PAYLOAD_ALLOW_LISTS: dict[str, frozenset[str]] = {
-    # Counts and percentages only. `analyse_execution` also returns `gaps`,
+    # Counts and identifiers only. `analyse_execution` also returns `gaps`,
     # which carries `question_text` and the answer itself, and `sections`,
     # which names each section. Neither may enter the audit row: the trail
-    # records THAT a score was produced and what it totalled, never the
-    # governed content behind it. `section_count` is derived here for that
-    # reason instead of passing `sections` through.
+    # records THAT an analysis was produced and what it totalled, never the
+    # governed content behind it. `section_count` is derived at the call site
+    # for that reason instead of passing `sections` through.
+    #
+    # One entry, two emitters. The first block is what the P2 read path
+    # records; the second is what a P7 snapshot adds. Keeping them in one
+    # allow-list rather than two keeps a single definition of what this event
+    # may ever carry -- the alternative is two lists that drift.
+    #
+    # `score_percent` and `completeness_percent` are legacy read-path output
+    # only. P7 does not pass them, so they never appear on a snapshot row, and
+    # nothing may treat either as a governed figure.
     IigChecklistEvent.GAP_ANALYSIS_GENERATED: frozenset(
         {
+            # P2 -- the on-demand GET.
             "execution_public_id",
             "checklist_version_public_id",
             "total_questions",
@@ -88,6 +106,14 @@ _PAYLOAD_ALLOW_LISTS: dict[str, frozenset[str]] = {
             "score_percent",
             "completeness_percent",
             "section_count",
+            # P7 -- the immutable snapshot, plus the corrected classification.
+            "analysis_public_id",
+            "input_hash",
+            "algorithm_version",
+            "applicable",
+            "gap",
+            "no_gap",
+            "review_required",
         }
     ),
     # Field NAMES only. The values are draft regulatory text -- change_summary

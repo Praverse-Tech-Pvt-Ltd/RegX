@@ -1085,3 +1085,110 @@ class CalculationOutcome(PublicIDModel, TimeStampedModel):
 
         if errors:
             raise ValidationError(errors)
+
+
+# ---------------------------------------------------------------------------
+# P7 -- immutable gap-analysis snapshots
+# ---------------------------------------------------------------------------
+class GapAnalysis(PublicIDModel, TimeStampedModel):
+    """One immutable gap-analysis snapshot of one execution.
+
+    The point of persisting at all is history: a reviewer needs to be able to
+    say what the checklist reported *at the moment somebody looked*, and the
+    on-demand endpoint cannot answer that because it always recomputes from
+    today's answers.
+
+    **Immutable.** Nothing here is ever rewritten. If the answers move, the next
+    generation is a new row; the old one keeps saying what it said. `save()`
+    refuses a second write rather than relying on callers to remember.
+
+    **Bound to its inputs.** `checklist_version` is a hard FK under PROTECT, so
+    a later version cannot silently change what an older snapshot meant, and the
+    version it was taken against cannot be deleted out from under it.
+    `input_hash` fingerprints the exact state that produced it.
+
+    **No question or answer text.** Items reference questions by FK. The
+    checklist version is immutable once active, so the text is recoverable
+    through that reference; copying it here would duplicate regulatory content
+    into a second, unreviewed place.
+    """
+
+    tenant = models.ForeignKey("tenancy.Tenant", on_delete=models.PROTECT)
+    execution = models.ForeignKey(
+        ChecklistExecution, on_delete=models.PROTECT, related_name="gap_analyses"
+    )
+    checklist_version = models.ForeignKey(ChecklistVersion, on_delete=models.PROTECT)
+    #: SHA-256 over the canonical analysis inputs. See `gap_snapshots.input_hash`.
+    input_hash = models.CharField(max_length=64)
+    algorithm_version = models.PositiveIntegerField()
+    generated_by = models.ForeignKey(
+        "identity.User", on_delete=models.PROTECT, null=True, blank=True
+    )
+    generated_at = models.DateTimeField()
+
+    #: Factual counts only. No score: no governed formula exists, and inventing
+    #: one here would give it the authority of a persisted regulatory record.
+    total_questions = models.PositiveIntegerField()
+    applicable_count = models.PositiveIntegerField()
+    gap_count = models.PositiveIntegerField()
+    no_gap_count = models.PositiveIntegerField()
+    unanswered_count = models.PositiveIntegerField()
+    review_required_count = models.PositiveIntegerField()
+    not_applicable_count = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ["-generated_at", "-id"]
+        constraints = [
+            # Idempotent regeneration: identical inputs under the same algorithm
+            # produce one row, so two reviewers pressing the button at the same
+            # moment cannot create two snapshots that say the same thing. The
+            # database is what enforces it, because a check-then-insert in the
+            # service would lose the race it exists to prevent.
+            models.UniqueConstraint(
+                fields=["tenant", "execution", "input_hash", "algorithm_version"],
+                name="unique_iig_gap_analysis_per_input",
+            )
+        ]
+        indexes = [models.Index(fields=["tenant", "execution", "-generated_at"])]
+
+    def __str__(self):
+        return f"GapAnalysis({self.public_id})"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValidationError("A gap analysis snapshot is immutable once written.")
+        return super().save(*args, **kwargs)
+
+
+class GapAnalysisItem(models.Model):
+    """One question's classification within a snapshot.
+
+    Not a `PublicIDModel`: an item has no independent identity outside its
+    analysis and is never addressed on its own.
+    """
+
+    analysis = models.ForeignKey(GapAnalysis, on_delete=models.CASCADE, related_name="items")
+    question = models.ForeignKey(ChecklistQuestion, on_delete=models.PROTECT)
+    #: Denormalised from the question's section so a snapshot keeps the grouping
+    #: it was taken with. `code` is unique per version; the section's *title* is
+    #: not, which is why identity is the code.
+    section_code = models.CharField(max_length=100)
+    section_display_order = models.PositiveIntegerField()
+    display_order = models.PositiveIntegerField()
+    status = models.CharField(max_length=32)
+    reason_code = models.CharField(max_length=64)
+    #: Exactly what the checklist definition configured, or blank for
+    #: unconfigured. Never derived, never ranked.
+    configured_criticality = models.CharField(max_length=20, blank=True)
+
+    class Meta:
+        ordering = ["section_display_order", "section_code", "display_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["analysis", "question"], name="unique_iig_gap_item_per_analysis"
+            )
+        ]
+        indexes = [models.Index(fields=["analysis", "status"])]
+
+    def __str__(self):
+        return f"GapAnalysisItem({self.analysis_id}, {self.question_id}, {self.status})"

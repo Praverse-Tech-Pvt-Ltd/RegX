@@ -1260,6 +1260,68 @@ export type ChecklistVersionStatus =
  *  definition is not yet classified and no execution may be created against it. */
 export type ChecklistExecutionScope = "formulation_component" | "formulation_version" | "";
 
+/**
+ * P7 gap analysis.
+ *
+ * Counts only. There is deliberately no score field: no governed scoring
+ * formula exists, and the legacy `score_percent` on the older on-demand
+ * endpoint is retained there for API compatibility rather than shown here.
+ */
+export type GapStatus =
+  | "gap"
+  | "no_gap"
+  | "unanswered"
+  | "review_required"
+  | "not_applicable";
+
+export interface GapAnalysisCounts {
+  total_questions: number;
+  applicable: number;
+  gap: number;
+  no_gap: number;
+  unanswered: number;
+  review_required: number;
+  not_applicable: number;
+}
+
+export interface GapAnalysisDTO {
+  public_id: string;
+  execution_public_id: string;
+  checklist_version_public_id: string;
+  checklist_version_number: number;
+  checklist_version_status: string;
+  input_hash: string;
+  algorithm_version: number;
+  generated_by_email: string;
+  generated_at: string;
+  counts: GapAnalysisCounts;
+}
+
+export interface GapAnalysisItemDTO {
+  question_public_id: string;
+  question_code: string;
+  question_text: string;
+  answer_type: string;
+  section_code: string;
+  section_title: string;
+  section_display_order: number;
+  display_order: number;
+  status: GapStatus;
+  reason_code: string;
+  /** Exactly what the checklist configured; "" means not configured. */
+  configured_criticality: string;
+}
+
+export interface GapAnalysisDetailDTO extends GapAnalysisDTO {
+  items: GapAnalysisItemDTO[];
+}
+
+export interface GapAnalysisListDTO {
+  current_input_hash: string;
+  latest_is_current: boolean;
+  results: GapAnalysisDTO[];
+}
+
 export interface ChecklistDefinition {
   public_id: string;
   code: string;
@@ -1590,6 +1652,38 @@ export const iigChecklists = {
         `/api/regx/v1/iig-checklists/executions/${publicId}/supersede/`,
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
       ).then(toChecklistExecution),
+
+    /**
+     * Immutable gap-analysis snapshots for one execution.
+     *
+     * `list` returns the history newest-first plus `latestIsCurrent`, which the
+     * server derives by comparing the newest snapshot's input hash with the
+     * hash of the execution's answers right now. That is a hash comparison, not
+     * a recomputed diff, so it is cheap enough to fetch with the list.
+     *
+     * `generate` answers 201 for a new snapshot and 200 when identical inputs
+     * returned the one that already exists. Both carry the full snapshot, so
+     * the caller never needs a follow-up read.
+     */
+    gapAnalyses: {
+      list: (tenantSlug: string, executionPublicId: string) =>
+        apiRequest<GapAnalysisListDTO>(
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/gap-analyses/`,
+          { headers: { "X-Tenant-Slug": tenantSlug } }
+        ),
+
+      get: (tenantSlug: string, executionPublicId: string, analysisPublicId: string) =>
+        apiRequest<GapAnalysisDetailDTO>(
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/gap-analyses/${analysisPublicId}/`,
+          { headers: { "X-Tenant-Slug": tenantSlug } }
+        ),
+
+      generate: (tenantSlug: string, executionPublicId: string) =>
+        apiRequest<GapAnalysisDetailDTO>(
+          `/api/regx/v1/iig-checklists/executions/${executionPublicId}/gap-analyses/`,
+          { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+        ),
+    },
 
     responses: {
       /**
