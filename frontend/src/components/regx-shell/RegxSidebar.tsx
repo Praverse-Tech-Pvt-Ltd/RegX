@@ -72,7 +72,11 @@ const REGX_MODULES: Item[] = [
     icon: "mdi mdi-checkbox-marked-outline",
     children: [
       { href: "/iig-checklists", label: "Definitions" },
-      { href: "/iig-checklists/versions", label: "Versions" },
+      // No "Versions" entry: there is no /iig-checklists/versions page. Only
+      // versions/[versionPublicId] exists, so that href fell through to
+      // iig-checklists/[publicId] with publicId="versions" and rendered
+      // "Checklist definition not found." Versions are reached from the
+      // definition that owns them, which is also where their lifecycle lives.
       { href: "/iig-checklists/executions", label: "Executions" },
     ],
   },
@@ -93,6 +97,25 @@ const REGX_MODULES: Item[] = [
     href: "/migration-batches",
     label: "Migration Batches",
     icon: "mdi mdi-swap-horizontal",
+  },
+  {
+    // Platform-level blueprint library. A dossier is case-scoped and reached
+    // through its case, but a blueprint is not: it is authored once and
+    // instantiated by many cases. It was only reachable from the dossiers
+    // panel inside a case detail page, which is the wrong place to look for
+    // the library itself.
+    id: "dossier-blueprints",
+    href: "/dossier-blueprints",
+    label: "Dossier Blueprints",
+    icon: "mdi mdi-file-tree-outline",
+  },
+  {
+    // Read-only operational overview across cases and dossiers. It had no
+    // inbound link anywhere in the app -- reachable only by typing the URL.
+    id: "submission-operations",
+    href: "/submission-operations",
+    label: "Submission Operations",
+    icon: "mdi mdi-view-dashboard-outline",
   },
   {
     id: "external-integrations",
@@ -224,13 +247,15 @@ function isActive(pathname: string, href: string): boolean {
     return pathname.startsWith("/iid-assessments");
   }
   if (href === "/iig-checklists") {
-    // The definitions list owns /iig-checklists itself and its [publicId]
-    // and /new children, but not the sibling /versions and /executions
-    // sections, which have their own entries.
+    // Definitions owns /iig-checklists, its [publicId] and /new children, and
+    // now version detail pages too: /versions lost its own entry when the
+    // link was found to be dead, and a version is reached from -- and belongs
+    // to -- the definition that owns it. Without this a version page would
+    // light up nothing at all. /executions keeps its own entry, so it stays
+    // excluded.
     return (
       pathname === href ||
       (pathname.startsWith(`${href}/`) &&
-        !pathname.startsWith("/iig-checklists/versions") &&
         !pathname.startsWith("/iig-checklists/executions"))
     );
   }
