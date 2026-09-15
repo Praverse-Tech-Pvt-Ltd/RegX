@@ -2,12 +2,103 @@
 
 ## Source
 
-Rows are adapted from the official FDA Orange Book products export shape
-(pipe-delimited text file, already parsed into row dicts before reaching
-`fda_data`): `Ingredient`, `DF;Route`, `Trade_Name`, `Applicant`, `Strength`,
-`Appl_Type`, `Appl_No`, `Product_No`, `TE_Code`, `Approval_Date`, `RLD`,
-`RS`. No commercial or scraped source is accepted; `official_source_reference`
-on `FDADataSourceRelease` records where the file actually came from.
+The official FDA Orange Book download is a ZIP containing **`Products.txt`,
+`Patent.txt` and `Exclusivity.txt`** — ASCII, **tilde (`~`) delimited**.
+
+> Earlier revisions of this document said *pipe-delimited*. That was wrong.
+> Splitting a tilde file on `|` yields a single column per row, which now
+> fails column validation rather than importing nonsense.
+
+`Products.txt` columns: `Ingredient`, `DF;Route`, `Trade_Name`, `Applicant`,
+`Strength`, `Appl_Type`, `Appl_No`, `Product_No`, `TE_Code`, `Approval_Date`,
+`RLD`, `RS`, `Type`.
+
+**Only `Products.txt` is read.** `Patent.txt` and `Exclusivity.txt` ship in the
+same archive and are ignored: there is no patent or exclusivity model in this
+system, and feeding them to the products adapter produces empty
+`OrangeBookProduct` rows that reconciliation then counts as imported.
+
+No commercial or scraped source is accepted. `official_source_reference` is
+**supplied by the operator and recorded verbatim** — a file whose columns match
+this shape is not thereby proved to have come from FDA, and nothing stamps
+"FDA official" on it because the header looked right.
+
+## Supported dataset types
+
+| Dataset type | Importable | Why not |
+|---|---|---|
+| `orange_book_products` | **yes** | — |
+| `fda_iid` | **yes** | — |
+| `orange_book_patents` | no | no destination model |
+| `orange_book_exclusivity` | no | no destination model |
+| `orange_book_discontinued` | no | discontinued flag not carried by the products adapter |
+| `fda_substance_identifiers` | no | UNII mappings are created by the proposal workflow, not bulk import |
+| `fda_route_terminology` | no | governed vocabulary, not imported source data |
+| `fda_dosage_form_terminology` | no | governed vocabulary, not imported source data |
+
+An unsupported type fails with **HTTP 400 before any release is created**. It
+previously returned 201 with zero rows imported, which looked like success.
+The authoritative list is `fda_data/dispatch.py`; a test asserts every declared
+enum member is either importable or has a stated reason.
+
+## IID source contract
+
+Official export, comma-delimited: `Inactive Ingredient`, `Route`,
+`Dosage Form`, `CAS Number`, `UNII`, `Potency Amount`, `Potency Unit`.
+
+`Inactive Ingredient`, `Potency Amount` and `Potency Unit` must be **present
+and non-empty**; a row missing any of them is rejected rather than stored with
+blanks. The adapter also accepts the older names `Ingredient Name`, `Potency`
+and `Unit` for existing JSON API callers, but an actual file must match what
+FDA publishes.
+
+**XLSX is not supported.** `openpyxl` is available, but a cell holding a
+formula with no cached result reads as `None`, and the only honest options are
+to reject the row or evaluate the formula — and evaluating spreadsheet formulas
+from an untrusted file is not something this importer should do. Convert to CSV
+first; the column contract is identical.
+
+## Importing a file
+
+```bash
+python manage.py import_fda_release EOBZIP_2026_01.zip     --dataset-type orange_book_products     --source-reference "FDA Orange Book, downloaded 2026-01-15 from fda.gov"
+
+python manage.py import_fda_release iid.csv     --dataset-type fda_iid     --source-reference "FDA IID export, downloaded 2026-01-15 from fda.gov"
+```
+
+`--dataset-type` is mandatory and never sniffed: `Products.txt` and
+`Patent.txt` are both tilde-delimited ASCII from the same archive, so guessing
+would eventually store patent rows as products. `--dry-run` parses and
+validates without writing.
+
+The command **registers** a release. It does not activate one — that still
+requires `validate → submit-review → approve → activate`.
+
+### Parser safety
+
+Rejected, not worked around: ZIP members with traversal paths (`..`, absolute),
+nested archives, a missing `Products.txt`, two members named `Products.txt`,
+uncompressed size over 256 MB, more than 500,000 rows, a row whose field count
+differs from the header, and a file that decodes as neither UTF-8 nor Latin-1.
+Latin-1 bytes are preserved as characters rather than replaced with U+FFFD,
+because a corrupted applicant name in a governed record is worse than a
+rejected file.
+
+## Two checksums, two meanings
+
+| Field | Covers |
+|---|---|
+| `source_checksum_sha256` | the exact bytes supplied — the FDA file/ZIP via the command, or the canonical JSON payload via the API |
+| `normalized_payload_sha256` | the canonical rows after parsing, independent of how they arrived |
+
+The first is the identity used for idempotency: the unique constraint is
+`(dataset_type, source_checksum_sha256)`, so re-importing the same bytes reuses
+the existing release instead of duplicating rows. The second lets two different
+source files that normalize identically be recognised as equivalent **without**
+losing the distinction between the files themselves.
+
+`source_file_size_bytes` and `parser_identifier` are recorded alongside.
+`parser_identifier` is blank for API-registered releases, because no parser ran.
 
 ## Pipeline
 
