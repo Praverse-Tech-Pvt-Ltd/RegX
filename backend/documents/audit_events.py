@@ -22,6 +22,34 @@ class DocumentEvent:
     DUPLICATE_DETECTED = "document.duplicate.detected"
 
 
+#: Payload keys permitted for the event types corrected in P2.
+#:
+#: Per event type, not domain-wide. A domain-wide allow-list would silently
+#: drop keys the twelve existing document events already record, changing the
+#: historical shape of the trail without review. These two start constrained;
+#: the rest keep what they were written with.
+#:
+#: `failure_detail` is deliberately absent. It carries str(exc), which for a
+#: parse failure can quote bytes of the document being processed -- exactly the
+#: content the audit table must not absorb, since it cannot be redacted later.
+_PAYLOAD_ALLOW_LISTS: dict[str, frozenset[str]] = {
+    DocumentEvent.PROCESSING_FAILED: frozenset({"failure_code", "retryable", "attempt_count"}),
+    DocumentEvent.SCAN_QUEUED: frozenset({"source"}),
+}
+
+
+def _restrict(event_type: str, payload: dict | None) -> dict:
+    """Drop anything the event type is not permitted to record.
+
+    Event types with no entry pass through untouched, so this narrows only
+    what P2 adds.
+    """
+    allowed = _PAYLOAD_ALLOW_LISTS.get(event_type)
+    if allowed is None:
+        return payload or {}
+    return {k: v for k, v in (payload or {}).items() if k in allowed}
+
+
 def emit(
     *,
     event_type: str,
@@ -40,6 +68,6 @@ def emit(
         event_type=event_type,
         resource_type=resource_type,
         resource_id=resource_id,
-        payload=payload or {},
+        payload=_restrict(event_type, payload),
         ip_address=ip_address,
     )
