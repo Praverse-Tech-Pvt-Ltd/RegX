@@ -499,6 +499,7 @@ class ChecklistVersionDetailView(APIView):
             # `5A-DEC-005` -- jurisdiction is editable here for the same reason
             # regulatory_basis is: both describe what the draft will be approved
             # against, and both freeze together when it leaves draft/returned.
+            fields_changed = []
             for field in (
                 "effective_date",
                 "expiry_date",
@@ -508,11 +509,40 @@ class ChecklistVersionDetailView(APIView):
             ):
                 if field in request.data:
                     setattr(version, field, request.data[field])
+                    fields_changed.append(field)
             try:
                 version.full_clean()
                 version.save()
             except DjangoValidationError as exc:
                 _raise_django_validation_as_drf(exc)
+
+            # These fields describe what the version will be approved against,
+            # so changing them changes the basis of a later approval. Every
+            # other transition on this version is audited; the edit that
+            # precedes them was not.
+            #
+            # After save() and inside the same transaction: a validation
+            # failure raises above, so a rejected edit records nothing, and a
+            # rollback takes the audit row with it.
+            #
+            # Field names only -- see audit._PAYLOAD_ALLOW_LISTS for why the
+            # values stay out.
+            if fields_changed:
+                emit(
+                    event_type=IigChecklistEvent.VERSION_UPDATED,
+                    resource_type="iig_checklist_version",
+                    resource_id=str(version.public_id),
+                    actor_id=request.user.id,
+                    actor_email=getattr(request.user, "email", ""),
+                    tenant_id=getattr(version.definition.tenant, "id", None),
+                    payload={
+                        "version_public_id": str(version.public_id),
+                        "definition_public_id": str(version.definition.public_id),
+                        "version_number": version.version_number,
+                        "status": version.status,
+                        "fields_changed": sorted(fields_changed),
+                    },
+                )
         return Response(ChecklistVersionSerializer(version).data)
 
 
@@ -1754,7 +1784,46 @@ class ExecutionGapAnalysisView(APIView):
 
         tenant = _require_tenant()
         execution = _get_execution_or_404(public_id, tenant)
-        return Response(analyse_execution(execution))
+        result = analyse_execution(execution)
+
+        # Audited on the read path because this is where the analysis happens:
+        # the score is computed on demand and never stored, so without this the
+        # fact that a score was produced leaves no trace at all.
+        #
+        # Emitted only after analyse_execution returns. A permission failure
+        # raises in _get_execution_or_404 above, so a refused request cannot
+        # record a successful generation.
+        #
+        # Only counts travel. `result` also holds `gaps` (question text and the
+        # answer given) and `sections` (section names); the allow-list in
+        # audit._PAYLOAD_ALLOW_LISTS drops both, and `section_count` is derived
+        # here so the shape of the checklist is recorded without its content.
+        emit(
+            event_type=IigChecklistEvent.GAP_ANALYSIS_GENERATED,
+            resource_type="iig_checklist_execution",
+            resource_id=str(execution.public_id),
+            actor_id=request.user.id,
+            actor_email=getattr(request.user, "email", ""),
+            tenant_id=getattr(tenant, "id", None),
+            payload={
+                "execution_public_id": str(execution.public_id),
+                "checklist_version_public_id": str(execution.checklist_version.public_id),
+                "total_questions": result.get("total_questions"),
+                "answered": result.get("answered"),
+                "unanswered": result.get("unanswered"),
+                # P7 split review-required out of `unanswered`. Recording it
+                # keeps this row consistent with the corrected
+                # classification rather than under-reporting by the
+                # difference.
+                "review_required": result.get("review_required"),
+                "not_applicable": result.get("not_applicable"),
+                "gap_count": result.get("gap_count"),
+                "score_percent": result.get("score_percent"),
+                "completeness_percent": result.get("completeness_percent"),
+                "section_count": len(result.get("sections") or []),
+            },
+        )
+        return Response(result)
 
 
 class ExecutionGapAnalysisSnapshotView(APIView):

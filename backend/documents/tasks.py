@@ -183,6 +183,19 @@ def process_document_version(self, version_pk: int, tenant_id: int) -> None:
         version.failure_code = "max_attempts_exceeded"
         version.failure_detail = "Document processing failed after maximum retries."
         version.save(update_fields=["processing_status", "failure_code", "failure_detail"])
+        # PROCESSING_STARTED and PROCESSING_COMPLETE were both audited; the
+        # failure paths were not, so a document could end permanently FAILED
+        # with the trail showing only that processing began.
+        emit(
+            event_type=DocumentEvent.PROCESSING_FAILED,
+            resource_id=str(version.public_id),
+            tenant_id=tenant_id,
+            payload={
+                "failure_code": "max_attempts_exceeded",
+                "retryable": False,
+                "attempt_count": job.attempt_count,
+            },
+        )
         return
 
     job.status = JobStatus.RUNNING
@@ -252,6 +265,21 @@ def _fail_job(job, version, code: str, detail: str, *, retryable: bool) -> None:
     version.failure_code = code
     version.failure_detail = detail
     version.save(update_fields=["processing_status", "failure_code", "failure_detail"])
+
+    # `code` is a fixed internal identifier. `detail` is not -- it carries
+    # str(exc), which for a parse failure can quote bytes of the document being
+    # processed. The code and the retryable flag are enough to see what
+    # happened; the detail stays on the row, where it can be deleted.
+    emit(
+        event_type=DocumentEvent.PROCESSING_FAILED,
+        resource_id=str(version.public_id),
+        tenant_id=version.document.tenant_id,
+        payload={
+            "failure_code": code,
+            "retryable": retryable,
+            "attempt_count": job.attempt_count,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

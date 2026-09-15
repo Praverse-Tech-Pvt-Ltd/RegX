@@ -176,4 +176,15 @@ def ingest_new_document(
     # browser is.
     transaction.on_commit(lambda: scan_document_version.delay(version.pk, tenant.pk))
 
+    # Records that a scan was requested, separately from its outcome. Without
+    # it a version stuck at PENDING is indistinguishable in the trail from one
+    # whose scan was never dispatched -- the difference between a slow worker
+    # and a lost task.
+    emit(
+        event_type=DocumentEvent.SCAN_QUEUED,
+        resource_id=str(version.public_id),
+        tenant_id=tenant.pk,
+        payload={"source": "ingest"},
+    )
+
     return document, version
