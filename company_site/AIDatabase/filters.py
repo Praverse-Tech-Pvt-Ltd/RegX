@@ -4,94 +4,20 @@ from .models import *
 from django import forms
 from django import forms
 from django_filters import DateFilter
-import openai
 import json
 import os
 import re
 
-# Read from the environment. The literal key that used to sit here was a
-# real OpenAI project key; it has been removed from this file and from
-# this branch's history. Set OPENAI_API_KEY to re-enable the (currently
-# unused) ChatGPT synonym lookup below.
-openai.api_key = os.environ.get("OPENAI_API_KEY", "")
-def get_synonyms_from_chatgpt(query):
-    # print("query",query)
-    prompt = f"""You are a helpful assistant that helps extract keywords, synonyms, and related terms from a user's input query. The keywords should be suitable for searching data in a database.
 
-            For the input query, provide a list of:
-            1. Relevant keywords from the query.
-            2. Synonyms of those keywords.
-            3. Related terms or concepts.
-
-            Input Query: "{query}"
-
-            If the words like this is present in the query : ['Capsules', 'Tablets', 'Vaginal Inserts', 'Injection', 'ER Tablets', 'Oral Suspension', 'Nasal Spray', 'Gel', 'Transdermal', 'ER Oral Suspension', 'DR Capsules', 'Oral Liquid', 'Nasal Spray', 'Solid Oral Tablet', 'Solid Oral Capsule', 'Topical ', 'Vaginal ', 'Injection', 'Transdermal','Nasal Spray'],
-            return me the list under the name "dosage"
-            If the words like this is present in the query: ['CMC', 'Clinical', 'clinical', 'CMC/ Clinical', ' Clinical', ' Solution', 'Solution', ' Suspension', 'Suspension', 'Sublingual Tablet', 'IR Tablet', 'DR Tablet', 'ER Tablet', 'IR Capsule', 'Ointment', 'ER Capsule', ' Insert', 'Dry Powder', 'Lyo', ' Gel', 'Gel', 'Patch', 'Cream','Nasal Spray', 'Powder for Oral Suspension', 'Oral Solution', 'ER Oral Suspension', 'Oral Suspension', 'Powder for Oral Solution', 'Vaginal ring', 'Topical Patch', 'Transdermal Patch', 'Suppository', 'Ointment', ' Solution', ' Gel', 'Cream', 'ER Capsules', 'ER Tablets', 'IR Tablets', 'IR Capsules', 'DR Tablets', ' ER Tablets', 'Sublingual Tablets', 'DR Capsules', 'Chewable Tablets', 'Otic', ' Ophthalmic ', 'Injectable', 'General Injectable ']
-            return me the list under the name "cmc"
-            If the words like this is present in the query: ['Drug Product', 'Drug Substance', 'Microbiology', 'QOS', 'Drug Product ', 'Process ', 'Drug Substance ', 'Bioequivalence (Module 5)', 'Biopharmaceutics', 'Drug substance']
-            return me the list under the name "type_of_dosage"
-            If the words like this is present in the query: ['Hyperlink/Bookmark', 'Legibility/Page Orientation', 'ICH M4 - CTD Structure', 'PDF Properties', 'STF / SAS / XPT', 'Organization/Format', 'File Naming', 'Publishing', '356h Form', 'Drug Product', '3455 Form', 'Administrative', 'Labeling', 'Bioequivalence', 'Drug Substance', 'Drug Substance/ Drug Product', '3674 Form','Administrative & Facilities', 'Stability (32P8)', 'BE & In-Vitro', 'General Property/ Administrative', 'Specification & CoA (32S41 & 32S44)', 'Components & Composition (3.2.P.1)', 'Method & Valdation (32P52 & 32P53)', 'Drug-Device', 'Characterization & Justification', 'Produc Development Report (32P2)', 'Manufacturing Process/ Scale-up', 'ANDA Exhibit Batch (32R)', 'In-Process Controls', 'Specification & CoA (32P51 & 32P54)', 'Container/Closure (3.2.P.7)', 'Microbiology', 'Product Development Report (32P2)', 'QOS (Module 2.3)', 'Excipients', 'Method & Valdation (32S42 & 32S43)', 'Reference Std', 'Process Validation', 'Bio', 'Drug Substance- Physico-Chemical Property', 'Charaterization/& Justification', 'Specification/CoA', 'Tablets', 'Container/Closure (32P7)', 'Stability', 'Components & Composition (32P1)', 'Dissolution', 'Reference Standard', 'Administrative/ Facilities', 'Drug substance- physico-Chemical Property', 'Drug Substance- General', 'Elemental Impurities', 'Polymorphism', 'Extractable /Leachable', 'DMF', 'Method &Valdation (32S42 & 32S43)', 'General/Administrative', 'Product Development Report-32P2', 'Characterization/Justification', 'Facility', 'Method &Valdation (32P52 & 32P53)', 'Drug - Device', 'Specification & CoA (32P51 &32P54)', 'ANDA Batch/ Reconciliation / 32R', 'Bioequivelence ', 'Component &Compostion (32P1)', 'Batch Formula', 'Compatibility Protocol ', 'Extactable / Leatchable ', 'Specification/CoA (32P541 & 32P544)', 'Stability -32P8', 'Components/ Composition (32P1)', 'Excipients (32P4)', 'Container/Closure', 'container/Closure', 'Extractable/Leachables', 'Specification/CoA (32P51 & 32P54)', 'Drug Substance - General', ' Specification/CoA (32S41 & 32S44)', 'Reference Standard (32S4)', 'Reference Standard (32P56)', 'Container/Closure (32S6)', 'Bioequivalence', 'Labeling', ' Elemental Impurities', 'administrative/ Facilities', 'Manufacturing Process/Scale-up', 'Specification/CoA (32P541 &32P544)', 'PDR-QbD (Development Report) - 32P2', 'Specification & CoA (32S41 &32S44)', 'Stability (32S7)', 'Components/ Composition', 'Drug- Device']
-            return me the list under the name "deficiency"
-            If the words like this is present in the query: ['DRL', 'Minor CR', 'Major CR', 'IR']
-            return me the list under the name "category"
-            Provide your response in this exact JSON format:
-            {{"keywords": [], "synonyms": [], "related_terms": [], "dosage": [], "cmc": [], "deficiency":[] , "category":[], "type_of_dosage": [] }}
-            """
-
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=150,
-            temperature=0.7
-        )
-        # print("try..............,",response)
-
-        # content = response['choices'][0]['message']['content']
-        content = response.choices[0].message.content
-        # print("Raw GPT response:", content)  # Debug print
-
-        # Find the JSON object in the response
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        # print("\n\n>>>Json",json_match)
-        if json_match:
-            # print("\n\n>>>Json after",json_match)
-            json_str = json_match.group()
-            # Clean up the string
-            json_str = json_str.replace("'", '"').replace('\n', '').strip()
-            data = json.loads(json_str)
-
-            # print("Data ======> ",data)
-            # Combine all terms for searching
-            search_terms = set()
-            dosage_terms = set()
-            cmc_terms = set()
-            deficiency_terms = set()
-            category_terms = set()
-            type_of_dosage_terms = set()
-
-            search_terms.update(data.get('keywords', []))
-            search_terms.update(data.get('synonyms', []))
-            search_terms.update(data.get('related_terms', []))
-
-            dosage_terms.update(data.get('dosage',[]))
-            cmc_terms.update(data.get('cmc',[]))
-            deficiency_terms.update(data.get('deficiency',[]))
-            category_terms.update(data.get('category',[]))
-            type_of_dosage_terms.update(data.get('type_of_dosage',[]))
-            # print("Extracted search terms:", list(search_terms))  # Debug print
-            return list(search_terms),list(dosage_terms),list(cmc_terms),list(deficiency_terms),list(category_terms),list(type_of_dosage_terms)
-        else:
-            # print("Else>.....")
-            # print("No JSON object found in response")
-            return [],[],[],[],[],[]
-
-    except Exception as e:
-        # print("Exception.....")
-        print(f"Error in getting synonyms: {str(e)}")
-        # print(f"Full response content: {content if 'content' in locals() else 'No content'}")
-        return [],[],[],[],[],[]
+# The ChatGPT synonym-expansion helper that used to live here was removed:
+# it was called from `Form483Filter.filter_observation_content`, which made
+# an ordinary Form 483 search reach a paid external API, and it did not work
+# (it returned a six-tuple that the caller iterated as a flat list, so every
+# search matched nothing). The search is now a plain `icontains`.
+#
+# Commented-out filter code further down still mentions the helper by name.
+# Those lines are dead; uncommenting one now raises NameError rather than
+# silently restoring a billed network call on a page render.
 
 # class ANDAFilter(django_filters.FilterSet):
 #     dosage_form = django_filters.ChoiceFilter(
@@ -927,30 +853,23 @@ class Form483Filter(django_filters.FilterSet):
     )
 
     def filter_observation_content(self, queryset, name, value):
+        """Plain database search over observation content.
+
+        This used to expand the query into synonyms through a ChatGPT call
+        before searching, which made an ordinary filter submission on the Form
+        483 page reach a paid external API. It also did not work: the helper
+        returned a six-tuple of lists and this method iterated it as if it were
+        a flat list of terms, so every search built `icontains=[]` and matched
+        nothing. Whoever typed in the box got an empty result set and no error.
+
+        One `icontains` over the related content, distinct because a master
+        record has many observations and several can match one term.
+        """
         if not value:
             return queryset
-
-        # Get synonyms and related terms from ChatGPT
-        search_terms = get_synonyms_from_chatgpt(value)
-
-        # Create Q objects for each search term
-        q_objects = Q()
-        for term in search_terms:
-            q_objects |= Q(form483system__form483observation__form483obeservationcontent__content__icontains=term)
-
-        # Return filtered queryset with distinct results
-        return queryset.filter(q_objects).distinct()
-
-    # def filter_observation_content(self, queryset, name, value):
-    #     value_new = Q(form483system__form483observation__form483obeservationcontent__content__icontains=value)
-    #     print("***",value_new)
-    #     if value:
-    #         return queryset.filter(
-    #             value_new
-    #         ).distinct()
-    #     else:
-    #         print(">>>>>>>>>")
-    #     return queryset
+        return queryset.filter(
+            form483system__form483observation__form483obeservationcontent__content__icontains=value
+        ).distinct()
 
     def clean(self):
         cleaned_data = super().clean()

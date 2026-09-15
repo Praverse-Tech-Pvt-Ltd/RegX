@@ -41,7 +41,7 @@ the harder, more valuable foundation. But the SOW heading is "Technical Tools
 | 2.3 | HTML calculators (dissolution/impurity/stability) | ⬜ | `impurity` 0 hits, `shelf-life` 0 hits, `dissolution` 1 |
 | 2.4 | Role hierarchy: Doer / Reviewer / VP | ✅ | `authorization.Role.BuiltIn` + `workflows` with append-only transitions |
 | 2.5 | FDA Orange Book integration | ✅ | `OrangeBookApplication` / `Product` / `ProductIngredient` + importer |
-| 2.6 | Chatbot across workflow | ⬜ | 0 hits for `chatbot`, `openai`, `llm` anywhere |
+| 2.6 | Chatbot across workflow | ⬜ | 0 hits for `chatbot`, `openai`, `llm` in `backend/` or `frontend/src`. See **Note 2.6** — the legacy `company_site` chatbot was removed in P8 |
 | 2.7 | Word plug-in | ⬜ | Not present |
 | 2.8 | AI-driven gap analysis engine | ⬜ | 0 hits for `gap analysis`, `gap score`, `predictive`, `heatmap` |
 | 2.9 | Stability & impurity AI + Part 11 audit trail | ⬜ / 🟡 | No AI. `audit.AuditEvent` is immutable at ORM **and** Postgres trigger level, but the codebase **explicitly disclaims** a Part 11 claim |
@@ -155,7 +155,12 @@ relevance, product category"*. SOW marks this item feasibility-TBD anyway.
 
 ## Not built ⬜ — the entire AI surface
 
-I searched `backend/`, `frontend/src`, `frontend/app` for every AI marker:
+I searched `backend/`, `frontend/src`, `frontend/app` for every AI marker.
+**These counts are for the REGX platform only and have never covered
+`company_site/`**, which is a separate legacy service carried into this
+repository. An earlier revision of this document reported them as holding
+"anywhere", which was wrong — see **Note 2.6**.
+
 
 | Term | Hits |
 |---|---|
@@ -202,6 +207,41 @@ ICH Q3A/Q3B threshold logic.
 | 2.8 Gap analysis | 🟡 scoring for 2 of 6 checklist families | ⬜ none at all |
 | 2.9 Part 11 trail | 🟡 model right, 3 call sites | 🟡 stronger mechanism, claim withheld |
 | 2.10 Doc management | ⬜ | 🟡 versioning built |
+
+**Note 2.6 (updated by P8).** REGX has no chatbot and none is planned by this
+work; 2.6 remains unbuilt and deferred. **No governed chatbot or AI assistant
+exists in REGX, and nothing here is validated or production-ready.**
+
+What did exist was in the legacy `company_site` service, not REGX: seven
+commented-out chatbot view functions, seven commented URL routes, an
+unreferenced 1,566-line chat template, a `ChatMessage` and a `ChatHistory`
+model, and a serializer. None of it was reachable — the routes had been
+commented out since the service was carried into this repository — and had it
+been re-enabled it would have exposed unauthenticated, CSRF-exempt destructive
+endpoints. P8 deleted all of it. No replacement was added.
+
+P8 also removed an *accidental* live dependency. `Form483Filter`'s observation
+search called a ChatGPT helper to expand the query into synonyms before
+searching, so an ordinary search submission on the Form 483 page reached a paid
+external API. It was also broken: the helper returned a six-tuple that the
+caller iterated as a flat list, so every search matched nothing. The search is
+now a plain database `icontains`, the helper and its OpenAI import are gone,
+and the behaviour is covered by tests that fail if the search touches a socket.
+
+**One OpenAI integration remains in the repository**, found by searching after
+the change: `company_site/AIDatabase/observation_summary.py`, which generates
+Form 483 observation summaries during an Excel cache refresh. It is off by
+default behind an explicit `OPENAI_API_KEY` check and returns `None` without
+one — a real gate, not the SDK-version accident that was masking the search
+path. P8 did not change it. There are no OpenAI references anywhere in
+`backend/` or `frontend/`.
+
+**Legacy SQLite tables.** `AIDatabase` has no migrations at all, so the chat
+models were never migration-managed. The checked-in `db.sqlite3` still contains
+empty `AIDatabase_chatmessage` and `AIDatabase_chathistory` tables (0 rows
+each). P8 deliberately did not fabricate a migration history for an app that
+has none, and did not mutate the database file. No application code references
+those tables; dropping them is a separate legacy-database maintenance task.
 
 **Note 2.8.** The legacy app is the *only* place gap scoring exists — `RATools/gap_analysis.py`
 produces a 0–100 score for ANDA and DMF. `regx-main` has none. If that logic is

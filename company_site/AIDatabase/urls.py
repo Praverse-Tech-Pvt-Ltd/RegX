@@ -111,13 +111,5 @@ urlpatterns = [
 
 
 
-    # path('chat_ui_view/', views.chat_ui_view, name='chat_ui'),
-    # path("chat_with_bot/", views.chat_with_bot, name="chat_with_bot"),
-    # path('clear_chat/', views.clear_chat, name='clear_chat'),
-    # path('new_chat/', views.new_chat, name='new_chat'),
-    # path("get_all_chat_histories/", views.get_all_chat_histories, name="get_all_chat_histories"),
-    # path("get_all_chat_by_specific_id/<int:chat_id>/", views.get_all_chat_by_specific_id, name="get_all_chat_by_specific_id"),
-    # path("delete_chat_by_id/<int:chat_id>/", views.delete_chat_by_id, name="delete_chat_by_id"),
-
 
 ]+ static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
