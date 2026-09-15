@@ -50,6 +50,11 @@ class IigChecklistEvent:
     #: mistaken for an ordinary edit in the trail.
     ANSWER_OVERRIDDEN = "iig_checklist.answer.overridden"
 
+    #: P7. Emitted only when a snapshot is actually written -- an idempotent
+    #: regeneration that returns an existing snapshot is not an event, and a
+    #: failed generation rolls this back with the row.
+    GAP_ANALYSIS_GENERATED = "iig_checklist.gap_analysis.generated"
+
 
 def emit(
     *,

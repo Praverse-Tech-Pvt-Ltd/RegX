@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import { iigChecklists, type ChecklistExecution, ApiError } from "@/lib/api";
 import { ChecklistResponses } from "./ChecklistResponses";
+import { GapAnalysis } from "./GapAnalysis";
 
 const TERMINAL_STATUSES = new Set(["rejected", "cancelled", "superseded"]);
 
@@ -230,6 +231,8 @@ function ExecutionDetailPageInner() {
         checklistVersionPublicId={execution.checklistVersion.publicId}
         executionStatus={execution.status}
       />
+
+      <GapAnalysis tenantSlug={tenantSlug} executionPublicId={executionPublicId} />
     </div>
   );
 }

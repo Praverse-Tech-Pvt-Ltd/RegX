@@ -25,6 +25,8 @@ from .models import (
     ChecklistResponse,
     ChecklistSection,
     ChecklistVersion,
+    GapAnalysis,
+    GapAnalysisItem,
 )
 
 
@@ -785,3 +787,93 @@ class EmptyActionSerializer(serializers.Serializer):
                 {"error_code": "unknown_field", "detail": f"Unknown fields: {unknown}"}
             )
         return attrs
+
+
+# ---------------------------------------------------------------------------
+# P7 -- gap-analysis snapshots
+# ---------------------------------------------------------------------------
+class GapAnalysisItemSerializer(serializers.ModelSerializer):
+    """One classified question.
+
+    `question_text` is read through the FK rather than stored on the item, which
+    is why the snapshot tables hold no regulatory content of their own.
+    """
+
+    question_public_id = serializers.UUIDField(source="question.public_id", read_only=True)
+    question_code = serializers.CharField(source="question.code", read_only=True)
+    question_text = serializers.CharField(source="question.question_text", read_only=True)
+    answer_type = serializers.CharField(source="question.answer_type", read_only=True)
+    section_title = serializers.CharField(source="question.section.title", read_only=True)
+
+    class Meta:
+        model = GapAnalysisItem
+        fields = [
+            "question_public_id",
+            "question_code",
+            "question_text",
+            "answer_type",
+            "section_code",
+            "section_title",
+            "section_display_order",
+            "display_order",
+            "status",
+            "reason_code",
+            "configured_criticality",
+        ]
+        read_only_fields = fields
+
+
+class GapAnalysisSerializer(serializers.ModelSerializer):
+    """A snapshot's header. No score: none is persisted, so none is served."""
+
+    public_id = serializers.UUIDField(read_only=True)
+    execution_public_id = serializers.UUIDField(source="execution.public_id", read_only=True)
+    checklist_version_public_id = serializers.UUIDField(
+        source="checklist_version.public_id", read_only=True
+    )
+    checklist_version_number = serializers.IntegerField(
+        source="checklist_version.version_number", read_only=True
+    )
+    checklist_version_status = serializers.CharField(
+        source="checklist_version.status", read_only=True
+    )
+    generated_by_email = serializers.SerializerMethodField()
+    counts = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GapAnalysis
+        fields = [
+            "public_id",
+            "execution_public_id",
+            "checklist_version_public_id",
+            "checklist_version_number",
+            "checklist_version_status",
+            "input_hash",
+            "algorithm_version",
+            "generated_by_email",
+            "generated_at",
+            "counts",
+        ]
+        read_only_fields = fields
+
+    def get_generated_by_email(self, obj):
+        return obj.generated_by.email if obj.generated_by_id else ""
+
+    def get_counts(self, obj):
+        return {
+            "total_questions": obj.total_questions,
+            "applicable": obj.applicable_count,
+            "gap": obj.gap_count,
+            "no_gap": obj.no_gap_count,
+            "unanswered": obj.unanswered_count,
+            "review_required": obj.review_required_count,
+            "not_applicable": obj.not_applicable_count,
+        }
+
+
+class GapAnalysisDetailSerializer(GapAnalysisSerializer):
+    items = GapAnalysisItemSerializer(many=True, read_only=True)
+
+    class Meta(GapAnalysisSerializer.Meta):
+        fields = [*GapAnalysisSerializer.Meta.fields, "items"]
+        read_only_fields = fields

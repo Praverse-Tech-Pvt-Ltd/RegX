@@ -114,6 +114,16 @@ urlpatterns = [
         name="execution-gap-analysis",
     ),
     path(
+        "iig-checklists/executions/<uuid:public_id>/gap-analyses/",
+        views.ExecutionGapAnalysisSnapshotView.as_view(),
+        name="execution-gap-analyses",
+    ),
+    path(
+        "iig-checklists/executions/<uuid:public_id>/gap-analyses/<uuid:analysis_public_id>/",
+        views.GapAnalysisDetailView.as_view(),
+        name="execution-gap-analysis-detail",
+    ),
+    path(
         "iig-checklists/executions/<uuid:public_id>/submit-review/",
         views.ChecklistExecutionSubmitView.as_view(),
         name="execution-submit-review",
