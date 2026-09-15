@@ -37,8 +37,8 @@ the harder, more valuable foundation. But the SOW heading is "Technical Tools
 | SOW | Item | Status | Evidence |
 |---|---|---|---|
 | 2.1 | Module architecture & toolkit | ✅ | 19 Django apps, React/TSX frontend, 200 API endpoints, docker compose |
-| 2.2 | IIG checklist automation | 🟡 | `iig_checklist` (35.8k LOC) + `fda_data` IID models. **Calculation engine is a placeholder** |
-| 2.3 | HTML calculators (dissolution/impurity/stability) | ⬜ | `impurity` 0 hits, `shelf-life` 0 hits, `dissolution` 1 |
+| 2.2 | IIG checklist automation | 🟡 | `iig_checklist` (35.8k LOC) + `fda_data` IID models. Calculation engine is **built** — six approved formulas, 279 tests — but **content approval is PENDING**. See [CALCULATOR_GAP_REPORT.md](CALCULATOR_GAP_REPORT.md) |
+| 2.3 | HTML calculators (dissolution/impurity/stability) | ⬜ | No implementation and **no approved formula specification** in either codebase. **Blocked on client input** — see [CALCULATOR_GAP_REPORT.md](CALCULATOR_GAP_REPORT.md) |
 | 2.4 | Role hierarchy: Doer / Reviewer / VP | ✅ | `authorization.Role.BuiltIn` + `workflows` with append-only transitions |
 | 2.5 | FDA Orange Book integration | ✅ | `OrangeBookApplication` / `Product` / `ProductIngredient` + importer |
 | 2.6 | Chatbot across workflow | ⬜ | 0 hits for `chatbot`, `openai`, `llm` anywhere |
@@ -114,18 +114,27 @@ The FDA side is there too — `fda_data` has `IIDIngredient`, `IIDPrecedentRecor
 produces `AssessmentSnapshot`. IID is the Inactive Ingredient Database, which is
 exactly the SOW's "FDA IIG database".
 
-**The gap:** the SOW asks for *"auto calculation limits"*. `CalculationOutcome`
-(`backend/iig_checklist/models.py:971`) says so itself:
+**The gap — corrected by P9.** This section previously reported the calculation
+engine as a placeholder awaiting Milestone 4D-3, quoting the `CalculationOutcome`
+docstring (`backend/iig_checklist/models.py:971`), which still reads *"Populated
+with actual values in 4D-3"*.
 
-```python
-class CalculationOutcome(PublicIDModel, TimeStampedModel):
-    """Calculation result placeholder created at execution creation.
-    Populated with actual values in 4D-3."""
-```
+4D-3 has since been delivered, so both the claim and that docstring are **stale**.
+Re-inspected at `de15742`: `iig_checklist`/`iid_assessment` carry **six approved
+formulas** — `Decimal`-only, versioned, fail-closed — under **279 tests** that
+assert real computed values and every blocked status. The number that comes out of
+the calculation is no longer a placeholder.
 
-So the checklist structure, the applicability rules, the ingredient data and the
-governance are all in place; the number that comes out of the calculation is a
-placeholder awaiting Milestone 4D-3.
+The remaining gap is a different one, and it is **not** engineering.
+`MILESTONE_5A_APPROVAL_REGISTER.md` records **Item 13** (`SYSTEM_CALCULATED`
+bindings — which calculation applies to which question, and the regulatory reason)
+as **PENDING**, with interpretation risk **HIGH**: *"the wrong calculation produces
+a wrong regulated number."* **Item 14** (dependencies and ordering) is **PENDING**
+behind it, and the content gate overall stands at **0 of 20 approved**.
+
+So: **engineering implementation complete, regulatory and content approval not.**
+No validated or production-ready status is claimed for the calculation engine.
+Detail in [CALCULATOR_GAP_REPORT.md](CALCULATOR_GAP_REPORT.md).
 
 ### 2.9 Part 11 audit trail
 
@@ -186,6 +195,21 @@ That is a deliberate scope boundary, held consistently, and it means SOW **2.6, 
 none of them a calculator. The 454 `ICH` hits are terminology and test fixtures, not
 ICH Q3A/Q3B threshold logic.
 
+**Re-inspected for P9 at `de15742`, and the position is unchanged but now has a
+reason.** There is no dissolution, impurity or stability/shelf-life calculator in
+`regx-main`, and none in the legacy `main` branch either — the 59
+`company_site/templates/RATools/*.html` files are document generators, not
+calculators, so 2.3 is not a port. More decisively, there is **no approved formula
+specification for any of the three** anywhere in this repository: no source
+document, no version, no owner, no sign-off.
+
+2.3 is therefore **blocked on client input, not on engineering capacity**. The
+formulas must be supplied and owned; deriving them from ICH guidance would be
+engineering choosing a regulatory parameter. The eleven required inputs, and the
+reason SOW 2.3 cannot be built inside the existing six-formula registry
+(`SCOPE-OUT-18`), are set out in
+[CALCULATOR_GAP_REPORT.md](CALCULATOR_GAP_REPORT.md).
+
 ---
 
 ## Comparison: the two codebases against the same SOW
@@ -193,8 +217,8 @@ ICH Q3A/Q3B threshold logic.
 | SOW | `main` (legacy) | `regx-main` |
 |---|---|---|
 | 2.1 Toolkit architecture | ⬜ scattered routes | ✅ |
-| 2.2 IIG automation | ⬜ manual text fields | 🟡 data + governance built, calc placeholder |
-| 2.3 Calculators | ⬜ | ⬜ |
+| 2.2 IIG automation | ⬜ manual text fields | 🟡 data + governance built, calc engine built, content approval PENDING |
+| 2.3 Calculators | ⬜ | ⬜ blocked on client formula specification |
 | 2.4 Doer/Reviewer/VP | ✅ basic | ✅ with append-only transitions |
 | 2.5 Orange Book | ⬜ | ✅ |
 | 2.6 Chatbot | ⬜ | ⬜ |
