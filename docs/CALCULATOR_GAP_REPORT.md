@@ -4,7 +4,14 @@
 > calculators — dissolution, impurity, stability/shelf-life).
 > **Type:** inspection record. No code, migration, UI, formula or
 > approval-status change accompanies this document.
-> **Inspected at:** `regx-main` `de15742`.
+> **Inspected at:** `regx-main` `de15742`; **re-verified at `fff12fd`** after
+> PRs #53–#57 landed. Every claim below was re-checked against the new base
+> rather than assumed to survive it: the calculation surface is untouched by
+> what landed (empty diff across `iid_assessment/` and the calculation
+> modules and tests), the registry still holds exactly six bindings, the test
+> count is still 279, `SCOPE-OUT-18` is unchanged, the gate still reads 0 of
+> 20, Items 13 and 14 are still PENDING, and the SOW 2.3 searches return the
+> same counts with no calculator added.
 > **Companions:** [SOW_SECTION_2_STATUS.md](SOW_SECTION_2_STATUS.md),
 > [IID_CALCULATION_RULES.md](IID_CALCULATION_RULES.md),
 > [MILESTONE_4D_3_IMPLEMENTATION_SPEC.md](MILESTONE_4D_3_IMPLEMENTATION_SPEC.md),
