@@ -42,7 +42,7 @@ the harder, more valuable foundation. But the SOW heading is "Technical Tools
 | 2.4 | Role hierarchy: Doer / Reviewer / VP | ✅ | `authorization.Role.BuiltIn` + `workflows` with append-only transitions |
 | 2.5 | FDA Orange Book integration | ✅ | `OrangeBookApplication` / `Product` / `ProductIngredient` + importer |
 | 2.6 | Chatbot across workflow | ⬜ | 0 hits for `chatbot`, `openai`, `llm` in `backend/` or `frontend/src`. See **Note 2.6** — the legacy `company_site` chatbot was removed in P8 |
-| 2.7 | Word plug-in | ⬜ | Not present |
+| 2.7 | Word plug-in *(SOW title, per secondary record: "Word plug-in (contextual drafting)")* | ⬜ | No Office Add-in code in either codebase. **Blocked on product/security contract** — see [WORD_ADDIN_GAP_REPORT.md](WORD_ADDIN_GAP_REPORT.md) |
 | 2.8 | AI-driven gap analysis engine | ⬜ | 0 hits for `gap analysis`, `gap score`, `predictive`, `heatmap` |
 | 2.9 | Stability & impurity AI + Part 11 audit trail | ⬜ / 🟡 | No AI. `audit.AuditEvent` is immutable at ORM **and** Postgres trigger level, but the codebase **explicitly disclaims** a Part 11 claim |
 | 2.10 | Intelligent document management | 🟡 💤 | Versioning + duplicate detection built. No AI comparison, commentary or auto-tagging |
@@ -194,6 +194,32 @@ The project states this itself. `docs/ROADMAP.md`, on the operations dashboard:
 That is a deliberate scope boundary, held consistently, and it means SOW **2.6, 2.7,
 2.8, and the AI half of 2.9 and 2.10 are entirely outstanding**.
 
+### 2.7 Word plug-in
+
+No Office Add-in exists in `regx-main` or in the legacy `main` branch —
+`office.js`, `taskpane`, `manifest.xml`, `Word.run`, `Office.context` and the
+Office insertion APIs return **0 occurrences each**. DOCX *validation* in
+`documents/validators.py` and the `RATools` document generators are not Add-ins.
+
+P10 re-inspected this at `d323084` and the conclusion is **not** simply
+"unbuilt". Functional intent for 2.7 is specified — contextual section-wise
+drafting, predictive deficiency flagging, gap analysis from backend data,
+version control on repeated section upload — but the **implementation contract
+is not**: authentication from Word, tenant selection, content retrieval,
+draft-vs-approved insertion, audit semantics, Desktop vs Online, manifest
+scope, provenance, distribution, and the verification method for "zero
+hallucination" are all undefined. Thirteen open contract items are recorded in
+[WORD_ADDIN_GAP_REPORT.md](WORD_ADDIN_GAP_REPORT.md).
+
+**Status: BLOCKED ON PRODUCT / SECURITY CONTRACT.** Architecture is a separate
+Office Add-in deliverable; nothing about it is unblocked by writing code.
+
+Note on this document as a source: the row above renders the SOW item as "Word
+plug-in", while a secondary record of the same SOW pages renders it "Word
+plug-in (contextual drafting)". The gap report states the requirement-source
+limitation explicitly — the authoritative SOW PDF was not available to its
+author.
+
 ### 2.3 Calculators
 
 `impurity` 0 hits, `shelf-life` 0 hits, `stability` 3 hits, `dissolution` 1 hit —
@@ -227,7 +253,7 @@ reason SOW 2.3 cannot be built inside the existing six-formula registry
 | 2.4 Doer/Reviewer/VP | ✅ basic | ✅ with append-only transitions |
 | 2.5 Orange Book | ⬜ | ✅ |
 | 2.6 Chatbot | ⬜ | ⬜ |
-| 2.7 Word plug-in | ⬜ | ⬜ |
+| 2.7 Word plug-in | ⬜ | ⬜ blocked on product/security contract |
 | 2.8 Gap analysis | 🟡 scoring for 2 of 6 checklist families | ⬜ none at all |
 | 2.9 Part 11 trail | 🟡 model right, 3 call sites | 🟡 stronger mechanism, claim withheld |
 | 2.10 Doc management | ⬜ | 🟡 versioning built |
