@@ -62,8 +62,10 @@ author of this report; the feasibility-TBD status shall be verified against the
 primary document when it becomes available.
 
 The same requirement-source limitation, and the same three-level evidence
-discipline, are set out at length in `WORD_ADDIN_GAP_REPORT.md` (P10, open as
-PR #61 at the time of writing and therefore deliberately not linked here).
+discipline, are set out at length in
+[WORD_ADDIN_GAP_REPORT.md](WORD_ADDIN_GAP_REPORT.md) (P10). That report was
+still an open pull request when this one was written, which is why earlier
+revisions named it without linking it; it has since merged and the link is live.
 
 ### A.3 Deficiency precedent data exists — and is not an assistant
 
