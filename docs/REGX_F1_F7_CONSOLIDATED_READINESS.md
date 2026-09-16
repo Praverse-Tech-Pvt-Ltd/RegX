@@ -42,6 +42,7 @@ confirmed its absence.
 | F-5 | [`OPERATIONAL_LOGGING.md`](OPERATIONAL_LOGGING.md) |
 | F-6 | [`RELEASE_ROLLBACK_RUNBOOK.md`](RELEASE_ROLLBACK_RUNBOOK.md) |
 | Pending decisions across F-3, F-5, F-6 and the security actions | [`REGX_OWNER_POLICY_DECISION_PACKAGE.md`](REGX_OWNER_POLICY_DECISION_PACKAGE.md) |
+| Current integrated state across phases P0-P14 — validation, capabilities, blocked items and standing non-claims. **This page stays scoped to F-1…F-7** | [`P0_P14_HANDOFF.md`](P0_P14_HANDOFF.md) |
 
 ---
 
