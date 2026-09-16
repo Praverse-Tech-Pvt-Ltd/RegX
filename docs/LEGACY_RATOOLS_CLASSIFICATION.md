@@ -227,7 +227,7 @@ public preview, not an open data endpoint.
 | Phase | Scope | Status |
 |---|---|---|
 | **P13a** | This classification artifact; correction of stale `LEGACY_BOUNDARY.md` | **this document** |
-| **P13b** | Remove only the commented-out material in §5 | Ready — scope reduced from six items to commented text only, per §6.1 |
+| **P13b** | Remove only the commented-out material in §5 | **Collapsed — no standalone phase. Fold into P14 final handoff cleanup only if still worth retaining.** |
 | **P13c** | Data and governance disposition of approval states and signature images | **Blocked on an accountable business/data owner** |
 
 P13c outcomes are open and are **not** an engineering choice. They include:
