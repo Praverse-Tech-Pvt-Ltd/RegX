@@ -2,9 +2,19 @@
 ## Status against `regx-main`
 
 - **Source:** `SOW - Praverse (Pratham)  iCretegy_April 22, 2026.pdf`, section 2 (pages 7–9), items 2.1–2.11
-- **Codebase:** branch `regx-main`, commit `0da78c8` (PR #44, "Milestone 16 — Final Validation, Release Readiness")
-- **Verified:** stack built and running locally — 7 services healthy, `readiness` reports `database: ok`, `cache: ok`
-- **Date:** 2026-09-08
+- **Codebase:** branch `regx-main`. **This document is amended in place as the
+  branch moves**, so individual rows and notes carry their own evidence point
+  rather than sharing one.
+- **Originally assessed at** commit `0da78c8` (PR #44, "Milestone 16 — Final
+  Validation, Release Readiness") on **2026-09-08**, when the stack was built
+  and running locally with 7 services healthy and `readiness` reporting
+  `database: ok`, `cache: ok`. *That is the historical origin of this
+  assessment, not its current state.*
+- **Amended since** by the P8–P14 phases. Rows corrected after the original
+  assessment say so and name the evidence; where a row points at a companion
+  gap report, that report carries its own inspection SHA.
+- **No release version, approval date or sign-off is asserted by this
+  document.**
 
 > **An earlier version of this assessment exists on the `main` branch** as
 > `SOW-TECHNICAL-TOOLS-STATUS.md`. It measured the legacy iPharmaAI Django
@@ -43,7 +53,7 @@ the harder, more valuable foundation. But the SOW heading is "Technical Tools
 | 2.5 | FDA Orange Book integration | ✅ | `OrangeBookApplication` / `Product` / `ProductIngredient` + importer |
 | 2.6 | Chatbot across workflow | ⬜ | 0 hits for `chatbot`, `openai`, `llm` in `backend/` or `frontend/src`. See **Note 2.6** — the legacy `company_site` chatbot was removed in P8 |
 | 2.7 | Word plug-in *(SOW title, per secondary record: "Word plug-in (contextual drafting)")* | ⬜ | No Office Add-in code in either codebase. **Blocked on product/security contract** — see [WORD_ADDIN_GAP_REPORT.md](WORD_ADDIN_GAP_REPORT.md) |
-| 2.8 | AI-driven gap analysis engine | ⬜ | 0 hits for `gap analysis`, `gap score`, `predictive`, `heatmap` |
+| 2.8 | AI-driven gap analysis engine | ⬜ | No AI, predictive or heat-map engine. **Governed non-AI gap analysis does exist** since P7 — see **Note 2.8** |
 | 2.9 | Stability & impurity AI + Part 11 audit trail | ⬜ / 🟡 | No AI. `audit.AuditEvent` is immutable at ORM **and** Postgres trigger level, but the codebase **explicitly disclaims** a Part 11 claim |
 | 2.10 | Intelligent document management | 🟡 💤 | Versioning + duplicate detection built. No AI comparison, commentary or auto-tagging |
 | 2.11 | Timeline | — | Their own roadmap runs to Milestone 16 |
@@ -254,7 +264,7 @@ reason SOW 2.3 cannot be built inside the existing six-formula registry
 | 2.5 Orange Book | ⬜ | ✅ |
 | 2.6 Chatbot | ⬜ | ⬜ |
 | 2.7 Word plug-in | ⬜ | ⬜ blocked on product/security contract |
-| 2.8 Gap analysis | 🟡 scoring for 2 of 6 checklist families | ⬜ none at all |
+| 2.8 Gap analysis | 🟡 ungoverned 0–100 score for 2 of 6 checklist families | 🟡 governed non-scoring analysis (P7); no AI engine |
 | 2.9 Part 11 trail | 🟡 model right, 3 call sites | 🟡 stronger mechanism, claim withheld |
 | 2.10 Doc management | ⬜ | 🟡 versioning built |
 
@@ -293,9 +303,32 @@ each). P8 deliberately did not fabricate a migration history for an app that
 has none, and did not mutate the database file. No application code references
 those tables; dropping them is a separate legacy-database maintenance task.
 
-**Note 2.8.** The legacy app is the *only* place gap scoring exists — `RATools/gap_analysis.py`
-produces a 0–100 score for ANDA and DMF. `regx-main` has none. If that logic is
-wanted in the new platform, it is a port, not a rewrite from nothing.
+**Note 2.8 (corrected by P14b).** An earlier revision of this document said the
+legacy app was the *only* place gap analysis existed, that `regx-main` had none,
+and that bringing it over would be "a port, not a rewrite from nothing." All
+three statements are now wrong, and the last one was the most consequential: it
+pointed a reader at porting logic that should not be ported.
+
+**REGX has governed gap analysis.** P7 delivered it: one deterministic
+classification engine serving both the on-demand read and immutable
+`GapAnalysis` snapshots, each snapshot bound to an exact checklist version and a
+canonical input hash.
+
+**It is deliberately non-scoring.** It reports factual counts — gap, no gap,
+unanswered, review required, not applicable — and configured criticality exactly
+as the checklist defines it. It produces no percentage and no composite score.
+
+**The legacy 0–100 score is a different thing, and is not a model to copy.**
+`RATools/gap_analysis.py` on the legacy `main` branch produces a 0–100 score for
+ANDA and DMF. That formula is **not governed**: no approved specification defines
+it, and `CALCULATOR_GAP_REPORT.md` records that the comparable percentages on
+REGX's own legacy read path are retained for API compatibility only — not
+persisted, not shown in the P7 UI, and not used in any decision. Replacing or
+extending scoring needs an approved specification, not a port.
+
+What remains outstanding for SOW 2.8 is the **AI-driven** engine — predictive
+flagging, heat maps, resolution playbooks. None of that exists, and nothing here
+claims otherwise.
 
 ---
 
@@ -325,8 +358,10 @@ wanted in the new platform, it is a port, not a rewrite from nothing.
 
 ## Caveats
 
-- Assessed at `0da78c8`. Several `regx/*` branches are unmerged and may contain work
-  not counted here.
+- **Originally** assessed at `0da78c8`; amended since, per the header. The
+  unmerged-branch caveat below applied at that time.
+- Several `regx/*` branches were unmerged at the original assessment and may
+  contain work not counted here.
 - I did not run the backend test suite (126 files, 2,965 test functions). "Built"
   here means present and wired into the API, not verified by execution.
 - The SOW says section 2 scope "may be finalized later (in phase 2)". This measures
