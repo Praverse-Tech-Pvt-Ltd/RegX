@@ -824,18 +824,98 @@ jobs:
           check /termsofuse/
           check /adminmaster/login/
 
-      - name: Verify REGX modules and API answer on the same origin
+      # Derived, not hand-listed. P14 found six RegX pages -- regulatory-cases,
+      # dossier-blueprints, submission-operations, external-integrations,
+      # submission-dossiers and submission-packages -- that answered 200 on the
+      # frontend container's own port and fell through to the company site on
+      # this origin, because nginx had no location for them. The step that used
+      # to be here checked a hand-picked list of six routes, and not one of the
+      # six broken routes was on it. A hand-written list is exactly what drifts,
+      # so enumerate the pages instead of naming them.
+      #
+      # The assertion is "which upstream answered", not "was it 200". A route
+      # that falls through returns the company site's 404; a RegX parent route
+      # with no index page returns Next.js's 404. Same status code, completely
+      # different meanings -- so status alone cannot detect this defect. The body
+      # can: anything Next.js renders references /_next/ assets, and the company
+      # 404 is 178 bytes of Django that references nothing.
+      - name: Verify every RegX page route is frontend-served on this origin
+        run: |
+          fail=0
+          body="${RUNNER_TEMP:-/tmp}/origin-body.html"
+
+          served_by() {
+            # A connection failure is reported as its own state. Folding it into
+            # "company" would name the wrong cause: an unreachable origin and a
+            # fallthrough are different defects with different fixes.
+            if ! code=$(curl -s --max-time 120 -o "$body" -w "%{http_code}" "http://localhost:8080$1"); then
+              echo "unreachable -"
+              return 0
+            fi
+            if grep -q "/_next/" "$body"; then echo "frontend $code"; else echo "company $code"; fi
+          }
+          # Records every route before failing: P14's defect broke six at once,
+          # and stopping at the first would have cost six CI runs to enumerate.
+          expect() { # expect <upstream> <path>
+            got=$(served_by "$2")
+            case "$got" in
+              "$1 "*) echo "  ok   $2 -> $got" ;;
+              *)      echo "  FAIL $2 -> $got (expected $1)"; fail=1 ;;
+            esac
+          }
+
+          # Source of truth for "a RegX page exists" is the route directories
+          # themselves. Route groups (x), private folders _x and dynamic
+          # segments [x] are not URL prefixes of their own.
+          segments=""
+          for dir in "frontend/src/app/(regx)"/*/; do
+            seg=$(basename "$dir")
+            case "$seg" in "("*|_*|"["*) continue ;; esac
+            segments="$segments $seg"
+          done
+
+          count=$(echo $segments | wc -w)
+          echo "enumerated $count RegX page segments"
+          # Guards the enumeration itself: a moved or renamed route group that
+          # matched nothing would make every check below vacuously pass.
+          [ "$count" -gt 5 ] || { echo "enumeration returned $count segments; the glob is wrong"; exit 1; }
+
+          echo "RegX pages:"
+          for seg in $segments; do expect frontend "/$seg"; done
+
+          echo "frontend routes outside the (regx) group:"
+          expect frontend /signin
+          expect frontend /mfa
+
+          echo "the company site keeps its own paths:"
+          expect company /
+          expect company /ratools/
+          expect company /adminmaster/login/
+
+          # The anti-wildcard sentinel. A catch-all `location /` aimed at the
+          # frontend would satisfy every check above while silently swallowing
+          # the company site, including its root. An unrouted path must still
+          # reach the company 404, so the routing stays explicit, not greedy.
+          echo "unrouted paths still fall through to the company site:"
+          expect company /not-a-route-6f1c2a
+
+          [ "$fail" = "0" ] || { echo "The routes marked FAIL did not reach their expected upstream through nginx."; exit 1; }
+
+      - name: Verify REGX pages, API and health answer on the same origin
         run: |
           check() {
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "http://localhost:8080$1")
             echo "$1: $code"
             [ "$code" = "200" ] || { echo "$1 returned $code"; exit 1; }
           }
+          # Leaf pages that do have an index, so 200 is the right assertion here
+          # -- unlike the parent routes above, which legitimately 404.
           check /documents
           check /iig-checklists
           check /migration-batches
           check /iid-assessments/preview
           check /api/regx/v1/health/
+          check /api/regx/v1/readiness/
           check /healthz
 
       - name: Verify both static trees are served and do not collide
