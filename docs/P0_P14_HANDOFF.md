@@ -1,9 +1,12 @@
-# RegX — P0–P14 Handoff
+# RegX — P0–P15 Handoff
 
 > **An index of the current integrated state, not a restatement of it.** Every
 > finding below has a canonical document; this page says what is true now, what
 > is blocked and on whom, and links to the record that carries the detail.
-> **Measured at** `regx-main` `c75acbcb2afb38d606ff90c892f5d78016aa891f`.
+> **Current at** `regx-main` `4218d571944089d657598afc1f2463a9c0bbd34f`.
+> The filename is deliberately left as `P0_P14_HANDOFF.md` so existing links
+> resolve; the scope is P0–P15. Section 1 stays pinned to the SHA its numbers
+> were actually measured at.
 
 ## Why this document exists rather than an update to an existing one
 
@@ -12,18 +15,18 @@ content without being rewritten into something it is not:
 
 | Document | What it is | Why not this |
 |---|---|---|
-| [REGX_F1_F7_CONSOLIDATED_READINESS.md](REGX_F1_F7_CONSOLIDATED_READINESS.md) | Closure record for seven specific controls F-1…F-7 | Its §1 matrix is those seven gaps with their PRs; P0–P14 is a different axis |
+| [REGX_F1_F7_CONSOLIDATED_READINESS.md](REGX_F1_F7_CONSOLIDATED_READINESS.md) | Closure record for seven specific controls F-1…F-7 | Its §1 matrix is those seven gaps with their PRs; P0–P15 is a different axis |
 | [REGX_PARALLEL_TECHNICAL_READINESS.md](REGX_PARALLEL_TECHNICAL_READINESS.md) | *"Discovery only"* — superseded by the above, by its own statement | Historical by declaration |
 | [RELEASE_BLOCKERS.md](RELEASE_BLOCKERS.md) | *"State at the Milestone 16 head"* | Milestone-scoped |
 | [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md) | *"What was actually run against the Milestone 9–15 platform"* | Milestone 16 evidence record |
 | [RELEASE_ROLLBACK_RUNBOOK.md](RELEASE_ROLLBACK_RUNBOOK.md) | Deploy / verify / rollback procedure | A runbook, not a status record |
 
 All five are closed records pinned to past milestones and SHAs. Amending one to
-describe the P0–P14 state would rewrite a record of what was true at a past
+describe the P0–P15 state would rewrite a record of what was true at a past
 point — the exact failure P14b corrected in `SOW_SECTION_2_STATUS.md`, which had
 been amended in place while still claiming to measure `0da78c8`.
 
-## 1. Validation, measured at this SHA
+## 1. Validation, measured at `c75acbc`
 
 Run against images **rebuilt from this source**, not the working containers that
 had accumulated file copies during development. The backend production image
@@ -43,10 +46,19 @@ invoked.
 | Playwright E2E | **257 passed** |
 | Docker integrated stack | 7 services healthy; `readiness` reports `database: ok`, `cache: ok` |
 
+**These numbers are the historical measurement at `c75acbc` and are not
+restated at the current head.** Only the change below was re-measured; every
+other row is left exactly as it was recorded.
+
+**Since that measurement.** P15 added four frontend unit tests
+(`nginx-route-coverage.test.ts`), taking the Vitest suite to **555 passed across
+23 files**, verified on PR #67. No other check in the table was re-run at
+`4218d57`.
+
 **Test evidence, not validation evidence.** These are engineering checks. No
 validated-system claim follows from them — see §6.
 
-## 2. Phase disposition P0–P14
+## 2. Phase disposition P0–P15
 
 | Phase | Status | Record |
 |---|---|---|
@@ -67,6 +79,7 @@ validated-system claim follows from them — see §6.
 | **P13b** Dead-code cleanup | **COLLAPSED** — no standalone phase | dropped; only commented-out text was ever in scope |
 | **P13c** Legacy approval/signature disposition | **BLOCKED** on accountable owner | [LEGACY_RATOOLS_CLASSIFICATION.md](LEGACY_RATOOLS_CLASSIFICATION.md) §4.4 |
 | **P14** Final integrated verification | **COMPLETE** | this document; one defect found and fixed (§4) |
+| **P15** Integrated-origin smoke coverage | **COMPLETE** | §5; [PR #67](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/67) static + live coverage, [PR #68](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/68) CI-trigger hardening |
 
 ## 3. Current capabilities
 
@@ -118,26 +131,85 @@ from the nginx location list, so `/regulatory-cases`, `/dossier-blueprints`,
 `/submission-packages` answered 404 on the integrated origin while serving
 correctly on the frontend container's own port. Four sidebar links pointed into
 that set. Fixed; all six verified 200 at this SHA. See §5 for why nothing caught
-it.
+it, and for what catches it now.
 
-## 5. Open engineering risk — integrated-origin smoke coverage
+## 5. Integrated-origin smoke coverage — CLOSED
 
-**Recorded, deliberately not implemented during handoff.**
+**Closed by P15.** This section recorded an open engineering risk at the P14
+handoff. The original reasoning is kept below rather than deleted, because what
+the gap was is the argument for the shape of the check that closed it.
 
-Nothing in the test suite exercises the integrated nginx origin. Playwright
-drives its own Next.js server on port 3100; the container checks cover `/`,
-`/healthz`, the health endpoints and `/ratools/` — not the feature paths. The
-defect in §4 sat exactly between those two layers, which is why a complete green
-suite coexisted with six unreachable pages.
+**What the risk was.** Nothing in the test suite exercised the integrated nginx
+origin. Playwright drives its own Next.js server; the container workflow checked
+the REGX feature routes on `localhost:3000` — the one place they were guaranteed
+to work — and its single integrated-origin REGX step was a hand-picked list of
+six routes, not one of which was among the six that had broken. The §4 defect sat
+exactly between those layers, which is why a complete green suite coexisted with
+six unreachable pages. The P14a fix added a comment marking the location list as
+load-bearing: that helps a person reading the file and catches nothing
+automatically.
 
-The fix added a comment marking the location list as load-bearing. That helps a
-person reading the file; it catches nothing automatically. **A page added
-tomorrow without its location entry would fail the same way and pass every
-test.**
+**What covers it now** — [PR #67](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/67).
+Both checks derive their inputs instead of listing routes, because a
+hand-written list is precisely what drifted.
 
-Closing this means an integrated-origin smoke check — a focused change with its
-own design decisions about what to assert and where it runs. It is not folded
-into this handoff.
+| Layer | Check | Asserts |
+|---|---|---|
+| Static, no stack running | `frontend/tests/unit/nginx-route-coverage.test.ts` | every `frontend/src/app/(regx)/<segment>/` has a matching `location ^~ /<segment>` in `infra/nginx/nginx.conf` |
+| Live, Docker integrated stack | `docker-integration.yml` — *Verify every RegX page route is frontend-served on this origin* | which upstream actually answered on `:8080`, for every enumerated segment |
+
+The live check asserts **which upstream answered, not the status code**. A route
+that falls through returns the company site's 404; a RegX parent route with no
+index page returns Next.js's 404 — the same status, two unrelated meanings, so
+status alone cannot detect this defect. The body separates them: Next.js output
+references `/_next/`, the company 404 does not. Four segments legitimately 404
+and are correctly routed; they pass, as they should.
+
+The check also asserts the boundary in the other direction. The company site
+keeps `/`, `/ratools/` and `/adminmaster/login/`, and an unrouted path must still
+reach the company 404 — a sentinel against "fixing" a future failure with a
+catch-all location, which would satisfy every frontend assertion while silently
+swallowing the company site, root included.
+
+**Mutation-tested against the original failure mode.** Removing the
+`/regulatory-cases` location and reloading nginx fails both checks, the live one
+reporting `company 404` where `frontend` was expected — the exact P14 symptom.
+Pointing the default location at the frontend trips the sentinel and the
+company-root assertion. `infra/nginx/nginx.conf` was restored to an empty diff
+after each mutation.
+
+**Verified non-vacuously in GitHub Actions**, not only against a local stack: the
+PR #67 run enumerated **17 RegX page segments** and reported 23 paths `ok`, all
+six P14a routes among them.
+
+### 5.1 Workflow-trigger hardening
+
+[PR #68](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/68). The two trigger
+blocks in `docker-integration.yml` were asymmetric: `push` re-ran the workflow
+when the workflow file itself changed, `pull_request` did not. P15 had just moved
+real routing logic into that file, so the next edit to it would have landed
+without Docker validation. PR #67 ran only because it also touched `frontend/`,
+which matched an existing path filter.
+
+One line, adding the workflow to `pull_request.paths`; the two lists are now
+identical. **The acceptance criterion was proven by #68 itself** — the branch
+changed only the workflow file, so before the fix it would not have triggered
+Docker Integration at all. It triggered and passed, and no unrelated workflow ran
+alongside it.
+
+### 5.2 Design assumptions
+
+Two limits, stated as the assumptions they are. **Neither is a defect**, neither
+is a validation deviation, and neither is a CAPA.
+
+1. **The nginx parser is regex-based** and assumes the current
+   `location ^~ /<prefix> { proxy_pass http://regx_frontend; }` structure. A
+   self-guard fails the test if the derivation matches implausibly few entries,
+   which catches a total parse collapse; restructuring the config into `include`
+   files or a `map` could partially under-match without tripping that guard.
+2. **Route derivation assumes the current flat top-level `(regx)` structure** —
+   one directory per URL prefix. A nested route group that introduced a new
+   top-level prefix would need the derivation revisited.
 
 ## 6. Blocked and deferred — none of it is blocked on engineering
 
@@ -182,8 +254,8 @@ Further standing limitations, each stated in its own document, are listed in
 
 ## 8. Repository state
 
-* **Head:** `c75acbcb2afb38d606ff90c892f5d78016aa891f`
-* PRs **#51–#65** merged, every one a normal two-parent merge.
+* **Head:** `4218d571944089d657598afc1f2463a9c0bbd34f`
+* PRs **#51–#68** merged, every one a normal two-parent merge.
 * No open pull requests at the time of writing.
 * No P-phase branch carries unmerged commits. Five older branches do; each was
   checked and is superseded or historical.
