@@ -18,6 +18,7 @@ on:
       - "company_site/**"
       - "compose.yaml"
       - "infra/**"
+      - ".github/workflows/docker-integration.yml"
 
 jobs:
   docker-stack:
