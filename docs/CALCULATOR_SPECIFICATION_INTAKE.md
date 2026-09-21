@@ -3,8 +3,11 @@
 > **What this is:** a blank input form for the client / regulatory content owner
 > to complete. Completing it is what unblocks SOW 2.3 calculator implementation.
 > **What this is not:** a specification, a phase, an approval, or engineering
-> work. **No formula, threshold, limit, rounding rule or acceptance criterion
-> appears anywhere in this document, and none may be added to it by engineering.**
+> work. **No formula, equation, operator, worked example, threshold, limit or
+> acceptance criterion appears anywhere in this document, and none may be added
+> to it by engineering.** No rounding rule is proposed for any calculator: the
+> single rounding value quoted (§2) is the existing engine's own recorded
+> behaviour, cited precisely so that nothing is assumed to be inherited from it.
 > Every value cell is deliberately empty.
 > **Prepared at** `regx-main` + [EXTERNAL_BLOCKER_READINESS.md](EXTERNAL_BLOCKER_READINESS.md)
 > (`cfbd9c5`). Engineering-contract facts below were read from code at that SHA.
@@ -76,29 +79,34 @@ not defaults for any field below.**
 `backend/iid_assessment/unit_conversion.py`,
 `backend/iig_checklist/calculation_registry.py:218`.
 
-### 2.1 An existing formula, shown only to illustrate required precision
+### 2.1 The precision an approved specification must reach
 
-> **This is an existing, already-approved, already-implemented formula from a
-> different deliverable (SOW 2.2). It is reproduced only to show what
-> "unambiguous" means in §B. It is NOT a template for any SOW 2.3 calculator,
-> NOT a starting point, and has no relationship to dissolution, impurity or
-> stability. Do not adapt it.**
+Stated structurally. **No formula, equation, operator, worked example, threshold
+or limit appears here or anywhere else in this document — including from the
+existing six-function engine.**
 
-```
-identifier:  percentage_w_w
-version:     1.0.0
-formula:     excipient % w/w = quantity_per_unit / total_dosage_unit_weight * 100
-variables:   quantity_per_unit           (Decimal, gram, required)
-             total_dosage_unit_weight    (Decimal, gram, required)
-zero denom:  total_dosage_unit_weight == 0  ->  blocked, reason NOT_COMPARABLE
-missing:     either input absent            ->  blocked, reason DATA_REQUIRED
-result unit: percent_w_w
-rounding:    none (Decimal, unrounded)
-```
+An approved calculator specification must identify:
 
-Note what it does *not* leave to the reader: which variable is the numerator,
-what units each side must already be in, what happens at zero, and what the
-result is called. **That is the standard §B and §C must meet.**
+* formula identifier
+* formula version
+* every variable
+* variable role
+* units
+* operand relationship
+* zero-denominator behaviour
+* missing-input behaviour
+* result unit
+* rounding rule
+* fail-closed conditions
+
+**Engineering shall not infer any of these from prose, examples, spreadsheets,
+regulatory guidance, or expected outputs.**
+
+Each item is listed because leaving it unstated transfers the decision to
+engineering. *Operand relationship* is the clearest case: naming the variables
+does not say how they relate, and a specification that names them without fixing
+that relationship has not been completed — it has been handed to engineering to
+finish. **That is the standard §B and §C must meet.**
 
 ## 3. Relationship to the eleven-item list already published
 
