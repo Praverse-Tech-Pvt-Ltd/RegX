@@ -71,27 +71,34 @@ oversight.
 
 ### 2.2 AI-derived content already present — read this before answering §5 and §6
 
-> **`Form483Observation.summary` is documented in the model as an
-> "LLM-generated abstract, populated by a separate pipeline"**
-> (`inspections/models.py:84`).
->
-> It is **never written anywhere in this repository** — the populating pipeline
-> is external. It **is exposed through the API** (`inspections/serializers.py:13`
-> and `:76`) and **is searched** (`Q(summary__icontains=...)` in
-> `inspections/views.py:138` and `:171`), behind `CanViewInspections`.
->
-> It carries **no provenance of any kind**: no model identifier, no prompt, no
-> version, no generation timestamp, no review status, no support state.
+**Two distinct models hold AI-derived summary content, and they differ in how it
+gets there.** Both are read behind `CanViewInspections`.
 
-**This does not contradict "no AI generation capability in the backend"** — a
-field is not a capability, and nothing here generates. But it means
-**AI-derived content of unrecorded provenance is already readable and searchable
-through the governed API today.**
+| | `Form483Observation.summary` | `WarningLetter.summary` |
+|---|---|---|
+| Evidence it is AI-derived | Model comment: *"LLM-generated abstract, populated by a separate pipeline"* (`models.py:84`) | Populated from a source column named **`ai_summary`** |
+| In-repo write path | **None.** No construction or assignment anywhere in this repository | **Yes** — `import_inspections.py:155`, `summary=_text(row["ai_summary"])` |
+| Ingestion shape | External pipeline, outside this codebase | First-party management command; full `delete()` then `bulk_create` |
+| Exposed via | `Form483ObservationSerializer` (`serializers.py:13`) | `WarningLetterSerializer` (`serializers.py:76`) |
+| Searched at | `views.py:138` — `Q(content__icontains) \| Q(summary__icontains)` | `views.py:171` — `Q(body__icontains) \| Q(summary__icontains)` |
+| Provenance stored | **None** — no model, prompt, version, timestamp, review status or support state | **None** — the same |
+
+**Neither model generates anything, and this does not contradict "no AI
+generation capability in the backend"** — a field is not a capability, and no
+code here produces the text. What it does establish is that **AI-derived content
+of unrecorded provenance is already readable and searchable through the governed
+API today**, and that for `WarningLetter` it enters through a **first-party
+import path in this repository**, not only an external one.
+
+**Nothing here is a defect, a CAPA or a validation deviation**, and none of it is
+evidence that an assistant capability exists or that this content is an approved
+source. It is recorded solely because the data-boundary decision (§1.5) must rule
+on whether such content may ever ground assistant output.
 
 Neither [STABILITY_IMPURITY_AND_CALCULATION_AUDIT_GAP_REPORT.md](STABILITY_IMPURITY_AND_CALCULATION_AUDIT_GAP_REPORT.md)
 nor [EXTERNAL_BLOCKER_READINESS.md](EXTERNAL_BLOCKER_READINESS.md) records this.
-It is raised here because Gate 1 §5 asks which sources are allowed, and **this
-one is already in the read path whether or not the assistant is ever built.**
+It is raised here because Gate 1 §5 asks which sources are allowed, and **both
+are already in the read path whether or not the assistant is ever built.**
 
 ### 2.3 Deficiency corpus
 
@@ -242,13 +249,15 @@ answer; blank is not "no".
 | External web content | | |
 | **Model prior knowledge** | | |
 | **`Form483Observation.summary` — existing AI-derived content (§2.2)** | | |
+| **`WarningLetter.summary` — imported from an `ai_summary` column (§2.2)** | | |
 | Other (describe) | | |
 
-> Two rows deserve deliberate attention. **Model prior knowledge** decides
-> whether answers may contain anything not traceable to a supplied source.
-> **`summary`** is AI-derived content already in the read path with no
-> provenance — allowing it as a source means allowing ungoverned AI output to
-> ground new AI output.
+> Three rows deserve deliberate attention. **Model prior knowledge** decides
+> whether answers may contain anything not traceable to a supplied source. The
+> two **`summary`** rows are AI-derived content already in the read path with no
+> provenance — allowing either as a source means allowing ungoverned AI output to
+> ground new AI output. They are listed separately because they arrive by
+> different routes (§2.2) and may reasonably be decided differently.
 
 | Owner | | Evidence | | Date / version | |
 |---|---|---|---|---|---|
