@@ -3,7 +3,10 @@
 > **An index of the current integrated state, not a restatement of it.** Every
 > finding below has a canonical document; this page says what is true now, what
 > is blocked and on whom, and links to the record that carries the detail.
-> **Current at** `regx-main` `4218d571944089d657598afc1f2463a9c0bbd34f`.
+> **Current at** `regx-main` `0ea8e1fd364e54708c47f3160fab01da2b88ad43`.
+> For current validation figures and the engineering-closure position, see
+> [FINAL_ENGINEERING_CLOSURE_AUDIT.md](FINAL_ENGINEERING_CLOSURE_AUDIT.md);
+> §1 below stays pinned to the SHA its numbers were measured at.
 > The filename is deliberately left as `P0_P14_HANDOFF.md` so existing links
 > resolve; the scope is P0–P15. Section 1 stays pinned to the SHA its numbers
 > were actually measured at.
@@ -252,13 +255,31 @@ must not be softened in any summary of it.
 Further standing limitations, each stated in its own document, are listed in
 [REGX_F1_F7_CONSOLIDATED_READINESS.md](REGX_F1_F7_CONSOLIDATED_READINESS.md) §9.
 
+### Owner-decision intakes for the blocked items
+
+Each blocked item in §6 now has a completable intake. They author no content and
+approve nothing — they record what is missing and who must supply it.
+
+| Blocked item | Intake |
+|---|---|
+| All external blockers, consolidated | [EXTERNAL_BLOCKER_READINESS.md](EXTERNAL_BLOCKER_READINESS.md) |
+| SOW 2.3 calculators | [CALCULATOR_SPECIFICATION_INTAKE.md](CALCULATOR_SPECIFICATION_INTAKE.md) |
+| SOW 2.7 Word Add-in | [WORD_ADDIN_CONTRACT_INTAKE.md](WORD_ADDIN_CONTRACT_INTAKE.md) |
+| SOW 2.9 stability/impurity assistant | [STABILITY_IMPURITY_ASSISTANT_INTAKE.md](STABILITY_IMPURITY_ASSISTANT_INTAKE.md) |
+| P13c legacy RATools disposition | [LEGACY_RATOOLS_DISPOSITION_INTAKE.md](LEGACY_RATOOLS_DISPOSITION_INTAKE.md) |
+| Approval Register Items 13 and 14 | [APPROVAL_REGISTER_13_14_DECISION_INTAKE.md](APPROVAL_REGISTER_13_14_DECISION_INTAKE.md) |
+| The full 20-item production content gate | [REGULATORY_CONTENT_GATE_20_ITEM_DECISION_INTAKE.md](REGULATORY_CONTENT_GATE_20_ITEM_DECISION_INTAKE.md) |
+
 ## 8. Repository state
 
-* **Head:** `4218d571944089d657598afc1f2463a9c0bbd34f`
-* PRs **#51–#68** merged, every one a normal two-parent merge.
+* **Head:** `0ea8e1fd364e54708c47f3160fab01da2b88ad43`
+* PRs **#51–#76** merged, every one a normal two-parent merge.
 * No open pull requests at the time of writing.
-* No P-phase branch carries unmerged commits. Five older branches do; each was
-  checked and is superseded or historical.
+* No P-phase branch carries unmerged commits. Eight older branches are ahead;
+  each was re-checked in
+  [FINAL_ENGINEERING_CLOSURE_AUDIT.md](FINAL_ENGINEERING_CLOSURE_AUDIT.md) §4
+  and is superseded or historical — including the one carrying an `nginx.conf`,
+  whose routing prefixes are identical to `regx-main`'s.
 * `company_site` remains a separate Django project against its own SQLite
   database, sharing a repository and compose stack with REGX but no code.
   [LEGACY_BOUNDARY.md](LEGACY_BOUNDARY.md)
