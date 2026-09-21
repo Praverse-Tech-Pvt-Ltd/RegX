@@ -316,6 +316,14 @@ an approval workflow.
 | Insertion restricted to a content class that *does* carry approval | Narrower and safer; excludes plain documents entirely |
 | A document approval state is introduced | **New model and workflow** — separate scope, not authorised by this document |
 
+> **Newly discovered prerequisite.** A document approval-state model is **not**
+> among the thirteen contract items and **not** among dependencies A–F. It
+> surfaced from reading the model at this SHA, and it is a **prerequisite that
+> applies only if "approved-only insertion" is the decision taken**. It is **not
+> an existing capability**, and it is **not authorised for implementation by this
+> document** — selecting that option creates separate scope to be approved on its
+> own terms.
+
 **Owner role.** Regulatory owner, with product owner on user experience.
 
 **Required evidence.** Explicit rule, and the required user-visible indication of
