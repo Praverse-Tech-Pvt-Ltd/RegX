@@ -93,6 +93,33 @@ jobs:
             || { echo "FAIL: no warning about the stub scanner"; exit 1; }
           echo "OK: accepted, and warned that the stub scanner does not scan"
 
+      - name: check_env --production refuses the stub scanner and the ALLOW_STUB escape hatch
+        env:
+          DJANGO_SECRET_KEY: ci-accepted-value-aaaaaaaaaaaa
+          POSTGRES_PASSWORD: ci-accepted-value-bbbbbbbbbbbb
+          MFA_ENCRYPTION_KEY: ci-accepted-value-cccccccccccc
+          COMPANY_SECRET_KEY: ci-accepted-value-dddddddddddd
+        run: |
+          if python scripts/check_env.py --production; then
+            echo "FAIL: --production accepted an unset (stub) scanner"; exit 1
+          fi
+          if DOCUMENT_SCANNER_BACKEND=clamav DOCUMENT_SCANNER_ALLOW_STUB=true \
+             python scripts/check_env.py --production; then
+            echo "FAIL: --production accepted DOCUMENT_SCANNER_ALLOW_STUB"; exit 1
+          fi
+          echo "OK: refused the stub scanner and the escape hatch"
+
+      - name: check_env --production accepts a real scanner
+        env:
+          DJANGO_SECRET_KEY: ci-accepted-value-aaaaaaaaaaaa
+          POSTGRES_PASSWORD: ci-accepted-value-bbbbbbbbbbbb
+          MFA_ENCRYPTION_KEY: ci-accepted-value-cccccccccccc
+          COMPANY_SECRET_KEY: ci-accepted-value-dddddddddddd
+          DOCUMENT_SCANNER_BACKEND: clamav
+        run: |
+          python scripts/check_env.py --production
+          echo "OK: accepted a production environment with a real scanner"
+
       - name: restore refuses without an explicit target
         run: |
           set +e

@@ -14,12 +14,21 @@ nothing, so the discrepancy never surfaced.
 The required set below is exactly the four variables compose guards. Everything
 else either has a safe default or is supplied by compose itself; see
 docs/DEPLOYMENT_BOUNDARIES.md.
+
+With `--production`, the stub malware scanner is a failure rather than a note:
+`DOCUMENT_SCANNER_BACKEND` unset or `stub`, or `DOCUMENT_SCANNER_ALLOW_STUB`
+set, means uploads would be marked clean without being scanned. Without the
+flag the behaviour is unchanged, because the local compose stack and CI run the
+stub on purpose.
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
+
+_TRUTHY = {"1", "true", "yes", "on"}
 
 #: The four variables `compose.yaml` guards with `:?`. Without any one of them
 #: `docker compose config` fails before a container starts. Keep this list in
@@ -56,9 +65,35 @@ INFORMATIONAL = [
 ]
 
 
-def main() -> int:
+def _scanner_failures() -> list[str]:
+    """Production-only: the reasons uploads would not actually be scanned."""
+    failures = []
+    backend = os.environ.get("DOCUMENT_SCANNER_BACKEND", "").strip() or "stub"
+    if backend == "stub":
+        failures.append(
+            "DOCUMENT_SCANNER_BACKEND is 'stub' (or unset) -- every upload would be "
+            "marked CLEAN without being scanned. Set it to 'clamav'."
+        )
+    if os.environ.get("DOCUMENT_SCANNER_ALLOW_STUB", "").strip().lower() in _TRUTHY:
+        failures.append(
+            "DOCUMENT_SCANNER_ALLOW_STUB is set -- it switches off the production "
+            "refusal to run the stub scanner. Remove it (compose.yaml defaults it to true)."
+        )
+    return failures
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--production",
+        action="store_true",
+        help="also fail if the stub malware scanner would be active",
+    )
+    args = parser.parse_args(argv)
+
     missing: list[str] = []
     placeholders: list[str] = []
+    scanner = _scanner_failures() if args.production else []
 
     for var in REQUIRED:
         value = os.environ.get(var, "").strip()
@@ -77,6 +112,8 @@ def main() -> int:
         print(message, file=sys.stderr)
     for message in placeholders:
         print(f"FAIL: {message}", file=sys.stderr)
+    for message in scanner:
+        print(f"FAIL: {message}", file=sys.stderr)
 
     if missing or placeholders:
         print(
@@ -84,6 +121,9 @@ def main() -> int:
             "variables with no default; everything else compose supplies or defaults.",
             file=sys.stderr,
         )
+    if scanner:
+        print("\nSee docs/DEPLOYMENT_BOUNDARIES.md section 3 (malware scanner).", file=sys.stderr)
+    if missing or placeholders or scanner:
         return 1
 
     print("OK: all four hard-required environment variables are present and non-placeholder.")
