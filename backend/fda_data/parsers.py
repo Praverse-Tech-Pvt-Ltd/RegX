@@ -57,6 +57,10 @@ ORANGE_BOOK_PRODUCTS_REQUIRED_COLUMNS = (
     "Approval_Date",
     "RLD",
     "RS",
+    # RX / OTC / DISCN. Verified present in every row of EOBZIP_2026_08; it is
+    # the only source of the discontinued flag, so a file without it must not
+    # import as if every product were still marketed.
+    "Type",
 )
 
 #: The official IID export's column names. These are the contract: the parser

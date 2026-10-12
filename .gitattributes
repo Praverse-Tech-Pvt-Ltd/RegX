@@ -27,3 +27,7 @@ docker-entrypoint.sh text eol=lf
 *.xlsx          binary
 *.docx          binary
 *.zip           binary
+
+# Real FDA Orange Book rows, byte-for-byte: CRLF line endings and no newline
+# after the last row, exactly as FDA publishes them. Never normalise these.
+backend/fda_data/tests/fixtures/** -text

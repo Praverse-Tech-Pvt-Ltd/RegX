@@ -423,6 +423,9 @@ class OrangeBookProduct(PublicIDModel, TimeStampedModel):
     te_code = models.CharField(max_length=20, blank=True)
     approval_date = models.DateField(null=True, blank=True)
     approval_date_text = models.CharField(max_length=255, blank=True)
+    # The Orange Book `Type` column verbatim: RX, OTC or DISCN. `discontinued`
+    # is derived from it (DISCN) at import and never inferred otherwise.
+    marketing_category = models.CharField(max_length=20, blank=True, db_index=True)
     discontinued = models.BooleanField(default=False)
     source_row_locator = models.CharField(max_length=255, blank=True)
     raw_row_payload = models.JSONField(default=dict)

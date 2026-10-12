@@ -45,7 +45,12 @@ def orange_book_products_adapter(rows: list[dict]) -> list[dict]:
                     "reference_standard_flag": str(row.get("RS", "")).strip().upper() == "YES",
                     "te_code": row.get("TE_Code", ""),
                     "approval_date_text": row.get("Approval_Date", ""),
-                    "discontinued": bool(row.get("_discontinued", False)),
+                    # The FDA file says RX, OTC or DISCN in `Type`; DISCN is the
+                    # only thing that marks a product discontinued. `_discontinued`
+                    # is kept for existing JSON API callers that set it directly.
+                    "marketing_category": str(row.get("Type", "")).strip().upper(),
+                    "discontinued": str(row.get("Type", "")).strip().upper() == "DISCN"
+                    or bool(row.get("_discontinued", False)),
                 },
             }
         )

@@ -317,6 +317,28 @@ class FdaReleaseReconciliationCsvView(APIView):
         return response
 
 
+_APPLICATION_PREFIXES = (("ANDA", "A"), ("NDA", "N"), ("A", "A"), ("N", "N"))
+
+
+def _parse_application_number(value: str) -> tuple[str | None, str | None]:
+    """Split user input such as "212379", "N212379", "NDA212379" or "ANDA 210928"
+    into (application_type or None, six-digit number or None).
+
+    The Orange Book stores the number zero-padded to six digits ("040603"), so a
+    shorter all-digit value is padded. Anything that is not an optional N/A/NDA/
+    ANDA prefix followed by digits returns (None, None): no match, never a guess.
+    """
+    text = value.strip().upper().replace(" ", "")
+    app_type = None
+    for prefix, code in _APPLICATION_PREFIXES:
+        if text.startswith(prefix) and text[len(prefix) :].isdigit():
+            app_type, text = code, text[len(prefix) :]
+            break
+    if not text.isdigit() or len(text) > 6:
+        return None, None
+    return app_type, text.zfill(6)
+
+
 class OrangeBookProductListView(APIView):
     pagination_class = FdaDataPagination
 
@@ -336,8 +358,20 @@ class OrangeBookProductListView(APIView):
         rld = params.get("rld")
         reference_standard = params.get("reference_standard")
         discontinued = params.get("discontinued")
+        trade_name = params.get("trade_name")
+        application_number = params.get("application_number")
         if ingredient:
             qs = qs.filter(active_ingredient_raw__icontains=ingredient)
+        if trade_name:
+            qs = qs.filter(trade_name__icontains=trade_name.strip())
+        if application_number:
+            app_type, number = _parse_application_number(application_number)
+            if number is None:
+                qs = qs.none()
+            else:
+                qs = qs.filter(application__application_number=number)
+                if app_type:
+                    qs = qs.filter(application__application_type=app_type)
         if route:
             qs = qs.filter(route_normalized__code=route)
         if dosage_form:

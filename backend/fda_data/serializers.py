@@ -132,6 +132,7 @@ class OrangeBookProductSerializer(serializers.ModelSerializer):
             "te_code",
             "approval_date",
             "approval_date_text",
+            "marketing_category",
             "discontinued",
         ]
         read_only_fields = fields
