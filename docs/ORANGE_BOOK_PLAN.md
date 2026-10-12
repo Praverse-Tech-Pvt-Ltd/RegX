@@ -231,6 +231,10 @@ Wording: factual labels only. Nothing says or implies "approved for", "can launc
 
 ## 6. White-paper flow: written spec for client sign-off (NOT to be built)
 
+> **The client-facing version, with our proposed answer to each question, is
+> `docs/ORANGE_BOOK_WHITE_PAPER_SPEC.md`.** This section stays as the engineering
+> background.
+
 ### What the legacy tool actually is (`company_site`, read-only review)
 
 "General White Paper (Structural Research Plan)" (`RATools/views.py:13466-13893`,
