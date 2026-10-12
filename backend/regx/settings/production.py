@@ -35,6 +35,18 @@ CSP_BASE_URI = ("'self'",)
 CSP_FORM_ACTION = ("'self'",)
 
 # ---------------------------------------------------------------------------
+# API schema and Swagger UI
+# ---------------------------------------------------------------------------
+# The schema maps every route, parameter and permission of the API. Here it is
+# served only to a signed-in session (the default SessionAuthentication), so
+# /api/schema/ and /api/docs/ answer 403 to anonymous callers. Development and
+# test settings keep the drf-spectacular default (AllowAny).
+SPECTACULAR_SETTINGS = {
+    **SPECTACULAR_SETTINGS,  # noqa: F405
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
+}
+
+# ---------------------------------------------------------------------------
 # Operational logging
 # ---------------------------------------------------------------------------
 # INFO to stdout. Inherited from base; stated explicitly because it is a
