@@ -251,15 +251,37 @@ class TestTenantIsolationApi:
         detail_resp = api_client_a.get(f"{BASE}/formulations/products/{public_id}/")
         assert detail_resp.json()["selected_ob_product_public_id"] is None
 
-        import uuid
+        # Selection is now validated against a real product in the active
+        # Orange Book release (test_reference_selection.py). Random UUIDs, which
+        # this test used to send, are correctly refused.
+        from fda_data.models import (
+            FDADataSourceRelease,
+            FDAReleaseStatus,
+            OrangeBookApplication,
+            OrangeBookProduct,
+        )
+
+        release = FDADataSourceRelease.objects.create(
+            dataset_type="orange_book_products",
+            source_name="Orange Book",
+            official_source_reference="Test fixture",
+            source_checksum_sha256="c" * 64,
+            status=FDAReleaseStatus.ACTIVE,
+        )
+        app = OrangeBookApplication.objects.create(
+            release=release, application_type="A", application_number="099999"
+        )
+        ob_product = OrangeBookProduct.objects.create(
+            release=release, application=app, product_number="001", active_ingredient_raw="X"
+        )
 
         select_resp = api_client_a.post(
             f"{BASE}/formulations/products/{public_id}/select-reference/",
             data={
                 "application_number": "099999",
                 "product_number": "001",
-                "product_public_id": str(uuid.uuid4()),
-                "release_public_id": str(uuid.uuid4()),
+                "product_public_id": str(ob_product.public_id),
+                "release_public_id": str(release.public_id),
                 "justification": "Only exact route/dosage-form/strength match.",
             },
             format="json",

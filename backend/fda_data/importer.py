@@ -19,6 +19,9 @@ Guarantees mirrored from templates_registry.importer:
 
 from __future__ import annotations
 
+import logging
+from datetime import date, datetime
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -120,6 +123,35 @@ def register_release(
     return release
 
 
+logger = logging.getLogger(__name__)
+
+#: FDA's documented stand-in for products approved before 1982 (the exact
+#: spelling in EOBZIP_2026_08, 5,873 rows). It is recognised, not a parse
+#: failure: the text is kept and `approval_date` stays NULL -- never a guessed
+#: 1982-01-01.
+PRE_1982_APPROVAL_TEXT = "approved prior to jan 1, 1982"
+
+#: Reason code recorded on the row's FdaImportRowResult when an approval date
+#: cannot be read, so the gap is auditable per row rather than silently empty.
+APPROVAL_DATE_UNPARSED = "approval_date_unparsed"
+
+
+def parse_approval_date(text: str) -> tuple[date | None, bool]:
+    """Return (date, unparsed) for an Orange Book `Approval_Date` value.
+
+    "Mmm d, yyyy" and "Mmm dd, yyyy" both parse with `%b %d, %Y`. Empty text
+    and the documented pre-1982 phrase return (None, False). Anything else
+    returns (None, True) so the caller records it instead of dropping it.
+    """
+    value = (text or "").strip()
+    if not value or value.lower() == PRE_1982_APPROVAL_TEXT:
+        return None, False
+    try:
+        return datetime.strptime(value, "%b %d, %Y").date(), False
+    except ValueError:
+        return None, True
+
+
 def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[dict], actor) -> None:
     """Idempotent: rerunning with the same neutral_rows produces the same
     OrangeBookApplication/Product rows via get_or_create, never
@@ -135,6 +167,7 @@ def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[di
         FdaImportRowResult.objects.filter(release=release).values_list("row_locator", flat=True)
     )
     imported = duplicate = failed = 0
+    unparsed_dates = 0
 
     for row in neutral_rows:
         locator = row["row_locator"]
@@ -142,6 +175,7 @@ def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[di
             continue
         fields = row["fields"]
         checksum = row_checksum(fields)
+        approval_date, date_unparsed = parse_approval_date(fields.get("approval_date_text", ""))
         try:
             with transaction.atomic():
                 app, _ = OrangeBookApplication.objects.get_or_create(
@@ -187,7 +221,9 @@ def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[di
                             fields.get("reference_standard_flag", False)
                         ),
                         "te_code": fields.get("te_code", ""),
+                        "approval_date": approval_date,
                         "approval_date_text": fields.get("approval_date_text", ""),
+                        "marketing_category": fields.get("marketing_category", ""),
                         "discontinued": bool(fields.get("discontinued", False)),
                         "source_row_locator": locator,
                         "raw_row_payload": row["raw_payload"],
@@ -207,7 +243,21 @@ def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[di
                     row_locator=locator,
                     target_public_identifier=product.public_id,
                     result=result_type,
+                    reason_code=APPROVAL_DATE_UNPARSED if date_unparsed else "",
+                    safe_detail=(
+                        f"Approval_Date not parsed; kept as text: "
+                        f"{fields.get('approval_date_text', '')[:100]}"
+                        if date_unparsed
+                        else ""
+                    ),
                 )
+                if date_unparsed and created:
+                    unparsed_dates += 1
+                    logger.warning(
+                        "Orange Book approval date not parsed; kept as text (release=%s, row=%s)",
+                        release.public_id,
+                        locator,
+                    )
                 if created:
                     imported += 1
                 else:
@@ -224,6 +274,14 @@ def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[di
             )
             failed += 1
 
+    if unparsed_dates:
+        logger.warning(
+            "Orange Book import: %s approval date(s) not parsed and kept as text "
+            "(release=%s, reason_code=%s)",
+            unparsed_dates,
+            release.public_id,
+            APPROVAL_DATE_UNPARSED,
+        )
     release.record_count_extracted = len(neutral_rows)
     release.record_count_imported = FdaImportRowResult.objects.filter(
         release=release, result=FdaImportRowResultType.IMPORTED

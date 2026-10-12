@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from fda_data.models import FDAReleaseStatus, OrangeBookProduct
+
 from .models import (
     DosingRegimen,
     FormulationComponent,
@@ -72,6 +74,47 @@ class ReferenceProductSelectionSerializer(serializers.Serializer):
     product_public_id = serializers.UUIDField()
     release_public_id = serializers.UUIDField()
     justification = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        """The selection must name a real Orange Book product in the ACTIVE
+        release, and every identifier sent must agree with that product.
+
+        Until this check, any UUID or number was stored, so a selection could
+        point at nothing. The snapshot design is unchanged: the identifiers are
+        still copied, not linked, so a later release cannot rewrite a past
+        selection.
+        """
+        product = (
+            OrangeBookProduct.objects.select_related("release", "application")
+            .filter(public_id=attrs["product_public_id"])
+            .first()
+        )
+        if product is None:
+            raise serializers.ValidationError(
+                {"product_public_id": "No Orange Book product has this identifier."}
+            )
+        if product.release.status != FDAReleaseStatus.ACTIVE:
+            raise serializers.ValidationError(
+                {"product_public_id": "This product is not in the active Orange Book release."}
+            )
+        mismatched = [
+            name
+            for name, sent, actual in (
+                ("release_public_id", attrs["release_public_id"], product.release.public_id),
+                (
+                    "application_number",
+                    attrs["application_number"].strip(),
+                    product.application.application_number,
+                ),
+                ("product_number", attrs["product_number"].strip(), product.product_number),
+            )
+            if sent != actual
+        ]
+        if mismatched:
+            raise serializers.ValidationError(
+                dict.fromkeys(mismatched, "Does not match the selected Orange Book product.")
+            )
+        return attrs
 
 
 class FormulationVersionSerializer(serializers.ModelSerializer):

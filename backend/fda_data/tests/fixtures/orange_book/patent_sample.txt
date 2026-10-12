@@ -1,0 +1,4 @@
+Appl_Type~Appl_No~Product_No~Patent_No~Patent_Expire_Date_Text~Drug_Substance_Flag~Drug_Product_Flag~Patent_Use_Code~Delist_Flag~Submission_Date
+N~212379~001~10137200~Oct 1, 2030~~~U-2647~~Nov 15, 2019
+N~212379~001~8865139~Oct 1, 2030~~Y~U-2647~~Nov 15, 2019
+N~212379~001~10398641~Sep 8, 2037~~~U-2647~~Nov 15, 2019
