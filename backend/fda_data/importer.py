@@ -20,7 +20,8 @@ Guarantees mirrored from templates_registry.importer:
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+import re
+from datetime import date
 
 from django.db import transaction
 from django.utils import timezone
@@ -136,19 +137,37 @@ PRE_1982_APPROVAL_TEXT = "approved prior to jan 1, 1982"
 APPROVAL_DATE_UNPARSED = "approval_date_unparsed"
 
 
+#: English month abbreviations as FDA writes them. A fixed table rather than
+#: strptime's `%b`, which reads month names from the process locale: under a
+#: German or French LC_TIME, "Oct 18, 2019" would not parse.
+_MONTHS = {
+    m: i
+    for i, m in enumerate(
+        ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"),
+        start=1,
+    )
+}
+_FDA_DATE = re.compile(r"([A-Za-z]{3}) (\d{1,2}), (\d{4})")
+
+
 def parse_approval_date(text: str) -> tuple[date | None, bool]:
     """Return (date, unparsed) for an Orange Book `Approval_Date` value.
 
-    "Mmm d, yyyy" and "Mmm dd, yyyy" both parse with `%b %d, %Y`. Empty text
-    and the documented pre-1982 phrase return (None, False). Anything else
-    returns (None, True) so the caller records it instead of dropping it.
+    "Mmm d, yyyy" and "Mmm dd, yyyy", parsed without reference to the system
+    locale. Empty text and the documented pre-1982 phrase return (None, False).
+    Anything else returns (None, True) so the caller records it instead of
+    dropping it.
     """
     value = (text or "").strip()
     if not value or value.lower() == PRE_1982_APPROVAL_TEXT:
         return None, False
+    match = _FDA_DATE.fullmatch(value)
+    month = _MONTHS.get(match.group(1).upper()) if match else None
+    if month is None:
+        return None, True
     try:
-        return datetime.strptime(value, "%b %d, %Y").date(), False
-    except ValueError:
+        return date(int(match.group(3)), month, int(match.group(2))), False
+    except ValueError:  # e.g. "Feb 30, 2020"
         return None, True
 
 

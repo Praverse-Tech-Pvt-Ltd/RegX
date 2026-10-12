@@ -13,6 +13,7 @@ BUDESONIDE A215328/001 (RX, TE AB, RS only), ALUPENT N016402/001 (DISCN,
 from __future__ import annotations
 
 import io
+import locale
 import logging
 import zipfile
 from datetime import date
@@ -142,6 +143,36 @@ class TestParseApprovalDate:
     @pytest.mark.parametrize("text", ["Oct 2019", "2019-10-18", "Octember 18, 2019", "N/A"])
     def test_anything_else_is_reported_unparsed(self, text):
         assert parse_approval_date(text) == (None, True)
+
+    def test_every_month_parses(self):
+        months = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
+        for number, name in enumerate(months, start=1):
+            assert parse_approval_date(f"{name} 1, 2020") == (date(2020, number, 1), False)
+
+    def test_impossible_date_is_reported_unparsed(self):
+        assert parse_approval_date("Feb 30, 2020") == (None, True)
+
+    def test_parsing_ignores_the_system_locale(self):
+        """`%b` in strptime reads month names from LC_TIME; the parser must not.
+
+        Skips where no non-English locale is installed (the slim test image has
+        only C/POSIX). Independence there holds by construction: the parser
+        uses a fixed English month table and no locale-aware call.
+        """
+        original = locale.setlocale(locale.LC_TIME)
+        for candidate in ("de_DE.UTF-8", "de_DE.utf8", "fr_FR.UTF-8", "German", "French"):
+            try:
+                locale.setlocale(locale.LC_TIME, candidate)
+                break
+            except locale.Error:
+                continue
+        else:
+            pytest.skip("no non-English locale installed")
+        try:
+            assert parse_approval_date("Oct 18, 2019") == (date(2019, 10, 18), False)
+            assert parse_approval_date("Mar 3, 2021") == (date(2021, 3, 3), False)
+        finally:
+            locale.setlocale(locale.LC_TIME, original)
 
 
 # ---------------------------------------------------------------------------
