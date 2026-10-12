@@ -1,5 +1,9 @@
 # Orange Book terminology mapping review
 
+> **ON HOLD (2026-10-12):** do not fill in the review workbook yet. The mappings must first point at an agreed
+> **controlled vocabulary** (FDA standard route, dosage-form and unit terms), which is being decided separately
+> (`docs/TERMINOLOGY_VOCABULARY_DECISION.md`, to follow). The workbook will be regenerated against that list.
+
 **Status:** proposals for human review. **Nothing has been approved, created or loaded.**
 **Owner:** Praverse regulatory reviewer, with sign-off by Pratham.
 **Prepared:** 2026-10-12 from the active local Orange Book release
