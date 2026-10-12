@@ -7,9 +7,11 @@ from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from . import login_lockout
 from .models import MFADevice, RecoveryCode
 from .serializers import (
     LoginSerializer,
@@ -48,8 +50,13 @@ def register_view(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login_view(request):
+    email = str(request.data.get("email", ""))
+    login_lockout.check(email)
     s = LoginSerializer(data=request.data, context={"request": request})
-    s.is_valid(raise_exception=True)
+    if not s.is_valid():
+        login_lockout.record_failure(email)
+        raise ValidationError(s.errors)
+    login_lockout.clear(email)
     user = s.validated_data["user"]
     login(request, user)
     return Response(UserPublicSerializer(user).data)
