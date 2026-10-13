@@ -128,6 +128,13 @@ def activate(release: FDADataSourceRelease, actor) -> FDADataSourceRelease:
         locked.activated_by = actor
         locked.activated_at = now
         locked.save(update_fields=["status", "activated_by", "activated_at", "updated_at"])
+
+        # An SPL terminology release changes the controlled vocabulary only
+        # here, once approved and activated -- never when it is loaded.
+        from .spl_terminology import TERMINOLOGY_DATASET_TYPES, apply_on_activation
+
+        if locked.dataset_type in TERMINOLOGY_DATASET_TYPES:
+            apply_on_activation(locked)
         emit(
             event_type=FdaDataEvent.RELEASE_ACTIVATED,
             resource_id=str(locked.public_id),

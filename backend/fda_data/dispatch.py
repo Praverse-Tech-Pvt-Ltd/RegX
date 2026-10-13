@@ -58,13 +58,14 @@ UNSUPPORTED_REASONS: dict[str, str] = {
         "proposal workflow, not by bulk import."
     ),
     FDADatasetType.FDA_ROUTE_TERMINOLOGY: (
-        "Route terminology ingestion is not implemented. `ControlledRoute` "
-        "values are governed vocabulary, not imported source data."
+        "Route terminology import through this API is not implemented. `ControlledRoute` "
+        "values are governed vocabulary, loaded only by `load_spl_terminology` "
+        "from a saved FDA SPL snapshot."
     ),
     FDADatasetType.FDA_DOSAGE_FORM_TERMINOLOGY: (
-        "Dosage form terminology ingestion is not implemented. "
-        "`ControlledDosageForm` values are governed vocabulary, not imported "
-        "source data."
+        "Dosage form terminology import through this API is not implemented. "
+        "`ControlledDosageForm` values are governed vocabulary, loaded only by "
+        "`load_spl_terminology` from a saved FDA SPL snapshot."
     ),
 }
 
