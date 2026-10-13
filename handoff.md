@@ -337,17 +337,17 @@ on first company sign-in):
 
 | Email | Password | REGX role | Company role | Lands on |
 |---|---|---|---|---|
-| `sso.admin@praverse.test` | `RegxSso2026` | `tenant_admin` | `admin` | `/adminmaster/adminbase` |
-| `sso.doer@praverse.test` | `RegxSso2026` | `doer` | `company_user` | `/ratools/` |
-| `sso.vp@praverse.test` | `RegxSso2026` | `vp` | `company_checker` | `/ratools/` |
+| `sso.admin@praverse.test` | set via DEMO_PW at seed time | `tenant_admin` | `admin` | `/adminmaster/adminbase` |
+| `sso.doer@praverse.test` | set via DEMO_PW at seed time | `doer` | `company_user` | `/ratools/` |
+| `sso.vp@praverse.test` | set via DEMO_PW at seed time | `vp` | `company_checker` | `/ratools/` |
 
 Legacy-only accounts, still working through the local fallback:
 
 | Username | Password | Role |
 |---|---|---|
-| `regx_admin` | `RegxAdmin#2026` | admin |
-| `regx_user` | `RegxUser#2026` | company_user |
-| `regx_checker` | `RegxUser#2026` | company_checker |
+| `regx_admin` | set via DEMO_PW at seed time | admin |
+| `regx_user` | set via DEMO_PW at seed time | company_user |
+| `regx_checker` | set via DEMO_PW at seed time | company_checker |
 
 These are **local demo credentials for a local database**. They are not
 deployed anywhere and must not be created in any environment that is.
