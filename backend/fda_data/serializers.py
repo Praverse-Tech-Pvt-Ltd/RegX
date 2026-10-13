@@ -213,6 +213,9 @@ class ReleaseRegistrationSerializer(serializers.Serializer):
 
 class ReviewActionSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
+    # Submit-review only: acknowledge that records still lack a route or
+    # dosage-form link (see FdaReleaseSubmitReviewView).
+    confirm_unmapped = serializers.BooleanField(required=False, default=False)
 
 
 # Each entry: (model_cls, controlled_fk_attr, controlled_label_attr,
