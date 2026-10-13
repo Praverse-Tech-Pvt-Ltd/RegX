@@ -1,8 +1,18 @@
 # Terminology vocabulary decision: which controlled lists REGX should use
 
-**Status:** recommendation, awaiting decision. Nothing here is built, seeded or approved.
+**Status:** decided 2026-10-13 (see Decisions below). Nothing here is built, seeded or approved by this document.
 **Date:** 2026-10-13. **Author:** Maanav (with Claude Code). **Decision owner:** Praverse regulatory reviewer; sign-off by Pratham.
 **Related:** `docs/FDA_TERMINOLOGY_MAPPING.md` (how mappings work), `docs/ORANGE_BOOK_PLAN.md` (Phase 3 depends on this).
+
+## Decisions (2026-10-13, owner)
+
+- **Controlled vocabulary:** the FDA SPL lists. For routes and dosage forms, `code` = the NCI Thesaurus code
+  (e.g. `C38288`); the SPL term (e.g. `ORAL`) is the display name (`canonical_label`).
+- **Units:** on hold. A separate, later PR, because units need a migration (§5).
+- **INJECTION:** the question in §4 goes to iCretegy with its three conditions. Until it is answered: show all matching
+  IID records, never auto-pick a limit, and the reviewer confirms the route. `find_iid_candidates` is **not** changed yet.
+- **Review scope:** the reviewer fills in **routes and dosage forms only**. The workbook's Units sheet is marked
+  "ON HOLD — do not fill".
 
 ## 1. The question
 
@@ -23,9 +33,20 @@ NCI Thesaurus codes for routes and dosage forms and UCUM for units, and map Oran
 | Units of Presentation | https://www.fda.gov/industry/structured-product-labeling-resources/units-presentation | 03/27/2018 | HTML table: SPL term + NCI code + UCUM | 76 terms |
 
 - Index page: https://www.fda.gov/industry/fda-data-standards-advisory-board/structured-product-labeling-resources.
-- **Licence: none is stated on any of the four pages.** The only "licence" words on them are navigation links to unrelated SPL lists.
-  I believe US federal government works are generally public domain, and that NCI Thesaurus content is published under a
-  Creative Commons attribution licence. **I have not verified either. Confirm both before distributing these lists.**
+- **Licence (checked 2026-10-13 on the official pages):**
+  - The four SPL pages carry no licence of their own; the only "licence" words on them are navigation links to unrelated SPL lists.
+  - **FDA website policy** (https://www.fda.gov/about-fda/about-website/website-policies, content current as of 01/19/2024):
+    "Unless otherwise noted, the contents of the FDA website (www.fda.gov) — both text and graphics — are not copyrighted.
+    They are in the public domain and may be republished, reprinted and otherwise used freely". "Credit to the U.S. Food and
+    Drug Administration as the source is appreciated but not required." FDA "strongly recommends that the copied item lists
+    the date that the material was copied". The SPL pages carry no "otherwise noted" exception.
+  - **NCI Thesaurus terms of use** (https://evs.nci.nih.gov/ftp1/NCI_Thesaurus/ThesaurusTermsofUse.htm, no date on the page):
+    "The NCI Thesaurus™ is released under the Creative Commons Attribution 4.0 International license (CC BY 4.0)."
+    "The name "NCI Thesaurus" is trademarked. Only the NCI Thesaurus™ published by the NCI can be released under this name."
+  - **What this means for REGX:** the NCI codes come from NCIt, so CC BY 4.0 applies to them: keep an attribution to NCI EVS
+    (in `fda_source` and any export), and never call REGX's list "NCI Thesaurus". Record the date each list was copied.
+  - **Not confirmed:** whether the CC BY 4.0 attribution has to appear in the user interface. That is a legal reading, not
+    something the pages state. UCUM (units) has its own terms; not checked, because units are on hold.
 - The pages are HTML, not file downloads. Scripted `/media/.../download` from fda.gov is blocked by FDA abuse detection and
   must not be worked around. A loader should read a saved snapshot of the table, not scrape fda.gov at run time.
 - The page dates are old (2018–2024). FDA updates these lists without a release cycle, so every load must record the
@@ -115,7 +136,7 @@ From `backend/fda_data/models.py` on `regx-main@eedbf9c`:
   stable even if FDA rewords the label), `canonical_label` = SPL term (`ORAL`), `fda_source` = list name + page date +
   snapshot sha256, `active_release` = an `FDADataSourceRelease` of the existing `fda_route_terminology` /
   `fda_dosage_form_terminology` type, so the approve/activate lifecycle (approver ≠ loader) already applies.
-  *Decision needed:* `code` = NCI code (recommended) or the SPL term. API callers pass `route_code`, so this choice is visible.
+  *Decided 2026-10-13:* `code` = NCI code. API callers pass `route_code`, so they will pass NCI codes.
 - **Units: not fully.** UCUM codes fit in `symbol`, and mg/g/ug/mL/L fit the existing dimensions. But meq, mmol, curie
   family, IU, USP units and rates (`/h`, `/d`) have **no dimension**, units have **no version/source field**, and
   per-presentation units (`MG/VIAL`, 634 OB strengths) cannot be represented. Those need a model change (a migration),
@@ -138,7 +159,7 @@ From `backend/fda_data/models.py` on `regx-main@eedbf9c`:
 
 1. **Routes and dosage forms:** adopt the FDA SPL lists (NCI codes) as `ControlledRoute` / `ControlledDosageForm`.
    The IID then maps 1:1 (59/59 routes, 105/106 forms); only the Orange Book needs reviewed mappings.
-2. **Units:** adopt UCUM codes, with written translation rules for Orange Book tokens (`GM`→`g`, `MCG`→`ug`, `MG/ML`→`mg/mL`).
+2. **Units (on hold, separate PR):** adopt UCUM codes, with written translation rules for Orange Book tokens (`GM`→`g`, `MCG`→`ug`, `MG/ML`→`mg/mL`).
    Percent basis, activity units and per-presentation units wait for a unit-model decision.
 3. **INJECTION:** send the question in §4 to iCretegy before any route mapping for it is approved.
 4. **Review:** use the regenerated workbook `orange_book_terminology_review_spl_2026-10-13.xlsx` (kept outside the repo,
