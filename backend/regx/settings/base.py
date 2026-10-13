@@ -229,6 +229,11 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"external_execution_create": "60/min"},
 }
 
+# Password login lockout, per account (see identity/login_lockout.py): this many
+# failures within LOGIN_LOCKOUT_SECONDS lock the account for LOGIN_LOCKOUT_SECONDS.
+LOGIN_LOCKOUT_THRESHOLD = 5
+LOGIN_LOCKOUT_SECONDS = 15 * 60
+
 # ---------------------------------------------------------------------------
 # Document platform
 # ---------------------------------------------------------------------------
