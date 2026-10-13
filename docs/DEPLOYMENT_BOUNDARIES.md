@@ -106,6 +106,33 @@ All have defaults; set them only to change behaviour.
 **`DOCUMENT_SCANNER_BACKEND` defaults to `stub`.** A production deployment that
 accepts uploads must set a real scanner; the stub does not scan.
 
+### Malware scanner: three guards, and the one escape hatch
+
+The stub scanner marks every upload `CLEAN` without inspecting it, and nothing
+downstream can tell that apart from a real clean result.
+
+| Guard | Where | Behaviour |
+|---|---|---|
+| Production refuses to start | `regx/settings/production.py` | `ImproperlyConfigured` at import if the backend is `stub`, **unless `DOCUMENT_SCANNER_ALLOW_STUB` is true** |
+| Startup warning | `documents/apps.py` | Every web and Celery process running the stub logs one `WARNING`: *"Malware scanning is DISABLED …"*. It also states the `DOCUMENT_SCANNER_ALLOW_STUB` value |
+| Pre-flight failure | `scripts/check_env.py --production` | Fails if `DOCUMENT_SCANNER_BACKEND` is unset or `stub`, **or** if `DOCUMENT_SCANNER_ALLOW_STUB` is set. Without `--production`, the script only prints a note, because local compose and CI run the stub on purpose |
+
+**`DOCUMENT_SCANNER_ALLOW_STUB` is the escape hatch, and `compose.yaml` sets it
+to `true` by default** (`${DOCUMENT_SCANNER_ALLOW_STUB:-true}`). That default
+exists for the local stack and the CI compose job, which run the production
+settings module. A deployment built from `compose.yaml` therefore accepts uploads
+unscanned unless it sets:
+
+```bash
+DOCUMENT_SCANNER_BACKEND=clamav
+DOCUMENT_SCANNER_ALLOW_STUB=false
+docker compose --profile scanning up -d   # starts the clamav service
+```
+
+The compose default itself is deliberately unchanged for now. Run
+`python scripts/check_env.py --production` before every deployment; it is the
+check that catches this.
+
 ---
 
 ## 4. Browser-visible — never secret
@@ -166,10 +193,12 @@ docker compose up -d
 Open **http://localhost:8080** — the single origin. Not `:3000`, not `:8000`.
 
 `scripts/check_env.py` validates the hard-required set before starting, and
-rejects placeholder values:
+rejects placeholder values. For a real deployment, add `--production`. That
+also fails on the stub malware scanner (see §3):
 
 ```bash
-python scripts/check_env.py
+python scripts/check_env.py               # local / CI
+python scripts/check_env.py --production  # any real deployment
 ```
 
 ---
@@ -183,7 +212,7 @@ python scripts/check_env.py
 - [ ] `CSRF_TRUSTED_ORIGINS` and `CORS_ALLOWED_ORIGINS` set to real origins
 - [ ] All four hard-required secrets generated fresh, never reused across environments
 - [ ] `INTEGRATED_APP_URL` set to the real public origin **before building the frontend image** — it is inlined at build time
-- [ ] `DOCUMENT_SCANNER_BACKEND` set to a real scanner if uploads are enabled
+- [ ] `DOCUMENT_SCANNER_BACKEND` set to a real scanner if uploads are enabled, **and `DOCUMENT_SCANNER_ALLOW_STUB` removed or `false`** (compose defaults it to `true`). `python scripts/check_env.py --production` passes
 - [ ] PostgreSQL TLS enabled
 - [ ] Redis AUTH enabled
 - [ ] No `unsafe-eval` in `script-src`. Note the shipped CSP does use
