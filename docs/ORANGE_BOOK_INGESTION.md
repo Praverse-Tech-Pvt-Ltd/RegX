@@ -43,20 +43,33 @@ enum member is either importable or has a stated reason.
 
 ## IID source contract
 
-Official export, comma-delimited: `Inactive Ingredient`, `Route`,
-`Dosage Form`, `CAS Number`, `UNII`, `Potency Amount`, `Potency Unit`.
+Official export: the ZIP FDA publishes (e.g. `iig_july_2026.zip`), or its
+`IIR_OCOMM.csv` member. Comma-delimited, CRLF, with this header (verified
+against the July 2026 file):
+`INGREDIENT_NAME`, `ROUTE`, `DOSAGE_FORM`, `CAS_NUMBER`, `UNII`,
+`POTENCY_AMOUNT`, `POTENCY_UNIT`, `MAXIMUM_DAILY_EXPOSURE`,
+`MAXIMUM_DAILY_EXPOSURE_UNIT`, plus an optional `RECORD_UPDATED` ("Y" on rows
+changed that quarter). The ZIP's `IIR_OCOMM.xls` and `Change_Log_Data` members
+are not read.
 
-`Inactive Ingredient`, `Potency Amount` and `Potency Unit` must be **present
-and non-empty**; a row missing any of them is rejected rather than stored with
-blanks. The adapter also accepts the older names `Ingredient Name`, `Potency`
-and `Unit` for existing JSON API callers, but an actual file must match what
-FDA publishes.
+`INGREDIENT_NAME`, `ROUTE` and `DOSAGE_FORM` must be **present and
+non-empty**; a row missing any of them is rejected rather than stored with
+blanks. Potency and maximum daily exposure are **not** required: each real row
+carries one of them, or neither (potency unit `NA` or `ADJ PH`). Each amount is
+stored twice: as the exact text (`potency_amount_raw`, `mde_amount_raw`) and,
+when it is a plain decimal, as a number. Anything else is kept as text, left
+unparsed and flagged on the row's import result. A UNII of `NA` is a
+placeholder, not an identifier, and is never used to match ingredients.
 
-**XLSX is not supported.** `openpyxl` is available, but a cell holding a
+The adapter also accepts the older names (`Inactive Ingredient`,
+`Potency Amount`, `Potency Unit`; `Ingredient Name`, `Potency`, `Unit`) for
+existing JSON API callers, but an actual file must match what FDA publishes.
+
+**XLSX/XLS is not supported.** `openpyxl` is available, but a cell holding a
 formula with no cached result reads as `None`, and the only honest options are
 to reject the row or evaluate the formula — and evaluating spreadsheet formulas
-from an untrusted file is not something this importer should do. Convert to CSV
-first; the column contract is identical.
+from an untrusted file is not something this importer should do. Use the CSV
+member; the column contract is identical.
 
 ## Importing a file
 

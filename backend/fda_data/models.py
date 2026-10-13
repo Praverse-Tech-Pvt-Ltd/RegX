@@ -566,6 +566,9 @@ class IIDPrecedentRecord(PublicIDModel, TimeStampedModel):
         ControlledDosageForm, on_delete=models.SET_NULL, null=True, blank=True
     )
     potency_amount = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    #: The potency amount exactly as the file states it. Kept beside the parsed
+    #: number so an unparseable value is never lost.
+    potency_amount_raw = models.CharField(max_length=100, blank=True)
     potency_unit_raw = models.CharField(max_length=100, blank=True)
     potency_unit_normalized = models.ForeignKey(
         ControlledUnit, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
@@ -574,6 +577,9 @@ class IIDPrecedentRecord(PublicIDModel, TimeStampedModel):
     maximum_daily_exposure = models.DecimalField(
         max_digits=20, decimal_places=6, null=True, blank=True
     )
+    #: The maximum daily exposure exactly as the file states it
+    #: (`MAXIMUM_DAILY_EXPOSURE`); `mde_unit_raw` holds its unit column.
+    mde_amount_raw = models.CharField(max_length=100, blank=True)
     mde_unit_raw = models.CharField(max_length=100, blank=True)
     mde_unit_normalized = models.ForeignKey(
         ControlledUnit, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"

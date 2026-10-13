@@ -29,7 +29,7 @@ import zipfile
 #: Bump when a parser's output shape changes, so a release records which
 #: version of the parsing rules produced its rows.
 ORANGE_BOOK_PRODUCTS_PARSER = "orange_book_products_txt:1"
-IID_CSV_PARSER = "fda_iid_csv:1"
+IID_CSV_PARSER = "fda_iid_csv:2"
 
 #: The Orange Book files are tilde-delimited ASCII. Not pipe: an earlier
 #: version of docs/ORANGE_BOOK_INGESTION.md said pipe, and a pipe-split of a
@@ -63,25 +63,36 @@ ORANGE_BOOK_PRODUCTS_REQUIRED_COLUMNS = (
     "Type",
 )
 
-#: The official IID export's column names. These are the contract: the parser
+#: The member of the official IID ZIP that holds the data. The same ZIP ships
+#: `IIR_OCOMM.xls` and a `Change_Log_Data` pair, which are not read.
+IID_MEMBER = "IIR_OCOMM.csv"
+
+#: The IID export's column names, exactly as FDA publishes them. Verified
+#: against the July 2026 file (`iig_july_2026.zip`, `IIR_OCOMM.csv`). The
+#: previous contract (`Inactive Ingredient`, `Potency Amount`, ...) was never
+#: FDA's header, so a real file was refused. These are the contract: the parser
 #: fails when one is missing rather than importing blanks. `adapters.py` keeps
-#: accepting the older spellings for JSON API callers, but a file must match
-#: what FDA actually publishes.
+#: accepting the older spellings for JSON API callers. `RECORD_UPDATED` (a "Y"
+#: on rows changed in that quarter) is also published but not required.
 IID_REQUIRED_COLUMNS = (
-    "Inactive Ingredient",
-    "Route",
-    "Dosage Form",
-    "CAS Number",
+    "INGREDIENT_NAME",
+    "ROUTE",
+    "DOSAGE_FORM",
+    "CAS_NUMBER",
     "UNII",
-    "Potency Amount",
-    "Potency Unit",
+    "POTENCY_AMOUNT",
+    "POTENCY_UNIT",
+    "MAXIMUM_DAILY_EXPOSURE",
+    "MAXIMUM_DAILY_EXPOSURE_UNIT",
 )
 
-#: Values the official contract requires to be present. A row missing any of
-#: these is rejected: an IID precedent with no ingredient name or no potency
-#: is not a usable precedent, and storing it as blanks would put an empty
-#: record behind a regulatory lookup.
-IID_REQUIRED_VALUES = ("Inactive Ingredient", "Potency Amount", "Potency Unit")
+#: Values every row must carry. A row missing any of these is rejected: an IID
+#: precedent with no ingredient, route or dosage form cannot be matched to
+#: anything. Potency and maximum daily exposure are NOT required: in the real
+#: file each row carries one of them, or neither (potency unit "NA" or
+#: "ADJ PH"). A blank there is FDA's data, stored as null with an explicit
+#: calculability status -- never a reason to drop the row or the file.
+IID_REQUIRED_VALUES = ("INGREDIENT_NAME", "ROUTE", "DOSAGE_FORM")
 
 #: Bounds. A zip bomb and a runaway file are the same problem from the
 #: parser's point of view: unbounded work triggered by untrusted input.
@@ -147,8 +158,9 @@ def _rows_from_delimited(
 # ---------------------------------------------------------------------------
 
 
-def _read_products_member(raw: bytes) -> bytes:
-    """Return the bytes of `Products.txt` from the official Orange Book ZIP.
+def _read_zip_member(raw: bytes, member_name: str) -> bytes:
+    """Return the bytes of `member_name` from an official FDA ZIP
+    (`Products.txt` for the Orange Book, `IIR_OCOMM.csv` for the IID).
 
     Every refusal here is a safety property, not a convenience check:
     traversal members cannot be written anywhere because nothing is extracted
@@ -179,17 +191,15 @@ def _read_products_member(raw: bytes) -> bytes:
         # Case-insensitive match: FDA has shipped both `Products.txt` and
         # `products.txt`. Two members differing only in case is ambiguous,
         # and picking one would be a guess about which is authoritative.
-        target = ORANGE_BOOK_PRODUCTS_MEMBER.lower()
+        target = member_name.lower()
         matches = [i for i in infos if i.filename.rsplit("/", 1)[-1].lower() == target]
         if not matches:
             present = ", ".join(sorted(i.filename for i in infos)) or "(empty archive)"
-            raise SourceFileError(
-                f"ZIP does not contain {ORANGE_BOOK_PRODUCTS_MEMBER}. Members: {present}."
-            )
+            raise SourceFileError(f"ZIP does not contain {member_name}. Members: {present}.")
         if len(matches) > 1:
             raise SourceFileError(
                 f"ZIP contains {len(matches)} members named "
-                f"{ORANGE_BOOK_PRODUCTS_MEMBER}; refusing to choose between them."
+                f"{member_name}; refusing to choose between them."
             )
 
         member = matches[0]
@@ -206,7 +216,7 @@ def parse_orange_book_products(raw: bytes, *, filename: str = "") -> list[dict]:
     `Patent.txt` and `Exclusivity.txt` inside that ZIP are never read here.
     """
     if raw[:2] == b"PK":
-        raw = _read_products_member(raw)
+        raw = _read_zip_member(raw, ORANGE_BOOK_PRODUCTS_MEMBER)
         what = f"{filename or 'archive'}:{ORANGE_BOOK_PRODUCTS_MEMBER}"
     else:
         what = filename or ORANGE_BOOK_PRODUCTS_MEMBER
@@ -226,7 +236,8 @@ def parse_orange_book_products(raw: bytes, *, filename: str = "") -> list[dict]:
 
 
 def parse_iid(raw: bytes, *, filename: str = "") -> list[dict]:
-    """Parse the official comma-delimited IID export.
+    """Parse the official comma-delimited IID export (`IIR_OCOMM.csv`), or
+    the official ZIP that contains it.
 
     XLSX is deliberately not handled. `openpyxl` is available, but a cell
     holding a formula with no cached result reads as `None`, and the only
@@ -234,7 +245,11 @@ def parse_iid(raw: bytes, *, filename: str = "") -> list[dict]:
     evaluating spreadsheet formulas out of an untrusted file is not something
     this importer should do. Convert to CSV first; the contract is the same.
     """
-    what = filename or "IID export"
+    if raw[:2] == b"PK":
+        raw = _read_zip_member(raw, IID_MEMBER)
+        what = f"{filename or 'archive'}:{IID_MEMBER}"
+    else:
+        what = filename or "IID export"
     text = _decode(raw, what=what)
     rows = _rows_from_delimited(
         text,

@@ -59,29 +59,25 @@ def orange_book_products_adapter(rows: list[dict]) -> list[dict]:
 
 #: Official IID column name -> older names this adapter also accepts.
 #:
-#: The official export publishes `Inactive Ingredient`, `Potency Amount` and
-#: `Potency Unit`. This adapter was written against `Ingredient Name`,
-#: `Potency` and `Unit`, and because every lookup uses `.get(col, "")`, a real
-#: IID file produced rows with an empty ingredient name, potency and unit --
-#: silently, because a missing column and an empty cell are indistinguishable
-#: to `.get`.
-#:
-#: The official name is tried first. The older spellings stay accepted so
-#: existing JSON API callers and fixtures keep working; `parsers.parse_iid`
-#: enforces the official contract for actual files, where a renamed column is
-#: a fault rather than a dialect.
+#: The official names are FDA's published header (`INGREDIENT_NAME`,
+#: `POTENCY_AMOUNT`, `MAXIMUM_DAILY_EXPOSURE`, ...; verified against the July
+#: 2026 `IIR_OCOMM.csv`). Two earlier guesses are kept as aliases so existing
+#: JSON API callers and fixtures keep working: `Inactive Ingredient` /
+#: `Potency Amount` / `Potency Unit`, and before that `Ingredient Name` /
+#: `Potency` / `Unit`. Every lookup uses `.get(col, "")`, so a missing column
+#: and an empty cell are indistinguishable here; `parsers.parse_iid` enforces
+#: the official header for actual files, where a renamed column is a fault
+#: rather than a dialect.
 _IID_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
-    "ingredient_name_raw": ("Inactive Ingredient", "Ingredient Name"),
+    "ingredient_name_raw": ("INGREDIENT_NAME", "Inactive Ingredient", "Ingredient Name"),
     "unii": ("UNII",),
-    "cas_number": ("CAS Number",),
-    "route_raw": ("Route",),
-    "dosage_form_raw": ("Dosage Form",),
-    "potency_raw": ("Potency Amount", "Potency"),
-    "potency_unit_raw": ("Potency Unit", "Unit"),
-    # Not part of the official seven-column contract. Present in some
-    # exports; absent is normal, so these stay optional.
-    "mde_raw": ("Maximum Daily Exposure",),
-    "mde_unit_raw": ("MDE Unit",),
+    "cas_number": ("CAS_NUMBER", "CAS Number"),
+    "route_raw": ("ROUTE", "Route"),
+    "dosage_form_raw": ("DOSAGE_FORM", "Dosage Form"),
+    "potency_raw": ("POTENCY_AMOUNT", "Potency Amount", "Potency"),
+    "potency_unit_raw": ("POTENCY_UNIT", "Potency Unit", "Unit"),
+    "mde_raw": ("MAXIMUM_DAILY_EXPOSURE", "Maximum Daily Exposure"),
+    "mde_unit_raw": ("MAXIMUM_DAILY_EXPOSURE_UNIT", "MDE Unit"),
 }
 
 
@@ -95,9 +91,10 @@ def _first_present(row: dict, names: tuple[str, ...]) -> str:
 def fda_iid_adapter(rows: list[dict]) -> list[dict]:
     """Adapts rows from the official FDA IID export.
 
-    Official columns: Inactive Ingredient, Route, Dosage Form, CAS Number,
-    UNII, Potency Amount, Potency Unit. Older column spellings are accepted
-    as aliases -- see `_IID_COLUMN_ALIASES` for why. Absent optional columns
+    Official columns: INGREDIENT_NAME, ROUTE, DOSAGE_FORM, CAS_NUMBER, UNII,
+    POTENCY_AMOUNT, POTENCY_UNIT, MAXIMUM_DAILY_EXPOSURE,
+    MAXIMUM_DAILY_EXPOSURE_UNIT. Older column spellings are accepted as
+    aliases -- see `_IID_COLUMN_ALIASES` for why. Absent optional columns
     yield "", never a fabricated placeholder.
     """
     neutral = []

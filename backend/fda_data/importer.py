@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 from django.utils import timezone
@@ -331,6 +332,35 @@ def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[di
         release.save(update_fields=["imported_at", "updated_at"])
 
 
+#: The IID publishes amounts and units in separate columns, and every amount
+#: in the July 2026 file is a plain decimal ("0.5", "1200"). Anything else is
+#: kept as text and flagged, never guessed at.
+_IID_PLAIN_AMOUNT = re.compile(r"^[0-9]+(?:\.[0-9]+)?$")
+
+#: UNII placeholder the IID writes when an ingredient has no UNII (1,595 rows
+#: in the July 2026 file, across 819 different ingredient names). It is not an
+#: identifier: matching on it would merge all those ingredients into one.
+_IID_UNII_PLACEHOLDERS = {"", "NA"}
+
+
+def parse_iid_amount(text: str) -> tuple[Decimal | None, bool]:
+    """Return (amount, unparsed) for an IID amount column.
+
+    Blank -> (None, False): FDA stated no value. A plain decimal -> (amount,
+    False). Anything else -> (None, True): the caller keeps the text and flags
+    the row.
+    """
+    text = (text or "").strip()
+    if not text:
+        return None, False
+    if _IID_PLAIN_AMOUNT.match(text):
+        try:
+            return Decimal(text), False
+        except InvalidOperation:
+            return None, True
+    return None, True
+
+
 def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], actor) -> None:
     """Idempotent per (release, raw_row_checksum). Never forces a blank or
     unparseable potency/MDE value to zero -- calculability_status records
@@ -373,32 +403,40 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
                 dosage_form_normalized = lookup_dosage_form_mapping(
                     release.dataset_type, fields.get("dosage_form_raw", "")
                 )
-                potency = parse_strength(
-                    f"{fields.get('potency_raw', '')} {fields.get('potency_unit_raw', '')}".strip()
-                )
+                # Amount and unit are separate IID columns, so the amount is
+                # parsed on its own: joining them first made units such as
+                # "mg/5ml" unparseable and dropped a plain number with them.
+                potency_text = (fields.get("potency_raw") or "").strip()
+                potency_amount, potency_unparsed = parse_iid_amount(potency_text)
                 potency_unit = (
                     lookup_unit(fields.get("potency_unit_raw", ""))
                     if fields.get("potency_unit_raw")
                     else None
                 )
-                mde_raw = fields.get("mde_raw", "")
-                mde_amount = None
-                mde_unit = None
-                if mde_raw:
-                    mde_parsed = parse_strength(
-                        f"{mde_raw} {fields.get('mde_unit_raw', '')}".strip()
+                mde_text = (fields.get("mde_raw") or "").strip()
+                mde_amount, mde_unparsed = parse_iid_amount(mde_text)
+                mde_unit = (
+                    lookup_unit(fields.get("mde_unit_raw", ""))
+                    if mde_amount is not None and fields.get("mde_unit_raw")
+                    else None
+                )
+                unparsed = [
+                    f"{column} not parsed; kept as text: {text[:100]}"
+                    for column, text, flag in (
+                        ("POTENCY_AMOUNT", potency_text, potency_unparsed),
+                        ("MAXIMUM_DAILY_EXPOSURE", mde_text, mde_unparsed),
                     )
-                    if mde_parsed["status"] == "parsed":
-                        mde_amount = mde_parsed["amount"]
-                        mde_unit = lookup_unit(fields.get("mde_unit_raw", ""))
+                    if flag
+                ]
 
                 status = _determine_calculability(
                     ingredient=ingredient,
                     route_normalized=route_normalized,
                     dosage_form_normalized=dosage_form_normalized,
-                    potency_amount=potency["amount"] if potency["status"] == "parsed" else None,
+                    potency_amount=potency_amount,
                     potency_unit=potency_unit,
                     mde_amount=mde_amount,
+                    potency_unparsed=potency_unparsed,
                 )
 
                 record = IIDPrecedentRecord.objects.create(
@@ -409,10 +447,12 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
                     route_normalized=route_normalized,
                     dosage_form_raw=fields.get("dosage_form_raw", ""),
                     dosage_form_normalized=dosage_form_normalized,
-                    potency_amount=potency["amount"] if potency["status"] == "parsed" else None,
+                    potency_amount=potency_amount,
+                    potency_amount_raw=potency_text,
                     potency_unit_raw=fields.get("potency_unit_raw", ""),
                     potency_unit_normalized=potency_unit,
                     maximum_daily_exposure=mde_amount,
+                    mde_amount_raw=mde_text,
                     mde_unit_raw=fields.get("mde_unit_raw", ""),
                     mde_unit_normalized=mde_unit,
                     source_row_locator=locator,
@@ -426,11 +466,18 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
                     target_public_identifier=record.public_id,
                     result=(
                         FdaImportRowResultType.IMPORTED
-                        if status == IIDCalculabilityStatus.CALCULABLE
+                        if status == IIDCalculabilityStatus.CALCULABLE and not unparsed
                         else FdaImportRowResultType.REVIEW_REQUIRED
                     ),
                     reason_code=status,
+                    safe_detail="; ".join(unparsed),
                 )
+                if unparsed:
+                    logger.warning(
+                        "IID amount not parsed; kept as text (release=%s, row=%s)",
+                        release.public_id,
+                        locator,
+                    )
         except Exception as exc:
             FdaImportRowResult.objects.get_or_create(
                 release=release,
@@ -466,6 +513,8 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
 def _resolve_iid_ingredient(fields: dict) -> IIDIngredient | None:
     name = (fields.get("ingredient_name_raw") or "").strip()
     unii = (fields.get("unii") or "").strip()
+    if unii.upper() in _IID_UNII_PLACEHOLDERS:
+        unii = ""
     if not name:
         return None
     if unii:
@@ -492,6 +541,7 @@ def _determine_calculability(
     potency_amount,
     potency_unit,
     mde_amount,
+    potency_unparsed=False,
 ) -> str:
     if ingredient is None:
         return IIDCalculabilityStatus.INGREDIENT_AMBIGUOUS
@@ -500,6 +550,8 @@ def _determine_calculability(
     if dosage_form_normalized is None:
         return IIDCalculabilityStatus.DOSAGE_FORM_UNMAPPED
     if potency_amount is None:
+        if potency_unparsed:
+            return IIDCalculabilityStatus.POTENCY_UNPARSEABLE
         return IIDCalculabilityStatus.POTENCY_MISSING
     if potency_unit is None:
         return IIDCalculabilityStatus.POTENCY_UNIT_MISSING

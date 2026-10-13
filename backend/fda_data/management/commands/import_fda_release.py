@@ -8,7 +8,7 @@ This command is that step.
         --dataset-type orange_book_products \\
         --source-reference "FDA Orange Book, downloaded 2026-01-15 from fda.gov"
 
-    python manage.py import_fda_release iid.csv \\
+    python manage.py import_fda_release iig_july_2026.zip \\
         --dataset-type fda_iid \\
         --source-reference "FDA IID export, downloaded 2026-01-15 from fda.gov"
 
@@ -53,7 +53,8 @@ _PARSERS = {
 
 class Command(BaseCommand):
     help = (
-        "Parse and import an official FDA source file (Orange Book ZIP/Products.txt, or IID CSV)."
+        "Parse and import an official FDA source file (Orange Book ZIP/Products.txt, "
+        "or IID ZIP/IIR_OCOMM.csv)."
     )
 
     def add_arguments(self, parser):
