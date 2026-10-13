@@ -167,6 +167,46 @@ Rules:
 The third replaces the two inconsistent variants in the current tool ("Not sure" and
 "Not sure, require controlled").
 
+### Q8. Which IID limit does the checklist compare against: per unit or per day?
+
+**Status: proposed, pending iCretegy and regulatory reviewer confirmation.** Nothing
+described here is built.
+
+**What the FDA data shows** (FDA IID file of July 2026, `IIR_OCOMM.csv`, 9,071 rows):
+each row carries **either** a per-unit limit **or** a per-day limit, never both.
+- 3,805 rows give a **maximum potency per unit dose** (`POTENCY_AMOUNT` + `POTENCY_UNIT`,
+  e.g. 0.14 mg, 11 %w/w, 45 mg/5ml).
+- 4,059 rows give a **maximum daily exposure** (`MAXIMUM_DAILY_EXPOSURE`, always in mg in
+  this file).
+- 1,207 rows give neither (potency unit "NA" or "ADJ PH").
+
+**Proposed answer:** the IIG checklist (Q2) picks the check from what the matching IID
+row provides:
+
+| IID row has | Check | Formula | Input from the White Paper |
+|---|---|---|---|
+| Potency (per unit) | **Per-unit check** | amount of the ingredient per dosage unit vs the IID potency | Amount per unit, in the same unit as the IID value |
+| Maximum daily exposure (per day) | **Per-day check** | amount per unit (mg) × maximum dosage units per day (= C2) vs the IID maximum daily exposure (mg/day) | The product's maximum daily dose, structured (Q6) |
+| Neither | No comparison | — | Shown as "IID gives no numeric limit for this ingredient, route and dosage form" |
+
+Rules:
+- The result is shown as "at or below" / "above" the IID value, with both numbers, the
+  formula and the IID release date. It is **not** a statement that the formulation is
+  acceptable or approvable.
+- Units are compared only through REGX's governed unit table (Q4). A potency in a
+  different basis (%w/w, %w/v, mg/5ml) is compared only when the product's amount is
+  given on the same basis. Otherwise it is shown as "cannot compare", never as a result.
+- If the maximum daily dose is missing or not structured, the per-day check is shown as
+  "cannot compare: maximum daily dose needed", never skipped silently.
+- When several IID rows match (for example the Orange Book route "INJECTION"), each row
+  is checked and shown separately. No limit is picked automatically (see
+  `docs/TERMINOLOGY_VOCABULARY_DECISION.md`).
+
+**Why this matters now:** under REGX's current IID rule, a row with only a maximum daily
+exposure is marked `potency_missing` (not usable). If this answer is accepted, that rule
+changes so that such rows feed the per-day check. That is a separate engineering change
+after confirmation.
+
 ---
 
 ## Not included in this proposal
@@ -179,5 +219,5 @@ The third replaces the two inconsistent variants in the current tool ("Not sure"
 
 ## Please return
 
-For each of Q1–Q7: **Accept / Amend (with changes) / Reject**, plus the name of the
+For each of Q1–Q8: **Accept / Amend (with changes) / Reject**, plus the name of the
 iCretegy signatory for Q4. Development starts only after written confirmation.
