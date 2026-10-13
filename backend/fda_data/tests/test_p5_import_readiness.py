@@ -52,9 +52,9 @@ PRODUCTS_ROW = (
 PRODUCTS_TXT = f"{PRODUCTS_HEADER}\n{PRODUCTS_ROW}\n".encode()
 
 IID_CSV = (
-    b"Inactive Ingredient,Route,Dosage Form,CAS Number,UNII,"
-    b"Potency Amount,Potency Unit\n"
-    b"SYNTHETIC-STARCH,ORAL,TABLET,9005-25-8,O8232NY3SJ,50,MG\n"
+    b"INGREDIENT_NAME,ROUTE,DOSAGE_FORM,CAS_NUMBER,UNII,POTENCY_AMOUNT,POTENCY_UNIT,"
+    b"MAXIMUM_DAILY_EXPOSURE,MAXIMUM_DAILY_EXPOSURE_UNIT,RECORD_UPDATED\n"
+    b"SYNTHETIC-STARCH,ORAL,TABLET,9005258,O8232NY3SJ,50,MG,,,\n"
 )
 
 
@@ -298,14 +298,15 @@ class TestOrangeBookParser:
 
 
 class TestIidParser:
-    def test_parses_the_official_seven_columns(self):
+    def test_parses_the_official_columns(self):
         rows = parse_iid(IID_CSV, filename="iid.csv")
-        assert rows[0]["Inactive Ingredient"] == "SYNTHETIC-STARCH"
-        assert rows[0]["Potency Amount"] == "50"
-        assert rows[0]["Potency Unit"] == "MG"
+        assert rows[0]["INGREDIENT_NAME"] == "SYNTHETIC-STARCH"
+        assert rows[0]["POTENCY_AMOUNT"] == "50"
+        assert rows[0]["POTENCY_UNIT"] == "MG"
 
     @pytest.mark.parametrize(
-        "column", ["Inactive Ingredient", "Potency Amount", "Potency Unit", "UNII"]
+        "column",
+        ["INGREDIENT_NAME", "POTENCY_AMOUNT", "POTENCY_UNIT", "UNII", "MAXIMUM_DAILY_EXPOSURE"],
     )
     def test_missing_required_column_is_refused(self, column):
         text = IID_CSV.decode()
@@ -316,10 +317,12 @@ class TestIidParser:
         with pytest.raises(SourceFileError, match=column):
             parse_iid(f"{new_header}\n{new_row}\n".encode(), filename="iid.csv")
 
-    @pytest.mark.parametrize("column", ["Inactive Ingredient", "Potency Amount", "Potency Unit"])
+    @pytest.mark.parametrize("column", ["INGREDIENT_NAME", "ROUTE", "DOSAGE_FORM"])
     def test_empty_required_value_is_refused_not_blank_filled(self, column):
         """The old adapter used .get(col, ""), so a missing value became an
-        empty string and an IID precedent with no potency was stored."""
+        empty string. Potency is no longer required here: the real file leaves
+        it blank on rows that state a maximum daily exposure instead (see
+        test_iid_real_rows.py)."""
         text = IID_CSV.decode()
         header = text.splitlines()[0].split(",")
         values = text.splitlines()[1].split(",")
