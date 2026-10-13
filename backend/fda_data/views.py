@@ -138,6 +138,23 @@ class FdaReleaseListView(APIView):
         payload_bytes = json.dumps(rows, sort_keys=True, default=str).encode("utf-8")
         file_obj = io.BytesIO(payload_bytes)
 
+        # The same payload used to return the existing release with 201 after
+        # a no-op import, which looked like a successful new import.
+        duplicate = importer.find_imported_duplicate(data["dataset_type"], file_obj)
+        if duplicate:
+            return Response(
+                {
+                    "error_code": "duplicate_release",
+                    "detail": (
+                        "These exact rows are already imported as release "
+                        f"{duplicate.public_id} (status: {duplicate.status}). Nothing was changed."
+                    ),
+                    "existing_release_public_id": str(duplicate.public_id),
+                    "existing_release_status": duplicate.status,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         release = importer.register_release(
             dataset_type=data["dataset_type"],
             source_name=data["source_name"],

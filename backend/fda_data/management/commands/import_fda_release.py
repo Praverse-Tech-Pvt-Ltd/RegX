@@ -39,7 +39,7 @@ from fda_data.dispatch import (
     UnsupportedDatasetType,
     resolve_importer,
 )
-from fda_data.models import FDADatasetType, FDADataSourceRelease
+from fda_data.models import FDADatasetType, FdaImportRowResult
 
 #: dataset type -> (parser, parser identifier)
 _PARSERS = {
@@ -134,6 +134,20 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("\n--dry-run: nothing was written."))
             return
 
+        duplicate = importer.find_imported_duplicate(dataset_type, io.BytesIO(raw))
+        if duplicate:
+            # Re-importing the same bytes would change nothing and would not
+            # apply mappings approved since; it only looked like a new import.
+            results = FdaImportRowResult.objects.filter(release=duplicate).count()
+            self.stdout.write(
+                self.style.WARNING(
+                    f"\nRefused: these exact bytes are already imported as release "
+                    f"{duplicate.public_id} (status: {duplicate.status}, "
+                    f"{results} row results). Nothing was changed."
+                )
+            )
+            return
+
         with transaction.atomic():
             release = importer.register_release(
                 dataset_type=dataset_type,
@@ -148,22 +162,6 @@ class Command(BaseCommand):
                 parser_identifier=parser_identifier,
                 publication_date=publication_date,
             )
-
-            already = FDADataSourceRelease.objects.filter(pk=release.pk).values_list(
-                "record_count_imported", flat=True
-            )[0]
-            if already:
-                # register_release is idempotent on (dataset_type, source
-                # checksum). Re-importing the same bytes would double every
-                # row result and corrupt reconciliation.
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"\nThese exact bytes are already imported as release "
-                        f"{release.public_id} ({already} rows). Nothing to do."
-                    )
-                )
-                return
-
             import_rows(release, neutral, None)
 
         release.refresh_from_db()
