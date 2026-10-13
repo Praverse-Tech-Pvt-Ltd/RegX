@@ -25,6 +25,7 @@ wrong, and guessing wrong here means patent rows stored as products.
 
 from __future__ import annotations
 
+import datetime
 import io
 import pathlib
 
@@ -71,6 +72,12 @@ class Command(BaseCommand):
         parser.add_argument("--source-name", default="", help="Human label for the release.")
         parser.add_argument("--schema-version", default="")
         parser.add_argument(
+            "--publication-date",
+            default="",
+            help="The date FDA published this data (YYYY-MM-DD), e.g. the source page's "
+            "'content current as of' date. Recorded on the release; never inferred.",
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Parse and validate only. Nothing is written.",
@@ -79,6 +86,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dataset_type = options["dataset_type"]
         path = pathlib.Path(options["path"])
+        publication_date = None
+        if options["publication_date"]:
+            try:
+                publication_date = datetime.date.fromisoformat(options["publication_date"])
+            except ValueError:
+                raise CommandError(
+                    f"--publication-date must be YYYY-MM-DD, got {options['publication_date']!r}."
+                ) from None
 
         if not path.is_file():
             raise CommandError(f"No such file: {path}")
@@ -106,6 +121,8 @@ class Command(BaseCommand):
 
         self.stdout.write(f"  rows parsed        {len(rows)}")
         self.stdout.write(f"  parser             {parser_identifier}")
+        if publication_date:
+            self.stdout.write(f"  publication date   {publication_date.isoformat()}")
 
         neutral = adapter(rows)
         normalized_sha = sha256_payload({"rows": [n["fields"] for n in neutral]})
@@ -128,6 +145,7 @@ class Command(BaseCommand):
                 schema_version=options["schema_version"],
                 normalized_payload_sha256=normalized_sha,
                 parser_identifier=parser_identifier,
+                publication_date=publication_date,
             )
 
             already = FDADataSourceRelease.objects.filter(pk=release.pk).values_list(
