@@ -1684,4 +1684,7 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
 
 **Overview updated:** §2 (backend row), §10 (PRs), §11 (#10b merged, #10c PR #100, #15 empty-text extraction).
 
+- **CI on #100 (`9421302`), all green:** compose stack ✓, "Dependency locks match their inputs" ✓, lint/type-check/test ✓; merge state CLEAN. Not merged.
+- **This Work Log entry** is committed on #99's branch (`578baf4` and the follow-up commit), since the overview is tracked only there until #99 merges.
+
 **Working files:** session scratchpad (outside the repo). Services stopped at the end.
