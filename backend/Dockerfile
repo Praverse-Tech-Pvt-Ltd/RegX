@@ -12,8 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
+# base.txt is a lock file (scripts/lock_backend_deps.sh): every package, direct
+# and indirect, at an exact version with sha256 hashes. --require-hashes makes
+# pip refuse anything not in it; --no-deps stops it resolving anything extra.
 COPY requirements/base.txt requirements/base.txt
-RUN pip install -r requirements/base.txt
+RUN pip install --require-hashes --no-deps -r requirements/base.txt
 
 COPY . .
 

@@ -1,0 +1,10 @@
+# Input for test.txt. Edit THIS file, then run scripts/lock_backend_deps.sh
+# to regenerate test.txt (exact versions + hashes for every package, direct and indirect).
+-r base.in
+# Shared packages keep the versions locked in base.txt.
+-c base.txt
+pytest==8.3.5
+pytest-django==4.10.0
+pytest-cov==6.1.0
+factory-boy==3.3.3
+freezegun==1.5.1
