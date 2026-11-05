@@ -181,6 +181,7 @@ def import_orange_book_rows(release: FDADataSourceRelease, neutral_rows: list[di
         resource_id=str(release.public_id),
         payload={"row_count": len(neutral_rows)},
         actor_id=getattr(actor, "id", None),
+        actor_email=getattr(actor, "email", ""),
     )
     release.record_count_expected = len(neutral_rows)
     already_resulted = set(
@@ -370,6 +371,7 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
         resource_id=str(release.public_id),
         payload={"row_count": len(neutral_rows)},
         actor_id=getattr(actor, "id", None),
+        actor_email=getattr(actor, "email", ""),
     )
     release.record_count_expected = len(neutral_rows)
     already_resulted = set(

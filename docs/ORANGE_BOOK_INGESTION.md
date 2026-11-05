@@ -74,10 +74,15 @@ member; the column contract is identical.
 ## Importing a file
 
 ```bash
-python manage.py import_fda_release EOBZIP_2026_01.zip     --dataset-type orange_book_products     --source-reference "FDA Orange Book, downloaded 2026-01-15 from fda.gov"
+python manage.py import_fda_release EOBZIP_2026_01.zip     --dataset-type orange_book_products     --actor doer@example.com     --source-reference "FDA Orange Book, downloaded 2026-01-15 from fda.gov"
 
-python manage.py import_fda_release iid.csv     --dataset-type fda_iid     --source-reference "FDA IID export, downloaded 2026-01-15 from fda.gov"
+python manage.py import_fda_release iid.csv     --dataset-type fda_iid     --actor doer@example.com     --source-reference "FDA IID export, downloaded 2026-01-15 from fda.gov"
 ```
+
+`--actor` is mandatory: the email of an existing, active user holding
+`fda_data.import` (Doer) in an active tenant. It is recorded as the release's
+`imported_by` and on its audit events, and that user cannot approve or activate
+the release (`load_spl_terminology` takes the same option).
 
 `--dataset-type` is mandatory and never sniffed: `Products.txt` and
 `Patent.txt` are both tilde-delimited ASCII from the same archive, so guessing

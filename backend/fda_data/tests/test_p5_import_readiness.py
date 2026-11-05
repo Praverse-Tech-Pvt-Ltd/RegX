@@ -34,6 +34,7 @@ from fda_data.parsers import (
     parse_iid,
     parse_orange_book_products,
 )
+from fda_data.tests._loader import loader_email
 
 pytestmark = pytest.mark.django_db
 
@@ -381,6 +382,7 @@ class TestProvenance:
             str(path),
             dataset_type="orange_book_products",
             source_reference="Synthetic test fixture, not FDA data",
+            actor=loader_email(),
             stdout=out,
         )
         return FDADataSourceRelease.objects.get(), out.getvalue()
@@ -440,6 +442,7 @@ class TestFileImportIdempotency:
         args = {
             "dataset_type": "orange_book_products",
             "source_reference": "Synthetic test fixture",
+            "actor": loader_email(),
         }
         call_command("import_fda_release", str(path), stdout=io.StringIO(), **args)
         second = io.StringIO()
@@ -461,6 +464,7 @@ class TestFileImportIdempotency:
             str(path),
             dataset_type="orange_book_products",
             source_reference="Synthetic test fixture",
+            actor=loader_email(),
             dry_run=True,
             stdout=out,
         )

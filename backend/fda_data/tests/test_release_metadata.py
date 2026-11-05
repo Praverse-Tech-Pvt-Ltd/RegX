@@ -11,6 +11,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 
 from fda_data.models import FDADataSourceRelease
+from fda_data.tests._loader import loader_email
 
 PRODUCTS = Path(__file__).parent / "fixtures" / "orange_book" / "products_sample.txt"
 BASE = "/api/regx/v1/fda-data/releases/"
@@ -28,6 +29,8 @@ def _import(tmp_path, *extra, name="products.txt"):
         "orange_book_products",
         "--source-reference",
         REF,
+        "--actor",
+        loader_email(),
         *extra,
         stdout=out,
     )

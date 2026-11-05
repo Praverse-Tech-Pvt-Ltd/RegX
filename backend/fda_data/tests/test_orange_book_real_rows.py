@@ -30,6 +30,7 @@ from fda_data.models import (
     OrangeBookProduct,
 )
 from fda_data.parsers import SourceFileError, parse_orange_book_products
+from fda_data.tests._loader import loader_email
 
 FIXTURES = Path(__file__).parent / "fixtures" / "orange_book"
 PRODUCTS = (FIXTURES / "products_sample.txt").read_bytes()
@@ -56,6 +57,7 @@ def _import(tmp_path, data: bytes = PRODUCTS, name: str = "products.txt") -> FDA
         str(path),
         dataset_type="orange_book_products",
         source_reference="Test fixture: real rows from FDA EOBZIP_2026_08.zip",
+        actor=loader_email(),
         stdout=io.StringIO(),
     )
     return FDADataSourceRelease.objects.latest("created_at")

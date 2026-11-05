@@ -5,11 +5,11 @@ the step that turns a published FDA download into those rows lived nowhere.
 This command is that step.
 
     python manage.py import_fda_release EOBZIP_2026_01.zip \\
-        --dataset-type orange_book_products \\
+        --dataset-type orange_book_products --actor doer@example.com \\
         --source-reference "FDA Orange Book, downloaded 2026-01-15 from fda.gov"
 
     python manage.py import_fda_release iig_july_2026.zip \\
-        --dataset-type fda_iid \\
+        --dataset-type fda_iid --actor doer@example.com \\
         --source-reference "FDA IID export, downloaded 2026-01-15 from fda.gov"
 
 `--source-reference` is required and never inferred. A file whose columns
@@ -40,6 +40,7 @@ from fda_data.dispatch import (
     resolve_importer,
 )
 from fda_data.models import FDADatasetType, FDADataSourceRelease
+from fda_data.permissions import LoaderActorError, resolve_loader_actor
 
 #: dataset type -> (parser, parser identifier)
 _PARSERS = {
@@ -70,6 +71,13 @@ class Command(BaseCommand):
             required=True,
             help="Where these bytes actually came from. Recorded verbatim.",
         )
+        parser.add_argument(
+            "--actor",
+            required=True,
+            help="Email of the user doing this load. Must be an existing, active user "
+            "holding fda_data.import (Doer). Recorded on the release and its audit "
+            "events; that user cannot later approve or activate the release.",
+        )
         parser.add_argument("--source-name", default="", help="Human label for the release.")
         parser.add_argument("--schema-version", default="")
         parser.add_argument(
@@ -87,6 +95,10 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dataset_type = options["dataset_type"]
         path = pathlib.Path(options["path"])
+        try:
+            actor = resolve_loader_actor(options["actor"])
+        except LoaderActorError as exc:
+            raise CommandError(str(exc)) from None
         publication_date = None
         if options["publication_date"]:
             try:
@@ -147,6 +159,7 @@ class Command(BaseCommand):
                 normalized_payload_sha256=normalized_sha,
                 parser_identifier=parser_identifier,
                 publication_date=publication_date,
+                imported_by=actor,
             )
 
             already = FDADataSourceRelease.objects.filter(pk=release.pk).values_list(
@@ -164,12 +177,13 @@ class Command(BaseCommand):
                 )
                 return
 
-            import_rows(release, neutral, None)
+            import_rows(release, neutral, actor)
 
         release.refresh_from_db()
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS(f"Release {release.public_id} registered."))
         self.stdout.write(f"  status             {release.status}")
+        self.stdout.write(f"  loaded by          {actor.email}")
         self.stdout.write(f"  source sha256      {release.source_checksum_sha256[:16]}...")
         self.stdout.write(f"  extracted          {release.record_count_extracted}")
         self.stdout.write(f"  imported           {release.record_count_imported}")
