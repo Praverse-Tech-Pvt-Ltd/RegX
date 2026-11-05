@@ -22,7 +22,8 @@ DATASET TYPE IS NEVER GUESSED. `Products.txt` and `Patent.txt` are both
 tilde-delimited ASCII from the same archive; sniffing would eventually guess
 wrong, and guessing wrong here means patent rows stored as products.
 
-EXIT CODES: 0 imported (or --dry-run); 1 error; 2 refused because these exact
+EXIT CODES: 0 imported (or --dry-run); 1 error; 2 usage error (Django's argument
+parser, e.g. a missing required option); 3 refused because these exact
 bytes are already imported for this dataset type (nothing was changed).
 """
 
@@ -44,7 +45,7 @@ from fda_data.dispatch import (
 )
 from fda_data.models import FDADatasetType, FdaImportRowResult
 
-DUPLICATE_EXIT_CODE = 2
+DUPLICATE_EXIT_CODE = 3
 
 #: dataset type -> (parser, parser identifier)
 _PARSERS = {
@@ -143,8 +144,9 @@ class Command(BaseCommand):
         if duplicate:
             # Re-importing the same bytes would change nothing and would not
             # apply mappings approved since; it only looked like a new import.
-            # Exit code 2, distinct from errors (1), so a script can tell
-            # "refused as a duplicate" apart from "failed" and from success.
+            # Exit code 3: distinct from errors (1), from argument-parser usage
+            # errors (2) and from success, so a script can tell "refused as a
+            # duplicate" apart from all of them.
             results = FdaImportRowResult.objects.filter(release=duplicate).count()
             raise CommandError(
                 f"Refused: these exact bytes are already imported as release "

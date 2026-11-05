@@ -39,10 +39,10 @@ def _run(tmp_path, data: bytes, name: str, dataset_type: str) -> str:
 
 
 def _refused(tmp_path, data: bytes, name: str, dataset_type: str) -> str:
-    """A refused duplicate exits with code 2 (errors exit with 1)."""
+    """A refused duplicate exits with code 3 (errors 1, usage errors 2)."""
     with pytest.raises(CommandError) as exc:
         _run(tmp_path, data, name, dataset_type)
-    assert exc.value.returncode == 2
+    assert exc.value.returncode == 3
     return str(exc.value)
 
 

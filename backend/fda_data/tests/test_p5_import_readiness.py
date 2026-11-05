@@ -445,10 +445,10 @@ class TestFileImportIdempotency:
 
         call_command("import_fda_release", str(path), stdout=io.StringIO(), **args)
         # Contract changed on purpose: a refused duplicate now exits with
-        # code 2 (it used to print a notice and exit 0).
+        # code 3 (it used to print a notice and exit 0; 2 is argparse usage).
         with pytest.raises(CommandError, match="already imported") as exc:
             call_command("import_fda_release", str(path), stdout=io.StringIO(), **args)
-        assert exc.value.returncode == 2
+        assert exc.value.returncode == 3
 
         assert FDADataSourceRelease.objects.count() == 1
         # The row was not imported twice.
