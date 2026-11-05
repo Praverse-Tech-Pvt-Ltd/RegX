@@ -1,4 +1,14 @@
-"""Identity views: register, login, logout, csrf, MFA setup/verify/recovery."""
+"""Identity views: register, login, logout, csrf, MFA setup/verify/recovery.
+
+Login is two steps for a user with a verified MFA device: the password step
+(`login_view`) only records a short-lived "pending" marker in the session and
+answers `mfa_required: true`; the full session is granted by
+`login_mfa_view` after a valid TOTP code. Users without a verified device log
+in with the password alone, as before. Both steps count failures against the
+same per-account lockout (`login_lockout`).
+"""
+
+import time
 
 import pyotp
 from django.contrib.auth import login, logout
@@ -12,7 +22,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from . import login_lockout
-from .models import MFADevice, RecoveryCode
+from .models import MFADevice, RecoveryCode, User
 from .serializers import (
     LoginSerializer,
     MFARecoverySerializer,
@@ -23,6 +33,11 @@ from .serializers import (
 
 _MFA_LOCKOUT_THRESHOLD = 5
 _MFA_LOCKOUT_MINUTES = 15
+
+#: Session key holding the user who passed the password step but not yet MFA.
+_MFA_PENDING_KEY = "identity_mfa_pending"
+#: How long the password step stays valid while waiting for the TOTP code.
+_MFA_PENDING_SECONDS = 5 * 60
 
 
 @extend_schema(
@@ -56,9 +71,62 @@ def login_view(request):
     if not s.is_valid():
         login_lockout.record_failure(email)
         raise ValidationError(s.errors)
-    login_lockout.clear(email)
     user = s.validated_data["user"]
+    if _verified_device(user) is not None:
+        # The password alone is not enough for an enrolled user: no session.
+        # Any session already on this browser ends here too, so a pending
+        # login never rides on someone else's. The lockout counter is NOT
+        # cleared: it is cleared only once the code is accepted, so wrong
+        # codes and wrong passwords add up on the same counter.
+        logout(request)
+        request.session[_MFA_PENDING_KEY] = {
+            "user": str(user.public_id),
+            "at": time.time(),
+        }
+        # `email` + `mfa_required` keep company_site's shared login
+        # (AdminMaster/regx_auth.py) on its "refuse MFA accounts" branch.
+        return Response({"mfa_required": True, "mfa_pending": True, "email": user.email})
+    login_lockout.clear(email)
     login(request, user)
+    return Response(UserPublicSerializer(user).data)
+
+
+@extend_schema(tags=["auth"], request=MFAVerifySerializer, responses={200: UserPublicSerializer})
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def login_mfa_view(request):
+    """Second login step: a valid TOTP code turns a pending login into a session."""
+    pending = request.session.get(_MFA_PENDING_KEY)
+    user = None
+    if pending and time.time() - pending.get("at", 0) <= _MFA_PENDING_SECONDS:
+        user = User.objects.filter(public_id=pending.get("user"), is_active=True).first()
+    device = _verified_device(user) if user is not None else None
+    if device is None:
+        request.session.pop(_MFA_PENDING_KEY, None)
+        return Response(
+            {
+                "detail": "No sign-in is waiting for a code. Sign in with your password again.",
+                "error_code": "mfa_not_pending",
+            },
+            status=400,
+        )
+
+    login_lockout.check(user.email)
+
+    s = MFAVerifySerializer(data=request.data)
+    counter = _matching_counter(device, s.validated_data["code"]) if s.is_valid() else None
+    if counter is None or (
+        device.last_used_counter is not None and counter <= device.last_used_counter
+    ):
+        # Wrong, malformed or replayed code: counts toward the lockout.
+        login_lockout.record_failure(user.email)
+        return Response({"detail": "Invalid code.", "error_code": "mfa_invalid_code"}, status=400)
+
+    device.last_used_counter = counter
+    device.save(update_fields=["last_used_counter"])
+    login_lockout.clear(user.email)
+    request.session.pop(_MFA_PENDING_KEY, None)
+    login(request, user)  # rotates the session key
     return Response(UserPublicSerializer(user).data)
 
 
@@ -165,6 +233,21 @@ def mfa_recovery_view(request):
     return Response({"detail": "Recovery code accepted."})
 
 
+def _verified_device(user) -> MFADevice | None:
+    """The user's MFA device if enrolment was completed, else None."""
+    return MFADevice.objects.filter(user=user, is_verified=True).first()
+
+
+def _matching_counter(device: MFADevice, code: str) -> int | None:
+    """The TOTP time-step the code belongs to (current one +/- 1), or None."""
+    totp = pyotp.TOTP(device.get_secret())
+    now = _totp_counter()
+    for counter in (now, now - 1, now + 1):
+        if pyotp.utils.strings_equal(totp.at(counter * totp.interval), code):
+            return counter
+    return None
+
+
 def _is_locked(device: MFADevice) -> bool:
     if device.locked_until and device.locked_until > timezone.now():
         return True
@@ -173,6 +256,4 @@ def _is_locked(device: MFADevice) -> bool:
 
 def _totp_counter() -> int:
     """Return the current 30-second TOTP window index (unix // 30)."""
-    import time
-
     return int(time.time()) // 30
