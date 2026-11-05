@@ -1,0 +1,8 @@
+# Input for dev.txt. Edit THIS file, then run scripts/lock_backend_deps.sh
+# to regenerate dev.txt (exact versions + hashes for every package, direct and indirect).
+-r test.in
+# Shared packages keep the versions locked in test.txt.
+-c test.txt
+ruff==0.11.13
+import-linter==2.3
+detect-secrets==1.5.0
