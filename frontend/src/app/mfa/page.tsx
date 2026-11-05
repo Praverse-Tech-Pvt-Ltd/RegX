@@ -2,8 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { mfa, ApiError } from "@/lib/api";
+import { auth, ApiError } from "@/lib/api";
 import AuthLayout from "@/components/auth/AuthLayout";
+import { safeReturnTarget } from "@/lib/returnTarget";
 
 export default function MFAPage() {
   const router = useRouter();
@@ -16,8 +17,10 @@ export default function MFAPage() {
     setError(null);
     setLoading(true);
     try {
-      await mfa.verify(code);
-      router.push("/tenants");
+      // Second sign-in step: the password step at /signin left a pending
+      // login; a valid code turns it into a session.
+      await auth.loginMfa(code);
+      router.push(safeReturnTarget());
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);

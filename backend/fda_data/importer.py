@@ -50,6 +50,26 @@ from .terminology import (
 )
 
 
+def find_imported_duplicate(dataset_type: str, file_obj) -> FDADataSourceRelease | None:
+    """The existing release with these exact bytes, if anything was already
+    imported into it.
+
+    `register_release` is idempotent on (dataset_type, checksum): it hands back
+    the existing release rather than creating one. Callers must not then run
+    the import again. Any row result counts, not only `imported` ones: an IID
+    release whose rows are all `review_required` has `record_count_imported`
+    = 0, and the old check let the same file through a second time as a
+    silent no-op that looked like a fresh import.
+    """
+    checksum = compute_sha256(file_obj)
+    existing = FDADataSourceRelease.objects.filter(
+        dataset_type=dataset_type, source_checksum_sha256=checksum
+    ).first()
+    if existing and FdaImportRowResult.objects.filter(release=existing).exists():
+        return existing
+    return None
+
+
 def register_release(
     *,
     dataset_type: str,

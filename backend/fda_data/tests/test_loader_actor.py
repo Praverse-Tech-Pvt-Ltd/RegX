@@ -206,7 +206,8 @@ class TestLoaderCannotApproveOrActivate:
         release = _import_iid(tmp_path, doer_and_vp.email)
         both = _client(doer_and_vp, tenant_a)
         url = f"{RELEASES}{release.public_id}/"
-        assert both.post(url + "submit-review/", {}).status_code == 200
+        # The fixture IID rows are unmapped; the #93 guard needs explicit confirmation.
+        assert both.post(url + "submit-review/", {"confirm_unmapped": True}).status_code == 200
 
         resp = both.post(url + "approve/", {})
         assert resp.status_code == 403

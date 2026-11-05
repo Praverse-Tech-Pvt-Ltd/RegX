@@ -444,12 +444,16 @@ class TestFileImportIdempotency:
             "source_reference": "Synthetic test fixture",
             "actor": loader_email(),
         }
+        from django.core.management.base import CommandError
+
         call_command("import_fda_release", str(path), stdout=io.StringIO(), **args)
-        second = io.StringIO()
-        call_command("import_fda_release", str(path), stdout=second, **args)
+        # Contract changed on purpose: a refused duplicate now exits with
+        # code 3 (it used to print a notice and exit 0; 2 is argparse usage).
+        with pytest.raises(CommandError, match="already imported") as exc:
+            call_command("import_fda_release", str(path), stdout=io.StringIO(), **args)
+        assert exc.value.returncode == 3
 
         assert FDADataSourceRelease.objects.count() == 1
-        assert "already imported" in second.getvalue()
         # The row was not imported twice.
         assert OrangeBookProduct.objects.count() == 1
 

@@ -101,6 +101,13 @@ export interface UserProfile {
   created_at: string;
 }
 
+/** Password step for a user enrolled in MFA: no session yet, send the code. */
+export interface MfaPending {
+  mfa_required: true;
+  mfa_pending: true;
+  email: string;
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -117,9 +124,15 @@ export const auth = {
     }),
 
   login: (email: string, password: string) =>
-    apiRequest<UserProfile>("/api/regx/v1/auth/login/", {
+    apiRequest<UserProfile | MfaPending>("/api/regx/v1/auth/login/", {
       method: "POST",
       body: { email, password },
+    }),
+
+  loginMfa: (code: string) =>
+    apiRequest<UserProfile>("/api/regx/v1/auth/login/mfa/", {
+      method: "POST",
+      body: { code },
     }),
 
   logout: () =>

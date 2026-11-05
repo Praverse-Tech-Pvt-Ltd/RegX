@@ -16,7 +16,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import importer, lifecycle
+from . import importer, lifecycle, reresolve
 from .audit_events import FdaDataEvent, emit
 from .dispatch import SUPPORTED_IMPORTERS, UnsupportedDatasetType, resolve_importer
 from .mapping_transitions import MappingAction
@@ -138,6 +138,23 @@ class FdaReleaseListView(APIView):
         payload_bytes = json.dumps(rows, sort_keys=True, default=str).encode("utf-8")
         file_obj = io.BytesIO(payload_bytes)
 
+        # The same payload used to return the existing release with 201 after
+        # a no-op import, which looked like a successful new import.
+        duplicate = importer.find_imported_duplicate(data["dataset_type"], file_obj)
+        if duplicate:
+            return Response(
+                {
+                    "error_code": "duplicate_release",
+                    "detail": (
+                        "These exact rows are already imported as release "
+                        f"{duplicate.public_id} (status: {duplicate.status}). Nothing was changed."
+                    ),
+                    "existing_release_public_id": str(duplicate.public_id),
+                    "existing_release_status": duplicate.status,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
         release = importer.register_release(
             dataset_type=data["dataset_type"],
             source_name=data["source_name"],
@@ -203,10 +220,44 @@ class _ReleaseActionView(APIView):
 
 
 class FdaReleaseSubmitReviewView(_ReleaseActionView):
+    """Submitting an IID release whose records still lack a route or dosage-form
+    link needs `confirm_unmapped: true`. After submission the release can no
+    longer be re-resolved (`reresolve.py`), so those records stay unmatched for
+    the life of the release."""
+
     required_permission_class = CanImportFdaData
 
-    def run_action(self, release, user, data):
-        return lifecycle.submit_for_review(release, user)
+    def post(self, request, public_id):
+        release = _get_release_or_404(public_id)
+        serializer = ReviewActionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        unmapped = reresolve.count_unmapped(release)
+        if unmapped and not serializer.validated_data["confirm_unmapped"]:
+            return Response(
+                {
+                    "error_code": "unmapped_rows",
+                    "unmapped_count": unmapped,
+                    "detail": (
+                        f"{unmapped} record(s) have no route or dosage-form link. After "
+                        "submission they can no longer be re-resolved. Approve the missing "
+                        "mappings and run reresolve_terminology first, or resubmit with "
+                        '"confirm_unmapped": true.'
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        try:
+            updated = lifecycle.submit_for_review(
+                release,
+                request.user,
+                extra_payload={"unmapped_rows_confirmed": unmapped} if unmapped else None,
+            )
+        except lifecycle.InvalidTransition as exc:
+            raise ValidationError(str(exc)) from exc
+        body = FDADataSourceReleaseSerializer(updated).data
+        if unmapped:
+            body = {**body, "warning": f"Submitted with {unmapped} unmapped record(s)."}
+        return Response(body)
 
 
 class FdaReleaseApproveView(_ReleaseActionView):

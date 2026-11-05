@@ -47,7 +47,9 @@ def _actor_fields(user):
     return {"actor_id": getattr(user, "id", None), "actor_email": getattr(user, "email", "")}
 
 
-def submit_for_review(release: FDADataSourceRelease, actor) -> FDADataSourceRelease:
+def submit_for_review(
+    release: FDADataSourceRelease, actor, extra_payload: dict | None = None
+) -> FDADataSourceRelease:
     with transaction.atomic():
         locked = FDADataSourceRelease.objects.select_for_update().get(pk=release.pk)
         if locked.status not in (
@@ -63,7 +65,7 @@ def submit_for_review(release: FDADataSourceRelease, actor) -> FDADataSourceRele
         emit(
             event_type=FdaDataEvent.RELEASE_SUBMITTED_FOR_REVIEW,
             resource_id=str(locked.public_id),
-            payload={"dataset_type": locked.dataset_type},
+            payload={"dataset_type": locked.dataset_type, **(extra_payload or {})},
             **_actor_fields(actor),
         )
         return locked

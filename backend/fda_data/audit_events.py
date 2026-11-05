@@ -21,6 +21,8 @@ class FdaDataEvent:
     RELEASE_SUPERSEDED = "fda_data.release.superseded"
     RELEASE_REJECTED = "fda_data.release.rejected"
     RECONCILIATION_EXPORTED = "fda_data.reconciliation.exported"
+    RECORD_TERMINOLOGY_RERESOLVED = "fda_data.record.terminology_reresolved"
+    RELEASE_TERMINOLOGY_RERESOLVED = "fda_data.release.terminology_reresolved"
 
 
 def emit(
