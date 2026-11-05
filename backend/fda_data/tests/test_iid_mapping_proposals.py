@@ -27,6 +27,7 @@ from fda_data.models import (
     RouteMapping,
 )
 from fda_data.spl_terminology import load_snapshot
+from fda_data.tests._loader import loader_email
 
 FIXTURES = Path(__file__).parent / "fixtures"
 IID = (FIXTURES / "iid" / "iir_ocomm_sample.csv").read_bytes()
@@ -47,6 +48,7 @@ def _iid_release(tmp_path):
         str(path),
         dataset_type="fda_iid",
         source_reference="Test fixture: real FDA rows",
+        actor=loader_email(),
         stdout=io.StringIO(),
     )
     return FDADataSourceRelease.objects.get(dataset_type="fda_iid")

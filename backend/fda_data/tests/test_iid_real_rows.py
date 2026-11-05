@@ -42,6 +42,7 @@ from fda_data.models import (
     RouteMapping,
 )
 from fda_data.parsers import IID_REQUIRED_COLUMNS, SourceFileError, parse_iid
+from fda_data.tests._loader import loader_email
 
 from .conftest import make_release_file
 
@@ -69,6 +70,7 @@ def _import(tmp_path, data: bytes = RAW, name: str = "IIR_OCOMM.csv") -> FDAData
         str(path),
         dataset_type="fda_iid",
         source_reference="Test fixture: real rows from FDA iig_july_2026.zip",
+        actor=loader_email(),
         stdout=io.StringIO(),
     )
     return FDADataSourceRelease.objects.latest("created_at")

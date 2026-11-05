@@ -28,6 +28,7 @@ from fda_data.models import (
     RouteMapping,
 )
 from fda_data.reresolve import ReresolveRefused, count_unmapped, reresolve
+from fda_data.tests._loader import loader_email
 
 FIXTURES = Path(__file__).parent / "fixtures"
 IID = (FIXTURES / "iid" / "iir_ocomm_sample.csv").read_bytes()
@@ -43,6 +44,7 @@ def _import(tmp_path, data=IID, name="IIR_OCOMM.csv", dataset_type="fda_iid"):
         str(path),
         dataset_type=dataset_type,
         source_reference="Test fixture: real FDA rows",
+        actor=loader_email(),
         stdout=io.StringIO(),
     )
     return FDADataSourceRelease.objects.latest("created_at")

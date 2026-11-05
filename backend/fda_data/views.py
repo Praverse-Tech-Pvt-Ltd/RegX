@@ -208,6 +208,11 @@ class _ReleaseActionView(APIView):
             updated = self.run_action(release, request.user, serializer.validated_data)
         except lifecycle.InvalidTransition as exc:
             raise ValidationError(str(exc)) from exc
+        except lifecycle.SeparationOfDutiesError as exc:
+            return Response(
+                {"detail": str(exc), "error_code": exc.error_code},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return Response(FDADataSourceReleaseSerializer(updated).data)
 
     def run_action(self, release, user, data):

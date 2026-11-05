@@ -17,6 +17,7 @@ from django.core.management.base import CommandError
 
 from audit.models import AuditEvent
 from fda_data.models import FDADataSourceRelease, FdaImportRowResult
+from fda_data.tests._loader import loader_email
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PRODUCTS = (FIXTURES / "orange_book" / "products_sample.txt").read_bytes()
@@ -33,6 +34,7 @@ def _run(tmp_path, data: bytes, name: str, dataset_type: str) -> str:
         str(path),
         dataset_type=dataset_type,
         source_reference="Test fixture: real FDA rows",
+        actor=loader_email(),
         stdout=out,
     )
     return out.getvalue()

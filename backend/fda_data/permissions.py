@@ -119,3 +119,50 @@ class CanProposeSubstanceMapping(BasePermission):
         return has_fda_data_permission(
             request.user, tenant, PERM_IMPORT
         ) or has_fda_data_permission(request.user, tenant, PERM_REVIEW)
+
+
+# ---------------------------------------------------------------------------
+# Command-line loaders (import_fda_release, load_spl_terminology)
+# ---------------------------------------------------------------------------
+
+
+class LoaderActorError(Exception):
+    """The --actor given to a loader command cannot be recorded as the loader."""
+
+
+def holds_fda_data_permission_anywhere(user, codename: str) -> bool:
+    """True if the user holds `codename` through an active membership of an
+    active tenant. A command has no request tenant, and FDA data is
+    platform-level, so any such membership qualifies (same role map as the API)."""
+    from authorization.models import MembershipRole
+    from tenancy.models import Tenant
+
+    role_names = MembershipRole.objects.filter(
+        membership__user=user,
+        membership__is_active=True,
+        membership__tenant__status=Tenant.Status.ACTIVE,
+    ).values_list("role__name", flat=True)
+    return any(codename in ROLE_PERMISSIONS.get(name, []) for name in role_names)
+
+
+def resolve_loader_actor(email: str, codename: str = PERM_IMPORT):
+    """The existing, active user named by a loader's --actor, holding `codename`.
+
+    Recorded as the release's `imported_by` and on its audit events, so the
+    approve and activate steps can refuse that same person."""
+    from identity.models import User
+
+    email = (email or "").strip()
+    if not email:
+        raise LoaderActorError("--actor is required: the email of the user doing this load.")
+    user = User.objects.filter(email__iexact=email).first()
+    if user is None:
+        raise LoaderActorError(f"--actor {email}: no user with this email exists.")
+    if not user.is_active:
+        raise LoaderActorError(f"--actor {email}: this user is not active.")
+    if not holds_fda_data_permission_anywhere(user, codename):
+        raise LoaderActorError(
+            f"--actor {email}: this user does not hold '{codename}' (the Doer role) "
+            "in any active tenant, so cannot be recorded as the loader."
+        )
+    return user

@@ -26,6 +26,7 @@ from fda_data.models import (
     FDAReleaseStatus,
 )
 from fda_data.spl_terminology import SnapshotError, load_snapshot, parse_snapshot
+from fda_data.tests._loader import loader_email
 
 FIXTURES = Path(__file__).parent / "fixtures" / "spl"
 ROUTES = (FIXTURES / "route_administration_sample.csv").read_bytes()
@@ -189,6 +190,7 @@ class TestCommand:
             list="routes",
             page_date=extra.pop("page_date", "2021-10-29"),
             source_reference="FDA SPL route page, saved 2026-10-13",
+            actor=loader_email(),
             stdout=out,
             **extra,
         )
