@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from audit.models import AuditEvent
 from fda_data.models import FDADataSourceRelease, FdaImportRowResult
@@ -37,6 +38,14 @@ def _run(tmp_path, data: bytes, name: str, dataset_type: str) -> str:
     return out.getvalue()
 
 
+def _refused(tmp_path, data: bytes, name: str, dataset_type: str) -> str:
+    """A refused duplicate exits with code 2 (errors exit with 1)."""
+    with pytest.raises(CommandError) as exc:
+        _run(tmp_path, data, name, dataset_type)
+    assert exc.value.returncode == 2
+    return str(exc.value)
+
+
 def _snapshot(release):
     return (
         FDADataSourceRelease.objects.count(),
@@ -51,7 +60,7 @@ class TestCommandRefusesTheSameFile:
         _run(tmp_path, PRODUCTS, "products.txt", "orange_book_products")
         release = FDADataSourceRelease.objects.get()
         before = _snapshot(release)
-        out = _run(tmp_path, PRODUCTS, "products.txt", "orange_book_products")
+        out = _refused(tmp_path, PRODUCTS, "products.txt", "orange_book_products")
         assert "Refused" in out and str(release.public_id) in out
         assert f"status: {release.status}" in out
         assert _snapshot(release) == before
@@ -63,7 +72,7 @@ class TestCommandRefusesTheSameFile:
         assert release.record_count_imported == 0
         assert FdaImportRowResult.objects.filter(release=release).count() == 11
         before = _snapshot(release)
-        out = _run(tmp_path, IID, "IIR_OCOMM.csv", "fda_iid")
+        out = _refused(tmp_path, IID, "IIR_OCOMM.csv", "fda_iid")
         assert "Refused" in out and str(release.public_id) in out
         assert "registered." not in out  # no longer looks like a fresh import
         assert _snapshot(release) == before  # no extra audit event either
@@ -78,10 +87,9 @@ class TestCommandRefusesTheSameFile:
     def test_same_bytes_under_another_dataset_type_are_not_a_duplicate(self, tmp_path):
         """Duplicates are per dataset type; the parser still decides."""
         _run(tmp_path, PRODUCTS, "products.txt", "orange_book_products")
-        from django.core.management.base import CommandError
-
-        with pytest.raises(CommandError, match="missing required column"):
+        with pytest.raises(CommandError, match="missing required column") as exc:
             _run(tmp_path, PRODUCTS, "products.txt", "fda_iid")
+        assert exc.value.returncode == 1  # an error, not a refused duplicate
 
 
 @pytest.mark.django_db
