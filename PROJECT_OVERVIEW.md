@@ -67,7 +67,7 @@ The discovery prompt's "Context I have" section came back empty. Until someone f
 
 | Layer | Tech |
 |---|---|
-| Backend | Python 3.12 (`python:3.12-slim`), Django 5.2.18, DRF 3.18.3, drf-spectacular 0.28 (OpenAPI), django-csp, django-cors-headers, psycopg 3.2.6, Celery 5.4 + kombu 5.6.2 + redis-py 5.2.1, cryptography 50.0.2 (Fernet for MFA secrets), pyotp (TOTP), gunicorn 23. Document parsing: pypdf 6.20.0, python-docx, openpyxl, python-pptx, filetype. (Django/DRF/pypdf/cryptography from PR #79, merged; kombu pin from #95, merged.) **Dependencies locked with pip-tools** (PR [#98](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/98), open): `backend/requirements/*.in` inputs → `base.txt` / `test.txt` / `dev.txt` lock files with exact versions and sha256 hashes for all 50 runtime and 68 dev packages; Docker and CI install with `--require-hashes --no-deps`; regenerate with `scripts/lock_backend_deps.sh` |
+| Backend | Python 3.12 (`python:3.12-slim`), Django 5.2.18, DRF 3.18.3, drf-spectacular 0.28 (OpenAPI), django-csp, django-cors-headers, psycopg 3.2.6, Celery 5.4 + kombu 5.6.2 + redis-py 5.2.1, cryptography 50.0.2 (Fernet for MFA secrets), pyotp (TOTP), gunicorn 23. Document parsing: pypdf 6.20.0 (6.21.4 in PR #100, §11 #10c), python-docx, openpyxl, python-pptx, filetype. (Django/DRF/pypdf/cryptography from PR #79, merged; kombu pin from #95, merged.) **Dependencies locked with pip-tools** (PR [#98](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/98), merged): `backend/requirements/*.in` inputs → `base.txt` / `test.txt` / `dev.txt` lock files with exact versions and sha256 hashes for all 50 runtime and 68 dev packages; Docker and CI install with `--require-hashes --no-deps`; regenerate with `scripts/lock_backend_deps.sh` |
 | Backend dev | pytest 8.3.5, pytest-django, pytest-cov (gate 55%), factory-boy, freezegun, ruff 0.11.13, import-linter 2.3 (16 layer contracts), detect-secrets |
 | Frontend | Next.js **15.5.27** on PR [#78](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/78) (regx-main is still on 15.1.0 until it merges) (App Router, standalone output), React 19.2, TypeScript 5.9. No UI library. Vitest 3 + Testing Library + jest-axe. Playwright 1.61 + axe-core |
 | Data | PostgreSQL 16 (REGX). Redis 7 (Celery broker, cache, sessions). SQLite (company_site only) |
@@ -481,7 +481,7 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
   - No stashes.
   - The previous branch `regx/feat/legacy-port-and-sso` is kept locally; it is fully merged.
 - **PRs:** #49–#97 all merged. #82–#87 on 2026-10-13 05:58–05:59 UTC; #88–#91 on 2026-10-13 08:53–08:54 UTC; **#92–#97 on 2026-11-05** (owner). `regx-main` is now `5a4bc36`.
-- **Open PR (2026-11-05):** [#98](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/98) `regx/chore/pip-tools-lock` (dependency lock, §11 #10b).
+- **PRs #98 merged (2026-11-05).** Open: [#99](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/99) `regx/docs/track-claude-md-and-overview` (docs only). [#100](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/100) `regx/fix/pypdf-upgrade` (§11 #10c).
 - **Branches (2026-11-05):** the merged branches of #88–#91 and of #92–#97 (including #95 `regx/fix/pin-kombu`) are deleted locally and on GitHub, tips verified in `regx-main` first (`branch-cleanup/BRANCH_INVENTORY.md`). **GitHub: 2 branches (`main`, `regx-main`). Local: those 2 plus `regx/chore/pip-tools-lock`.**
 - **Branch inventory (2026-10-12, before cleanup):** 14 local and 88 remote branches, 91 distinct names.
   - KEEP 5 · SAFE TO DELETE 79 · REVIEW 7. Details are in `branch-cleanup/BRANCH_INVENTORY.md` and `branch-cleanup/restore.sh` (both outside git).
@@ -611,12 +611,12 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
     - **Fix:** PR [#95](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/95) (`regx/fix/pin-kombu`, `796761a`) pins `kombu==5.6.2`. **MERGED 2026-11-05** (`regx-main` = `4b942a5`; confirmed on GitHub before acting). Earlier the same day it was reported merged while still open; the merge was then watched for and acted on once GitHub showed it. Locally, a clean image build with the pin starts a worker that reports `ready`. #92, #93, #94, #96 and #97 were then updated from `regx-main` by a merge commit each (no force-push) so CI re-ran with the pin. **All checks green on all five** (Work Log, 2026-11-05 second session); none merged yet.
     - Root cause is #10b.
 10b. **Only direct backend dependencies are pinned; indirect ones float** [Verified 2026-11-05].
-    - **Status 2026-11-05: BUILT, PR [#98](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/98) (`regx/chore/pip-tools-lock`, `1fc8f52`, from `regx-main@5a4bc36`), open, not merged.** Built as proposed below, with these specifics:
+    - **Status: MERGED 2026-11-05** as PR [#98](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/98) (`369b9c3`); branch deleted. All four CI checks green, including the new "Dependency locks match their inputs". Built as proposed below, with these specifics:
       - `backend/requirements/{base,test,dev}.in` are the old hand-edited files (`test.in` and `dev.in` constrained by the lock below them, so shared packages match). `base.txt` 50 packages / `test.txt` 59 / `dev.txt` 68, all with sha256 hashes. pip-tools 7.4.1 in `python:3.12-slim` (Python 3.12.16, pip 25.0.1, as the image).
       - **No version changed.** The locks were seeded from a fresh `--no-cache` build of `regx-main` (pip-compile keeps versions already locked). Every locked version equals what that image installs (50/50 runtime, 68/68 dev; 0 differences). kombu 5.6.2, redis 5.2.1, Django 5.2.18, DRF 3.18.3, pypdf 6.20.0, cryptography 50.0.2, celery 5.4.0 all kept. A second run changes nothing.
       - `backend/Dockerfile` and `.github/workflows/backend.yml` install with `--require-hashes --no-deps`. New CI job "Dependency locks match their inputs" regenerates the locks and fails on a diff. `scripts/lock_backend_deps.sh` (one command, Docker). Documented in `CLAUDE.md` "Commands".
       - **Proof:** clean `--no-cache` image build installs exactly the baseline set; Celery worker logs `Connected to redis` and `ready`, answers `inspect ping` with pong; `dev.txt` installs hash-checked with `pip check` clean; full backend suite 4,230 passed / 2 skipped; pip-audit identical before and after (#10c).
-10c. **pypdf 6.20.0 now has 16 known advisories** [Verified 2026-11-05, pip-audit]. PR #79 moved pypdf to 6.20.0 when it had none; since then 16 GHSA advisories were published against it, fixed between 6.20.1 and 6.21.4. **pypdf parses user uploads** (`documents/tasks.py`), so this matters. Also open: pytest 8.3.5 (`PYSEC-2026-1845`, fixed in 9.0.3; dev only). Not upgraded in the lock PR, by instruction. **Status:** owner approved the upgrade (2026-11-05) as `regx/fix/pypdf-upgrade` once #98 is merged; not started yet. **Next:** a separate PR running `scripts/lock_backend_deps.sh --upgrade-package pypdf==6.21.4` (or newer), with the document-parsing tests and a real-PDF upload check.
+10c. **pypdf 6.20.0 now has 16 known advisories** [Verified 2026-11-05, pip-audit]. PR #79 moved pypdf to 6.20.0 when it had none; since then 16 GHSA advisories were published against it, fixed between 6.20.1 and 6.21.4. **pypdf parses user uploads** (`documents/tasks.py`), so this matters. Also open: pytest 8.3.5 (`PYSEC-2026-1845`, fixed in 9.0.3; dev only). Not upgraded in the lock PR, by instruction. **Status 2026-11-05: PR [#100](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/100) (`regx/fix/pypdf-upgrade`, `9421302`, from `regx-main@369b9c3`), open, not merged.** pypdf 6.20.0 → **6.21.4** (newest; fixes all 16) via `base.in` + `scripts/lock_backend_deps.sh`; it is the **only** version change in all three locks (no hash change for any other package; pypdf has no runtime dependencies on Python 3.12). pip-audit: `base.txt` 16 → **0**, `dev.txt` 17 → 1 (pytest only: its fix 9.0.3 is a major upgrade, so excluded by instruction). Clean build, worker ready, live 5-page PDF upload through the documents API: all pages extracted, text **identical page by page** to pypdf 6.20.0. Full suite 4,230 passed / 2 skipped. **Next:** a separate PR running `scripts/lock_backend_deps.sh --upgrade-package pypdf==6.21.4` (or newer), with the document-parsing tests and a real-PDF upload check.
 10d. **company_site dependencies are not locked** (follow-up to #10b, out of scope of the lock PR). Its requirements are unpinned (§11 #9), so its builds drift the same way REGX's did. Same approach would apply (`.in` + hashed lock + script + CI check), but company_site has no tests, so a lock must be checked by hand against a working image first. The runtime image installs 50 packages; `base.txt` pins 19. About 31 (e.g. `kombu`, `billiard`, `vine`, `amqp`, `asgiref`, `sqlparse`) resolve to whatever is newest on build day, so two builds of the same commit can differ. The Dockerfile runs `pip install -r requirements/base.txt`; CI runs `pip install -r requirements/dev.txt`. **Proposal (not built):**
     - **Tool:** `pip-tools`. Keep the human-edited files as inputs (rename to `base.in`, `test.in`, `dev.in`, same content plus `-c` links), and generate fully pinned lock files `base.txt`, `test.txt`, `dev.txt` with `pip-compile --generate-hashes --strip-extras`. Every package, direct and indirect, gets an exact version and a sha256 hash. Compile on Linux with Python 3.12 (inside the backend image) so platform markers match production.
     - **Docker:** unchanged command, but install with `pip install --require-hashes --no-deps -r requirements/base.txt`. A missing or changed package then fails the build instead of silently installing something else.
@@ -637,7 +637,18 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 15. Errors are swallowed:
     - `documents/tasks.py` (5× `except Exception: pass` in text extraction)
     - 9 `_tenant()` helpers return None on any exception
-16. Import-linter gaps: the 4 ported apps are outside `root_packages`, so no layering contract covers them.
+    - **A PDF with no extractable text is reported as a full success** [Verified live 2026-11-05, pypdf 6.21.4 build]. A 2-page image-only PDF (text rendered as pixels, like a scanned 483; generated, since the two real FDA PDFs were never placed in `D:/Praverse/data/test-pdfs/` and the owner chose to skip them) uploaded through `POST /documents/`:
+      - version `processing_status` **`complete`**, `failure_code` empty, processing job `success`;
+      - 2 page locators, **0 characters on each**;
+      - audit trail `document.version.created` → `scan.queued` → `scan.complete` → `processing.started` → **`processing.complete`**; no event, flag, field or log line says no text was extracted;
+      - the same holds when `page.extract_text()` raises: `_process_pdf` in `backend/documents/tasks.py` catches it with `except Exception: pass` and stores an empty page.
+      - **Effect:** a scanned 483 looks processed but is invisible to anything that searches or reads extracted text (gap analysis, future AI features), and no one is told.
+    - **Proposal (not built):**
+      - record per page why text is empty: `extraction_outcome` in the page locator's `structured_metadata` = `text` / `no_text_layer` (page has images but no text) / `extract_error` (exception, with the exception class only);
+      - add a version-level summary to `source_metadata`: `pages_with_text`, `pages_without_text`, `pages_with_errors`;
+      - when no page has text, keep `processing_status = complete` (the file *was* processed) but set a new field or flag `text_extraction = none` with the reason "no extractable text, likely scanned", emit `document.processing.no_text` (audited), and show a warning badge on the document page; partial cases ("3 of 12 pages have no text") get the same treatment at page level;
+      - log a WARNING (no document content) instead of the silent `pass`;
+      - **OCR:** not in the SOW as a named feature, and it would add a heavy dependency (e.g. Tesseract in the image, or a paid cloud OCR API, which is an owner decision on cost and data handling). Recommended: build the detection and warning first (S–M); treat OCR as a separate owner decision, since 483s are often scanned and §2.6/§2.8 depend on their text.16. Import-linter gaps: the 4 ported apps are outside `root_packages`, so no layering contract covers them.
 17. Docs drift:
     - The `ARCHITECTURE.md` module table lists 13 of 25 apps.
     - `README.md` claims "shares no code with legacy" while `company_site/` is in the tree.
@@ -1639,3 +1650,38 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
 **Overview updated:** §2 (backend row), §10 (PRs, branches), §11 (#10b status, new #10c pypdf, new #10d company_site lock).
 
 **Working files:** session scratchpad (outside the repo). Images `regx-baseline` (throwaway) and the rebuilt compose images. Services stopped at the end.
+
+### 2026-11-05 (fifth session) — CLAUDE.md and overview tracked (#99), pypdf 6.21.4 (Claude Code)
+
+**Session start rule:** deleted `review-handoff/` and `review-handoff.zip` without reading them.
+
+**Gate:** confirmed on GitHub that #98 is merged (`369b9c3`); deleted its branch `regx/chore/pip-tools-lock` locally and on GitHub (tip in `regx-main`).
+
+**Step 1: track `CLAUDE.md` and `PROJECT_OVERVIEW.md`.** Branch `regx/docs/track-claude-md-and-overview` from `regx-main@369b9c3`, commit `6303a3c`, PR [#99](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/99) (docs only, not merged).
+- **Secret scan before committing** (both files): `sk-…` keys (one hit, the words "risk-evaluation-" in a sentence), AWS keys, GitHub tokens, private-key blocks, password/secret/token/api_key assignments with a value, long base64/hex strings (only paths and git SHAs), email addresses (only `admin@praverse.local`, `sso.vp@praverse.test`, `lockcheck@example.invalid`), and the throwaway live-check password of the first session (absent). **Nothing to redact.** Past leaks are described by file and line only. People are named by role or GitHub username, with no contact details.
+- `.gitignore` now ignores `/review-handoff/`, `/review-handoff.zip` and `/branch-cleanup/` for every clone (they were only in this clone's `.git/info/exclude`).
+- `CLAUDE.md`: notes that both files are tracked, so a Work Log entry or rule change is a commit (session branch, or a small docs PR); the hand-off rule points at `.gitignore`.
+- **Working-copy note:** on `regx-main` (until #99 merges) both files are still untracked in this checkout. Overview updates from later sessions are pushed to the #99 branch too, so the PR stays current.
+
+**Step 2: pypdf upgrade (§11 #10c).** Branch `regx/fix/pypdf-upgrade` from `regx-main@369b9c3`, commit `9421302`. After the owner reviewed the diff and results: **pushed, PR [#100](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/100) open, not merged.**
+- `backend/requirements/base.in`: `pypdf==6.20.0` → `pypdf==6.21.4` (newest release; the highest fix version among the 16 advisories is 6.21.4). Ran `scripts/lock_backend_deps.sh`.
+- **Every version change in the locks** (`backend/requirements/base.txt`, `test.txt`, `dev.txt`): pypdf 6.20.0 → 6.21.4 in each; **nothing else** changed (no version, no hash). pypdf has no runtime dependencies on Python 3.12, so none were added. Re-running the script changes nothing, so the CI lock check passes.
+- **pytest not included:** its fix (PYSEC-2026-1845) is 9.0.3, a major upgrade from 8.3.5, not a patch.
+- **pip-audit 2.9.0 (`--require-hashes`):** `base.txt` before 16 (pypdf) → after **0**; `dev.txt` before 17 → after 1 (pytest 8.3.5 only).
+- **Clean `--no-cache` build** of backend and celery: hash-checked install; installed set equals the pre-upgrade baseline except pypdf 6.21.4. Worker: `Connected to redis://redis:6379/0`, `celery@… ready.`, `inspect ping` → pong; both containers import pypdf 6.21.4.
+- **Live PDF check** (local stack via nginx `:8080`, User-Agent `REGX-dev-research`): a 5-page PDF with known text per page (embedded TrueType font, page 4 in two columns; made with matplotlib from the repo `.venv`), uploaded through `POST /api/regx/v1/documents/` by a throwaway `tenant_admin` in a throwaway tenant, before (images with pypdf 6.20.0) and after (6.21.4). Both: 201, scan `clean`, processing `complete`, 5 page locators (`Page 1`–`Page 5`, `page_number` 1–5), every expected line found on its page. **Extracted text identical page by page** (5/5; 159/104/114/111/50 characters). Page 4 reads row by row across the two columns in both versions. The throwaway tenant, its 2 documents and the user were deleted afterwards.
+- `backend/documents/tasks.py` (`_process_pdf`) is the code path exercised: `pypdf.PdfReader`, one page locator per page with `extract_text()`.
+- **Full backend suite: 4,230 passed / 2 skipped, 0 failed.**
+
+**Step 3: real-world PDF check.** The two public FDA PDFs were not in `D:/Praverse/data/test-pdfs/` (the folder does not exist; no PDFs under `D:/Praverse/data`). **Owner: skip the real PDFs.** The scanned-document question was answered instead with a generated 2-page image-only PDF (text drawn as pixels; pypdf reads 0 characters and 2 images per page), uploaded through the documents API on the pypdf 6.21.4 stack:
+  - pages detected 2; characters per page 0 / 0; first 200 characters of pages 1 and 2: empty;
+  - final status: scan `clean`, processing **`complete`**, `failure_code` empty, processing job `success`;
+  - audit events: `document.version.created`, `document.scan.queued`, `document.scan.complete`, `document.processing.started`, `document.processing.complete`; no event, field, flag or log line says no text was extracted (the only celery warning is the stub scanner's);
+  - findings and a proposal (not built) added to §11 #15; OCR left as an owner decision.
+  - Throwaway tenant, its documents and user deleted afterwards (both live checks).
+
+**Not done (per the prompt):** nothing merged; no mapping approvals, no re-resolve, no Phase 3.
+
+**Overview updated:** §2 (backend row), §10 (PRs), §11 (#10b merged, #10c PR #100, #15 empty-text extraction).
+
+**Working files:** session scratchpad (outside the repo). Services stopped at the end.
