@@ -128,3 +128,9 @@ frontend/screenshots/
 
 # Client contract documents — not for the repo
 SOW - Praverse*.pdf
+
+# Per-session review hand-off and branch-cleanup working files (see CLAUDE.md);
+# rebuilt locally every session, never committed.
+/review-handoff/
+/review-handoff.zip
+/branch-cleanup/
