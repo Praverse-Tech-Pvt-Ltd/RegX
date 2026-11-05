@@ -21,6 +21,10 @@ bytes actually came from.
 DATASET TYPE IS NEVER GUESSED. `Products.txt` and `Patent.txt` are both
 tilde-delimited ASCII from the same archive; sniffing would eventually guess
 wrong, and guessing wrong here means patent rows stored as products.
+
+EXIT CODES: 0 imported (or --dry-run); 1 error; 2 usage error (Django's argument
+parser, e.g. a missing required option); 3 refused because these exact
+bytes are already imported for this dataset type (nothing was changed).
 """
 
 from __future__ import annotations
@@ -39,7 +43,9 @@ from fda_data.dispatch import (
     UnsupportedDatasetType,
     resolve_importer,
 )
-from fda_data.models import FDADatasetType, FDADataSourceRelease
+from fda_data.models import FDADatasetType, FdaImportRowResult
+
+DUPLICATE_EXIT_CODE = 3
 
 #: dataset type -> (parser, parser identifier)
 _PARSERS = {
@@ -134,6 +140,21 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("\n--dry-run: nothing was written."))
             return
 
+        duplicate = importer.find_imported_duplicate(dataset_type, io.BytesIO(raw))
+        if duplicate:
+            # Re-importing the same bytes would change nothing and would not
+            # apply mappings approved since; it only looked like a new import.
+            # Exit code 3: distinct from errors (1), from argument-parser usage
+            # errors (2) and from success, so a script can tell "refused as a
+            # duplicate" apart from all of them.
+            results = FdaImportRowResult.objects.filter(release=duplicate).count()
+            raise CommandError(
+                f"Refused: these exact bytes are already imported as release "
+                f"{duplicate.public_id} (status: {duplicate.status}, "
+                f"{results} row results). Nothing was changed.",
+                returncode=DUPLICATE_EXIT_CODE,
+            )
+
         with transaction.atomic():
             release = importer.register_release(
                 dataset_type=dataset_type,
@@ -148,22 +169,6 @@ class Command(BaseCommand):
                 parser_identifier=parser_identifier,
                 publication_date=publication_date,
             )
-
-            already = FDADataSourceRelease.objects.filter(pk=release.pk).values_list(
-                "record_count_imported", flat=True
-            )[0]
-            if already:
-                # register_release is idempotent on (dataset_type, source
-                # checksum). Re-importing the same bytes would double every
-                # row result and corrupt reconciliation.
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"\nThese exact bytes are already imported as release "
-                        f"{release.public_id} ({already} rows). Nothing to do."
-                    )
-                )
-                return
-
             import_rows(release, neutral, None)
 
         release.refresh_from_db()
