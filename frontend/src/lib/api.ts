@@ -166,12 +166,18 @@ export type ScanStatus =
   | "quarantined";
 export type ProcessingStatus = "pending" | "processing" | "complete" | "failed" | "skipped";
 
-/** PDF text-extraction summary for one upload (null for other formats). */
+/**
+ * Text-extraction summary for one upload (PDF, Word, Excel, PowerPoint).
+ * Counts keep the PDF key names; for Office files `unit` says what they count.
+ */
 export interface TextExtractionSummary {
+  unit?: "slide" | "sheet" | "paragraph or table";
   total_pages: number;
   pages_with_text: number;
   pages_without_text: number;
   pages_failed: number;
+  /** Units whose text was cut at the 10,000-character cap (see locator metadata). */
+  pages_truncated?: number;
   result: "complete" | "partial" | "none";
 }
 
@@ -182,6 +188,7 @@ export interface TextExtractionWarning {
   message: string;
   pages_without_text?: number;
   total_pages?: number;
+  unit?: "slide" | "sheet" | "paragraph or table";
 }
 
 export interface DocumentVersion {
