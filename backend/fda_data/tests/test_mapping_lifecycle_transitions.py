@@ -367,9 +367,7 @@ class TestConcurrentApproval:
         from tenancy.models import TenantMembership
 
         membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp_user)
-        role, _ = Role.objects.get_or_create(
-            tenant=tenant_a, name="vp", defaults={"is_system": True}
-        )
+        role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
         MembershipRole.objects.get_or_create(membership=membership, role=role)
 
         mapping = SubstanceSynonymMapping.objects.create(

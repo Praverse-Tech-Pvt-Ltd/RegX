@@ -18,7 +18,7 @@ def doer_membership(db, user, tenant):
     from tenancy.models import TenantMembership
 
     mem, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
-    role, _ = Role.objects.get_or_create(name="doer", tenant=tenant, defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(name="doer", tenant=None, defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=mem, role=role)
     return mem
 

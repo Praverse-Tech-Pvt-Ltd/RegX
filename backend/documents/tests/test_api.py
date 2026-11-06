@@ -229,7 +229,7 @@ class TestCrossTenantIsolation:
 
         mem_b, _ = TenantMembership.objects.get_or_create(tenant=tenant_b, user=user_b)
         role_b, _ = Role.objects.get_or_create(
-            name="doer", tenant=tenant_b, defaults={"is_system": True}
+            name="doer", tenant=None, defaults={"is_system": True}
         )
         MembershipRole.objects.get_or_create(membership=mem_b, role=role_b)
 
@@ -262,7 +262,7 @@ class TestCrossTenantIsolation:
 
         mem_b, _ = TenantMembership.objects.get_or_create(tenant=tenant_b, user=user_b)
         role_b, _ = Role.objects.get_or_create(
-            name="doer", tenant=tenant_b, defaults={"is_system": True}
+            name="doer", tenant=None, defaults={"is_system": True}
         )
         MembershipRole.objects.get_or_create(membership=mem_b, role=role_b)
 

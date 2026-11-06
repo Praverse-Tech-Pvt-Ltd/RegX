@@ -24,7 +24,7 @@ def loader_email() -> str:
         )
         membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
         role, _ = Role.objects.get_or_create(
-            tenant=tenant, name=Role.BuiltIn.DOER, defaults={"is_system": True}
+            tenant=None, name=Role.BuiltIn.DOER, defaults={"is_system": True}
         )
         MembershipRole.objects.get_or_create(membership=membership, role=role)
     return LOADER_EMAIL

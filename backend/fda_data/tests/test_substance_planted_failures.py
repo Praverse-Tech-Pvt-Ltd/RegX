@@ -180,7 +180,7 @@ def test_s4_self_approval_blocked(tenant_a, user_a, vp_membership_factory=None):
     User = get_user_model()
     vp = User.objects.create_user(email="vp-s4@example.com", password="x", full_name="VP")
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     mapping = SubstanceSynonymMapping.objects.create(
@@ -247,7 +247,7 @@ def test_s5_doer_cannot_approve_substance_mapping(tenant_a, user_a, doer_members
     User = get_user_model()
     vp = User.objects.create_user(email="vp-s5@example.com", password="x", full_name="VP")
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
     vp_client = _client_for(vp, tenant_a)
     resp2 = vp_client.post(
@@ -269,7 +269,7 @@ def test_s6_affected_records_never_leak_storage_path(tenant_a, user_a, vp_member
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=user_a)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     release = FDADataSourceRelease.objects.create(
@@ -334,7 +334,7 @@ def test_s7_affected_records_never_leak_numeric_id(tenant_a, user_a):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=user_a)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     release = FDADataSourceRelease.objects.create(
@@ -395,7 +395,7 @@ def test_s8_affected_records_never_cross_release(tenant_a, user_a):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=user_a)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     release_a = FDADataSourceRelease.objects.create(
