@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CompanyNavbar from "./CompanyNavbar";
 import RegxSidebar from "./RegxSidebar";
+import MfaEnrolmentBanner from "./MfaEnrolmentBanner";
 
 /**
  * The company /ratools/ shell, reproduced for the REGX operational pages.
@@ -62,6 +63,7 @@ export default function RegxShell({ children }: { children: React.ReactNode }) {
               flexGrow: 1,
             }}
           >
+            <MfaEnrolmentBanner />
             {children}
           </div>
         </div>

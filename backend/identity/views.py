@@ -1,4 +1,4 @@
-"""Identity views: register, login, logout, csrf, MFA setup/verify/recovery.
+"""Identity views: login, logout, csrf, MFA setup/verify/recovery; registration refused.
 
 Login is two steps for a user with a verified MFA device: the password step
 (`login_view`) only records a short-lived "pending" marker in the session and
@@ -27,7 +27,6 @@ from .serializers import (
     LoginSerializer,
     MFARecoverySerializer,
     MFAVerifySerializer,
-    RegisterSerializer,
     UserPublicSerializer,
 )
 
@@ -51,14 +50,23 @@ def csrf_view(request):
     return Response({"csrfToken": get_token(request)})
 
 
-@extend_schema(tags=["auth"], request=RegisterSerializer, responses={201: UserPublicSerializer})
+@extend_schema(tags=["auth"], responses={403: None})
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register_view(request):
-    s = RegisterSerializer(data=request.data)
-    s.is_valid(raise_exception=True)
-    user = s.save()
-    return Response(UserPublicSerializer(user).data, status=status.HTTP_201_CREATED)
+    """Public self-registration is disabled: accounts are created by an administrator.
+
+    The route stays so an old client gets a clear answer instead of a 404.
+    Platform operators create accounts with `manage.py create_tenant_user`.
+    """
+    return Response(
+        {
+            "detail": "Self-registration is disabled. Ask your organisation's "
+            "administrator for an account.",
+            "error_code": "self_registration_disabled",
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
 
 
 @extend_schema(tags=["auth"], request=LoginSerializer, responses={200: UserPublicSerializer})

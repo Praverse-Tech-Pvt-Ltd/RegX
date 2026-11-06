@@ -195,6 +195,8 @@ jobs:
           from django.test import Client
 
           from authorization.models import MembershipRole, Role
+          from identity.models import MFADevice
+          import pyotp
           from tenancy.models import Tenant, TenantMembership
 
           from fda_data import importer, lifecycle
@@ -219,6 +221,12 @@ jobs:
               membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
               role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
               MembershipRole.objects.get_or_create(membership=membership, role=role)
+              if role_name in ('reviewer', 'vp') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
+                  # SOW 4.3: a Reviewer/VP needs a verified MFA device before
+                  # any write (authorization.middleware.MFAEnrolmentMiddleware).
+                  device = MFADevice(user=user, is_verified=True)
+                  device.set_secret(pyotp.random_base32())
+                  device.save()
               return user
 
           def api_client(user):
@@ -460,6 +468,8 @@ jobs:
           from django.test import Client
 
           from authorization.models import MembershipRole, Role
+          from identity.models import MFADevice
+          import pyotp
           from tenancy.models import Tenant, TenantMembership
 
           User = get_user_model()
@@ -472,6 +482,12 @@ jobs:
               membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
               role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
               MembershipRole.objects.get_or_create(membership=membership, role=role)
+              if role_name in ('reviewer', 'vp') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
+                  # SOW 4.3: a Reviewer/VP needs a verified MFA device before
+                  # any write (authorization.middleware.MFAEnrolmentMiddleware).
+                  device = MFADevice(user=user, is_verified=True)
+                  device.set_secret(pyotp.random_base32())
+                  device.save()
               return user
 
           def api_client(user):
@@ -676,6 +692,8 @@ jobs:
           from django.test import Client
 
           from authorization.models import MembershipRole, Role
+          from identity.models import MFADevice
+          import pyotp
           from tenancy.models import Tenant, TenantMembership
           from formulations.models import FormulationVersion, ProductDevelopmentRecord
           from iig_checklist.models import ChecklistDefinition, ChecklistVersion
@@ -690,6 +708,12 @@ jobs:
               membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
               role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
               MembershipRole.objects.get_or_create(membership=membership, role=role)
+              if role_name in ('reviewer', 'vp') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
+                  # SOW 4.3: a Reviewer/VP needs a verified MFA device before
+                  # any write (authorization.middleware.MFAEnrolmentMiddleware).
+                  device = MFADevice(user=user, is_verified=True)
+                  device.set_secret(pyotp.random_base32())
+                  device.save()
               return user
 
           def api_client(user):
