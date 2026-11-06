@@ -40,7 +40,7 @@ _PAYLOAD_ALLOW_LISTS: dict[str, frozenset[str]] = {
     DocumentEvent.SCAN_QUEUED: frozenset({"source"}),
     # Page counts only; never extracted text.
     DocumentEvent.PROCESSING_NO_TEXT: frozenset(
-        {"total_pages", "pages_with_text", "pages_without_text", "pages_failed"}
+        {"total_pages", "pages_with_text", "pages_without_text", "pages_failed", "unit"}
     ),
 }
 

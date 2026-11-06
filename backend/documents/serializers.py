@@ -28,33 +28,70 @@ PARTIAL_TEXT_MESSAGE = (
     "{without} of {total} pages have no extractable text. Extracted text for this "
     "document is incomplete."
 )
+#: Word, Excel and PowerPoint: "likely scanned" does not apply.
+OFFICE_NO_TEXT_MESSAGE = (
+    "No extractable text. Text-based features cannot use this document; its "
+    "extracted text is incomplete: no extractable text."
+)
+OFFICE_PARTIAL_TEXT_MESSAGE = (
+    "{without} of {total} {units} have no extractable text. Extracted text for "
+    "this document is incomplete."
+)
+#: Word: blank paragraphs are layout, so "partial" means some could not be read.
+WORD_PARTIAL_TEXT_MESSAGE = (
+    "{without} of {total} paragraphs or tables could not be read. Extracted text "
+    "for this document is incomplete."
+)
+_UNIT_PLURAL = {"slide": "slides", "sheet": "sheets", "paragraph or table": "paragraphs or tables"}
 
 
 def text_extraction_summary(version) -> dict | None:
-    """The per-upload summary written by PDF processing, or None (other formats,
-    or versions processed before the summary existed)."""
+    """The per-upload summary written by processing (PDF, Word, Excel,
+    PowerPoint), or None (versions processed before the summary existed).
+
+    Counts keep the PDF key names (`total_pages`, `pages_with_text`, ...);
+    for Office files `unit` says what they count (slide, sheet, paragraph or
+    table). No `unit` means pages."""
     summary = (version.source_metadata or {}).get("text_extraction")
     return summary if isinstance(summary, dict) else None
 
 
 def text_extraction_warning(version) -> dict | None:
-    """A warning when some or all pages yielded no text; None otherwise."""
+    """A warning when some or all units yielded no text; None otherwise."""
     summary = text_extraction_summary(version)
     if not summary:
         return None
+    unit = summary.get("unit")
     total = summary.get("total_pages", 0)
     with_text = summary.get("pages_with_text", 0)
     if summary.get("result") == "none":
-        return {"level": "warning", "code": "no_extractable_text", "message": NO_TEXT_MESSAGE}
+        message = OFFICE_NO_TEXT_MESSAGE if unit else NO_TEXT_MESSAGE
+        warning = {"level": "warning", "code": "no_extractable_text", "message": message}
+        if unit:
+            warning["unit"] = unit
+        return warning
     if summary.get("result") == "partial":
-        without = total - with_text
-        return {
+        if unit == "paragraph or table":
+            without = summary.get("pages_failed", 0)
+            message = WORD_PARTIAL_TEXT_MESSAGE.format(without=without, total=total)
+        elif unit:
+            without = total - with_text
+            message = OFFICE_PARTIAL_TEXT_MESSAGE.format(
+                without=without, total=total, units=_UNIT_PLURAL.get(unit, unit)
+            )
+        else:
+            without = total - with_text
+            message = PARTIAL_TEXT_MESSAGE.format(without=without, total=total)
+        warning = {
             "level": "warning",
             "code": "partial_text",
             "pages_without_text": without,
             "total_pages": total,
-            "message": PARTIAL_TEXT_MESSAGE.format(without=without, total=total),
+            "message": message,
         }
+        if unit:
+            warning["unit"] = unit
+        return warning
     return None
 
 

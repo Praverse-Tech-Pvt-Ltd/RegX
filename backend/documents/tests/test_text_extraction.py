@@ -155,6 +155,8 @@ class TestImageOnlyPdf:
             "pages_with_text": 0,
             "pages_without_text": 3,
             "pages_failed": 0,
+            # Added with truncation tracking (deliberate API addition).
+            "pages_truncated": 0,
             "result": "none",
         }
         # Its own audit event, counts only.
