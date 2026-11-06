@@ -1,0 +1,39 @@
+# Keep the backend image to tracked code only: no caches, secrets or data files.
+# Check: list every file in the built image's /app that git does not track; it
+# must be empty (PROJECT_OVERVIEW.md §11 #10g).
+
+# Tool caches
+.ruff_cache/
+.import_linter_cache/
+.pytest_cache/
+.mypy_cache/
+**/__pycache__/
+**/*.pyc
+.coverage
+htmlcov/
+
+# Secrets and local settings
+.env
+.env.*
+*.env
+
+# Runtime data written by the app (document storage is a volume, never baked in)
+document_storage/
+media/
+staticfiles/
+
+# Data files of any kind: client data reaches a server only as mounted data or
+# uploads, never inside an image.
+**/*.sqlite3*
+**/*.db
+**/*.dump
+**/*.xlsx
+**/*.xls
+**/*.csv
+**/*.zip
+**/*.pkl
+**/*.parquet
+
+# ...except the small synthetic test fixtures that in-container test runs read
+# (test-checklist.md runs pytest inside this image).
+!**/tests/fixtures/**

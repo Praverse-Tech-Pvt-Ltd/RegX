@@ -20,7 +20,7 @@ media/
 # Stale database backups copied for exactness; nothing reads them. The live
 # db.sqlite3 is deliberately NOT excluded — docker-entrypoint.sh seeds the
 # volume from it on first start.
-db.sqlite3.bak
+db.sqlite3.bak*
 db_17_1_2.sqlite3
 db_corrupted.sqlite3
 db_old.sqlite3
