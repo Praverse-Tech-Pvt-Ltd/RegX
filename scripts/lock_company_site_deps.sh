@@ -25,7 +25,7 @@ REQ="$PWD/company_site"
 # Git Bash on Windows: Docker needs a Windows path for the bind mount.
 if command -v cygpath >/dev/null 2>&1; then REQ="$(cygpath -w "$REQ")"; fi
 
-IMAGE="python:3.12-slim"   # keep in step with the FROM line in company_site/Dockerfile
+IMAGE="python:3.12-slim@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30"   # keep in step with the FROM line in company_site/Dockerfile
 PIP_TOOLS="pip-tools==7.4.1"
 
 MSYS_NO_PATHCONV=1 docker run --rm \
