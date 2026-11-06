@@ -209,6 +209,59 @@ class FakeRegx:
         return Session
 
 
+class FakeRegxMfa:
+    """REGX for an MFA-enrolled account: password step answers mfa_pending; the
+    code step accepts GOOD_CODE once, counts every refusal (as REGX's lockout
+    does) and answers 429 once `lock_after` refusals are reached."""
+
+    GOOD_CODE = "123456"
+
+    def __init__(self, roles=("vp",), lock_after=5, pending=True):
+        self.roles = list(roles)
+        self.lock_after = lock_after
+        self.pending = pending
+        self.failures = 0
+        self.calls: list[tuple[str, str, dict]] = []
+
+    def session(self):
+        fake = self
+
+        class Session:
+            def __init__(self):
+                self.cookies = FakeCookies(csrftoken="fake-csrf")
+
+            def get(self, url, timeout=None):
+                fake.calls.append(("GET", url, {}))
+                if url.endswith("/auth/csrf/"):
+                    return FakeResponse(200, {"csrfToken": "fake-csrf"})
+                if url.endswith("/permissions/mine/"):
+                    return FakeResponse(200, {"roles": fake.roles})
+                return FakeResponse(404, {})
+
+            def post(self, url, json=None, headers=None, timeout=None):
+                fake.calls.append(("POST", url, dict(self.cookies)))
+                if url.endswith("/auth/login/"):
+                    self.cookies["sessionid"] = "fake-pending-session"
+                    return FakeResponse(200, {"mfa_required": True, "mfa_pending": True,
+                                              "email": "vp@smoke.invalid"})
+                if url.endswith("/auth/login/mfa/"):
+                    if not fake.pending or self.cookies.get("sessionid") != "fake-pending-session":
+                        return FakeResponse(400, {"error_code": "mfa_not_pending"})
+                    if fake.failures >= fake.lock_after:
+                        return FakeResponse(429, {"detail": "Locked."})
+                    if (json or {}).get("code") != FakeRegxMfa.GOOD_CODE:
+                        fake.failures += 1
+                        return FakeResponse(400, {"error_code": "mfa_invalid_code"})
+                    self.cookies["sessionid"] = "fake-regx-session"
+                    return FakeResponse(200, {"email": "vp@smoke.invalid", "full_name": "Smoke VP",
+                                              "is_active": True, "mfa_required": True})
+                if url.endswith("/auth/logout/"):
+                    return FakeResponse(204, {})
+                return FakeResponse(404, {})
+
+        return Session
+
+
 def _login(client, username, password=PASSWORD):
     return client.post("/adminmaster/login/", {"username": username, "password": password})
 
@@ -255,23 +308,93 @@ class SharedRegxLoginTests(GuardedTestCase):
         self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
         self.assertIn(("POST", f"{REGX}/api/regx/v1/auth/login/"), fake.calls)
 
-    def test_mfa_enrolled_user_is_refused(self):
+    def test_mfa_enrolled_user_gets_the_code_page_not_a_session(self):
         """REGX answers the password step of an MFA-enrolled user with
-        mfa_required (PR #96); the company login must not open a session."""
-        fake = FakeRegx(200, {"mfa_required": True, "mfa_pending": True,
-                              "email": "vp@smoke.invalid"})
+        mfa_required + mfa_pending (PR #96): no company session yet, code page next."""
+        fake = FakeRegxMfa()
         self._with_regx(fake)
         response = _login(self.client, "vp@smoke.invalid")
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Invalid Credential")
+        self.assertRedirects(response, "/adminmaster/login/mfa/", fetch_redirect_response=False)
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertFalse(CustomUser.objects.filter(username="vp@smoke.invalid").exists())
+        page = self.client.get("/adminmaster/login/mfa/")
+        self.assertContains(page, "Enter the 6-digit code")
+        self.assertContains(page, 'name="code"')
 
     def test_wrong_password_is_refused(self):
         self._with_regx(FakeRegx(400, {"detail": "Invalid credentials."}))
         response = _login(self.client, "doer@smoke.invalid", "wrong")
         self.assertContains(response, "Invalid Credential")
         self.assertNotIn("_auth_user_id", self.client.session)
+
+
+@override_settings(REGX_AUTH_URL=REGX)
+class SharedRegxMfaCodeStepTests(GuardedTestCase):
+    """company_site's MFA code step (PROJECT_OVERVIEW.md §11 #10k): the code goes to
+    REGX's /auth/login/mfa/; the company session exists only after REGX accepts it."""
+
+    def setUp(self):
+        super().setUp()
+        self.fake = FakeRegxMfa()
+        p = mock.patch("AdminMaster.regx_auth.requests.Session", self.fake.session())
+        p.start()
+        self.addCleanup(p.stop)
+        _login(self.client, "vp@smoke.invalid")
+
+    def _code(self, code):
+        return self.client.post("/adminmaster/login/mfa/", {"code": code})
+
+    def _mfa_posts(self):
+        return [c for c in self.fake.calls if c[1].endswith("/auth/login/mfa/")]
+
+    def test_correct_code_signs_in_with_the_mapped_role(self):
+        response = self._code(FakeRegxMfa.GOOD_CODE)
+        self.assertRedirects(response, "/ratools/", fetch_redirect_response=False)
+        user = CustomUser.objects.get(username="vp@smoke.invalid")
+        self.assertEqual(user.role, "company_checker")
+        self.assertFalse(user.has_usable_password())
+        self.assertEqual(int(self.client.session["_auth_user_id"]), user.pk)
+        self.assertNotIn("regx_mfa_pending", self.client.session)
+        # The code went to REGX on the pending REGX session, then that session was ended.
+        self.assertEqual(self._mfa_posts()[0][2].get("sessionid"), "fake-pending-session")
+        self.assertIn(f"{REGX}/api/regx/v1/auth/logout/", [c[1] for c in self.fake.calls])
+
+    def test_wrong_code_is_refused_and_sent_to_regx_to_count(self):
+        response = self._code("000000")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Invalid code.")
+        self.assertContains(response, 'name="code"')  # still on the code page
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertEqual(self.fake.failures, 1)  # REGX counted it
+        self.assertEqual(len(self._mfa_posts()), 1)
+
+    def test_lockout_is_respected(self):
+        for _ in range(self.fake.lock_after):
+            self._code("000000")
+        self.assertEqual(self.fake.failures, self.fake.lock_after)
+        response = self._code(FakeRegxMfa.GOOD_CODE)  # even the right code, once locked
+        self.assertContains(response, "Too many failed attempts")
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotIn("regx_mfa_pending", self.client.session)
+        self.assertFalse(CustomUser.objects.filter(username="vp@smoke.invalid").exists())
+
+    def test_expired_pending_sign_in_starts_over(self):
+        self.fake.pending = False
+        response = self._code(FakeRegxMfa.GOOD_CODE)
+        self.assertContains(response, "Your sign-in timed out")
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_code_page_without_a_password_step_opens_nothing(self):
+        other = self.client_class()
+        response = other.post("/adminmaster/login/mfa/", {"code": FakeRegxMfa.GOOD_CODE})
+        self.assertContains(response, "Your sign-in timed out")
+        self.assertNotIn("_auth_user_id", other.session)
+        self.assertEqual(len(self._mfa_posts()), 0)
+
+    def test_the_totp_secret_is_never_stored(self):
+        pending = self.client.session["regx_mfa_pending"]
+        self.assertEqual(set(pending), {"email", "cookies", "at"})
+        self.assertEqual(set(pending["cookies"]), {"sessionid", "csrftoken"})
 
 
 # --------------------------------------------------------------------------- 3. local fallback

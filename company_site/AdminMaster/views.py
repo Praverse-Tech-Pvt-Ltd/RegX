@@ -6,6 +6,7 @@ from RATools.models import *
 from .forms import *
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+import time
 import uuid
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -88,6 +89,13 @@ def _authenticate(username, password):
     return auth.authenticate(username=username, password=password)
 
 
+#: Session key for a sign-in waiting for the MFA code: the email, REGX's
+#: pending-login cookies and the time. Never the TOTP secret.
+_MFA_PENDING_KEY = "regx_mfa_pending"
+#: REGX keeps its own pending marker for 5 minutes (identity/views.py).
+_MFA_PENDING_SECONDS = 5 * 60
+
+
 def login(request):
     if request.method == "GET":
         return render(request, "AdminMaster/login.html")
@@ -95,42 +103,99 @@ def login(request):
     elif request.method == "POST":
         username = request.POST["username"]
         password = request.POST["password"]
-        user = _authenticate(username, password)
+        try:
+            user = _authenticate(username, password)
+        except regx_auth.MfaCodeRequired as challenge:
+            # Password accepted by REGX; no session here until the code is too.
+            request.session[_MFA_PENDING_KEY] = {
+                "email": challenge.email,
+                "cookies": challenge.cookies,
+                "at": time.time(),
+            }
+            return redirect("/adminmaster/login/mfa/")
 
         if user is not None:
-            cookie_token = request.COOKIES.get("device_token")
-
-            if config("SERVER") != "PRODUCTION" or user.internal_team:
-                auth.login(request, user)
-                response = redirect("/adminmaster/adminbase" if user.role == "admin" else "/ratools/")
-                return response
-            else:
-                # Production mode
-                if user.login_token == "No":
-                    print("Prod: First time login — setting device_token")
-                    user.login_token = str(uuid.uuid4())
-                    user.save()
-                    auth.login(request, user)
-                    response = redirect("/adminmaster/adminbase" if user.role == "admin" else "/ratools/")
-                    response.set_cookie("device_token", user.login_token, max_age=10 * 365 * 24 * 60 * 60)
-                    return response
-                else:
-                    if cookie_token != user.login_token:
-                        print("Prod: Device token mismatch")
-                        return render(request, "AdminMaster/login.html", {
-                            "message": "Please login from your registered device."
-                        })
-                    else:
-                        print("Prod: Device token matched")
-                        auth.login(request, user)
-                        response = redirect("/adminmaster/adminbase" if user.role == "admin" else "/ratools/")
-                        response.set_cookie("device_token", user.login_token, max_age=10 * 365 * 24 * 60 * 60)
-                        return response
+            return _complete_login(request, user)
 
         else:
             return render(request, "AdminMaster/login.html", {
                 "message": "Invalid Credential"
             })
+
+
+def login_mfa(request):
+    """Second step for REGX accounts enrolled in MFA: the code goes to REGX.
+
+    Only after REGX accepts it is the company session created (same steps as a
+    password-only login). Wrong codes are counted by REGX's own lockout.
+    """
+    pending = request.session.get(_MFA_PENDING_KEY)
+    if not pending or time.time() - pending.get("at", 0) > _MFA_PENDING_SECONDS:
+        request.session.pop(_MFA_PENDING_KEY, None)
+        return render(request, "AdminMaster/login.html", {
+            "message": "Your sign-in timed out. Please sign in again."
+        })
+
+    if request.method != "POST":
+        return render(request, "AdminMaster/login.html", {"mfa_step": True})
+
+    code = request.POST.get("code", "").strip()
+    try:
+        user = regx_auth.verify_code(pending.get("cookies"), code)
+    except regx_auth.MfaInvalidCode:
+        return render(request, "AdminMaster/login.html", {
+            "mfa_step": True, "message": "Invalid code."
+        })
+    except regx_auth.MfaLocked:
+        request.session.pop(_MFA_PENDING_KEY, None)
+        return render(request, "AdminMaster/login.html", {
+            "message": "Too many failed attempts. Please try again later."
+        })
+    except regx_auth.MfaExpired:
+        request.session.pop(_MFA_PENDING_KEY, None)
+        return render(request, "AdminMaster/login.html", {
+            "message": "Your sign-in timed out. Please sign in again."
+        })
+    except regx_auth.RegxUnavailable as exc:
+        logger.warning("REGX unavailable during the MFA step: %s", exc)
+        return render(request, "AdminMaster/login.html", {
+            "mfa_step": True, "message": "The sign-in service is unavailable. Please try again."
+        })
+
+    request.session.pop(_MFA_PENDING_KEY, None)
+    return _complete_login(request, user)
+
+
+def _complete_login(request, user):
+    """The company session and device-token rules, unchanged from the original login view."""
+    cookie_token = request.COOKIES.get("device_token")
+
+    if config("SERVER") != "PRODUCTION" or user.internal_team:
+        auth.login(request, user)
+        response = redirect("/adminmaster/adminbase" if user.role == "admin" else "/ratools/")
+        return response
+    else:
+        # Production mode
+        if user.login_token == "No":
+            print("Prod: First time login — setting device_token")
+            user.login_token = str(uuid.uuid4())
+            user.save()
+            auth.login(request, user)
+            response = redirect("/adminmaster/adminbase" if user.role == "admin" else "/ratools/")
+            response.set_cookie("device_token", user.login_token, max_age=10 * 365 * 24 * 60 * 60)
+            return response
+        else:
+            if cookie_token != user.login_token:
+                print("Prod: Device token mismatch")
+                return render(request, "AdminMaster/login.html", {
+                    "message": "Please login from your registered device."
+                })
+            else:
+                print("Prod: Device token matched")
+                auth.login(request, user)
+                response = redirect("/adminmaster/adminbase" if user.role == "admin" else "/ratools/")
+                response.set_cookie("device_token", user.login_token, max_age=10 * 365 * 24 * 60 * 60)
+                return response
 
 
 def logout(request):
