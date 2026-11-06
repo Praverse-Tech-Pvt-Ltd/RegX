@@ -4,7 +4,8 @@ and nothing ever calls OpenAI.
 Every test runs with outbound network blocked (``NetworkGuard``): any socket
 connection to a non-loopback address fails the test. The shared REGX login is
 exercised against a fake ``requests.Session``, never a real server. The FDA-483
-spreadsheet is a temporary copy of the repository's fallback file, and every
+spreadsheet is a small synthetic workbook built in the test (the real one is
+client data and git-ignored), and every
 file the cache refresh writes (snapshots, summary checkpoints) goes to a temp
 directory, so no repository file or database is changed. The test database is
 Django's in-memory SQLite database.
@@ -27,10 +28,56 @@ from AdminMaster.models import AssignChecker, CustomUser
 
 REGX = "http://regx.test"
 PASSWORD = "Smoke-test-only-1!"
-FALLBACK_483 = (
-    Path(settings.BASE_DIR) / "AIDatabase" / "management" / "commands"
-    / "Final_File_FDA_Observations_15_12_2025.xlsx"
-)
+#: Column headers of the company's FDA-483 workbook (headers only; the real
+#: workbook is client data, git-ignored, and not available in CI).
+FORM483_COLUMNS = [
+    "Sr. No.", "Company Name", "City, Country", "Type of establishment",
+    "Month of Inspection", "FDA Investigator(s) name", "Year of Inspection",
+    "System", "Form 483 Observation", "Observation Details", "Summary",
+]
+
+
+def build_synthetic_483(path: Path, *, summaries: bool) -> None:
+    """A small, made-up FDA-483 workbook with the real column layout.
+
+    Two observations per company, two detail rows per observation (one
+    summariser block each), across several companies, systems and years. With
+    `summaries=False` every block lacks a summary, so the summariser would try
+    to generate each one."""
+    import datetime
+
+    import pandas as pd
+
+    companies = [
+        ("Example Pharma Ltd", "Mumbai, India", "API"),
+        ("Sample Labs Inc", "Boston, United States", "Finished Dosage"),
+        ("Demo Biologics GmbH", "Berlin, Germany", "Biologics"),
+        ("Test Generics Pvt Ltd", "Hyderabad, India", "Finished Dosage"),
+    ]
+    systems = ["Quality System", "Laboratory Control System", "Production System",
+               "Facilities and Equipment System"]
+    rows, n = [], 0
+    for c, (company, city, kind) in enumerate(companies):
+        for o in range(2):
+            for d in range(2):
+                n += 1
+                rows.append({
+                    "Sr. No.": n,
+                    "Company Name": company,
+                    "City, Country": city,
+                    "Type of establishment": kind,
+                    "Month of Inspection": datetime.datetime(2020 + c, 1 + o, 15),
+                    "FDA Investigator(s) name": f"Investigator {c + 1}",
+                    "Year of Inspection": 2020 + c,
+                    "System": systems[(c + o) % len(systems)],
+                    "Form 483 Observation": f"Observation {o + 1}",
+                    "Observation Details": (
+                        f"Made-up detail {d + 1} for test company {c + 1}: written procedures "
+                        "were not followed and records were incomplete. " * 4
+                    ),
+                    "Summary": None if not summaries else f"Made-up summary {c}-{o}",
+                })
+    pd.DataFrame(rows, columns=FORM483_COLUMNS).to_excel(path, index=False, sheet_name="Sheet1")
 LOOPBACK = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -258,8 +305,12 @@ class LocalFallbackLoginTests(GuardedTestCase):
 
 
 class Form483DataMixin:
-    """Point the FDA-483 cache at a temp copy of the fallback spreadsheet and send
-    every file the refresh writes to a temp directory."""
+    """Point the FDA-483 cache at a synthetic workbook in a temp directory and
+    send every file the refresh writes to that directory too."""
+
+    #: Pages tests use a workbook whose blocks already have summaries; the
+    #: no-OpenAI tests set this to False so every block would need one.
+    with_summaries = True
 
     def setUp(self):
         super().setUp()
@@ -268,7 +319,7 @@ class Form483DataMixin:
         self.tmp = Path(tempfile.mkdtemp(prefix="cs-smoke-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.xlsx = self.tmp / "observations.xlsx"
-        shutil.copy2(FALLBACK_483, self.xlsx)
+        build_synthetic_483(self.xlsx, summaries=self.with_summaries)
         self.xlsx_bytes = self.xlsx.read_bytes()
 
         source = {"path": str(self.xlsx), "source_key": "smoke:observations", "active_id": None}
@@ -337,6 +388,8 @@ class NoOpenAICallTests(Form483DataMixin, GuardedTestCase):
     stops because no key is set, no SDK client is built, no completion is
     requested and no socket is opened."""
 
+    with_summaries = False
+
     def setUp(self):
         super().setUp()
         from AIDatabase import observation_summary
@@ -362,17 +415,7 @@ class NoOpenAICallTests(Form483DataMixin, GuardedTestCase):
         AssignChecker.objects.create(user=user)
         self.client.force_login(user)
 
-    def _blank_summaries(self):
-        """Clear the Summary column in the temp copy so every block needs one."""
-        import pandas as pd
-
-        df = pd.read_excel(self.xlsx)
-        df["Summary"] = None
-        df.head(40).to_excel(self.xlsx, index=False, sheet_name="Sheet1")
-        self.xlsx_bytes = self.xlsx.read_bytes()
-
     def test_home_and_dashboards_make_no_openai_call(self):
-        self._blank_summaries()
         for url in ("/", "/aidatabase/form483/", "/aidatabase/auditiq/", "/aidatabase/gmpc_module/"):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200, url)
