@@ -12,7 +12,7 @@
 - It is **called during page loads**. Fifteen routes, starting with `GET /`, load the FDA-483 spreadsheet through `get_cached_df()`. On a cold cache, or after the spreadsheet changes, the page runs `process_observation_summary` (`company_site/AIDatabase/views.py:559`) **before it can answer**.
 - Every block without a summary is sent to the model, one after another, inside that request.
 - **Only one thing stops this today:** `OPENAI_API_KEY` is unset. With no key, each block is skipped. With a key, generation starts immediately on the next page load.
-- **Size today** (shipped spreadsheet, measured; see §6): 8,362 blocks, of which 2,700 already have a summary. **5,662 would be generated on one cold page load.**
+- **Size today** (measured on the local copy of the client spreadsheet; see §6): 8,362 blocks, of which 2,700 already have a summary. **5,662 would be generated on one cold page load.**
 
 ## 2. Why this is unsafe
 
@@ -106,7 +106,7 @@ It is unsafe for **any** model, OpenAI or our own.
 
 ## 6. Measurements behind the numbers
 
-- **Source:** the spreadsheet shipped in the repository (`Final_File_FDA_Observations_15_12_2025.xlsx`), read-only, with the summariser's own block rules, in a container with no network.
+- **Source:** the client spreadsheet the code falls back to (`Final_File_FDA_Observations_15_12_2025.xlsx`). It is **git-ignored client data, not in the repository**; the measurement used the local copy, read-only, with the summariser's own block rules, in a container with no network.
 - **Counts:** 13,576 rows → 8,362 blocks. 2,700 are already summarised, 5,662 need a summary, and 0 have no details.
 - **Input per block:**
   - mean 1,381 characters, median 933, maximum 14,689 (the code cuts at 15,000);

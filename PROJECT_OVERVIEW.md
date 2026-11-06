@@ -1812,8 +1812,10 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
   - **Proposal:** pages only read stored summaries; a background batch job (command + Celery task) with a kill switch (off by default), a per-run limit, recorded progress and failures, idempotent re-runs and a dry run; new 483s summarised on import; a model adapter (OpenAI or the Azure-hosted model through one setting, default disabled) with the SOW 4.2 b no-training confirmation recorded per run.
   - **Estimates (marked as estimates):** build about 1.5–2 weeks; backfill = 5,662 × S seconds ÷ concurrency (3 s placeholder: about 4.7 h at concurrency 1, about 1.2 h at 4).
   - **Preconditions** before any key or endpoint is set in company_site (9 items).
-  - **Measured** on the shipped spreadsheet (script `measure_backfill.py`, read-only, no network): 13,576 rows, 8,362 blocks, 2,700 summarised, 5,662 needing one; input mean 213 words (median 142, total 1,208,535); output target 362,560 words.
+  - **Measured** on the local copy of the client spreadsheet (git-ignored, not in the repository; script `measure_backfill.py`, read-only, no network): 13,576 rows, 8,362 blocks, 2,700 summarised, 5,662 needing one; input mean 213 words (median 142, total 1,208,535); output target 362,560 words.
 - **§11 new #10f:** pin the Python base images by digest (backend and company_site Dockerfiles and both lock scripts). Small follow-up, not built.
+
+**Correction (same session):** an earlier draft called the measured spreadsheet "shipped in the repository". It is git-ignored client data present only locally (this also broke #104's first CI run, now fixed there with a synthetic workbook). The numbers are unchanged; the server copy may differ.
 
 **Merge note:** #104 also edits §11 (adds #10e) and appends a Work Log entry, so whichever of #104 and this docs PR merges second will need a small, text-only conflict resolution in `PROJECT_OVERVIEW.md`.
 
