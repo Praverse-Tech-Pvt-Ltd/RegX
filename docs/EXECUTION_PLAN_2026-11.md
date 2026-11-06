@@ -1,70 +1,273 @@
-# REGX consolidated execution plan (November 2026)
+# REGX execution plan, version 2 (November 2026)
 
-**For:** Pratham (internal review first). **From:** Maanav, with Claude Code. **Date:** 2026-11-06 (revision 2, same day). **Due:** 2026-11-13.
-**Answers:** section 16 (points A–G) of Pratham's direction of 2026-11-06 (`docs/decisions/2026-11-06-pratham-direction.md`).
-**Status:** draft for review. Nothing in this plan has been agreed with iCretegy.
+**For:** Pratham. **From:** Maanav, with Claude Code. **Date:** 2026-11-06 (version 2; version 1 was merged in PR #110).
+**Answers:** section 12 (A–G) of Pratham's second direction, `docs/decisions/2026-11-07-pratham-direction-2.md`; first direction `docs/decisions/2026-11-06-pratham-direction.md`.
+**Engineering detail:** `docs/PROJECT_TRACKER.csv` (full tracker); `docs/IID_BLOCKER_ANALYSIS.md`; `docs/CONTROLLED_UNITS_DESIGN.md`; `docs/REGULATORY_REVIEW_PACKAGE.md`; `docs/AZURE_MODEL_INTEGRATION_CHECKLIST.md`; `docs/CREDENTIAL_INVENTORY.md`.
 
-**How to read it**
-- **Sources:** facts come only from the repository (`regx-main@0e60622`), `PROJECT_OVERVIEW.md`, the SOW (22 April 2026; read from a **local, untracked copy** of the PDF in the working folder, ignored by `.gitignore:130` and never committed on any branch, tag or PR head; checked 2026-11-06), and the decision record. File paths and PR numbers are the evidence.
-- **[Estimate]** marks every effort or date figure. **[Assumption]** marks anything not proven. Sizes are for one experienced developer.
-- **Status ladder** (Pratham, §12 of his direction): **1** implemented → **2** code review and CI → **3** security and tenant checks → **4** real reference data → **5** regulatory validation → **6** staging → **7** client UAT → **8** written acceptance → **9** production → **10** handover. A row shows the **highest step reached**. Merged code is step 2 at most until the later steps are evidenced. **No item in this plan has reached step 6 or above: there is no staging or production environment.**
-- **No compliance or certification claims.** REGX has technical controls (roles, audit trail, tenant isolation). It is not certified for anything (SOC 2, ISO 27001, HIPAA, 21 CFR Part 11).
+**Rules of this document**
+- Facts come from the repository, `PROJECT_OVERVIEW.md`, the decision records and a local, untracked copy of the SOW. **[Estimate]** marks every effort or date; **[Assumption]** marks anything unproven. Sizes assume one experienced developer.
+- **All M2/M3 dates are internal estimates, not commitments to iCretegy** (direction §11). The reduced first release is **not** an agreed SOW revision until iCretegy agrees in writing.
+- Status ladder: implemented → CI → security → real data → regulatory validation → staging → UAT → acceptance → production → handover. **Nothing has reached staging; no environment exists.**
+- No compliance or certification claims.
 
 ---
 
-## 1. One-page summary
+## Management view (one page)
 
-> **Question for Pratham: is Dev (or another developer) available for this project, and from when?**
-> Everything below assumes one developer until you answer. The table shows what a second developer changes.
+**Progressing**
+- **Security fixes, all with tests, open for review:** company_site no longer starts without a secret key (#111); duplicate tenant-scoped roles merged and forbidden (#112); MFA for Tenant Admin and Platform Support (#113); **company_site MFA code step** (#114, the deployment blocker from #107). MFA recovery (recovery codes at sign-in, audited admin reset) built on its own branch, not pushed.
+- **Regulatory data:** real FDA IID (9,071 rows) and Orange Book (48,761 products) load locally; blocker breakdown done (below); units design ready to build.
+- **Planning:** this plan, the regulatory review package (one document for the reviewer and iCretegy), the Azure checklist.
 
-| Milestone [Estimate] | One developer | Two developers (second from F1) |
+**Blocked (on whom)**
+
+| What | Blocked on | Owner |
 |---|---|---|
-| First AI demo: redesigned 483 summaries on the Azure model, supervised 20-observation batch | **F8** (15–26 Feb 2027) | **F5** (4–15 Jan 2027) |
-| **M2 (40 %)**: minimum Part 1 first release deployed, UAT, written acceptance (section G.1) | **F17** (21 Jun–2 Jul 2027) | **F12** (12–23 Apr 2027) |
-| **M3 (40 %)**: Regulatory AI per the agreed Phase 2 scope, deployed, accepted | **F29** (6–17 Dec 2027) or later | **F20** (2–13 Aug 2027) |
-| Part 3 API v1 build starts | after M3 (2028) | **F19** (19–30 Jul 2027) |
+| First AI demo on the real model | Azure dev endpoint, model/version, dev credential (secure channel), the "before synthetic data" answers (section E.1) | Azure owner, via Pratham |
+| Any mapping approval; any real IID comparison | Named regulatory reviewer | Pratham |
+| Per-day IID comparisons (4,059 records) | Q8 written answer | iCretegy (after reviewer) |
+| Real checklist content | 20-item gate, Register 13/14 | iCretegy |
+| Staging environment | Azure subscription owner, budget | Pratham |
+| Credential revocation proof; image/registry/Render checks | Account owners (section A.2–A.3) | Pratham |
 
-These dates hold only if: the Azure dev deployment and credentials arrive by the first-AI-demo fortnight; a server with the real 483 dataset is available for the dry run; the regulatory reviewer is named by F6; iCretegy agrees the M2 scope (G.1) and the Phase 2 scope in time; and client-blocked items (calculators, Word add-in, 2.9) are either specified in time or moved out of M3 by agreement. A later second developer moves the two-developer column right by the same amount [Assumption].
+**Needs your decision (prioritised; detail in section G)**
+1. **Revoke the Gemini API key found in the PUBLIC repo `iCretegy-AI483`** (history, `backend/.env`), and decide whether that repo stays public. The read-only scan of all related repos is done (`docs/CREDENTIAL_INVENTORY.md` §8): the 3 OpenAI keys and client spreadsheets ("For Cipla") are also in the private `booking-demo-final` and `Django-booking-demo-page`; neither public repo holds them.
+2. **Staffing:** is Dev (or another developer) available, and from when? Part-time Azure/DevOps?
+3. **Azure:** subscription owner, budget, and the dev model endpoint + credential.
+4. **Regulatory reviewer:** name and start date.
+5. **Credentials:** confirm revocation with the checklist in A.2.
+6. **Admin access** for the checks in A.3.
+7. **Units:** confirm the move-up (scenario 1 places units right after the 483 MVP; before it costs about 1.5 fortnights on the 483 dates).
+8. **M1 definition** and the delivery-stage agreement with iCretegy (section F).
 
-**Done (engineering, step 2: merged with CI; not deployed anywhere)**
-- **REGX governed platform (SOW Part 2, non-AI):** Doer → Reviewer → VP review gates, IIG checklist engine with calculation registry and gap analysis on checklist answers, FDA reference data (Orange Book and IID importers, SPL route and dosage-form lists), formulations and IID matching, documents with versioning, scanning hooks and text extraction, immutable audit trail, tenant isolation. Full backend suite 4,298 passed / 2 skipped (PR #107 run).
-- **Security, last two weeks:** login lockout (#82), schema behind login (#83), loud stub scanner (#84), MFA code at login (#96), loader cannot approve (#97), locked dependencies (#98, #104), pypdf upgrade (#100), text-extraction warnings (#101, #102), base images pinned and backend `.dockerignore` (#106), **MFA mandatory for Reviewer/VP and no self-registration (#107)**, local CSRF fix (#109).
-- **Real data, locally only (step 4 locally, not on a shared environment):** Orange Book 48,761 products; IID July 2026, 9,071 rows; 164 IID mapping proposals (none approved).
+**Dates at a glance [internal estimates]**
 
-**Blocked, and on whom**
+| Milestone | Scenario 1: one developer | Scenario 2: two developers | Scenario 3: two developers + part-time DevOps |
+|---|---|---|---|
+| First technical demo (483 search → grounded AI answer → citation → feedback) | F3 (by 18 Dec 2026) | F2 (by 4 Dec 2026) | F2 (by 4 Dec 2026) |
+| Internal MVP (483) on internal staging | F9 (by 12 Mar 2027) | F7 (by 12 Feb 2027) | F6 (by 29 Jan 2027) |
+| Client UAT release (483) | F12 (by 23 Apr 2027) | F9 (by 12 Mar 2027) | F8 (by 26 Feb 2027) |
+| Accepted release (483, M2), if iCretegy UAT takes 2 fortnights | F14 (by 21 May 2027) | F11 (by 9 Apr 2027) | F10 (by 26 Mar 2027) |
+| First real IID comparison (needs approved mappings) | F16 (by 18 Jun 2027) | F5 (by 15 Jan 2027) | F5 (by 15 Jan 2027) |
+| M3 regulatory AI accepted (needs signed Phase 2 scope) | F29 (Dec 2027) or later | F20 (Aug 2027) | F18 (Jul 2027) |
 
-| Blocked item | Waiting for | Owner |
+Fortnights start F1 = 9–20 Nov 2026. Each date assumes its blockers clear in time; section B lists them.
+
+---
+
+## A. Security closure register
+
+### A.1 Issues
+
+| # | Issue | Owner | Verification evidence (today) | Status | Deployment blocker? |
+|---|---|---|---|---|---|
+| S1 | 3 OpenAI keys leaked on `main` (key C live in `AIDatabase/filters.py`) | Pratham (revocation) | `docs/CREDENTIAL_INVENTORY.md`; no current REGX config uses them (hash check) | Revocation **unverified** | **Yes** for any deployment of `main`; no for REGX (not referenced) |
+| S2 | SMTP password leaked on `main` | Pratham / mail admin | Same inventory | Rotation **unverified** | Yes for `main` |
+| S3 | Leaked `django-insecure` key as company_site fallback | Maanav | **PR #111**: fallback removed, start refused without key, 44 smoke tests, 0 tracked files contain the value | Fixed in PR; value stays in history | **Yes until #111 is merged** |
+| S4 | company_site refuses MFA accounts (lockout after #107) | Maanav | **PR #114**: code step; 47 smoke tests; live check (enrolled VP signs in with a code) | Fixed in PR | **Yes until #114 is merged and independently tested** |
+| S5 | No MFA recovery path (lost authenticator = locked out) | Maanav | Branch `regx/feat/mfa-recovery`: recovery code at sign-in, audited admin reset by a different admin with MFA; tests | Built, not pushed | **Yes for production MFA enforcement** |
+| S6 | Privileged roles without MFA | Maanav | **PR #113**: Tenant Admin, Platform Support gated; one setting | Fixed in PR | Recommended before production |
+| S7 | Duplicate tenant-scoped system roles | Maanav | **PR #112**: migration + constraint; full suite 4,307 passed | Fixed in PR | No (data hygiene) |
+| S8 | Client spreadsheets baked into the local company_site image | Maanav | §11 #10g; `backend/.dockerignore` done (#106); company_site spreadsheets still included | Open | **Yes for any company_site deployment** |
+| S9 | `company_site/db.sqlite3` (user rows, password hashes) tracked and baked in | Maanav (clean seed, approved) | §11 #10h | Open | **Yes for production** |
+| S10 | Unknown image/code distribution (registries, Render, other repos) | Pratham (admin checks) | Repository shows no push step; **not sufficient evidence** (direction §1B) | Open | **Yes until A.3 is done** |
+| S11 | Public org repositories related to this client | Pratham | **Scanned read-only 2026-11-06** (`docs/CREDENTIAL_INVENTORY.md` §8): no OpenAI key, no known leaked value, no client spreadsheets in either public repo; findings S17, S18 | Scan done; owner actions open | See S17 |
+| **S17** | **Google (Gemini) API key in the PUBLIC repo `iCretegy-AI483`** (`backend/.env`, commit `88a8cc4`, history only) | Pratham / Google Cloud project owner | Inventory §8.2 P1 (no value printed) | **Open, urgent** | **Yes**: revoke before anything else; confirm usage |
+| S18 | **Client spreadsheets (6 "For Cipla") and SQLite databases in the private repos `booking-demo-final` and `Django-booking-demo-page`**, plus the 3 OpenAI keys and SMTP password | Pratham | Inventory §8.3 R1–R6 | Open | **Yes for any deployment built from them**; access review of their 4 collaborators |
+| S19 | `django-insecure` default in the PUBLIC repo `iPharmaAi-booking-demo-page` (branch `django-rewrite`, different value) and a live Vercel homepage | Pratham | Inventory §8.2 P4 | Open | Yes for any deployment of that branch without `DJANGO_SECRET_KEY` |
+| S12 | company_site summariser can call OpenAI on page load | Maanav (redesign approved) | §11 #10, #10e; no key set anywhere | Open; contained by "no key" | **Yes for setting any model key** |
+| S13 | Local Django superusers bypass REGX MFA in company_site | Pratham (decision) | Report in #113 | Open | Recommended: retire local admins before production |
+| S14 | Branch protection on `regx-main` | Pratham (admin) | Not set | Open | Recommended before production |
+| S15 | Backups manual, no restore test | Maanav (with staging) | §11 #13 | Open | **Yes for production** |
+| S16 | Stub malware scanner allowed by compose default | Maanav | #84 makes production pre-flight fail on the stub | Contained in production config | Yes if a deployment sets `ALLOW_STUB` |
+
+### A.2 Credential confirmation checklist (no values)
+
+| Credential | Provider | Where it leaked | Account owner | Revocation independently verified? | How to verify |
+|---|---|---|---|---|---|
+| OpenAI key A | OpenAI | `main` `AIDatabase/filters.py:34` (commented) | **To be named by Pratham** | No | Owner shows the key revoked in the OpenAI dashboard; a second person confirms a test call with it returns 401 |
+| OpenAI key B | OpenAI | `main` `filters.py:35-36`, `views.py` (commented) | To be named | No | Same |
+| OpenAI key C (live in code) | OpenAI | `main` `filters.py:37`; also `booking-demo-final`, `Django-booking-demo-page` | To be named | No | Same, plus usage history since 2026-07-13 |
+| **Gemini API key** | Google Cloud | **PUBLIC** `iCretegy-AI483` `backend/.env` (history, `88a8cc4`) | To be named (owner of the Google Cloud project) | No | Key deleted or restricted in the Google Cloud console; a second person confirms a test call fails; usage since 2026-02-20 reviewed |
+| SMTP mailbox password | Microsoft 365 (default `smtp.office365.com`) | `main` `RAAI/settings.py:171` | Mail admin, to be named | No | Password changed; sign-in log reviewed; old password fails |
+| `django-insecure` key | Django (no provider) | `main`; company_site default | Pratham | n/a | Confirm no environment ever ran with it; rotate where it did |
+| Demo passwords (company_site, handoff history) | — | `create_demo_users.py`, `handoff.md` history | Pratham | n/a | Confirm demo accounts exist only locally |
+
+### A.3 Admin verification list
+
+| Where | Who must look | What to check |
 |---|---|---|
-| Any real checklist content going live | 20-item content gate (0 of 20 signed) and Approval Register 13/14 | iCretegy regulatory approver |
-| Formally approved terminology mappings (164 IID proposals, Orange Book workbook) | Named Praverse regulatory reviewer | Pratham (to appoint) |
-| IID per-day rule (Q8) and INJECTION matching | Written answers | iCretegy (after reviewer check) |
-| AI features against a real model; benchmarks | Azure endpoint, model/version, limits, region, dev credentials; data-privacy verification | Azure deployment owner (arranged by Pratham) |
-| Calculators (2.3), Word add-in (2.7), stability/impurity (2.9) | Specs with worked examples; 13 contract items; feasibility decision | iCretegy |
-| Credential revocation (3 OpenAI keys, SMTP password) | Provider-side action and confirmation | Pratham |
-| Branch protection on `regx-main`; GHCR / Render / org-app checks | Repository/org admin, Render account | Pratham |
-| Any deployment (staging or production) | Azure subscription owner, billing, region, backup design, budget | Pratham |
+| GitHub org `Praverse-Tech-Pvt-Ltd`: **Packages** (GHCR) | Org owner | Any container images; their tags, publish dates, who published; inspect any REGX/iPharmaAI image for client spreadsheets or `db.sqlite3` |
+| GitHub org: installed **GitHub Apps** and OAuth apps | Org owner | Render or other deploy integrations; which repos they can read |
+| GitHub org: settings | Org owner | 2FA required for members (API did not return it), members/outside collaborators, "members can create public repositories" (currently **allowed**), audit log for package publishes and visibility changes |
+| Repo `RegX` | Org owner | Branch protection, deploy keys, Actions secrets (names only), environments, collaborators |
+| **Repo `iCretegy-AI483` (PUBLIC)** | Org owner | Does it contain legacy 483 code, the leaked keys, client spreadsheets or databases? If yes: make private, revoke, assess notification (direction §1B) |
+| **Repo `iPharmaAi-booking-demo-page` (PUBLIC)** | Org owner | Same |
+| Repos `booking-demo-final`, `Django-booking-demo-page`, `483-AI-final`, `iCretegy-SaaS`, `OCR-FDA` (private) | Org owner | Copies of the leaked keys or client data; who has access |
+| Render account(s) | Render account owner | Services (`booking-demo-final` or any built from `main`), **which GitHub repository and branch each deploys from** (the repositories cannot show this), environment variables referencing OpenAI/SMTP (names), deploy history, disks |
+| Vercel account | Vercel account owner | The project behind `iPharmaAi-booking-demo-page`'s homepage: source repo/branch, environment variables (names), whether `DJANGO_SECRET_KEY` is set if the Django branch is deployed |
+| Google Cloud project holding the Gemini key | Project owner | Delete or restrict the key; usage logs since 2026-02-20 |
+| OpenAI organisation | OpenAI account owner | API keys list, usage since 2026-07-13 |
+| Microsoft 365 | Mail admin | Mailbox password changed, sign-in logs |
+| Docker Hub / Azure Container Registry / other registries | Whoever holds accounts; ask the previous developer | Any images named regx, ipharmaai, company_site, 483 |
+| Previous developer's machines and accounts | Pratham | Local copies, images, personal registries |
 
-**Three biggest risks**
-1. **The 40 % + 40 % milestones depend on AI that does not exist yet.** REGX has no model call path; the only 483 AI code is the legacy company_site summariser, which is unsafe to switch on before its redesign (§11 #10, #10e). With one developer the first AI demo on the real model lands in **F8, late February 2027**, and the M2 first release in **F17, late June / early July 2027 [Estimate]** (section D).
-2. **IID matching produces no comparisons.** **0 of 9,071 IID records are calculable today**: 5,240 rows carry only a maximum daily exposure (the Q8 per-day rule is not built) and 3,764 have a potency unit that cannot be compared (controlled units are on hold). SOW 2.2 "auto calculation limits" cannot be demonstrated on real data until both exist. **Recommendation: move units up now** rather than keep them on hold; Q8 still needs iCretegy's written answer, but units do not.
-3. **Capacity.** **This plan assumes one developer** unless Pratham confirms more. At about 7 effective days per fortnight [Estimate], M2 lands about mid-2027 and M3 about the end of 2027, with the Part 3 API after that (table above). Each extra person unlocks:
+---
 
-| Extra person | What it unlocks earlier [Estimate] |
+## B. Delivery scenarios
+
+**Common assumptions [Assumption]:** fortnights of 9 working days, about 7 for engineering; F4 (late Dec) at half capacity; Azure dev access by F2; reviewer named by F6; iCretegy UAT about 2 fortnights; client inputs for blocked items arrive in time or those items move out of M3 by agreement.
+
+| | Scenario 1: one developer | Scenario 2: two developers | Scenario 3: two developers + part-time Azure/DevOps (about 0.5 FTE) |
+|---|---|---|---|
+| **Split** | Strict critical path: security → thin AI slice → 483 flow → 483 MVP → staging → UAT → units → regulatory | Dev A: AI + 483. Dev B: security, units, regulatory workflows, then staging | As scenario 2; DevOps builds environments from F2 so developers stay on features |
+| First technical demo | F3 (18 Dec 2026) | F2 (4 Dec 2026) | F2 (4 Dec 2026) |
+| Internal MVP (483) | F9 (12 Mar 2027) | F7 (12 Feb 2027) | F6 (29 Jan 2027) |
+| Client UAT release (483) | F12 (23 Apr 2027) | F9 (12 Mar 2027) | F8 (26 Feb 2027) |
+| Accepted release (M2) | F14 (21 May 2027) | F11 (9 Apr 2027) | F10 (26 Mar 2027) |
+| First real IID comparison | F16 (18 Jun 2027) | F5 (15 Jan 2027) | F5 (15 Jan 2027) |
+| M3 accepted | F29 (Dec 2027) or later | F20 (Aug 2027) | F18 (Jul 2027) |
+| **Effort [Estimate]** | ~95–120 developer-days to M2; ~250–310 to M3 | Same work, split; ~10 % coordination overhead | Same, plus ~25–35 DevOps days for environments, IaC, CI/CD, backups, monitoring |
+| **Improvement vs scenario 1** | — | M2 ~6 weeks earlier; IID demo ~5 months earlier; M3 ~4 months earlier | M2 ~8 weeks earlier; M3 ~5 months earlier; staging exists from F4 instead of F9 |
+| **Key dependencies** | Azure by F2; nothing else in parallel, so any blocker stalls the line | Reviewer by F4 for Dev B's IID work | Azure subscription and budget by F2 for DevOps to start |
+
+**Scenario 1 order of work [Estimate]:** F1 finish security PRs (#111–#114, recovery); F2 thin AI slice; F3 483 flow → first demo; F4 (½) benchmark report; F5–F6 summariser on the slice; F7–F8 Fast/Think + citation hardening; F9 spreadsheets out of image + internal staging (IaC, automated deploy) → internal MVP; F10 evaluation and accuracy review + clean seed; F11 UAT environment + production hardening; F12 client UAT release; F13–F14 UAT fixes → acceptance; F15–F16 units → first IID comparison; F17 Q8 (if answered) + bulk approval; F18–F27 Explain This Gap, chatbot, document gap feasibility and build (if agreed); F28–F29 Part 2 UAT → M3.
+**If units go before the 483 MVP** (your §6 priority), every 483 date in scenario 1 moves about 1.5 fortnights later.
+
+---
+
+## C. AI critical path (thin secure slice to the first 483 demo)
+
+**Goal of the first technical demo:** a user searches or selects an FDA-483 observation in company_site, gets an AI answer grounded in that observation's source text, sees the citation (record, company, date, observation number), and can give feedback. Running on the Azure dev model, with synthetic or public data until the customer-data answers in E.1 are in.
+
+**In the thin slice (must exist for the demo; built once, not thrown away) [Estimate: 7–9 days]**
+
+| Piece | What exactly | Why it cannot wait |
+|---|---|---|
+| Model connectivity | One adapter call to the Azure deployment: endpoint, deployment name, API version from settings; credential from the environment/Key Vault | The point of the demo |
+| Off switch | `AI_ENABLED` setting, default **off**; checked on every call; when off, AI features show "AI unavailable" and everything else works | Safety; Pratham's §4 point 5 |
+| Prompt version | Each prompt template has an id and version stored with every response | Auditability from day one |
+| Tenant and permission check | The REGX AI layer checks the caller's permission to the data it retrieves, **independently** of the caller (see below); 483 data is platform reference data, client documents are tenant data | No bypass via the internal endpoint (§10) |
+| Safe logging | Log request id, prompt version, model/deployment, latency, tokens, status. **No prompt or document text** | Privacy gate |
+| Essential metrics | Latency p50/p95, error rate, tokens, timeouts | Benchmarks and §4 monitoring |
+| Feedback (minimal) | Thumbs up/down + optional comment stored against the response id | Part of the demo flow |
+| Tests | No network in CI (fake model); off switch; timeout; permission refusal; no content in logs | Safety in CI |
+
+**Internal AI endpoint (company_site → REGX AI layer)**
+- **Service-to-service auth:** a dedicated service credential for company_site (shared secret or signed token) held in Key Vault/environment, sent over the private network only; REGX rejects any call without it. It identifies the **service**, not a user.
+- **Independent permission checks:** company_site passes the end user's REGX identity (its mirrored REGX email, from the shared login); REGX re-checks that user's access to every record it retrieves. The service credential alone grants access only to platform reference data (FDA-483 corpus), never to tenant documents. Unknown or inactive users are refused.
+- **Timeout and failure behaviour:** company_site calls the AI with a short timeout (for example 15 s for Think, 8 s for Fast [Assumption, tuned after benchmarks]) and a circuit breaker; on timeout, error or off switch it shows "AI answer unavailable" **and the rest of the page (search results, filters, dashboards) renders normally**. AI calls never run inside page rendering of ordinary browsing pages.
+
+**Deferred to later increments:** full feedback framework (categories, review queue, monthly report), automated evaluation pipeline, multiple providers/adapter breadth, retrieval tuning and re-ranking, caching, prompt management UI, cost dashboards, streaming responses.
+
+**Benchmark right after connectivity (F3–F4, scenario 1):** Fast, Think and a representative 483 summarisation task; latency p50/p95 end to end at concurrency 1/5/10, output consistency (same input repeated), quality scored on a small reviewer-checked set. **Any gap against Fast < 5 s p95 / Think < 10 s p95 is reported before more development depends on it.**
+
+---
+
+## D. Regulatory critical path (IID)
+
+Counts from `docs/IID_BLOCKER_ANALYSIS.md` (9,071 real records, one primary blocker each):
+
+| Step | Unlocks | Needs | Size [Estimate] |
+|---|---|---|---|
+| 1. Reviewer approves the 164 route/dosage-form mappings (bulk approval helps) | All records leave "unmapped" except `DROPS` (67) | Named reviewer | Reviewer time; bulk approval 2–3 days dev |
+| 2. Controlled units (`docs/CONTROLLED_UNITS_DESIGN.md`) | Up to **3,748** per-unit records (41.3 %) become comparable; first **1,914** with `mg` per dose unit | Reviewer approves the unit list and 21 unit mappings | 9–13 days dev |
+| 3. Q8 per-day rule | Up to **4,059** daily-exposure records (44.7 %) | iCretegy + reviewer written answer; structured max daily dose on formulations | 3–5 days dev after the answer |
+| 4. `DROPS` per record; `mg/mg` basis | 41 + 16 records | Reviewer | Reviewer time |
+| 5. Real IID calculation through the governed checklist | SOW 2.2 demonstrated | Content gate items for the comparison question (Register 13) | S once approved |
+| 6. Regulatory review of results | Validation step on the ladder | Reviewer | — |
+| Never comparable | 1,207 records (13.3 %) have no numeric limit | — | Shown as "no IID limit published" |
+
+INJECTION matching (Orange Book side) and the white-paper calculations follow the same pattern: reviewer, then iCretegy in writing (`docs/REGULATORY_REVIEW_PACKAGE.md`).
+
+### D.1 Smallest document gap-analysis feasibility test (direction §8)
+
+- **Input:** 3–5 representative regulatory documents (one text PDF, one scanned PDF, one Word file) and **one approved checklist requirement** (or a clearly labelled demo requirement until the content gate allows a real one).
+- **Steps:** upload through the existing document pipeline (scan, text extraction with the #101/#102 warnings) → split into sections by headings/CTD numbering → show the section(s) matched to the requirement, with page references → the model states present / partial / missing **with the quoted source text**, labelled as an AI suggestion → a reviewer marks each result right or wrong.
+- **Output:** a short report: extraction quality (including the scanned file, with and without Azure OCR), section-matching accuracy, reviewer agreement, latency and cost per document. **No score, no regulatory claim**; the scoring method stays subject to approval.
+- **Size [Estimate]:** about 5 days after the AI slice exists, plus reviewer time.
+
+**What needs whom (Part 2):** buildable without client input: AI slice, Explain This Gap on existing checklist answers, units model, Orange Book patents/exclusivity, document feasibility test, API architecture. **Needs client specification:** calculators (originals + 3–5 worked examples each), Word add-in (named owner + 13 contract items), real checklist content (20-item gate), Q8, INJECTION, White Paper formulas. **Feasibility-dependent in the SOW:** heatmap (2.8b), stability/impurity assistant (2.9), document intelligence (2.10), smart alerts (1.12), scheduled reports (1.9).
+
+---
+
+## E. Early deployment plan
+
+| Stage | Purpose | Contents | Earliest start (scenario 1 / 3) | Needs |
+|---|---|---|---|---|
+| 1. Dev / model integration | Real-model benchmarks and the first demo | Azure model dev deployment; one small app environment or the developer stack connecting over the internet with IP allow-list; Key Vault for the dev credential | F2 / F2 | Azure dev endpoint and credential; E.1 "synthetic" answers |
+| 2. Internal staging | Integrated demos, automated deploys | Container hosting (REGX backend, frontend, worker, company_site, nginx), managed PostgreSQL, Redis, blob storage for documents and client data files, Key Vault, logging/monitoring; **infrastructure as code** (Bicep or Terraform) and CI deploy on merge | F9 / F4 | Subscription, budget, region |
+| 3. UAT | iCretegy testing | Same IaC, separate data and credentials; test data; client data only after E.1 "customer data" answers and written approval | F11 / F7 | iCretegy test users |
+| 4. Production hardening | Go-live | Backups with a tested restore (target RPO/RTO from the owner policy package), monitoring and alerts, no stub scanner (ClamAV), secrets in Key Vault, private networking to the model, runbook, rollback | F11 / F8 | Backup and retention decisions |
+
+**Rough monthly Azure cost [Estimate, low confidence; verify with the Azure pricing calculator for the chosen region before deciding]** — assumptions: one region, small burstable/basic tiers, light traffic, no high availability in dev/staging, **model usage excluded** (depends on deployment type, tokens and whether capacity is reserved):
+
+| Environment | Rough range per month (USD) |
 |---|---|
-| +1 developer (backend/AI) | Two tracks in parallel (483/AI and REGX/security/deployment): first AI demo about 6 weeks earlier, M2 about 10 weeks earlier, M3 about 4 months earlier (table above) |
-| +1 frontend developer | REGX pages for the four ported APIs (deficiencies, inspections, controlled correspondence, product comparison), 483 UI items (filters, dashboard, history), retiring the 32 legacy sidebar links |
-| Part-time DevOps (Azure) | Staging environment, backups, monitoring, CI deploy: the plan's step 6 ("staging demonstrated") becomes possible in Q1 2027 instead of after the feature work |
-| Regulatory reviewer (named, not a developer) | Unblocks mapping approvals, content gate preparation, Q8/INJECTION review, white-paper review. No developer can substitute |
+| Dev / model integration (app hosting minimal; often only Key Vault + logs) | 50–200 |
+| Internal staging | 250–600 |
+| UAT (can share staging infrastructure with separate databases) | 150–400 |
+| Production (zone-redundant database, backups, monitoring, ClamAV) | 700–2,000 |
+| **Model consumption** | Separate; from the Azure owner's quota and pricing (checklist §4, §8) |
 
-**Scope note to resolve:** on 2026-10-08 the owner stated that Parts 1 and 3 are **outside REGX** (`PROJECT_OVERVIEW.md` §0). Pratham's direction now asks for one plan across Parts 1–3 and prefers a unified platform long term (§5 of the direction). This plan covers all three parts and treats "where Part 1 lives" as an open decision (section E, question 9).
+### E.1 Azure checklist split (`docs/AZURE_MODEL_INTEGRATION_CHECKLIST.md`)
+
+**Required before connecting synthetic or public test data:** service type and API version (1.1, 2.1); dev endpoint and deployment name (1.2, 1.3); model and version (1.4); authentication method and a **dev credential delivered over a secure channel** (2.2, 6.1, 6.4); request format and limits (2.3, 3.1–3.4); rate/concurrency quota (4.1–4.4); network access for the dev caller (7.7); content filter configuration (7.6); budget owner and spending limit (8.3).
+
+**Additionally required before any customer data (including iCretegy's 483 dataset):** verified storage, logging, retention, abuse-monitoring inspection and training settings, **with evidence** (7.1–7.5); region and residency confirmed against client requirements (5.1–5.3); separate production credentials and named holders (6.1, 6.5); private networking (7.7); monitoring without content (8.5); incident contact (8.4); **written approval from Pratham** and, where the data is iCretegy's, iCretegy's agreement.
 
 ---
 
-## A. Technical status against the SOW
+## F. SOW milestone matrix
+
+| | First release (proposed to iCretegy) | Remaining committed deliverables | Feasibility-dependent (SOW wording) |
+|---|---|---|---|
+| **Part 1 (483)** | Controlled background summaries; Fast and Think modes; dataset search with verifiable citations and "No supporting data found"; existing intelligence pages, filters and dashboards; feedback capture; secure deployment, UAT, acceptance | Web and combined search (1.3 b/c); prompt dictionary, follow-ups, question history (1.4); response formats with charts per answer, reference guide (1.5); new-483 alerts, personalised dashboard, answer-ready pop-up, accuracy graph (1.6); onboarding and explain-this (1.7, part); session memory, profile context (1.8); reports and exports in PDF/Word/Excel/PPT/JSON (1.9, part); confidence score with an agreed method, source panel, "why did the AI say this" (1.10); voice, WCAG 2.1 AA, multi-language (1.11) | "Ask Claude to explain" (1.7), scheduled reports and report templates (1.9), smart alerts (1.12) |
+| **Part 2 (regulatory)** | Per agreed Phase 2 scope | IIG automation with real comparisons (2.2), Orange Book/White Paper (2.5), chatbot (2.6), Word add-in (2.7, needs contract), gap scoring (2.8a), calculators (2.3, needs specs) | Heatmap (2.8b), stability/impurity (2.9), document intelligence (2.10) |
+| **Part 3 (API)** | — | API endpoints, keys, versioning, sandbox, OAuth, per-key scopes, webhooks, integrations (3.1–3.5) | Rate-limit tiers (3.2) |
+
+**Measurable acceptance criteria for the 483 first release (proposed):**
+- No page triggers a model call (automated test); the AI off switch leaves every non-AI page working.
+- On an agreed, reviewer-scored evaluation set: every dataset answer cites its source record or answers "No supporting data found"; accuracy and citation correctness at or above thresholds agreed in writing before UAT.
+- Fast < 5 s p95 and Think < 10 s p95 end to end at the agreed concurrency, or a written, agreed exception with measurements.
+- UAT script passed by iCretegy users; restore test passed; written acceptance.
+
+**M1 (20 %) definition, separate question:** the SOW says "20 % after completion of 2 milestones (483 Ai) i.e., after 1 month" without naming the two milestones. Ask iCretegy to name them in writing; Pratham to confirm invoices and payments received.
+
+**Contract position:** the first release is a **proposal**. iCretegy's written agreement is needed for the delivery stages, the remaining commitments and the acceptance criteria. Part 3 needs an explicit scheduling and acceptance agreement if it follows the regulatory AI deployment.
+
+---
+
+## G. Decisions needing Pratham (prioritised)
+
+1. **Public repositories (urgent):** revoke the Gemini key (S17); decide whether `iCretegy-AI483` and `iPharmaAi-booking-demo-page` stay public; review access to `booking-demo-final` and `Django-booking-demo-page` (client spreadsheets, keys); consider disallowing public repositories for members. `OCR-FDA` was outside the agreed scope and is not scanned.
+2. **Staffing:** second developer (who, from when) and part-time Azure/DevOps. Decides scenario 1, 2 or 3.
+3. **Azure:** subscription owner, budget, region; dev model endpoint and credential through a secure channel; the E.1 "synthetic" answers.
+4. **Regulatory reviewer:** name and start date (blocks all IID progress).
+5. **Credentials:** run the A.2 checklist with the account owners; confirm each revocation independently.
+6. **Admin checks:** the A.3 list (GHCR, apps, org settings, Render, OpenAI, Microsoft 365, other registries).
+7. **Units vs 483 order** in scenario 1 (units after the 483 MVP is the default here).
+8. **iCretegy:** send the regulatory review package and the M1 / delivery-stage questions; agree the first-release scope in writing.
+9. **Local admin accounts in company_site:** retire them in favour of REGX accounts (so MFA covers them), with `/admin/` limited to the operator network meanwhile.
+
+---
+
+## Recommendation: long-term REGX / iPharmaAI unification (short)
+
+- **Approach: strangler, not rewrite.** Keep company_site running; move capabilities into REGX one at a time behind the same domain and login (483 search and AI first, then intelligence pages), retiring each legacy page only when its REGX replacement is accepted. No big-bang migration without a separate technical and commercial case.
+- **Shared authentication:** REGX is the identity provider (already true for passwords; MFA with #114). Next step: proper SSO between the two (OIDC from REGX, or a shared session service) so users sign in once; later SAML/OIDC for enterprise customers (SOW 4.3).
+- **Data ownership:** FDA public data (483s, IID, Orange Book) as platform reference data owned by REGX with release governance; iCretegy-supplied curated data (CAPA, root cause) as a governed dataset with provenance; each customer's documents and outputs as tenant data, never shared.
+- **API boundaries:** one versioned REGX API (`/api/regx/v1/…`) serves both UIs and, later, external customers (Part 3) through separate credentials, scopes and rate limits; the legacy app consumes REGX through that API and the internal AI endpoint only, never through the database.
+
+---
+
+# Annexes
+
+## Annex 1. Technical status against the SOW (from version 1, still current; PRs #111–#114 not yet reflected)
 
 Ladder step shown as **"step N"** (see "How to read it"). **Built** = code, API, UI and tests exist; **Partly built**; **Missing**; **Blocked** = a specific external input is missing.
 
-### A.1 Part 1: 483 Database – AI based (lives in legacy `company_site/` today)
+### 1.1 Part 1: 483 Database – AI based (lives in legacy `company_site/` today)
 
 Read from code only (routes in `company_site/AIDatabase/urls.py`, views in `company_site/AIDatabase/views.py`, templates); the app was not run for this plan, so "exists" means a route and view exist, not that it was demonstrated. **The only AI call in company_site is the observation summariser** (`company_site/AIDatabase/observation_summary.py:332`, `:350`, OpenAI), which runs on page load and is unsafe to enable before the approved redesign (`docs/LEGACY_483_SUMMARISER_REDESIGN.md`: 5,662 observations pending). Company_site has smoke tests only (41, PR #104).
 
@@ -84,7 +287,7 @@ Read from code only (routes in `company_site/AIDatabase/urls.py`, views in `comp
 | 1.12 | Alert priority scoring, trend and competitor alerts *(feasibility later)* | Missing | — | — | Feasibility; needs 1.6 alerts first |
 | 1.13 | Install on iCretegy's web within 90 days (Day 60 testing, Day 75 real testing, Day 90 go-live) | Missed | — | SOW dated 22 April 2026; 90 days passed on 21 July 2026 | Recovery plan (section D) and an agreed revised date |
 
-### A.2 Part 2: Technical Tools (Regulatory) – AI based (REGX)
+### 1.2 Part 2: Technical Tools (Regulatory) – AI based (REGX)
 
 | SOW | Requirement (short) | Status | Step | Evidence | Gap / blocker |
 |---|---|---|---|---|---|
@@ -102,7 +305,7 @@ Read from code only (routes in `company_site/AIDatabase/urls.py`, views in `comp
 | 2.10 | Smart versioning summary, version diff with AI commentary, auto-tagging *(feasibility TBD)* | Partly built (versioning only) | 2 | `DocumentVersion`, duplicate detection, text extraction | AI foundation; diff view; tag model |
 | 2.11 | Timeline "mutually decided" in phase 2 | Open | — | SOW page 9 | Phase 2 scope document (direction §9) |
 
-### A.3 Part 3: API end point creation
+### 1.3 Part 3: API end point creation
 
 | SOW | Requirement (short) | Status | Step | Evidence | Gap / blocker |
 |---|---|---|---|---|---|
@@ -113,7 +316,7 @@ Read from code only (routes in `company_site/AIDatabase/urls.py`, views in `comp
 | 3.5 | Native integrations (Veeva, MasterControl, Salesforce, Teams, Slack), Zapier/Make, embeddable widget | Missing | — | `external_integrations` connector framework could host some [Assumption] | Phased acceptance (direction §11) |
 | 3.6 | Timeline: after the software is generated | — | — | SOW page 11 | — |
 
-### A.4 Sections 4–6 (enhancements)
+### 1.4 Sections 4–6 (enhancements)
 
 | SOW | Requirement (short) | Status | Step | Evidence | Gap / blocker |
 |---|---|---|---|---|---|
@@ -136,48 +339,9 @@ Read from code only (routes in `company_site/AIDatabase/urls.py`, views in `comp
 
 ---
 
-## B. Ready to start now vs blocked
-
-**Ready now (no further approval needed: covered by Pratham's approval of "immediate safety and foundation work")**
-
-| Item | Why it is unblocked | Size [Estimate] |
-|---|---|---|
-| Admin and privileged-account MFA policy (tenant_admin, platform_support) | Direction §10 | S (1 day) |
-| Remove the leaked `django-insecure` fallback in `company_site/RAAI/settings.py` (refuse to start without `SECRET_KEY`) | Direction §3C "disable wherever we control the configuration" | S (0.5 day) |
-| Clean duplicate tenant-scoped roles; constrain `is_system ⇒ tenant IS NULL`; fix `seed_regx_demo` lookup | §11 #25; found again 2026-11-06 | S (1 day) |
-| company_site MFA code step (design in §11 #10k) | Unblocks enforcing #107 anywhere real | M (3–4 days) |
-| Legacy 483 summariser redesign (disabled by default; no key connected), **built on the common AI layer** | Approved, direction §2; direction §4 point 10 (one interface) | 6.5–8 days + ~3 days review, once the AI foundation exists (its model adapter moves into the foundation) |
-| Clean reproducible company_site seed replacing `db.sqlite3` | Approved, direction §3A (history already inspected, §11 #10h) | ~1 week |
-| Client spreadsheets out of the company_site image (mounted data path) | Direction §3B | S–M (1–2 days) |
-| **Controlled units** (model, migration, loader, mapping proposals) | Recommended to move up (summary); no client input needed to build | M–L (1.5–2 weeks) |
-| VP-only bulk approval of mappings | Approved, direction §6B | S–M (2–3 days) |
-| AI foundation against a **stub** provider (adapter, config, kill switch, safe logging, metrics, prompt versions, tenant guard, feedback capture), plus an internal service endpoint so company_site uses the same layer | Approved, direction §4 | 2–3 weeks + 2–3 days for the internal endpoint |
-| Orange Book Phase 3: patents and exclusivity (import + reference tables) | Direction §7 supports structured tables | M–L (1–2 weeks) |
-| Part 3 API architecture document | Direction §11 | S–M (2–3 days) |
-| Consolidated cross-tenant negative test suite | Direction §10 | M (2–3 days) |
-| Phase 2 scope and acceptance document; Part 1 delivery checklist | Direction §5, §9 | M (3–5 days, writing) |
-| openFDA API key registration | Approved, direction §7 | S (Pratham registers; we store it as a secret) |
-
-**Blocked**
-
-| Item | Blocker | Owner |
-|---|---|---|
-| Real model integration, benchmarks, summariser dry run and 20-observation batch | Azure details, dev credentials, privacy verification; a server with the real dataset | Azure deployment owner; Pratham |
-| Approving the 164 IID mappings and the Orange Book workbook | Named regulatory reviewer | Pratham |
-| Q8 per-day comparison going live | iCretegy answer after reviewer check | iCretegy; regulatory reviewer |
-| INJECTION matching behaviour | iCretegy written confirmation | iCretegy |
-| White-paper build (Q1–Q8, 92-question bank, combination appendix) | Reviewer check, then iCretegy Accept/Amend/Reject | Regulatory reviewer; iCretegy |
-| Real checklist content (content gate 0/20, Register 13/14) | iCretegy regulatory approver | iCretegy |
-| Calculators (2.3) | Specs, originals, 3–5 worked examples each | iCretegy |
-| Word add-in (2.7) | Named client owner + 13 contract items | iCretegy |
-| Stability/impurity assistant (2.9) | Feasibility decision | iCretegy |
-| Document gap analysis build (2.8a) | Feasibility test result + agreed scoring method + full-text storage decision | Pratham; iCretegy |
-| Deployment (staging, production) | Azure subscription owner, billing, region, backup design, budget | Pratham |
-| Branch protection; GHCR/org-app/Render checks; credential revocation | Admin/account access | Pratham |
-
 ---
 
-## C. Architecture
+## Annex 2. Architecture (from version 1; the internal AI endpoint rules in section C above take precedence)
 
 **Principles (from the direction):** one model-agnostic AI layer used by every feature; client data never inside images; tenant isolation everywhere; dev/staging/production separated; AI off by default and switchable by an administrator.
 
@@ -266,86 +430,9 @@ flowchart LR
 
 ---
 
-## D. Roadmap (fortnightly milestones)
-
-**Capacity [Estimate]:** about 9 working days per fortnight, of which about 7 go to engineering after reviews, the fortnightly project review, client questions and documentation. F4 (late December) is planned at half capacity. Dates are targets, not commitments, and move when a blocker in section B is not cleared in time.
-
-**Why this order:** the AI foundation comes first because the direction asks for one AI interface shared by REGX features and 483 summarisation (§4 point 10), so the summariser redesign is built on that layer instead of growing its own adapter that would later be thrown away; units move back accordingly.
-
-### D.1 One developer (the default assumption)
-
-| Fortnight | Dates | Work [Estimate] | Needs |
-|---|---|---|---|
-| **Every fortnight** | — | **Fortnightly project review with a short demo of completed work and a written record of decisions and blockers** (direction §16; about half a day, inside the capacity above) | Pratham; iCretegy when the SOW meeting cadence applies |
-| F1 | 9–20 Nov 2026 | Admin/privileged MFA; leaked company_site fallback key removed; duplicate roles fixed; **company_site MFA code step**; this plan reviewed; Azure checklist sent | — |
-| F2 | 23 Nov–4 Dec | **AI foundation (stub provider)**, part 1: adapter interface, configuration, kill switch, timeouts/retries/circuit breaker | — |
-| F3 | 7–18 Dec | **AI foundation**, part 2: safe logging, metrics, prompt versions, tenant guard, feedback capture, evaluation harness | — |
-| F4 | 21 Dec–1 Jan (½) | Internal AI service endpoint for company_site; VP bulk approval | — |
-| F5 | 4–15 Jan 2027 | **483 summariser redesign on the AI layer** (tables, read-only page, batch job, import hook) | — |
-| F6 | 18–29 Jan | Summariser tests and finish; **units** start; client spreadsheets out of the image | — |
-| F7 | 1–12 Feb | **Units** finish (moved back from F3–F5); cross-tenant suite | Reviewer for unit mappings |
-| F8 | 15–26 Feb | **Benchmarks** on the Azure dev model; summariser **dry run + 20-observation batch** → **first AI demo** | Azure dev access; server dataset |
-| F9–F10 | 1–26 Mar | **Fast and Think modes** for 483 (structured summary, root cause, CAPA, classification; source-supported vs AI-suggested labelled) | Azure; reviewer for examples |
-| F11–F12 | 29 Mar–23 Apr | **Dataset search with citations and "No supporting data found"**; response feedback | — |
-| F13 | 26 Apr–7 May | Evaluation set and accuracy review; clean company_site seed | Reviewer |
-| F14–F15 | 10 May–4 Jun | **Azure staging and production** for the M2 release (backups, monitoring, runbook) | Azure subscription, budget |
-| F16–F17 | 7 Jun–2 Jul | **UAT with iCretegy**, fixes, written acceptance → **M2** | iCretegy users |
-| F18–F21 | 5 Jul–10 Sep | Explain This Gap (F18); contextual chatbot v1 (F19–F21) | Approved checklist content for real use |
-| F22–F27 | 13 Sep–19 Nov | Document gap analysis feasibility (F22); Orange Book patents/exclusivity (F23); document gap analysis build if agreed (F24–F27) | Representative documents; agreed scoring method |
-| F28–F29 | 22 Nov–17 Dec | Part 2 staging, UAT, acceptance → **M3** | Phase 2 scope signed |
-| Later | 2028 | Part 3 API v1; Part 1 later deliverables (G.1) | — |
-
-Q8 (3–5 days) and white-paper items slot into the first fortnight after iCretegy answers, displacing the lowest item in that fortnight.
-
-### D.2 Two developers (if a second developer joins from F1)
-
-| Fortnight | Developer A: AI and 483 (Part 1) | Developer B: REGX, security, deployment |
-|---|---|---|
-| **Every fortnight** | **Fortnightly project review with demo** (both attend) | |
-| F1 | AI foundation (stub), part 1 | Admin MFA; leaked key; duplicate roles; company_site MFA code step |
-| F2 | AI foundation, part 2; internal endpoint | VP bulk approval; cross-tenant suite |
-| F3 | Summariser redesign on the AI layer | Spreadsheets out of image; clean company_site seed |
-| F4 (½) | Summariser finish | Units start |
-| F5 | Benchmarks; dry run + 20 batch → **first AI demo** | Units finish |
-| F6–F7 | Fast and Think modes | Orange Book patents/exclusivity; Azure environment set-up starts |
-| F8–F9 | Dataset search with citations; feedback | Azure staging and production; backups, monitoring |
-| F10 | Evaluation set and accuracy review | Explain This Gap |
-| F11–F12 | UAT fixes; written acceptance → **M2** | Explain This Gap finish; document gap feasibility |
-| F13–F15 | Contextual chatbot v1 | Document gap analysis build (if agreed) |
-| F16–F18 | Chatbot finish; Part 1 later deliverables start | Document gap analysis build continues |
-| F19–F20 | Part 3 API v1 starts | Part 2 staging, UAT, acceptance → **M3** |
-
-**Effort per named item [Estimate]**
-
-| Item | Effort | Depends on |
-|---|---|---|
-| company_site MFA code step | 3–4 days | — |
-| AI foundation (stub provider) | 10–15 days | — (Azure only for live use) |
-| Internal AI service endpoint for company_site | 2–3 days | AI foundation |
-| 483 summariser redesign on the AI layer | 6.5–8 days + ~3 days review/integration | AI foundation |
-| Dry run, 20-observation batch, accuracy review, backfill | 3–5 days spread over two fortnights | Azure model; server dataset; reviewer time |
-| Fast and Think modes (483) | 10–15 days | AI foundation; Azure |
-| Dataset search with citations and abstention (483) | 10–15 days | AI foundation |
-| Response feedback | 2–3 days | AI foundation |
-| Azure staging and production for M2 | 10–15 days | Subscription, budget, backup decisions |
-| Clean company_site seed | ~5 days | — |
-| Controlled units | 7–10 days | Reviewer to approve unit mappings |
-| Q8 per-day rule | 3–5 days | iCretegy answer |
-| Benchmarks (Fast/Think, concurrency, long context) | 3–5 days | Azure dev deployment |
-| Explain This Gap | 7–10 days | AI foundation; approved checklist content for real use |
-| Contextual chatbot v1 | 15–20 days | AI foundation; retrieval sources |
-| VP bulk approval | 2–3 days | — |
-| Orange Book patents and exclusivity | 5–10 days | — |
-| Document gap analysis feasibility test | 5 days | Representative documents; Azure OCR access |
-| Document gap analysis build | 5–8 weeks | Feasibility result; agreed scope and scoring method |
-| API architecture document | 2–3 days | — |
-| API v1 | 3–5 weeks | Architecture agreed; capabilities to expose |
-
-**Dependencies that move dates most:** Azure access (first-AI-demo fortnight), named regulatory reviewer (by F6), iCretegy agreement on the M2 scope (G.1) and the Phase 2 scope, and whether and when a second developer joins.
-
 ---
 
-## E. iCretegy question pack
+## Annex 3. iCretegy question pack (from version 1; regulatory items now in `docs/REGULATORY_REVIEW_PACKAGE.md`)
 
 Owner column: who must answer. "Proposed answer" is ours, for them to accept, amend or reject in writing.
 
@@ -368,7 +455,9 @@ Owner column: who must answer. "Proposed answer" is ours, for them to accept, am
 
 ---
 
-## F. Validation approach
+---
+
+## Annex 4. Validation approach (from version 1)
 
 | Area | Method | Pass criteria (proposed) | Needs |
 |---|---|---|---|
@@ -381,7 +470,9 @@ Owner column: who must answer. "Proposed answer" is ours, for them to accept, am
 
 ---
 
-## G. Milestone reconciliation and acceptance matrix
+---
+
+## Annex 5. Milestone reconciliation (from version 1; payments column for Pratham)
 
 SOW fee INR 17,00,000; milestones 20 % / 40 % / 40 % (SOW page 15). **The payments column is for Pratham to fill.**
 
@@ -394,51 +485,3 @@ SOW fee INR 17,00,000; milestones 20 % / 40 % / 40 % (SOW page 15). **The paymen
 | Maintenance | — | — | — | Starts at deployment | 1 year included; 24×7 support from year 2 at INR 1,50,000/year (SOW page 16) | |
 
 **Do not present** a repaired summariser as Part 1 delivery, or merged code as accepted (direction §14, §15).
-
-### G.1 Proposed minimum first release for M2 (40 %)
-
-**For iCretegy to agree in writing.** A concrete, testable first release of the 483 AI; everything else in SOW Part 1 stays in scope as a named later deliverable.
-
-**In the first release**
-
-| # | Capability | SOW | Acceptance test (proposed) |
-|---|---|---|---|
-| 1 | **Redesigned 483 summaries**: background generation on the common AI layer, stored with model and prompt version; never generated on page load; disabled by default until approved | 1.2 | No page triggers a model call (automated test); summaries visible for the agreed observation set |
-| 2 | **Fast mode** (quick summary) and **Think mode** (structured: summary, root cause, CAPA, classification), with source-supported findings shown apart from AI suggestions; no invented root cause or CAPA when evidence is insufficient | 1.2 | Reviewer-scored evaluation set passes the agreed thresholds; Fast < 5 s p95 and Think < 10 s p95 end to end, or measured results and an agreed exception |
-| 3 | **Dataset search with citations**: answers from the iCretegy 483 dataset only, each citing the source record (and page or section where the source has one); "**No supporting data found**" when nothing supports an answer | 1.3 a | Every answer in the evaluation set cites a source or abstains; citations open the cited record |
-| 4 | **Existing filters, intelligence pages and dashboards** (company, country, investigator, year, FEI, system; top-20 recurring; investigator and company insights; charts), carried into the release as they are | 1.4, 1.5, 1.6 (part) | UAT script passes on the deployed system |
-| 5 | **Response feedback**: thumbs up/down and comment on every AI response, stored for the monthly accuracy report | 1.5, 6.3 | Feedback recorded and exportable |
-| 6 | **Deployed on Azure** for iCretegy (staging for UAT, then production), with backups, monitoring, MFA for Reviewer/VP and the company_site code step, no client data in images | 1.13, 5.2 (part) | Restore test passes; UAT signed; **written acceptance** |
-
-**Later deliverables (not dropped; dates to agree in the Phase 2 / Part 1 schedule)**
-
-| SOW | Item |
-|---|---|
-| 1.1 | Light/dark mode; ingestion of PDF/Word/PPT 483 sources beyond the current data set; browser/IP user management review |
-| 1.3 b, c | Web search and combined dataset + web search with labelled sources |
-| 1.4 | Predefined prompt dictionary; related questions and smart follow-ups; question history panel |
-| 1.5 | Variable response formats with tables and charts generated per answer; installed reference guide |
-| 1.6 | Automatic new-483 alerts; personalised home dashboard (KPIs, recent searches, trending topics); pop-up when an answer is ready; accuracy graph |
-| 1.7 | Skill assessment, guided tour, progressive disclosure, "explain this result" |
-| 1.8 | Session memory, user profile context, multi-turn reasoning (shown as a structured explanation, not raw model reasoning) |
-| 1.9 | One-click PDF/Word reports, export formats (PDF, Word, Excel, PPT, JSON), scheduled reports and templates *(the last two "feasibility later" in the SOW)* |
-| 1.10 | Confidence score (with an agreed method, not an invented percentage), source attribution panel, "why did the AI say this" |
-| 1.11 | Voice input, WCAG 2.1 AA, multi-language UI |
-| 1.12 | Smart alerts: priority scoring, trend and competitor alerts *(feasibility later in the SOW)* |
-| 1.6, 4.1 | GDPR/HIPAA: legal and contractual actions, not software features |
-
-**Target [Estimate]:** **F17 (21 Jun–2 Jul 2027) with one developer; F12 (12–23 Apr 2027) with two.** Both assume Azure access by the first-AI-demo fortnight and iCretegy's agreement to this scope by about F6.
-
----
-
-## Appendix: open items from the direction not yet built
-
-| Item | Direction ref | Size [Estimate] | Plan slot |
-|---|---|---|---|
-| MFA policy for administrative and privileged accounts (tenant_admin, platform_support); today only Reviewer/VP are gated | §10 | S (1 day) | F1 |
-| Consolidated cross-tenant negative tests (documents, FDA assessments, exports; chat history, summaries and API credentials as they are built) | §10 | M (2–3 days) |F7 (one developer) / F2 (two) |
-| Branch protection on `regx-main` (required checks, controlled merges, no force-push, no deletion) | §10 | S (Pratham, admin) | F1 |
-| Remove the leaked `django-insecure` fallback in `company_site/RAAI/settings.py:29`; refuse to start without `SECRET_KEY` | §3C | S (0.5 day) | F1 |
-| Clean the duplicate tenant-scoped roles (`praverse-demo` roles 6–8, `is_system=True`); add a constraint; fix `seed_regx_demo` | §11 #25 (overview) | S (1 day) | F1 |
-| company_site MFA code step (deployment blocker for #107) | overview §11 #10k | M (3–4 days) | F1 |
-| Test logins through real sessions so the MFA gate is exercised (about 40 files use `force_authenticate`) | overview §11 #10l | M | F3 onward, alongside other work |
