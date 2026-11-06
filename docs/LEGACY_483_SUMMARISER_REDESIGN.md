@@ -125,6 +125,8 @@ It is unsafe for **any** model, OpenAI or our own.
 7. The company_site smoke tests (`company_site/run_tests.sh`) still run in CI **without** the key. CI must never receive it.
 8. The first live run is a small, supervised one (for example `--max-blocks 20`), and someone reads the results before the backfill starts.
 9. The legacy `AIDatabase/filters.py` key on the `main` branch stays the owner's call. This proposal doesn't depend on it.
+10. **No route reachable without login can trigger generation.** Today `GET /`, `/aidatabase/form483/` and `/aidatabase/auditiq/` need no login and all run the summariser. After the redesign no page generates at all; until then, and as a standing rule afterwards, a test must prove that an anonymous request cannot start or queue a generation.
+11. **Client data files reach a server only as mounted data or uploads, never inside a Docker image.** The local company_site image today contains 12 git-ignored client spreadsheets and a database backup (`PROJECT_OVERVIEW.md` §11 #10g); the summariser's fallback spreadsheet is one of them. Before any key is set, the image must be built without them and the spreadsheets supplied through a mounted volume or the admin upload, so a pushed image never carries client data.
 
 ## 8. Not covered
 
