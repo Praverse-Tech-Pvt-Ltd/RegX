@@ -1,7 +1,7 @@
 # Company website (booking-demo-final) carried into REGX verbatim.
 #
 # This Dockerfile is the only file authored inside company_site/ apart from
-# RAAI/settings_integration.py and requirements.docker.txt — the application
+# RAAI/settings_integration.py, requirements.docker.in/.txt and the smoke tests — the application
 # code, templates, static assets and database are exact copies of the source
 # we were given.
 FROM python:3.12-slim
@@ -27,10 +27,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # The company's own requirements.txt is UTF-16 encoded, which pip cannot
-# parse. requirements.docker.txt is the identical package list re-encoded as
-# UTF-8; the original file is left untouched.
+# parse. requirements.docker.in is the identical package list re-encoded as
+# UTF-8; requirements.docker.txt is the lock generated from it by
+# scripts/lock_company_site_deps.sh: every package, direct and indirect, at an
+# exact version with sha256 hashes. --require-hashes makes pip refuse anything
+# not in it; --no-deps stops it resolving anything extra.
 COPY requirements.docker.txt ./
-RUN pip install -r requirements.docker.txt
+RUN pip install --require-hashes --no-deps -r requirements.docker.txt
 
 COPY . .
 

@@ -1,0 +1,56 @@
+name: company_site
+
+# Runs on every pull request (no path filter, by request): the company site
+# carries the FDA-483 summariser, and its smoke tests are the guard that no
+# change, anywhere, makes it reach OpenAI.
+on:
+  push:
+    branches: [regx-main]
+  pull_request:
+    branches: [regx-main]
+
+jobs:
+  lock-check:
+    name: company_site lock matches its input
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Regenerates company_site/requirements.docker.txt from
+      # requirements.docker.in inside python:3.12-slim. pip-compile keeps the
+      # versions already locked, so with an unchanged input nothing changes.
+      - name: Regenerate the lock
+        run: scripts/lock_company_site_deps.sh
+
+      - name: Fail if the lock is out of date
+        run: |
+          if ! git diff --exit-code -- company_site/requirements.docker.txt; then
+            echo "::error::company_site/requirements.docker.txt is out of date with requirements.docker.in. Run scripts/lock_company_site_deps.sh and commit the result."
+            exit 1
+          fi
+
+  smoke-tests:
+    name: company_site smoke tests (no OpenAI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Hard rule: the key is never set for these tests. Fail before building
+      # if anything (a repository or org secret mapped by mistake) exports it.
+      - name: OPENAI_API_KEY must be unset
+        run: |
+          if [ -n "${OPENAI_API_KEY:-}" ]; then
+            echo "::error::OPENAI_API_KEY is set in the CI environment; refusing to run."
+            exit 1
+          fi
+
+      # Same image as production: hash-checked install from the lock.
+      - name: Build the company_site image
+        run: docker build -t company-site-ci company_site
+
+      # run_tests.sh refuses to start if OPENAI_API_KEY is set, uses Django's
+      # in-memory test database, and blocks all outbound network in the tests.
+      # The container gets no --env for OpenAI and no network access to REGX
+      # (the shared login is tested against a fake session).
+      - name: Run the smoke tests and the AIDatabase tests
+        run: docker run --rm --network none --entrypoint ./run_tests.sh company-site-ci -v 2
