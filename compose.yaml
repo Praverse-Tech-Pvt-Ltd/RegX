@@ -57,6 +57,14 @@ services:
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?MFA_ENCRYPTION_KEY is required}
       CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
       ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      # The browser reaches the API through nginx on 8080, and nginx forwards
+      # `Host $$host` without the port, so Django cannot match a signed-in
+      # POST's Origin against the request host and falls back to this list.
+      # Without 8080 here every authenticated write from the integrated origin
+      # fails CSRF with a 403 (sign-in still works because it is anonymous).
+      # LOCAL STACK ONLY: a real deployment sets its own https origin(s) via
+      # CSRF_TRUSTED_ORIGINS in its environment.
+      CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
       # Tags every structured log line so backend and worker output can be told
       # apart -- they run the same image with the same settings.
       REGX_SERVICE_NAME: backend
