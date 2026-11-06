@@ -166,6 +166,24 @@ export type ScanStatus =
   | "quarantined";
 export type ProcessingStatus = "pending" | "processing" | "complete" | "failed" | "skipped";
 
+/** PDF text-extraction summary for one upload (null for other formats). */
+export interface TextExtractionSummary {
+  total_pages: number;
+  pages_with_text: number;
+  pages_without_text: number;
+  pages_failed: number;
+  result: "complete" | "partial" | "none";
+}
+
+/** Shown when some or all pages yielded no text. A warning, not an error. */
+export interface TextExtractionWarning {
+  level: "warning";
+  code: "no_extractable_text" | "partial_text";
+  message: string;
+  pages_without_text?: number;
+  total_pages?: number;
+}
+
 export interface DocumentVersion {
   public_id: string;
   version_number: number;
@@ -181,6 +199,8 @@ export interface DocumentVersion {
   uploaded_at: string;
   processing_started_at: string | null;
   processing_finished_at: string | null;
+  text_extraction?: TextExtractionSummary | null;
+  text_extraction_warning?: TextExtractionWarning | null;
 }
 
 export interface Document {
@@ -299,7 +319,11 @@ export const documents = {
   },
 
   versionStatus: (tenantSlug: string, publicId: string, versionPublicId: string) =>
-    apiRequest<{ scan_status: ScanStatus; processing_status: ProcessingStatus }>(
+    apiRequest<{
+      scan_status: ScanStatus;
+      processing_status: ProcessingStatus;
+      text_extraction_warning?: TextExtractionWarning | null;
+    }>(
       `/api/regx/v1/documents/${publicId}/versions/${versionPublicId}/status/`,
       { headers: { "X-Tenant-Slug": tenantSlug } }
     ),

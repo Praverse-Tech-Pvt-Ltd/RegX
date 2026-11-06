@@ -18,8 +18,58 @@ from .models import (
     DocumentVersion,
 )
 
+#: Wording for the text-extraction warning. A warning, not an error: the file
+#: was processed. Says nothing about review or approval of the document.
+NO_TEXT_MESSAGE = (
+    "No extractable text, likely scanned. Text-based features cannot use this "
+    "document; its extracted text is incomplete: no extractable text."
+)
+PARTIAL_TEXT_MESSAGE = (
+    "{without} of {total} pages have no extractable text. Extracted text for this "
+    "document is incomplete."
+)
 
-class DocumentVersionStatusSerializer(serializers.ModelSerializer):
+
+def text_extraction_summary(version) -> dict | None:
+    """The per-upload summary written by PDF processing, or None (other formats,
+    or versions processed before the summary existed)."""
+    summary = (version.source_metadata or {}).get("text_extraction")
+    return summary if isinstance(summary, dict) else None
+
+
+def text_extraction_warning(version) -> dict | None:
+    """A warning when some or all pages yielded no text; None otherwise."""
+    summary = text_extraction_summary(version)
+    if not summary:
+        return None
+    total = summary.get("total_pages", 0)
+    with_text = summary.get("pages_with_text", 0)
+    if summary.get("result") == "none":
+        return {"level": "warning", "code": "no_extractable_text", "message": NO_TEXT_MESSAGE}
+    if summary.get("result") == "partial":
+        without = total - with_text
+        return {
+            "level": "warning",
+            "code": "partial_text",
+            "pages_without_text": without,
+            "total_pages": total,
+            "message": PARTIAL_TEXT_MESSAGE.format(without=without, total=total),
+        }
+    return None
+
+
+class _TextExtractionFieldsMixin(serializers.Serializer):
+    text_extraction = serializers.SerializerMethodField()
+    text_extraction_warning = serializers.SerializerMethodField()
+
+    def get_text_extraction(self, obj):
+        return text_extraction_summary(obj)
+
+    def get_text_extraction_warning(self, obj):
+        return text_extraction_warning(obj)
+
+
+class DocumentVersionStatusSerializer(_TextExtractionFieldsMixin, serializers.ModelSerializer):
     """Lightweight version status for polling."""
 
     class Meta:
@@ -34,11 +84,13 @@ class DocumentVersionStatusSerializer(serializers.ModelSerializer):
             "processing_started_at",
             "processing_finished_at",
             "uploaded_at",
+            "text_extraction",
+            "text_extraction_warning",
         ]
         read_only_fields = fields
 
 
-class DocumentVersionSerializer(serializers.ModelSerializer):
+class DocumentVersionSerializer(_TextExtractionFieldsMixin, serializers.ModelSerializer):
     uploaded_by_email = serializers.EmailField(
         source="uploaded_by.email", read_only=True, default=None
     )
@@ -63,6 +115,8 @@ class DocumentVersionSerializer(serializers.ModelSerializer):
             "processing_started_at",
             "processing_finished_at",
             "source_metadata",
+            "text_extraction",
+            "text_extraction_warning",
         ]
         read_only_fields = fields
         # storage_key is explicitly excluded — never exposed

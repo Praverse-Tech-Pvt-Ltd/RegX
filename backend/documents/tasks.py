@@ -225,8 +225,9 @@ def process_document_version(self, version_pk: int, tenant_id: int) -> None:
 
     try:
         ext = version.extension.lower()
+        text_summary = None
         if ext == "pdf":
-            _process_pdf(version, raw)
+            text_summary = _process_pdf(version, raw)
         elif ext == "docx":
             _process_docx(version, raw)
         elif ext == "xlsx":
@@ -247,6 +248,16 @@ def process_document_version(self, version_pk: int, tenant_id: int) -> None:
             resource_id=str(version.public_id),
             tenant_id=tenant_id,
         )
+        # The file was processed, so the status stays COMPLETE; but a PDF that
+        # yielded no text at all (typically a scan) gets its own audited event,
+        # so "processed" is never silently read as "has usable text".
+        if text_summary and text_summary["result"] == TEXT_RESULT_NONE:
+            emit(
+                event_type=DocumentEvent.PROCESSING_NO_TEXT,
+                resource_id=str(version.public_id),
+                tenant_id=tenant_id,
+                payload={k: text_summary[k] for k in _SUMMARY_COUNT_KEYS},
+            )
 
     except Exception as exc:
         logger.exception("process_document_version failed for version %s", version_pk)
@@ -305,7 +316,27 @@ def _create_locator(
     )
 
 
-def _process_pdf(version, raw: bytes) -> None:
+#: Per-page outcome of PDF text extraction, stored on the page locator's
+#: structured_metadata["extraction_outcome"].
+PAGE_TEXT = "text"  # the page yielded text
+PAGE_NO_TEXT = "no_text"  # the page yielded 0 characters (e.g. a scanned image)
+PAGE_ERROR = "error"  # extract_text() raised; the page is stored empty
+
+#: Version-level result, stored in source_metadata["text_extraction"]["result"].
+TEXT_RESULT_COMPLETE = "complete"  # every page has text
+TEXT_RESULT_PARTIAL = "partial"  # some pages have text, some do not
+TEXT_RESULT_NONE = "none"  # no page has text: no extractable text, likely scanned
+
+_SUMMARY_COUNT_KEYS = ("total_pages", "pages_with_text", "pages_without_text", "pages_failed")
+
+
+def _process_pdf(version, raw: bytes) -> dict:
+    """Extract text per page. Returns the text-extraction summary.
+
+    A page whose extraction yields nothing, or raises, is still stored (empty),
+    but its outcome is recorded instead of being silently swallowed, and the
+    version carries a summary so callers can tell "processed" from "has text".
+    """
     import pypdf
 
     reader = pypdf.PdfReader(io.BytesIO(raw))
@@ -322,21 +353,67 @@ def _process_pdf(version, raw: bytes) -> None:
     version.source_metadata = {"page_count": page_count, **meta}
     version.save(update_fields=["source_metadata"])
 
+    with_text = without_text = failed = 0
     for i, page in enumerate(reader.pages):
+        page_number = i + 1
         text = ""
+        page_meta = {"page_number": page_number}
         try:
             text = page.extract_text() or ""
-        except Exception:  # noqa: S110
-            pass
+        except Exception as exc:
+            # Never log the text or str(exc) (it can quote document bytes);
+            # identify the page and the exception class only.
+            logger.warning(
+                "pdf text extraction failed (document=%s, version=%s, page=%s, error=%s)",
+                version.document.public_id,
+                version.public_id,
+                page_number,
+                type(exc).__name__,
+            )
+            text = ""
+            page_meta["extraction_outcome"] = PAGE_ERROR
+            page_meta["extraction_error"] = type(exc).__name__
+            failed += 1
+        else:
+            if text.strip():
+                page_meta["extraction_outcome"] = PAGE_TEXT
+                with_text += 1
+            else:
+                page_meta["extraction_outcome"] = PAGE_NO_TEXT
+                without_text += 1
         _create_locator(
             version,
             LocatorType.PAGE,
-            i + 1,
-            display_label=f"Page {i + 1}",
-            metadata={"page_number": i + 1},
+            page_number,
+            display_label=f"Page {page_number}",
+            metadata=page_meta,
             text=text[:10000],
             order=i,
         )
+
+    if with_text == 0:
+        result = TEXT_RESULT_NONE
+    elif with_text < page_count:
+        result = TEXT_RESULT_PARTIAL
+    else:
+        result = TEXT_RESULT_COMPLETE
+    summary = {
+        "total_pages": page_count,
+        "pages_with_text": with_text,
+        "pages_without_text": without_text,
+        "pages_failed": failed,
+        "result": result,
+    }
+    version.source_metadata = {**version.source_metadata, "text_extraction": summary}
+    version.save(update_fields=["source_metadata"])
+    if result == TEXT_RESULT_NONE:
+        logger.warning(
+            "pdf has no extractable text, likely scanned (document=%s, version=%s, pages=%s)",
+            version.document.public_id,
+            version.public_id,
+            page_count,
+        )
+    return summary
 
 
 def _process_docx(version, raw: bytes) -> None:

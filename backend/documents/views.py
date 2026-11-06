@@ -50,6 +50,7 @@ from .serializers import (
     DocumentVersionSerializer,
     DocumentVersionStatusSerializer,
     DocumentVersionUploadSerializer,
+    text_extraction_warning,
 )
 from .storage import compute_sha256, get_storage_backend
 from .tasks import scan_document_version
@@ -376,7 +377,11 @@ class DocumentLocatorListView(APIView):
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(locators, request)
         serializer = DocumentLocatorSerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
+        response = paginator.get_paginated_response(serializer.data)
+        # Callers that read only the extracted text must still see when it is
+        # incomplete (no extractable text, likely scanned, or some pages empty).
+        response.data["text_extraction_warning"] = text_extraction_warning(version)
+        return response
 
 
 @extend_schema_view(
