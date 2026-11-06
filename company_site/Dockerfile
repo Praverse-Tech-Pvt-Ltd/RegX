@@ -4,7 +4,10 @@
 # RAAI/settings_integration.py, requirements.docker.in/.txt and the smoke tests — the application
 # code, templates, static assets and database are exact copies of the source
 # we were given.
-FROM python:3.12-slim
+# Pinned by digest (python:3.12-slim as of 2026-10-28, Python 3.12.16). The tag moves;
+# bump the digest deliberately in its own PR, together with the lock scripts
+# (scripts/lock_*_deps.sh), and run the full suites.
+FROM python:3.12-slim@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
