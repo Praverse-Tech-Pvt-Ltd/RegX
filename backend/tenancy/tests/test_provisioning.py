@@ -95,6 +95,21 @@ class TestCreateTenantUserCommand:
         roles = MembershipRole.objects.filter(membership__user=user, membership__tenant=tenant)
         assert sorted(roles.values_list("role__name", flat=True)) == ["doer", "reviewer"]
 
+    def test_binds_the_platform_role_not_another_tenants_copy(self, tenant, user):
+        """Found on a real local database: tenant-scoped rows that reuse the
+        built-in names (e.g. `vp` in another tenant) with is_system=True."""
+        from authorization.models import Role
+
+        other = Tenant.objects.create(name="Other", slug="other")
+        Role.objects.create(name="vp", tenant=other, is_system=True)
+        call_command(
+            "create_tenant_user", "--tenant", tenant.slug, "--email", user.email,
+            "--role", "vp",
+        )  # fmt: skip
+        bound = MembershipRole.objects.get(membership__user=user, membership__tenant=tenant)
+        assert bound.role.tenant is None
+        assert bound.role.name == "vp"
+
     def test_new_user_without_password_env_is_refused(self, tenant):
         with pytest.raises(CommandError, match="--password-env"):
             call_command(

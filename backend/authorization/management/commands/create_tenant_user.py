@@ -51,7 +51,10 @@ class Command(BaseCommand):
 
         roles = []
         for name in sorted(set(options["role"])):
-            role = Role.objects.filter(name=name, is_system=True).first()
+            # The platform-wide built-in role (tenant=None, seeded by
+            # authorization/seed.py). Some databases also hold tenant-scoped
+            # copies of these names; never bind another tenant's role.
+            role = Role.objects.filter(name=name, tenant__isnull=True, is_system=True).first()
             if role is None:
                 raise CommandError(f"System role {name!r} is missing. Run migrations first.")
             roles.append(role)
