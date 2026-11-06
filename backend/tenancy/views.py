@@ -7,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .models import Tenant, TenantMembership
-from .serializers import MembershipSerializer, TenantCreateSerializer, TenantSerializer
+from .serializers import MembershipSerializer, TenantSerializer
 
 
 @extend_schema(tags=["tenants"])
@@ -21,11 +21,16 @@ def tenant_list_view(request):
         tenants = [m.tenant for m in memberships]
         return Response(TenantSerializer(tenants, many=True).data)
 
-    s = TenantCreateSerializer(data=request.data)
-    s.is_valid(raise_exception=True)
-    tenant = s.save()
-    TenantMembership.objects.create(tenant=tenant, user=request.user)
-    return Response(TenantSerializer(tenant).data, status=status.HTTP_201_CREATED)
+    # Self-service tenant creation is disabled: any signed-in user could create
+    # a tenant and become its only member. Platform operators create tenants
+    # with `manage.py create_tenant`. POST stays routed for a clear answer.
+    return Response(
+        {
+            "detail": "Creating an organisation is restricted to platform administrators.",
+            "error_code": "tenant_creation_restricted",
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
 
 
 @extend_schema(tags=["tenants"])

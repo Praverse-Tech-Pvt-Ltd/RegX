@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from . import mfa_policy
 from .models import MembershipRole, Permission, Role
 
 
@@ -63,3 +64,22 @@ def my_roles_view(request):
         .distinct()
     )
     return Response({"roles": sorted(set(names))})
+
+
+@extend_schema(tags=["authorization"])
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def mfa_status_view(request):
+    """Whether the caller must enrol in MFA before acting (SOW 4.3).
+
+    `mfa_enrolment_required` is true for a Reviewer or VP with no verified
+    device; the UI uses it to show the enrolment banner. Read-only, own account.
+    """
+    user = request.user
+    return Response(
+        {
+            "mfa_enrolled": mfa_policy.is_enrolled(user),
+            "holds_mfa_required_role": mfa_policy.holds_mfa_required_role(user),
+            "mfa_enrolment_required": mfa_policy.requires_mfa_enrolment(user),
+        }
+    )

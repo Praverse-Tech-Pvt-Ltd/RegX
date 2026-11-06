@@ -79,6 +79,8 @@ MIDDLEWARE = [
     "csp.middleware.CSPMiddleware",
     "tenancy.middleware.TenantMiddleware",
     "audit.middleware.AuditMiddleware",
+    # After authentication and tenancy: needs request.user. SOW 4.3.
+    "authorization.middleware.MFAEnrolmentMiddleware",
 ]
 
 ROOT_URLCONF = "regx.urls"

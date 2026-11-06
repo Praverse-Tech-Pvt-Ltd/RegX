@@ -116,13 +116,9 @@ export interface Tenant {
   created_at: string;
 }
 
+// There is no `register`: public self-registration is disabled (403
+// `self_registration_disabled`); platform operators create accounts.
 export const auth = {
-  register: (email: string, password: string, full_name?: string) =>
-    apiRequest<UserProfile>("/api/regx/v1/auth/register/", {
-      method: "POST",
-      body: { email, password, full_name },
-    }),
-
   login: (email: string, password: string) =>
     apiRequest<UserProfile | MfaPending>("/api/regx/v1/auth/login/", {
       method: "POST",
@@ -141,14 +137,10 @@ export const auth = {
   me: () => apiRequest<UserProfile>("/api/regx/v1/auth/me/"),
 };
 
+// There is no `create`: self-service tenant creation is disabled (403
+// `tenant_creation_restricted`); platform operators create tenants.
 export const tenants = {
   list: () => apiRequest<Tenant[]>("/api/regx/v1/tenants/"),
-
-  create: (name: string, slug: string) =>
-    apiRequest<Tenant>("/api/regx/v1/tenants/", {
-      method: "POST",
-      body: { name, slug },
-    }),
 };
 
 // ---------------------------------------------------------------------------
@@ -1890,7 +1882,16 @@ export const iigChecklists = {
   },
 };
 
+/** SOW 4.3: a Reviewer or VP must enrol before any state-changing request. */
+export interface MfaStatus {
+  mfa_enrolled: boolean;
+  holds_mfa_required_role: boolean;
+  mfa_enrolment_required: boolean;
+}
+
 export const mfa = {
+  status: () => apiRequest<MfaStatus>("/api/regx/v1/permissions/mfa-status/"),
+
   setup: () => apiRequest<{ totp_uri: string; recovery_codes: string[] }>("/api/regx/v1/mfa/setup/", { method: "POST" }),
 
   verify: (code: string) =>
