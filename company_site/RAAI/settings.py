@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 
 
 
@@ -24,10 +25,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config(
-    "SECRET_KEY",
-    default="django-insecure-@p+gqd5klb7_e&nd7cpt)hhbbb1wbuua(^h82+7mc9oijp-15m",
-)
+# No default: a hardcoded fallback key was committed here before and must be
+# treated as compromised (docs/CREDENTIAL_INVENTORY.md). Without SECRET_KEY the
+# app refuses to start. compose passes COMPANY_SECRET_KEY in as SECRET_KEY;
+# run_tests.sh generates a throwaway one for the tests.
+SECRET_KEY = config("SECRET_KEY", default="")
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        "SECRET_KEY is not set. company_site refuses to start without it: set SECRET_KEY "
+        "in the environment (docker compose passes COMPANY_SECRET_KEY as SECRET_KEY)."
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", cast=bool, default=True)
