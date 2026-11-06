@@ -75,7 +75,7 @@ session and carrying anything over makes them lie about this one.
 
 - `backend/`: Django 5.2 + DRF. The project package is `regx` (`regx/settings/{base,development,production,test}.py`). Each domain is a top-level app. `demo_seed/` is a composition root that nothing may import.
 - `frontend/`: Next.js 15 / React 19. Pages live under `src/app/(regx)/`. The whole API client is one file, `src/lib/api.ts`. Tests are in `tests/unit` (vitest) and `e2e/` (Playwright, API mocked with `page.route`).
-- `company_site/`: the legacy monolith (`RAAI`, `RATools`, `AIDatabase`, `AdminMaster`), carried in and run as its own service on its own SQLite DB. It has no migrations folder, no CI tests, and REGX code must never import it.
+- `company_site/`: the legacy monolith (`RAAI`, `RATools`, `AIDatabase`, `AdminMaster`), carried in and run as its own service on its own SQLite DB. It has no migrations folder and REGX code must never import it. Its smoke tests (`company_site/run_tests.sh`) run in CI on every PR, always with `OPENAI_API_KEY` unset.
 - `infra/nginx/nginx.conf`: the single integrated origin.
   - `:8080` serves the REGX API (`/api/`), an **explicit allow-list of REGX page prefixes**, and company_site for everything else.
   - `:8090` serves the company_site admin console only.
@@ -130,7 +130,7 @@ scripts/lock_backend_deps.sh --upgrade-package kombu  # deliberately upgrade one
 - Never edit a `.txt` lock by hand. Commit each `.in` together with its regenerated `.txt`.
 - The script runs `pip-compile` in `python:3.12-slim` (the backend image's base), so versions match production. It keeps already-locked versions unless told to upgrade, so a re-run with unchanged inputs changes nothing.
 - CI job "Dependency locks match their inputs" regenerates the locks and fails on any diff.
-- `company_site/` is not locked (see `PROJECT_OVERVIEW.md` §11).
+- `company_site/` is locked the same way: `company_site/requirements.docker.in` → `requirements.docker.txt`, regenerated with `scripts/lock_company_site_deps.sh`.
 
 In the compose container (the runtime image ships without pytest):
 

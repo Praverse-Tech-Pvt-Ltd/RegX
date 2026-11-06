@@ -600,8 +600,8 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 9. **company_site:**
    - insecure-key and `DEBUG=True` defaults outside compose
    - `@csrf_exempt` POST views
-   - **0 tests** for about 22k lines of RATools/AdminMaster views
-   - unpinned dependencies, so builds are not reproducible
+   - **0 tests** for about 22k lines of RATools/AdminMaster views (2026-11-06: 17 smoke tests added, plus the 24 existing AIDatabase tests, in CI on every PR; branch `regx/chore/company-site-pin-and-smoke`, see #10d)
+   - unpinned dependencies, so builds are not reproducible (2026-11-06: locked with hashes, see #10d)
    - a 7 MB SQLite database in git
    - no Celery worker, so queued jobs silently never run
 10. **The documented OpenAI cost guard is missing from the code that runs.** `ENABLE_OBSERVATION_SUMMARIES` is described in `constraints.md:57` and `handoff.md:288`. It exists only on the legacy `main` branch (`4193f09`) and was never ported into `company_site/` on regx-main. Setting `OPENAI_API_KEY` there would let the public `GET /` trigger paid calls.
@@ -618,6 +618,13 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
       - **Proof:** clean `--no-cache` image build installs exactly the baseline set; Celery worker logs `Connected to redis` and `ready`, answers `inspect ping` with pong; `dev.txt` installs hash-checked with `pip check` clean; full backend suite 4,230 passed / 2 skipped; pip-audit identical before and after (#10c).
 10c. **pypdf 6.20.0 now has 16 known advisories** [Verified 2026-11-05, pip-audit]. PR #79 moved pypdf to 6.20.0 when it had none; since then 16 GHSA advisories were published against it, fixed between 6.20.1 and 6.21.4. **pypdf parses user uploads** (`documents/tasks.py`), so this matters. Also open: pytest 8.3.5 (`PYSEC-2026-1845`, fixed in 9.0.3; dev only). Not upgraded in the lock PR, by instruction. **Status 2026-11-05: PR [#100](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/100) (`regx/fix/pypdf-upgrade`, `9421302`, from `regx-main@369b9c3`), open, not merged.** pypdf 6.20.0 → **6.21.4** (newest; fixes all 16) via `base.in` + `scripts/lock_backend_deps.sh`; it is the **only** version change in all three locks (no hash change for any other package; pypdf has no runtime dependencies on Python 3.12). pip-audit: `base.txt` 16 → **0**, `dev.txt` 17 → 1 (pytest only: its fix 9.0.3 is a major upgrade, so excluded by instruction). Clean build, worker ready, live 5-page PDF upload through the documents API: all pages extracted, text **identical page by page** to pypdf 6.20.0. Full suite 4,230 passed / 2 skipped. **Next:** a separate PR running `scripts/lock_backend_deps.sh --upgrade-package pypdf==6.21.4` (or newer), with the document-parsing tests and a real-PDF upload check.
 10d. **company_site dependencies are not locked** (follow-up to #10b, out of scope of the lock PR). Its requirements are unpinned (§11 #9), so its builds drift the same way REGX's did. Same approach would apply (`.in` + hashed lock + script + CI check), but company_site has no tests, so a lock must be checked by hand against a working image first. The runtime image installs 50 packages; `base.txt` pins 19. About 31 (e.g. `kombu`, `billiard`, `vine`, `amqp`, `asgiref`, `sqlparse`) resolve to whatever is newest on build day, so two builds of the same commit can differ. The Dockerfile runs `pip install -r requirements/base.txt`; CI runs `pip install -r requirements/dev.txt`. **Proposal (not built):**
+    - **Status 2026-11-06: BUILT on local branch `regx/chore/company-site-pin-and-smoke` (from `regx-main@447ac97`), not pushed** (owner: stop with the diff first). No feature change, no upgrade.
+      - `company_site/requirements.docker.in` (the company's list, unchanged) → `company_site/requirements.docker.txt`, a pip-tools lock: 76 packages, all with sha256 hashes. Seeded from `pip freeze` of the image that was running (built 2026-10-12). **0 differences** against it, and the clean `--no-cache` build installs exactly that set. `scripts/lock_company_site_deps.sh` regenerates it (python:3.12-slim, pip-tools 7.4.1); a re-run changes nothing.
+      - `company_site/Dockerfile` installs with `--require-hashes --no-deps`. The service starts and its compose health check (`/termsofuse/`) reports healthy.
+      - **Not pinned:** the base image tag `python:3.12-slim` (it moved from Python 3.12.15 to 3.12.16 between builds) and the apt packages; same as the backend.
+      - Kept as they were (pinning is not upgrading): Django 5.1.3 (past end of support, 22 advisories), PyPDF2 3.0.1, djangorestframework-simplejwt 5.3.1, openai 3.26.1.
+      - **Smoke tests** `company_site/smoke_tests/` (17, Django test runner) + the existing `AIDatabase/tests.py` (24), run by `company_site/run_tests.sh`; CI workflow `.github/workflows/company-site.yml` on every PR (lock check + tests in the built image with `--network none`).
+
     - **Tool:** `pip-tools`. Keep the human-edited files as inputs (rename to `base.in`, `test.in`, `dev.in`, same content plus `-c` links), and generate fully pinned lock files `base.txt`, `test.txt`, `dev.txt` with `pip-compile --generate-hashes --strip-extras`. Every package, direct and indirect, gets an exact version and a sha256 hash. Compile on Linux with Python 3.12 (inside the backend image) so platform markers match production.
     - **Docker:** unchanged command, but install with `pip install --require-hashes --no-deps -r requirements/base.txt`. A missing or changed package then fails the build instead of silently installing something else.
     - **CI:** install `dev.txt` the same way. Add a job that runs `pip-compile --dry-run` (or compiles into a temp file and diffs) and fails if a `.in` file changed without regenerating its lock. Keep pip-audit (§11 #14) pointed at the lock files, which now describe exactly what ships.
@@ -629,6 +636,17 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 
 **Medium**
 
+10e. **Where company_site can call OpenAI** [Verified 2026-11-06, static analysis (`ast`) plus a test run with a network guard; for the 483 work]:
+    - **The only OpenAI code:** `company_site/AIDatabase/observation_summary.py`: `generate_summary` (line 293) calls `client.chat.completions.create` (line 350, OpenAI SDK) or the legacy `openai.ChatCompletion.create` (line 332), model `gpt-4.1-mini` (line 35), up to 3 attempts per block (`SUMMARY_MAX_ATTEMPTS`, line 43). The key is read by `_get_openai_api_key` (line 264) from `OPENAI_API_KEY` (env, then settings, then `openai.api_key`); with no key, `_get_openai_client` (line 272) returns None and nothing is sent. No other module imports or calls OpenAI (no `api.openai.com`, no other SDK).
+    - **The one way in:** `process_observation_summary` (`observation_summary.py:384`) is called only from `_refresh_excel_cache_from_source_info` (`company_site/AIDatabase/views.py:559`), and only for the `observations` cache (the FDA-483 spreadsheet). Warning-letter and GMPC caches never summarise.
+    - **Routes that can trigger it** (each loads the observations cache via `get_cached_df()`, `views.py:727`; a cold cache or a changed spreadsheet runs the summariser):
+      - `GET /` → `RATools.views.home` (`company_site/RATools/views.py:216`, call at line 223), the route behind the 71-call incident;
+      - `/aidatabase/form483/` (`form483_dashboard`, `views.py:1918`), `/aidatabase/auditiq/` (`auditiq_dashboard`, `views.py:1888`), `/aidatabase/gmpc_module/` (`gmpc_homepage` via `_get_homepage_fda_observation_total`, `views.py:1875`);
+      - `/aidatabase/company_object/`, `/aidatabase/list_of_organization_names/`, `list_of_fei_numbers/`, `list_of_country/`, `list_of_company/`, `list_of_investigators/`, `list_of_establishments/`, `list_of_systems/`, `list_of_years/` (`views.py:3999`, `4694`–`4816`);
+      - `/aidatabase/investigator_insights/` (`views.py:5510`) and `/aidatabase/investigator-detail-insights/` (`views.py:5550`).
+      - URL table: `company_site/AIDatabase/urls.py` lines 25–26, 63–71, 101–102, 105; `company_site/RAAI/urls.py:11`.
+    - **Non-route triggers (dormant today):** saving an `ObservationImageExcelMaster` in the Django admin (`company_site/AIDatabase/admin.py:39`, queues `process_form483_excel_task` at line 74) and its `post_save` signal (`company_site/AIDatabase/signals.py:17`) queue the Celery task `company_site/AIDatabase/tasks.py:7`, which calls `refresh_form483_excel_cache` (`views.py:1597`). No company Celery worker runs in compose, so the task waits in Redis and never executes; starting a worker would run it.
+    - **Scale:** with the spreadsheet shipped in the repository (`Final_File_FDA_Observations_15_12_2025.xlsx`), one cold load covers 8,362 observation blocks: 2,700 already have a summary and **5,662 would each go to OpenAI** (up to 3 attempts each). That is far more than the 71 calls recorded earlier. The only guard is still that `OPENAI_API_KEY` is unset (§11 #10).
 11. ~~The OpenAPI schema and Swagger are public to anonymous users.~~ The full map of 273 operations is exposed [Verified].
     - **Fix in PR [#83](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/83) (open; rebased as `9c62f97`):** production settings only, `SERVE_PERMISSIONS=IsAuthenticated`. Development and test settings stay open.
 12. Migrations do not run on start, and readiness says "ready" on an empty schema [Verified]. Easy to ship a broken release.
@@ -1800,3 +1818,36 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
 **Not done:** nothing merged; no code changed.
 
 **Working files:** session scratchpad (outside the repo). No services were started; they are confirmed stopped at the end.
+
+### 2026-11-06 (fourth session) — company_site: dependency lock, smoke tests, OpenAI call sites (Claude Code)
+
+**Session start rule:** deleted `review-handoff/` and `review-handoff.zip` without reading them.
+
+**Branch `regx/chore/company-site-pin-and-smoke`** from `regx-main@447ac97` (#103 merged), committed together with this entry, **not pushed** (owner: stop with the diff first). No feature change, no upgrade, no template or data change.
+
+**Safety first:**
+- Backed up both company databases to `D:/Praverse/backups/company_site/2026-11-06/` (outside the repo) before running anything: the repository copy `company_site/db.sqlite3` (checksum matches the original) and the live one from the `company_db` volume.
+- `OPENAI_API_KEY`: absent from the running container's environment and process. It was never set in any container or test run this session, not even to test the refusal check (that check is verified by reading the code only).
+- Tests run in throwaway containers without the `company_db` volume, on Django's in-memory test database; the FDA-483 spreadsheet is a temp copy; every file the cache refresh writes is redirected to a temp directory.
+
+**Step 1: pin.**
+- Baseline: `pip freeze` of the running image (built 2026-10-12, Python 3.12.15): 77 entries (76 without pip).
+- `company_site/requirements.docker.txt` renamed (`git mv`) to `company_site/requirements.docker.in` (content unchanged, header added); a new `requirements.docker.txt` lock generated by `scripts/lock_company_site_deps.sh` (pip-tools 7.4.1 in python:3.12-slim), seeded from the baseline: **76 packages, 1,277 hashes, 0 differences**; a re-run changes nothing.
+- `company_site/Dockerfile`: `pip install --require-hashes --no-deps -r requirements.docker.txt`.
+- **Proof:** clean `--no-cache` build: installed set **identical** to the baseline (only Python moved 3.12.15 → 3.12.16 with the base image tag, not pinned); service started, compose health check **healthy** after about 20 s.
+
+**Step 2: smoke tests** (`company_site/smoke_tests/__init__.py`, `company_site/smoke_tests/test_smoke.py`, runner `company_site/run_tests.sh`):
+- **Guards:** `run_tests.sh` exits before running anything if `OPENAI_API_KEY` is set; `smoke_tests/__init__.py` raises at import for direct runs; every test asserts the key is unset in the environment and in settings, and runs under a network guard that blocks and records any non-loopback connection (socket `connect`, `connect_ex`, `create_connection`, `getaddrinfo`); `tearDown` fails on any attempt.
+- **Tests (17):** app starts (system checks, `/termsofuse/` health route, login page); shared REGX login against a fake `requests.Session` (normal user signed in and mirrored with an unusable password and an `AssignChecker` row; MFA-enrolled user refused with "Invalid Credential" and no session; wrong password refused); local fallback with blank `REGX_AUTH_URL` (works, REGX never contacted; wrong password refused); main pages for a logged-in user with content checks (`/`, `/ratools/`, `/aidatabase/auditiq/`, `/aidatabase/form483/`, `/adminmaster/adminbase`, spreadsheet unchanged); **no OpenAI call**: `/`, `/aidatabase/form483/`, `/aidatabase/auditiq/`, `/aidatabase/gmpc_module/` with blanked summaries run the summariser (its client getter is called) but no SDK client is built, no completion is requested, no socket is opened, and the spreadsheet is not rewritten; `process_observation_summary` with no key generates nothing; the guard really blocks `api.openai.com`.
+- **Results:** 41 tests OK (17 smoke + 24 existing AIDatabase), also with `--network none`.
+- **CI:** `.github/workflows/company-site.yml`, on every PR (no path filter, as requested) and on pushes to `regx-main`: lock check (regenerate, fail on diff) and smoke tests in the built image with `--network none`, after a step that fails if `OPENAI_API_KEY` is set.
+
+**Report: OpenAI call sites** (script `map_openai_paths.py`, static `ast` analysis, imports nothing from the app): see §11 #10e. Summary: one module (`AIDatabase/observation_summary.py`), one caller (`AIDatabase/views.py:559`, observations cache only), 15 routes including `GET /` (the tracer's 4 warning-letter routes excluded: that cache never summarises), plus dormant admin/signal/Celery triggers. With the shipped spreadsheet a cold load would send **5,662** observation blocks to OpenAI (8,362 total, 2,700 already summarised), up to 3 attempts each.
+
+**Also changed:** `CLAUDE.md` Layout and Commands lines that became false (company_site "no CI tests" and "is not locked"); the lock command is documented there.
+
+**Not done:** no upgrades (Django 5.1.3, PyPDF2, simplejwt, openai stay as installed), nothing pushed or merged.
+
+**Overview updated:** §11 #9, #10d (status), new #10e (OpenAI call sites).
+
+**Working files:** session scratchpad (outside the repo). Services stopped at the end.

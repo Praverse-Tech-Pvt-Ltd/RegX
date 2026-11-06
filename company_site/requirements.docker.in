@@ -1,0 +1,35 @@
+# Input for requirements.docker.txt (the lock the Dockerfile installs).
+# Edit THIS file, then run scripts/lock_company_site_deps.sh to regenerate the lock
+# (exact versions + sha256 hashes for every package, direct and indirect).
+# The list itself is the company's own requirements, re-encoded as UTF-8; unchanged.
+crispy-bootstrap4==2024.10
+crispy-bootstrap5==2024.10
+Django==5.1.3
+django-bootstrap5==24.3
+django-ckeditor==6.7.1
+django-cors-headers==4.6.0
+django-countries==7.6.1
+django-crispy-forms==2.3
+django-filter==24.3
+django-js-asset==2.2.0
+django-multiselectfield==0.1.13
+django-richtextfield==1.6.2
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+openai
+pandas
+seaborn
+matplotlib
+python-decouple
+gunicorn
+pillow
+fuzzywuzzy
+openpyxl
+pytz
+requests
+celery
+redis
+django-celery-beat
+django-celery-results
+python-docx
+PyPDF2
