@@ -1972,7 +1972,7 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
 
 **Step 6: local CSRF fix** (§11 #10j). **Fixed on local branch `regx/fix/csrf-trusted-origins` (`8a45087`), not pushed** (stopped for review): the backend service in `compose.yaml` gets `CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}` (local stack only, overridable; a real deployment sets its own https origins). Proven live: stack rebuilt from the branch, signed in through `http://localhost:8080` in the browser, `POST /tenants/active/` → 200 (403 "Origin checking failed" before). Follow-up (not built): a compose-stack CI step that performs one authenticated write.
 
-**Docs PR:** branch `regx/docs/credentials-and-azure-checklist`, docs-only PR opened at the end of the session (inventory, Azure checklist, Pratham's email, overview). Not merged.
+**Docs PR:** [#108](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/108), branch `regx/docs/credentials-and-azure-checklist` (inventory, Azure checklist, Pratham's email, overview). Not merged.
 
 **Not done (per Maanav's sequencing):** no AI code, no 483 redesign build, no `db.sqlite3` change, no units. Nothing merged. Open from the email for later sessions: MFA policy for admin/privileged accounts; tenant-isolation negative tests; branch protection; disable the leaked `django-insecure` default in company_site settings ("disable wherever we control the deployment configuration"); the consolidated plan due 2026-11-13.
 
