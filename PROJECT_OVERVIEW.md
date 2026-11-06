@@ -629,6 +629,7 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 
 **Medium**
 
+10f. **Pin the Python base images by digest** (small follow-up, not built; noted 2026-11-06). `backend/Dockerfile` and `company_site/Dockerfile` use the moving tag `FROM python:3.12-slim`, and both lock scripts (`scripts/lock_backend_deps.sh`, `scripts/lock_company_site_deps.sh`) run in that tag too. The Python packages are locked with hashes, but the interpreter and OS are not: between two company_site builds the tag moved Python from 3.12.15 to 3.12.16. Proposal: `FROM python:3.12-slim@sha256:<digest>` in both Dockerfiles and the same digest in both lock scripts, updated deliberately (one PR per bump, full suites run). The apt packages (`gcc`, `libpq-dev`, `g++`) stay unpinned unless that becomes a problem. Size: S.
 11. ~~The OpenAPI schema and Swagger are public to anonymous users.~~ The full map of 273 operations is exposed [Verified].
     - **Fix in PR [#83](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/83) (open; rebased as `9c62f97`):** production settings only, `SERVE_PERMISSIONS=IsAuthenticated`. Development and test settings stay open.
 12. Migrations do not run on start, and readiness says "ready" on an empty schema [Verified]. Easy to ship a broken release.
@@ -1800,3 +1801,22 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
 **Not done:** nothing merged; no code changed.
 
 **Working files:** session scratchpad (outside the repo). No services were started; they are confirmed stopped at the end.
+
+### 2026-11-06 (fifth session) — company_site PR #104, legacy 483 summariser redesign proposal (Claude Code)
+
+**Session start rule:** deleted `review-handoff/` and `review-handoff.zip` without reading them.
+
+- **Pushed `regx/chore/company-site-pin-and-smoke` (`ccab385`) and opened PR [#104](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/104)** (not merged): company_site dependency lock, smoke tests with the no-OpenAI guard, new CI workflow. CI result in the session summary.
+- **New proposal for Pratham:** `docs/LEGACY_483_SUMMARISER_REDESIGN.md` (docs only, nothing built), on branch `regx/docs/legacy-483-summariser-redesign`, separate docs-only PR.
+  - **Today:** summaries are generated inside page loads (15 routes, `GET /`, `/aidatabase/form483/` and `/aidatabase/auditiq/` need no login). With a key set, one cold load starts 5,662 generations, up to 16,986 calls with retries. Unsafe for OpenAI (cost, no cap) and for a self-hosted model (120 s gunicorn timeout, repeated partial work, duplicate calls across 3 workers).
+  - **Proposal:** pages only read stored summaries; a background batch job (command + Celery task) with a kill switch (off by default), a per-run limit, recorded progress and failures, idempotent re-runs and a dry run; new 483s summarised on import; a model adapter (OpenAI or the Azure-hosted model through one setting, default disabled) with the SOW 4.2 b no-training confirmation recorded per run.
+  - **Estimates (marked as estimates):** build about 1.5–2 weeks; backfill = 5,662 × S seconds ÷ concurrency (3 s placeholder: about 4.7 h at concurrency 1, about 1.2 h at 4).
+  - **Preconditions** before any key or endpoint is set in company_site (9 items).
+  - **Measured** on the shipped spreadsheet (script `measure_backfill.py`, read-only, no network): 13,576 rows, 8,362 blocks, 2,700 summarised, 5,662 needing one; input mean 213 words (median 142, total 1,208,535); output target 362,560 words.
+- **§11 new #10f:** pin the Python base images by digest (backend and company_site Dockerfiles and both lock scripts). Small follow-up, not built.
+
+**Merge note:** #104 also edits §11 (adds #10e) and appends a Work Log entry, so whichever of #104 and this docs PR merges second will need a small, text-only conflict resolution in `PROJECT_OVERVIEW.md`.
+
+**Not done:** nothing merged; no code changed in this docs PR.
+
+**Working files:** session scratchpad (outside the repo). Services stopped at the end.
