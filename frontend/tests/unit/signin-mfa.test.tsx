@@ -19,11 +19,14 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
-const api = vi.hoisted(() => ({ login: vi.fn(), loginMfa: vi.fn() }));
+const api = vi.hoisted(() => ({ login: vi.fn(), loginMfa: vi.fn(), loginRecovery: vi.fn() }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
-  return { ...actual, auth: { ...actual.auth, login: api.login, loginMfa: api.loginMfa } };
+  return {
+    ...actual,
+    auth: { ...actual.auth, login: api.login, loginMfa: api.loginMfa, loginRecovery: api.loginRecovery },
+  };
 });
 
 const PROFILE = {
@@ -51,6 +54,7 @@ beforeEach(() => {
   nav.push.mockReset();
   api.login.mockReset();
   api.loginMfa.mockReset();
+  api.loginRecovery.mockReset();
   setSearch("");
 });
 
@@ -97,5 +101,18 @@ describe("Sign-in with MFA", () => {
     await user.type(screen.getByLabelText("OTP Code"), "123456");
     await user.click(screen.getByRole("button", { name: "Verify" }));
     expect(nav.push).toHaveBeenCalledWith("/tenants");
+  });
+
+  it("a recovery code can be used instead of the authenticator code", async () => {
+    window.history.replaceState({}, "", "/mfa?next=%2Fdocuments");
+    api.loginRecovery.mockResolvedValue({ ...PROFILE, mfa_required: true, recovery_codes_remaining: 9 });
+    const user = userEvent.setup();
+    render(<MFAPage />);
+    await user.click(screen.getByRole("button", { name: /Use a recovery code/ }));
+    await user.type(screen.getByLabelText("Recovery code"), "0123456789abcdef0123");
+    await user.click(screen.getByRole("button", { name: "Verify" }));
+    expect(api.loginRecovery).toHaveBeenCalledWith("0123456789abcdef0123");
+    expect(api.loginMfa).not.toHaveBeenCalled();
+    expect(nav.push).toHaveBeenCalledWith("/documents");
   });
 });

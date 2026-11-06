@@ -250,6 +250,10 @@ def authenticate(username, password):
 def verify_code(pending_cookies, code):
     """Second step: pass the code to REGX's `/auth/login/mfa/` on the pending REGX session.
 
+    `code` is either the 6-digit authenticator code or a single-use recovery
+    code (20 characters, for a lost authenticator); REGX checks both, counts
+    failures toward its lockout and audits recovery-code use.
+
     Returns the local mirror user once REGX accepts the code. Raises
     `MfaInvalidCode` (REGX counted the failure), `MfaLocked` (429), `MfaExpired`
     (no pending sign-in), or `RegxUnavailable`. The company session is created
@@ -264,8 +268,10 @@ def verify_code(pending_cookies, code):
     if pending_cookies and pending_cookies.get("csrftoken"):
         headers["X-CSRFToken"] = pending_cookies["csrftoken"]
     try:
+        code = (code or "").strip()
+        payload = {"code": code} if len(code) == 6 and code.isdigit() else {"recovery_code": code}
         response = session.post(
-            _api("/auth/login/mfa/"), json={"code": code}, headers=headers, timeout=TIMEOUT
+            _api("/auth/login/mfa/"), json=payload, headers=headers, timeout=TIMEOUT
         )
     except requests.RequestException as exc:
         raise RegxUnavailable(str(exc)) from exc

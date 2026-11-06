@@ -153,13 +153,11 @@ class RecoveryCode(TimeStampedModel):
         from django.utils import timezone
 
         h = cls._hash(plaintext)
-        try:
-            code = cls.objects.get(device=device, code_hash=h, used_at__isnull=True)
-        except cls.DoesNotExist:
-            return False
-        code.used_at = timezone.now()
-        code.save(update_fields=["used_at"])
-        return True
+        # One UPDATE, so two simultaneous uses of the same code cannot both succeed.
+        used = cls.objects.filter(device=device, code_hash=h, used_at__isnull=True).update(
+            used_at=timezone.now()
+        )
+        return used == 1
 
     @property
     def is_used(self) -> bool:
