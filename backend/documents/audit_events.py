@@ -15,6 +15,9 @@ class DocumentEvent:
     PROCESSING_STARTED = "document.processing.started"
     PROCESSING_COMPLETE = "document.processing.complete"
     PROCESSING_FAILED = "document.processing.failed"
+    #: The PDF was processed but no page yielded text (no extractable text, likely
+    #: scanned). Status stays COMPLETE; this event is the audited signal.
+    PROCESSING_NO_TEXT = "document.processing.no_text"
     VERSION_CREATED = "document.version.created"
     DOCUMENT_CREATED = "document.created"
     DOCUMENT_ARCHIVED = "document.archived"
@@ -35,6 +38,10 @@ class DocumentEvent:
 _PAYLOAD_ALLOW_LISTS: dict[str, frozenset[str]] = {
     DocumentEvent.PROCESSING_FAILED: frozenset({"failure_code", "retryable", "attempt_count"}),
     DocumentEvent.SCAN_QUEUED: frozenset({"source"}),
+    # Page counts only; never extracted text.
+    DocumentEvent.PROCESSING_NO_TEXT: frozenset(
+        {"total_pages", "pages_with_text", "pages_without_text", "pages_failed"}
+    ),
 }
 
 

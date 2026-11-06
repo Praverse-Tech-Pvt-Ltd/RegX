@@ -9,8 +9,37 @@ import {
   type DocumentVersion,
   type ProcessingStatus,
   type ScanStatus,
+  type TextExtractionWarning,
   ApiError,
 } from "@/lib/api";
+
+/**
+ * Text-extraction warning. Amber, not red: the file was processed; some or all
+ * of its pages simply yielded no text (typically a scan). The full banner is
+ * for "no extractable text"; a page count is a smaller note.
+ */
+function TextExtractionNotice({ warning, compact }: { warning: TextExtractionWarning; compact?: boolean }) {
+  const full = warning.code === "no_extractable_text" && !compact;
+  return (
+    <div
+      role="status"
+      data-testid={`text-extraction-${warning.code}`}
+      style={{
+        marginTop: full ? 0 : "0.5rem",
+        marginBottom: full ? "1rem" : 0,
+        padding: full ? "0.75rem 1rem" : "4px 8px",
+        border: "1px solid #e8c77a",
+        borderRadius: 6,
+        background: "#fff8e6",
+        color: "#6b4a00",
+        fontSize: full ? 14 : 12,
+      }}
+    >
+      {full && <strong style={{ display: "block", marginBottom: 2 }}>Warning: no extractable text</strong>}
+      {warning.message}
+    </div>
+  );
+}
 
 function scanLabel(s: ScanStatus) {
   const map: Record<ScanStatus, string> = {
@@ -66,7 +95,11 @@ function VersionRow({
   tenantSlug: string;
   docId: string;
 }) {
-  const [status, setStatus] = useState<{ scan_status: ScanStatus; processing_status: ProcessingStatus } | null>(null);
+  const [status, setStatus] = useState<{
+    scan_status: ScanStatus;
+    processing_status: ProcessingStatus;
+    text_extraction_warning?: TextExtractionWarning | null;
+  } | null>(null);
   const [showLocators, setShowLocators] = useState(false);
   const [locators, setLocators] = useState<{ public_id: string; locator_type: string; display_label: string; ordering: number }[]>([]);
   const [loadingLocators, setLoadingLocators] = useState(false);
@@ -83,6 +116,7 @@ function VersionRow({
 
   const effectiveScan = status?.scan_status ?? v.scan_status;
   const effectiveProcessing = status?.processing_status ?? v.processing_status;
+  const textWarning = status?.text_extraction_warning ?? v.text_extraction_warning ?? null;
 
   function loadLocators() {
     if (locators.length > 0) { setShowLocators(!showLocators); return; }
@@ -145,6 +179,10 @@ function VersionRow({
           </span>
         </div>
       </div>
+
+      {effectiveProcessing === "complete" && textWarning && (
+        <TextExtractionNotice warning={textWarning} compact />
+      )}
 
       {effectiveProcessing === "complete" && effectiveScan !== "quarantined" && (
         <div style={{ marginTop: "0.75rem" }}>
@@ -341,6 +379,11 @@ function DocumentDetailPageInner() {
       </div>
 
       {actionError && <p role="alert" style={{ color: "#c0392b", fontSize: 13 }}>{actionError}</p>}
+
+      {doc.current_version?.processing_status === "complete" &&
+        doc.current_version.text_extraction_warning && (
+          <TextExtractionNotice warning={doc.current_version.text_extraction_warning} />
+        )}
 
       {doc.status === "active" && (
         <section style={{ marginBottom: "2rem" }}>

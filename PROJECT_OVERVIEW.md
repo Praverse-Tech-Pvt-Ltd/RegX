@@ -643,7 +643,14 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
       - audit trail `document.version.created` → `scan.queued` → `scan.complete` → `processing.started` → **`processing.complete`**; no event, flag, field or log line says no text was extracted;
       - the same holds when `page.extract_text()` raises: `_process_pdf` in `backend/documents/tasks.py` catches it with `except Exception: pass` and stores an empty page.
       - **Effect:** a scanned 483 looks processed but is invisible to anything that searches or reads extracted text (gap analysis, future AI features), and no one is told.
-    - **Proposal (not built):**
+    - **Status 2026-11-05: BUILT on local branch `regx/fix/document-empty-text-warning` (from `regx-main@98f2cff`), not pushed** (owner: stop with the diff first). No OCR. No migration (existing JSON fields). Details in the Work Log (sixth session). In short:
+      - per page: `structured_metadata.extraction_outcome` = `text` / `no_text` / `error` (+ `extraction_error` = exception class); the silent `pass` is now a WARNING log with document and version public ids and the page number, never the text or `str(exc)`;
+      - per upload: `source_metadata.text_extraction` = `total_pages`, `pages_with_text`, `pages_without_text`, `pages_failed`, `result` (`complete` / `partial` / `none`);
+      - API: `text_extraction` and `text_extraction_warning` on the version and status responses (so on the document detail and list too) and on the locators response; `none` → warning `no_extractable_text` "No extractable text, likely scanned…"; `partial` → warning `partial_text` "N of M pages have no extractable text…"; status stays `complete` (a warning, not an error);
+      - audit: new `document.processing.no_text` (page counts only) when no page has text;
+      - UI: amber banner on the document page and a note on the version row; smaller note for partial;
+      - **consumers of extracted text:** only the documents API and its page read it; gap analysis (`iig_checklist/gap_analysis.py`) works on checklist answers and never reads documents; evidence links (workflows, packages, cases, dossiers) require only `scan_status == clean`. A new guard test fails if any module outside `documents` reads extracted text without handling the warning.
+    - **Original proposal:**
       - record per page why text is empty: `extraction_outcome` in the page locator's `structured_metadata` = `text` / `no_text_layer` (page has images but no text) / `extract_error` (exception, with the exception class only);
       - add a version-level summary to `source_metadata`: `pages_with_text`, `pages_without_text`, `pages_with_errors`;
       - when no page has text, keep `processing_status = complete` (the file *was* processed) but set a new field or flag `text_extraction = none` with the reason "no extractable text, likely scanned", emit `document.processing.no_text` (audited), and show a warning badge on the document page; partial cases ("3 of 12 pages have no text") get the same treatment at page level;
@@ -797,7 +804,7 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 | 2.6 a | Chatbot across the workflow: step-by-step guidance, explain requirements, gap assessments, resolution summaries | **Not started** | No LLM code, no chat UI, no provider dependency. The legacy chatbot was **removed** in P8 (`cd0448e`) | All of it: LLM integration, retrieval over REGX data (checklists, deficiency corpus, guidance), chat UI, grounding and citations, audit logging of prompts and responses, claim-guard compliance | Eng (provider choice and data policy is an owner decision, see Q5) | XL |
 | 2.6 b | Single or bulk module upload "on iPharmaAI UI" for automatic gap assessment and resolution; minimal response time | Not started | Upload is single-file (`POST /documents/`). Gap analysis works on **checklist answers**, not on uploaded documents | Bulk upload; analysis of uploaded documents; resolution output. "iPharmaAI UI" is ambiguous (legacy `company_site` or the REGX frontend?) | Eng; Client to clarify where it lives | XL |
 | 2.7 | Word plug-in: section guidance, predictive deficiency flags, gap analysis, references, zero hallucination, auto-versioning | Not started | None. `docs/WORD_ADDIN_CONTRACT_INTAKE.md` lists 13 open contract items | Office add-in, backend API for it, auth (depends on SSO in 4.3). An Eng prototype taskpane is possible, but distribution, security and data-handling decisions are specific missing inputs | **Blocked on client** (13 contract items) | XL |
-| 2.8 a | ANDA/DMF gap score 0–100 for **uploaded documents**, drill-down by section, against iCretegy DB | Partly built | Checklist-based gap analysis with section breakdown, immutable snapshots and UI (P7: `iig_checklist/gap_analysis.py`, `/gap-analyses/`). **The score is deliberately withheld:** the legacy `score_percent` is kept for API compatibility only and is "not governed" (`gap_analysis.py:30-34, 379-396`) | Analysis of uploaded documents, not just checklist answers; the 0–100 score; per-section drill-down on documents. Can be built now with a clearly labelled demo formula. The production formula needs client sign-off | Eng (Client for the final formula) | XL |
+| 2.8 a | ANDA/DMF gap score 0–100 for **uploaded documents**, drill-down by section, against iCretegy DB | Partly built (checklist answers only; **no document pipeline**) | Checklist-based gap analysis with section breakdown, immutable snapshots and UI (P7: `iig_checklist/gap_analysis.py`, `/gap-analyses/`). **The score is deliberately withheld:** the legacy `score_percent` is kept for API compatibility only and is "not governed" (`gap_analysis.py:30-34, 379-396`) | Analysis of uploaded documents, not just checklist answers; the 0–100 score; per-section drill-down on documents. Can be built now with a clearly labelled demo formula. The production formula needs client sign-off | Eng (Client for the final formula) | XL |
 | 2.8 b | Predictive deficiency heatmap by section *(feasibility TBD)* | Not started | The deficiency corpus exists as an API (`/deficiencies/`, `deficiencies` app). It is empty until `import_deficiencies` runs from the legacy snapshot | Section classifier, likelihood model over the deficiency history, heatmap UI | Eng (data is available locally) | L–XL |
 | 2.8 c | AI resolution playbook per gap, with regulatory references | Not started | None | LLM generation grounded in the deficiency corpus and guidance, with citations. Reuses the 2.6 foundation | Eng (guidance corpus from client improves it) | L (after 2.6) |
 | 2.9 a | Stability trend analyzer: ICH data → trend plots, shelf-life prediction, out-of-trend flags *(feasibility TBD)* | Not started | `docs/STABILITY_IMPURITY_ASSISTANT_INTAKE.md` (feasibility intake) | Everything. The SOW defers feasibility, and the intake lists specific decisions (data format, statistical method, assertion boundary) | **Blocked on client** | XL |
@@ -819,6 +826,15 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 | 5.1 | API response under 2 s p95 | Not measured | Same as above. No load test (`docs/RELEASE_BLOCKERS.md`) | Load test (k6/Locust) against a seeded stack | Eng | S–M |
 | 5.1 | 99.9% monthly uptime | Not applicable yet | Nothing is deployed | Hosting decision, monitoring, deployment | Client/owner (hosting) | L (after decision) |
 | 5.1 | Fast/Think query, alert delivery SLAs | Out of REGX scope | These are Part 1 (483 AI) features | — | — | — |
+
+**Row 2.8 a, document gap score: what exists and what it would need** [Verified 2026-11-06, report only, nothing built]:
+- **Today:** gap analysis (`backend/iig_checklist/gap_analysis.py`) works on **checklist answers only**. Nothing in the backend reads uploaded document text except the documents API itself (guarded by `backend/documents/tests/test_text_extraction.py::TestConsumersOfExtractedText`). Uploaded documents are split into page/paragraph/sheet/slide locators with raw text, and nothing more. So the SOW 2.8 "gap score for uploaded documents" has **no pipeline yet**.
+- **What it would need, in order** (sizes are **estimates** for one experienced developer, before any client input):
+  1. **Section splitting** (M): turn locators into document sections (CTD module / heading structure for ANDA and DMF files), with page ranges. Needs the empty-text warning from §11 #15 so scanned files are refused, not scored; OCR stays an owner decision.
+  2. **Matching sections to checklist items** (L): map each checklist item to the section(s) that should answer it. Start with rules on CTD numbering and headings; an AI or embedding match only as a labelled second pass, with a reviewer able to correct the mapping.
+  3. **Gap scoring** (M): per item present / partial / missing, rolled up per section and to the 0–100 score. The formula needs client sign-off (today's checklist score is deliberately withheld as "not governed"); until then a visibly labelled demo formula. Results stored as immutable snapshots like P7.
+  4. **AI explanation on top** (L, after the §2.6 AI foundation): per gap, why it was flagged and which section/page was checked, citing the source text; must pass the regulatory-claim guard and never state that a document is acceptable to an agency.
+  - **Total:** roughly XL (about 4–7 weeks), plus the AI foundation (§13 build order item 2) and the client's formula and checklist content gate. Estimate only.
 
 **Where the docs and the code disagree:**
 - `docs/SOW_SECTION_2_STATUS.md` and the closure audit do not claim the AI items are done, but the closure audit **omits 2.6 and 2.8 entirely**. "Engineering complete" should therefore be read as "the non-AI platform is complete".
@@ -1688,3 +1704,46 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
 - **This Work Log entry** is committed on #99's branch (`578baf4` and the follow-up commit), since the overview is tracked only there until #99 merges.
 
 **Working files:** session scratchpad (outside the repo). Services stopped at the end.
+
+### 2026-11-05 (sixth session) — empty-text warning for PDFs (Claude Code)
+
+**Session start rule:** deleted `review-handoff/` and `review-handoff.zip` without reading them.
+
+**Gate:** confirmed on GitHub that #99 (`8ac9999`) and #100 (`98f2cff`) are merged. `CLAUDE.md` and `PROJECT_OVERVIEW.md` are now tracked on `regx-main`; the untracked local copies were identical (line endings aside) and were replaced by the tracked ones. This entry is committed on this session's branch, per the new rule.
+
+**Branch `regx/fix/document-empty-text-warning`** from `regx-main@98f2cff`, built on 2026-11-05 and **committed and pushed on 2026-11-06** (see the next entry). Builds §11 #15. No OCR.
+
+- **Per page** (`backend/documents/tasks.py`, `_process_pdf`): each page locator's `structured_metadata` gets `extraction_outcome` = `text` / `no_text` / `error`, plus `extraction_error` (exception class) for errors. The silent `except Exception: pass` around `extract_text()` is replaced by a WARNING log naming the document public id, version public id, page number and exception class, never the text or `str(exc)`.
+- **Per upload:** `source_metadata["text_extraction"]` = `total_pages`, `pages_with_text`, `pages_without_text`, `pages_failed`, `result` (`complete` / `partial` / `none`). A WARNING log line when the result is `none`.
+- **Document level:** status stays `complete` (the file was processed). When no page has text, a new audit event `document.processing.no_text` with page counts only (`backend/documents/audit_events.py`, payload allow-listed).
+- **API** (`backend/documents/serializers.py`, `backend/documents/views.py`): `text_extraction` and `text_extraction_warning` on the version serializer (document detail and list via `current_version`, version list) and the status-polling serializer; the locators response carries `text_extraction_warning` at the top. Warning codes `no_extractable_text` ("No extractable text, likely scanned. Text-based features cannot use this document; its extracted text is incomplete: no extractable text.") and `partial_text` ("N of M pages have no extractable text. Extracted text for this document is incomplete."), `level: warning`.
+- **UI** (`frontend/src/app/(regx)/documents/[publicId]/page.tsx`, `frontend/src/lib/api.ts`): amber "Warning: no extractable text" banner on the document page (role `status`, not `alert`), a compact note on the version row; for partial, a smaller note with the count.
+- **Consumers of extracted text (item 5), found by searching the backend for `extracted_text`, `DocumentLocator`, `.locators.`, `processing_status`, `source_metadata`:**
+  - the documents API itself (version, status, locators) and the document page: **labelled** as above;
+  - gap analysis (`backend/iig_checklist/gap_analysis.py`): **does not read documents at all**; it works on checklist answers, so it cannot report "no gaps found" from a text-less document;
+  - no search or matching over document text exists anywhere;
+  - workflows evidence, submission packages, regulatory cases and dossiers link document versions but check only `scan_status == clean`; they never read text;
+  - **guard:** `test_only_the_documents_app_reads_extracted_text` fails if any module outside `documents` reads extracted text without using `text_extraction_warning`; `test_gap_analysis_does_not_read_documents` pins gap analysis.
+  - Not covered: the DOCX/XLSX/PPTX extractors keep their own `except Exception: pass` blocks (the other four of the five in §11 #15); they have no page concept and were out of this request.
+- **Migration:** none (existing `source_metadata` and `structured_metadata` JSON fields).
+- **Tests** (`backend/documents/tests/test_text_extraction.py`, PDFs built in code, no client data): fully image-only PDF (outcomes, summary, `no_text` audit event with counts only, log line), mixed PDF (partial, no `no_text` event), a page whose extraction raises (recorded as `error`, logged with page and class, text and exception message never logged), normal text PDF (unchanged), API warning on document detail, status and locators, partial counts, no warning for a text PDF, the consumer and gap-analysis guards, and wording (no banned regulatory-claim phrase, no review/approval wording). `frontend/tests/unit/document-text-warning.test.tsx` (3): full banner, partial note, nothing for a text PDF.
+- **Results:** `documents` + regulatory-claim guard 182 passed; **full backend suite: the 2026-11-05 run was cut off at 40% when the session ended; re-run on 2026-11-06: 4,241 passed / 2 skipped, 0 failed**; frontend type-check, lint and vitest (563) pass; ruff and import-linter (16 kept) clean.
+- **Live check** (local stack via nginx `:8080`, throwaway tenant `pdf-live-check` and `tenant_admin`, both deleted afterwards):
+  - image-only 2-page PDF: 201; status `complete`; `text_extraction` `{result: none, total_pages: 2, pages_with_text: 0, pages_without_text: 2, pages_failed: 0}`; `text_extraction_warning` `no_extractable_text` on status, document detail and locators; page outcomes `no_text`, `no_text`; audit trail ends `processing.complete` then `processing.no_text` with the counts; celery log "pdf has no extractable text, likely scanned (document=…, version=…, pages=2)";
+  - normal 5-page text PDF: `result complete`, warning `null` everywhere, outcomes all `text`, no `no_text` event, text unchanged (159/104/114/111/50 characters);
+  - UI (browser): the image-only document page shows the amber banner and the version note with the badge still "Complete"; the text PDF page shows no warning.
+
+**Not done (per the prompt):** no OCR, no mapping approvals, no Phase 3; nothing pushed that day.
+
+**Overview updated:** §11 #15 (status).
+
+**Working files:** session scratchpad (outside the repo). The session ended before the hand-off and the service stop; both were done on 2026-11-06.
+
+### 2026-11-06 — empty-text warning committed (PR), §13 row 2.8 note (Claude Code)
+
+**Session start rule:** deleted `review-handoff/` and `review-handoff.zip` without reading them.
+
+- **Re-ran the full backend suite** on `regx/fix/document-empty-text-warning` (yesterday's run stopped at 40% when the session ended; Docker was down and was restarted, images rebuilt from the branch): **4,241 passed / 2 skipped, 0 failed**.
+- **Committed** code, tests, overview and both Work Log entries on that branch (this session's branch, per the tracked-overview rule), **pushed, PR opened, not merged** (number and CI in the session summary and the next entry).
+- **§13 row 2.8 (report only):** gap analysis works on checklist answers only; nothing reads uploaded documents, so the SOW 2.8 document gap score has no pipeline. Added an outline below the table: section splitting (M), matching sections to checklist items (L), gap scoring with a client-approved formula (M), AI explanation on top after the §2.6 AI foundation (L); total roughly XL (about 4–7 weeks). **Estimates.**
+- **Office extractors (Word, Excel, PowerPoint):** not started. The owner's gate: only after the empty-text PR is merged.
