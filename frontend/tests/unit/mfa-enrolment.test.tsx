@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 describe("MFA enrolment banner (SOW 4.3)", () => {
-  it("shows for a Reviewer or VP who has not enrolled, linking to setup", async () => {
+  it("shows for a user in a gated role who has not enrolled, linking to setup", async () => {
     api.status.mockResolvedValue({
       mfa_enrolled: false,
       holds_mfa_required_role: true,

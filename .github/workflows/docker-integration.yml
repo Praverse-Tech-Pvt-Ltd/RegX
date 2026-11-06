@@ -221,7 +221,7 @@ jobs:
               membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
               role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
               MembershipRole.objects.get_or_create(membership=membership, role=role)
-              if role_name in ('reviewer', 'vp') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
+              if role_name in ('reviewer', 'vp', 'tenant_admin', 'platform_support') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
                   # SOW 4.3: a Reviewer/VP needs a verified MFA device before
                   # any write (authorization.middleware.MFAEnrolmentMiddleware).
                   device = MFADevice(user=user, is_verified=True)
@@ -482,7 +482,7 @@ jobs:
               membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
               role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
               MembershipRole.objects.get_or_create(membership=membership, role=role)
-              if role_name in ('reviewer', 'vp') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
+              if role_name in ('reviewer', 'vp', 'tenant_admin', 'platform_support') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
                   # SOW 4.3: a Reviewer/VP needs a verified MFA device before
                   # any write (authorization.middleware.MFAEnrolmentMiddleware).
                   device = MFADevice(user=user, is_verified=True)
@@ -708,7 +708,7 @@ jobs:
               membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
               role, _ = Role.objects.get_or_create(tenant=tenant, name=role_name, defaults={'is_system': True})
               MembershipRole.objects.get_or_create(membership=membership, role=role)
-              if role_name in ('reviewer', 'vp') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
+              if role_name in ('reviewer', 'vp', 'tenant_admin', 'platform_support') and not MFADevice.objects.filter(user=user, is_verified=True).exists():
                   # SOW 4.3: a Reviewer/VP needs a verified MFA device before
                   # any write (authorization.middleware.MFAEnrolmentMiddleware).
                   device = MFADevice(user=user, is_verified=True)

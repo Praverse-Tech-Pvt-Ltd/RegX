@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { mfa } from "@/lib/api";
 
 /**
- * SOW 4.3: a Reviewer or VP with no MFA device can read but not act.
+ * SOW 4.3: a Reviewer, VP, Tenant Admin or Platform Support user with no MFA
+ * device can read but not act (backend setting REGX_MFA_REQUIRED_ROLES).
  *
  * The backend refuses their state-changing requests with 403
  * `mfa_enrolment_required`; this banner tells them why before they try, and
@@ -40,7 +41,7 @@ export default function MfaEnrolmentBanner() {
         color: "#3d3200",
       }}
     >
-      Your Reviewer or VP role requires two-step sign-in (MFA). You can view
+      Your role requires two-step sign-in (MFA). You can view
       records, but you cannot review, approve or change anything until you{" "}
       <a href="/mfa/setup">set up MFA</a>.
     </div>
