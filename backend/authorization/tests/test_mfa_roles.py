@@ -1,6 +1,7 @@
-"""SOW 4.3: Reviewer and VP must enrol in MFA before they can act.
+"""SOW 4.3: Reviewer, VP, Tenant Admin and Platform Support must enrol in MFA before they act.
 
-A Reviewer or VP with no verified MFA device may sign in and read, but every
+The list is `settings.REGX_MFA_REQUIRED_ROLES`. A user holding one of those roles
+with no verified MFA device may sign in and read, but every
 state-changing API call outside `auth/` and `mfa/` is refused with 403
 `mfa_enrolment_required` until they enrol. Other roles are unaffected.
 
@@ -15,6 +16,8 @@ import pyotp
 import pytest
 from django.conf import settings
 from django.core.cache import cache
+from django.core.management import call_command
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -71,10 +74,35 @@ def _enrol(client):
     assert resp.status_code == 200, resp.content
 
 
+GATED = [
+    Role.BuiltIn.REVIEWER,
+    Role.BuiltIn.VP,
+    Role.BuiltIn.TENANT_ADMIN,
+    Role.BuiltIn.PLATFORM_SUPPORT,
+]
+
+
 @pytest.mark.django_db
 class TestGate:
-    @pytest.mark.parametrize("role", [Role.BuiltIn.REVIEWER, Role.BuiltIn.VP])
-    def test_unenrolled_reviewer_or_vp_cannot_write(self, make_member, tenant, role):
+    def test_the_setting_lists_the_gated_roles(self):
+        assert set(settings.REGX_MFA_REQUIRED_ROLES) == {str(r) for r in GATED}
+
+    @override_settings(REGX_MFA_REQUIRED_ROLES=("reviewer",))
+    def test_changing_the_setting_changes_who_is_gated(self, make_member, tenant):
+        """One line in settings decides; nothing else is hardcoded."""
+        assert (
+            _post_write(_session(make_member("vp1@mfa.test", Role.BuiltIn.VP)), tenant).status_code
+            == 200
+        )
+        assert (
+            _post_write(
+                _session(make_member("rv1@mfa.test", Role.BuiltIn.REVIEWER)), tenant
+            ).status_code
+            == 403
+        )
+
+    @pytest.mark.parametrize("role", GATED)
+    def test_unenrolled_gated_role_cannot_write(self, make_member, tenant, role):
         client = _session(make_member(f"{role}@mfa.test", role))
         resp = _post_write(client, tenant)
         assert resp.status_code == status.HTTP_403_FORBIDDEN
@@ -88,16 +116,14 @@ class TestGate:
         assert resp.status_code == status.HTTP_403_FORBIDDEN
         assert resp.json()["error_code"] == "mfa_enrolment_required"
 
-    @pytest.mark.parametrize("role", [Role.BuiltIn.REVIEWER, Role.BuiltIn.VP])
-    def test_unenrolled_reviewer_or_vp_can_still_read(self, make_member, tenant, role):
+    @pytest.mark.parametrize("role", GATED)
+    def test_unenrolled_gated_role_can_still_read(self, make_member, tenant, role):
         client = _session(make_member(f"{role}@mfa.test", role))
         resp = client.get(READ)
         assert resp.status_code == status.HTTP_200_OK
         assert [t["slug"] for t in resp.data] == [tenant.slug]
 
-    @pytest.mark.parametrize(
-        "role", [Role.BuiltIn.DOER, Role.BuiltIn.TENANT_ADMIN, Role.BuiltIn.PLATFORM_SUPPORT]
-    )
+    @pytest.mark.parametrize("role", [Role.BuiltIn.DOER])
     def test_other_roles_are_not_gated(self, make_member, tenant, role):
         client = _session(make_member(f"{role}@mfa.test", role))
         resp = _post_write(client, tenant)
@@ -195,3 +221,40 @@ class TestStatusEndpoint:
 
     def test_anonymous_rejected(self):
         assert APIClient().get(STATUS).status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+class TestPrivilegedRoles:
+    @pytest.mark.parametrize("role", [Role.BuiltIn.TENANT_ADMIN, Role.BuiltIn.PLATFORM_SUPPORT])
+    def test_enrolment_lifts_the_block_for_privileged_roles(self, make_member, tenant, role):
+        client = _session(make_member(f"{role}-lift@mfa.test", role))
+        assert _post_write(client, tenant).status_code == status.HTTP_403_FORBIDDEN
+        _enrol(client)
+        assert _post_write(client, tenant).status_code == status.HTTP_200_OK
+
+    def test_status_endpoint_for_a_tenant_admin(self, make_member):
+        client = _session(make_member("ta@mfa.test", Role.BuiltIn.TENANT_ADMIN))
+        assert client.get(STATUS).data == {
+            "mfa_enrolled": False,
+            "holds_mfa_required_role": True,
+            "mfa_enrolment_required": True,
+        }
+
+    def test_operator_commands_still_work_and_their_users_are_gated(self, monkeypatch):
+        """The #107 operator commands run on the server, not through the API, so the
+        gate never blocks them; the tenant admin they create must still enrol."""
+        monkeypatch.setenv("NEW_ADMIN_PW", "Str0ng-Enough-Pass!")
+        call_command("create_tenant", "--slug", "mfa-ops", "--name", "MFA Ops")
+        call_command(
+            "create_tenant_user", "--tenant", "mfa-ops", "--email", "admin@mfa-ops.test",
+            "--role", "tenant_admin", "--password-env", "NEW_ADMIN_PW",
+        )  # fmt: skip
+        from tenancy.models import Tenant
+
+        tenant = Tenant.objects.get(slug="mfa-ops")
+        client = APIClient()
+        resp = client.post(
+            LOGIN, {"email": "admin@mfa-ops.test", "password": "Str0ng-Enough-Pass!"}, format="json"
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        assert _post_write(client, tenant).json()["error_code"] == "mfa_enrolment_required"

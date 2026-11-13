@@ -5,7 +5,8 @@ import { mfa, ApiError } from "@/lib/api";
 import AuthLayout from "@/components/auth/AuthLayout";
 
 /**
- * MFA enrolment for a signed-in user (mandatory for Reviewer and VP, SOW 4.3).
+ * MFA enrolment for a signed-in user (mandatory for Reviewer, VP, Tenant Admin and
+ * Platform Support, SOW 4.3; backend setting REGX_MFA_REQUIRED_ROLES).
  *
  * 1. "Start setup" asks the backend for a new authenticator key and 10
  *    single-use recovery codes. They are shown once and kept only in this
@@ -76,7 +77,7 @@ export default function MfaSetupPage() {
   return (
     <AuthLayout
       title="Set up two-step sign-in"
-      subtitle="Required for Reviewer and VP roles. Optional for everyone else."
+      subtitle="Required for Reviewer, VP, Tenant Admin and Platform Support. Optional for everyone else."
     >
       {error && (
         <p role="alert" className="regx-auth__error">

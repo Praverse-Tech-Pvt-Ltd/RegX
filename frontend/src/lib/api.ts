@@ -1882,7 +1882,7 @@ export const iigChecklists = {
   },
 };
 
-/** SOW 4.3: a Reviewer or VP must enrol before any state-changing request. */
+/** SOW 4.3: roles in REGX_MFA_REQUIRED_ROLES must enrol before any state-changing request. */
 export interface MfaStatus {
   mfa_enrolled: boolean;
   holds_mfa_required_role: boolean;

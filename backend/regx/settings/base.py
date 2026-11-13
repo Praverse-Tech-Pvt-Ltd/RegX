@@ -83,6 +83,11 @@ MIDDLEWARE = [
     "authorization.middleware.MFAEnrolmentMiddleware",
 ]
 
+# Roles that must have a verified MFA device before any write (SOW 4.3; Pratham's
+# direction 2026-11-06 §10: Reviewer and VP, plus the administrative and privileged
+# roles). The one place to change who is gated; read by authorization.mfa_policy.
+REGX_MFA_REQUIRED_ROLES = ("reviewer", "vp", "tenant_admin", "platform_support")
+
 ROOT_URLCONF = "regx.urls"
 
 TEMPLATES = [

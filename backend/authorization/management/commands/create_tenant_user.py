@@ -12,7 +12,8 @@ checked against the configured password validators.
 
 If the email already exists, the account and its password are left as they are
 and only the membership and roles are added; no password is needed then.
-A Reviewer or VP must enrol in MFA at first sign-in before they can act.
+A Reviewer, VP, Tenant Admin or Platform Support user must enrol in MFA at first
+sign-in before they can act (settings.REGX_MFA_REQUIRED_ROLES).
 """
 
 import os
