@@ -303,6 +303,40 @@ class AppStartsTests(GuardedTestCase):
         self.assertContains(response, "iPharmaAI Login")
 
 
+class SecretKeyRequiredTests(TestCase):
+    """settings.py has no fallback key any more: without SECRET_KEY it refuses to load.
+
+    Runs the import in a child process so this test's own settings are untouched.
+    No network is involved (the child only imports settings)."""
+
+    def _import_settings(self, secret_key):
+        import subprocess
+        import sys
+
+        env = {k: v for k, v in os.environ.items() if k != "SECRET_KEY"}
+        if secret_key is not None:
+            env["SECRET_KEY"] = secret_key
+        return subprocess.run(
+            [sys.executable, "-c", "import RAAI.settings"],
+            cwd=settings.BASE_DIR, env=env, capture_output=True, text=True, timeout=60,
+        )
+
+    def test_missing_key_refuses_to_start(self):
+        result = self._import_settings(None)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ImproperlyConfigured", result.stderr)
+        self.assertIn("SECRET_KEY is not set", result.stderr)
+
+    def test_empty_key_refuses_to_start(self):
+        result = self._import_settings("")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SECRET_KEY is not set", result.stderr)
+
+    def test_supplied_key_loads(self):
+        result = self._import_settings("tests-only-throwaway-key-for-this-check")
+        self.assertEqual(result.returncode, 0, result.stderr[-500:])
+
+
 # --------------------------------------------------------------------------- 2. shared REGX login
 
 

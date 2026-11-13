@@ -34,6 +34,14 @@ class Role(TimeStampedModel):
     class Meta:
         unique_together = [("tenant", "name")]
         ordering = ["name"]
+        constraints = [
+            # Built-in roles are platform-wide; a tenant may add its own roles,
+            # but never one marked as system (migrations 0003-0004, §11 #25).
+            models.CheckConstraint(
+                condition=models.Q(is_system=False) | models.Q(tenant__isnull=True),
+                name="role_system_has_no_tenant",
+            ),
+        ]
 
     def __str__(self):
         tenant_label = self.tenant.slug if self.tenant else "system"

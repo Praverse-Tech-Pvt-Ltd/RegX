@@ -81,7 +81,7 @@ def _create_execution_submitted(tenant, tenant_definition, user, submitter):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=submitter)
-    role, _ = Role.objects.get_or_create(tenant=tenant, name="doer", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="doer", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     from iig_checklist.services import create_execution

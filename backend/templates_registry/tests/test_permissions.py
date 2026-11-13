@@ -106,7 +106,7 @@ class TestPlatformSupportAndFailClosed:
 
         membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=user_a)
         role, _ = Role.objects.get_or_create(
-            tenant=tenant_a, name="platform_support", defaults={"is_system": True}
+            tenant=None, name="platform_support", defaults={"is_system": True}
         )
         MembershipRole.objects.get_or_create(membership=membership, role=role)
 
@@ -126,9 +126,7 @@ class TestPlatformSupportAndFailClosed:
         from tenancy.models import TenantMembership
 
         membership = TenantMembership.objects.create(tenant=tenant_a, user=user_a, is_active=False)
-        role, _ = Role.objects.get_or_create(
-            tenant=tenant_a, name="vp", defaults={"is_system": True}
-        )
+        role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
         MembershipRole.objects.create(membership=membership, role=role)
         # PLANTED VIOLATION (detected): a deactivated membership must not
         # grant permission even though a role assignment still exists.

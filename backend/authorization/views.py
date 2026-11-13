@@ -72,7 +72,8 @@ def my_roles_view(request):
 def mfa_status_view(request):
     """Whether the caller must enrol in MFA before acting (SOW 4.3).
 
-    `mfa_enrolment_required` is true for a Reviewer or VP with no verified
+    `mfa_enrolment_required` is true for a user holding a role in
+    `settings.REGX_MFA_REQUIRED_ROLES` with no verified
     device; the UI uses it to show the enrolment banner. Read-only, own account.
     """
     user = request.user

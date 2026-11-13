@@ -15,7 +15,9 @@ if [ -n "${OPENAI_API_KEY:-}" ]; then
 fi
 
 # Throwaway values for settings that have no default; never real secrets.
-export SECRET_KEY="${SECRET_KEY:-company-site-tests-not-a-secret}"
+# SECRET_KEY: a fresh random throwaway per run (settings refuse to start without one).
+SECRET_KEY="${SECRET_KEY:-$(python -c 'import secrets; print("tests-only-" + secrets.token_urlsafe(48))')}"
+export SECRET_KEY
 export BASE_URL="${BASE_URL:-http://localhost:8080}"
 export SERVER="${SERVER:-LOCAL}"
 export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-RAAI.settings_integration}"

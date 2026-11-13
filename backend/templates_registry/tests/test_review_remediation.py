@@ -512,9 +512,7 @@ class TestReconciliationAuditCompleteness:
         batch = importer.MigrationBatch.objects.get(source_package=package)
 
         membership = TenantMembership.objects.create(tenant=tenant_b, user=user_b)
-        role, _ = Role.objects.get_or_create(
-            tenant=tenant_b, name="vp", defaults={"is_system": True}
-        )
+        role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
         MembershipRole.objects.create(membership=membership, role=role)
 
         client = _client_for(user_b, tenant_b)
