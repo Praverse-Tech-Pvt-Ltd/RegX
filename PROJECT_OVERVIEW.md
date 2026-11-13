@@ -16,7 +16,7 @@ The discovery prompt's "Context I have" section came back empty. Until someone f
 |---|---|---|
 | Project purpose | SOW (2026-04-22) between Praverse (Pratham Shrivastav) and iCretegy Solutions (Alpesh Patel, CEO): an "AI solution for Inspection & Regulatory Database", fee INR 17,00,000 | From the SOW PDF in the repo root |
 | **REGX scope** | **SOW Part 2 (Technical/Regulatory Tools, §2.1–2.11)**, plus §4 (security/compliance) and §5 (performance) where they apply to Part 2. Part 1 (483 Database AI) and Part 3 (client API program) are **not expected inside REGX** | **Stated by owner, 2026-10-08** |
-| Who left | Assumption: **`Devpt1904`**, who wrote almost all of REGX between July and 2026-09-21. `praversetech2-sudo` merged the PRs. | Confirm |
+| Who left | Assumption: **`Devpt1904`**, who wrote almost all of REGX between July and 2026-09-21. `praversetech2-sudo` merged the PRs. **2026-11-13: the same handle is still committing daily to the private `483-AI-final` repository (2,735 of its 2,880 commits, last on 2026-11-13); so the person has moved to the 483 product, not left.** See `docs/483_AI_FINAL_ASSESSMENT.md` §1. | Confirm |
 | Hosting/deploy | **No REGX deployment exists** (see §8). The legacy app may run at ipharmaai.com (Assumption). | Confirm |
 | Access | Real `.env` present locally with all 4 required secrets set. `gh` is authenticated as `Rabbitshah`. No cloud, OpenAI, Azure or SMTP credentials were found. | Confirm what else exists |
 | Next goal | Unknown | **Owner must state** |
@@ -781,6 +781,14 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 8a. Was a phase-2 scope or date for Part 2 agreed with iCretegy after the SOW (§2.11 leaves it "mutually decided")?
 
 **Consolidated execution plan (direction §16, due 2026-11-13): drafted 2026-11-06** as `docs/EXECUTION_PLAN_2026-11.md` and `docs/PROJECT_TRACKER.csv` (docs-only PR, for Pratham's internal review before anything goes to iCretegy). Its open asks: lift the hold on controlled units; confirm developer capacity; name the regulatory reviewer; Azure owner details; the iCretegy question pack (section E, 14 questions including which two milestones trigger the first 20 %).
+
+**Pratham's third direction** (session prompt of 2026-11-13; the e-mail is to be saved unchanged at `docs/decisions/2026-11-09-pratham-direction-3.md`. **The e-mail text was not in the prompt, so it is not saved yet and is not summarised here**; the steps below are the prompt's instructions as carried out.)
+- **Part 1 / M2 dates:** marked "SUPERSEDED — pending 483-AI-final reassessment" in plan v2 and the tracker (kept, struck through). M3, REGX and IID dates stand.
+- **483-AI-final assessment** (static, read-only): `docs/483_AI_FINAL_ASSESSMENT.md`. A large, active 483 product ("AuditMind") in client UAT on an E2E Networks GPU server (not Azure); measured quality not at release level by its own grading; no written client acceptance found; open questions for the call in its §10.
+- **Credential and exposure register:** `docs/CREDENTIAL_INVENTORY.md` §9 (19 rows, none verified). **Admin checks:** `docs/ADMIN_VERIFICATION_CHECKLIST.md`.
+- **Auth coverage:** mapped against Pratham's list; 5 missing tests added; MFA recovery re-opened into `regx-main` as PR #117.
+- **IID:** 3,748 confirmed; units demo labelling designed (`docs/CONTROLLED_UNITS_DESIGN.md` §7–§8). Units build waits for Pratham's confirmation on the call.
+- **Not now (per the direction):** summariser redesign, 483 migration or integration, units build, AI code.
 
 **Decisions from Pratham's second direction** (saved unchanged at `docs/decisions/2026-11-07-pratham-direction-2.md`; recorded 2026-11-06, the system date of this session). Summarised per section; the email is the record.
 - **§1A Credentials:** treated as compromised; kept out of all active configurations; Pratham coordinates revocation and wants **independent verification**; a confirmation checklist without values (plan §A.2).
@@ -2082,3 +2090,21 @@ Continues the 2026-10-12 eighth-session prompt (Step 3 only; Steps 1, 2 and 4 we
 - One harness incident on 11-06: two full-suite runs overlapped on `test_regx` (an earlier `&` launch was still running) and voided Item 3's first result; rerun alone on 11-13: 4,307 passed.
 
 **Not done:** no AI code, no summariser redesign, no units build, no seed work. Nothing merged.
+
+### 2026-11-13 (tenth session) — third direction: Part 1 dates superseded, 483-AI-final assessment, credential register, admin checklist, auth coverage, IID check (Claude Code)
+
+**Session start rule:** `review-handoff/` and `review-handoff.zip` deleted without reading. **Pratham's third e-mail was not included in the prompt**; it is not saved and §12 records the prompt's steps only (to be completed when Maanav pastes the e-mail).
+
+**Step 1 (docs):** every Part 1 / M2 date in `docs/EXECUTION_PLAN_2026-11.md` and 14 Part 1/M2 rows of `docs/PROJECT_TRACKER.csv` marked "SUPERSEDED — pending 483-AI-final reassessment", kept struck through. Caveat recorded in the plan: scenario 1's M3 dates were sequenced after the 483 work and may move. A first pass over-matched 3 Security/decision rows on the word "483"; reverted.
+
+**Step 2, `docs/483_AI_FINAL_ASSESSMENT.md`:** static reading of a bare mirror (90 branches, 2,880 commits; nothing run, no key set, no external call; tests not run because they need Postgres and a networked install). Findings: `Devpt1904` wrote 2,735 commits and is active today; FastAPI + React + Postgres + Qdrant, self-hosted Qwen via vLLM plus Gemini/OpenAI paths and Tavily web search; production/UAT on one E2E Networks GPU server, no CI, no off-node backup; most SOW 1.x features present in some form (1.12 absent, 1.13 not met as specified); 14,423 backend test functions with a 105–250 failing-test baseline; own blind grading 43 correct / 51 critical of 209; the "Client QA" PDFs are vendor-made samples, the iCretegy feedback CSV (223 rows) was reconciled, and **no written client acceptance** exists in the repository; single-client app with per-user scoping and optional MFA. Client data is described, never copied.
+
+**Step 3:** `docs/CREDENTIAL_INVENTORY.md` §9, 19 rows (provider, repositories, visibility, exposure period, confirmed vs potential, owner, action, verified). Two corrections: OpenAI keys A–C and the Django key first appear in `Django-booking-demo-page` on 2026-06-24 (not 2026-07-13); the public Gemini key is in commits up to 2026-04-08. **0 of 19 verified.**
+
+**Step 4:** `docs/ADMIN_VERIFICATION_CHECKLIST.md`: GitHub G1–G7, Render R1–R4, Vercel V1–V4, Google Cloud C1–C4, each with who, where (confidence marked), what to look for, how to record. None done.
+
+**Step 5, auth coverage:** #116 had been merged into the #114 branch **after** #114 merged, so MFA recovery never reached `regx-main`. Mapped every item of Pratham's list to tests; added 5 (`3e3a760`): the reset rules hold in the view with the middleware gate switched off (the old "admin without MFA" test passed only because of the #113 gate), platform_support can reset, a reset target cannot write until re-enrolment, another user's recovery code is refused, the older `/mfa/recovery/` endpoint signs nobody in. Merged `regx-main` into the branch (`55cd039`) and opened PR #117 into `regx-main`. Results: recovery tests 17 passed; `authorization`/`identity`/`tenancy` 152 passed; full backend suite 4,332 passed, 2 skipped; company_site 52 OK; frontend type-check, lint and 13 MFA tests pass; ruff clean. Open for the owner: refused reset attempts are not audited.
+
+**Step 6, IID:** fresh read-only export identical to 11-06; **3,748** confirmed. 20-record sample in `docs/CONTROLLED_UNITS_DESIGN.md` §7: 3,663 of the 3,748 have a like-for-like comparator; 60 route/form groups mix dimensions (`%w/w` vs `%w/v`, per-dose vs per-volume) and compare only within a dimension. My first sample check grouped `%w/w` with `%w/v`; corrected before writing. §8 designs the "Technically comparable (not regulatorily approved)" vs reviewed labels (fail closed). Not built.
+
+**Not done:** e-mail 3 not saved (not provided); no AI code, no summariser redesign, no 483 integration, no units build. Nothing merged.
