@@ -414,7 +414,7 @@ def test_10_source_path_never_exposed_to_non_raw_viewer(tenant_a, user_a, doer_m
     User = get_user_model()
     vp_user = User.objects.create_user(email="vp-10@example.com", password="x", full_name="VP")
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp_user)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
     vp_client = _client_for(vp_user, tenant_a)
     resp2 = vp_client.get(f"{BASE}/fda-data/releases/{release.public_id}/")
@@ -496,7 +496,7 @@ def test_13_doer_cannot_approve_release(tenant_a, user_a, doer_membership):
     User = get_user_model()
     vp_user = User.objects.create_user(email="vp-13@example.com", password="x", full_name="VP")
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp_user)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
     vp_client = _client_for(vp_user, tenant_a)
     resp2 = vp_client.post(
@@ -580,7 +580,7 @@ def test_15_formula_injection_value_neutralized_on_export(tenant_a, user_a):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=user_a)
-    role, _ = Role.objects.get_or_create(tenant=tenant_a, name="vp", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     release = _make_release(status=FDAReleaseStatus.ACTIVE)

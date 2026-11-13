@@ -84,7 +84,7 @@ class TestPlatformSupportPermissions:
         membership = TenantMembership.objects.create(tenant=tenant, user=user)
         role, _ = Role.objects.get_or_create(
             name="platform_support",
-            tenant=tenant,
+            tenant=None,
             defaults={"is_system": True},
         )
         MembershipRole.objects.create(membership=membership, role=role)

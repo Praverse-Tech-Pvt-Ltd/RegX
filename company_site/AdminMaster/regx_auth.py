@@ -60,6 +60,41 @@ class RegxUnavailable(Exception):
     """REGX could not be reached or answered unusably."""
 
 
+#: REGX cookies that carry a pending (password-checked, code-not-yet-given) login.
+#: They are REGX's session and CSRF cookies, never the TOTP secret.
+PENDING_COOKIES = ("sessionid", "csrftoken")
+
+
+class MfaCodeRequired(Exception):
+    """REGX accepted the password but needs the 6-digit code (PR #96 two-step login).
+
+    `cookies` holds REGX's pending-login cookies so the code can be checked on
+    the same REGX session; REGX keeps the pending marker for 5 minutes. This
+    application never sees or stores the TOTP secret.
+    """
+
+    def __init__(self, email, cookies):
+        super().__init__(email)
+        self.email = email
+        self.cookies = cookies
+
+
+class MfaInvalidCode(Exception):
+    """REGX refused the code (wrong, malformed or replayed). REGX counted it toward its lockout."""
+
+
+class MfaLocked(Exception):
+    """REGX's per-account lockout is active (HTTP 429). `retry_after` is in seconds, if given."""
+
+    def __init__(self, retry_after=None):
+        super().__init__(retry_after)
+        self.retry_after = retry_after
+
+
+class MfaExpired(Exception):
+    """REGX has no pending sign-in for this session any more (timed out or already used)."""
+
+
 def _api(path):
     return settings.REGX_AUTH_URL.rstrip("/") + "/api/regx/v1" + path
 
@@ -197,9 +232,12 @@ def authenticate(username, password):
         raise RegxUnavailable("REGX auth returned no email")
 
     if profile.get("mfa_required"):
-        # This login page collects a password and nothing else. Granting a
-        # session here would skip a second factor the person chose to enable,
-        # making this the weaker of the two doors into the same identity.
+        # The password alone never opens a session for an enrolled account.
+        # When REGX has a pending second step (PR #96), hand its cookies to the
+        # view, which asks for the code and calls `verify_code`.
+        if profile.get("mfa_pending"):
+            cookies = {k: session.cookies.get(k) for k in PENDING_COOKIES if session.cookies.get(k)}
+            raise MfaCodeRequired(profile["email"], cookies)
         logger.warning("Refused company login for %s: REGX requires MFA", profile["email"])
         return None
 
@@ -207,3 +245,81 @@ def authenticate(username, password):
     role = _legacy_role(_roles_for(session))
     logger.info("REGX login for %s mapped to legacy role %s", profile["email"], role)
     return _provision(profile, role)
+
+
+def verify_code(pending_cookies, code):
+    """Second step: pass the code to REGX's `/auth/login/mfa/` on the pending REGX session.
+
+    Returns the local mirror user once REGX accepts the code. Raises
+    `MfaInvalidCode` (REGX counted the failure), `MfaLocked` (429), `MfaExpired`
+    (no pending sign-in), or `RegxUnavailable`. The company session is created
+    by the caller, only after this returns.
+    """
+    session = requests.Session()
+    for name, value in (pending_cookies or {}).items():
+        # Same internal plain-HTTP hop as `_carry_session_cookie`: re-set
+        # REGX's own cookies without the Secure flag so `requests` sends them.
+        session.cookies.set(name, value)
+    headers = {}
+    if pending_cookies and pending_cookies.get("csrftoken"):
+        headers["X-CSRFToken"] = pending_cookies["csrftoken"]
+    try:
+        response = session.post(
+            _api("/auth/login/mfa/"), json={"code": code}, headers=headers, timeout=TIMEOUT
+        )
+    except requests.RequestException as exc:
+        raise RegxUnavailable(str(exc)) from exc
+
+    if response.status_code == 429:
+        raise MfaLocked(getattr(response, "headers", {}).get("Retry-After"))
+    if response.status_code == 400:
+        try:
+            error_code = response.json().get("error_code")
+        except ValueError:
+            error_code = None
+        if error_code == "mfa_not_pending":
+            raise MfaExpired()
+        raise MfaInvalidCode()
+    if response.status_code != 200:
+        raise RegxUnavailable("REGX MFA step returned HTTP %s" % response.status_code)
+    try:
+        profile = response.json()
+    except ValueError as exc:
+        raise RegxUnavailable("REGX MFA step returned a non-JSON body") from exc
+    if not profile.get("email"):
+        raise RegxUnavailable("REGX MFA step returned no email")
+
+    # REGX rotates its session when the code is accepted, so the jar now holds
+    # the pending cookie we set and the new one from the response under the same
+    # name (different cookie domains). Keep only the new session.
+    _replace_cookie(session, "sessionid", response.cookies.get("sessionid"))
+    role = _legacy_role(_roles_for(session))
+    user = _provision(profile, role)
+    _end_regx_session(session)
+    logger.info("REGX login with MFA for %s mapped to legacy role %s", profile["email"], role)
+    return user
+
+
+def _replace_cookie(session, name, value):
+    """Leave exactly one cookie `name` in the jar, set without the Secure flag for the
+    internal plain-HTTP hop (see `_carry_session_cookie`). No-op when `value` is empty."""
+    if not value:
+        return
+    for cookie in [c for c in session.cookies if c.name == name]:
+        session.cookies.clear(cookie.domain, cookie.path, cookie.name)
+    session.cookies.set(name, value)
+
+
+def _end_regx_session(session):
+    """Log the internal REGX session out; this application keeps only its own session."""
+    try:
+        csrf = session.get(_api("/auth/csrf/"), timeout=TIMEOUT)
+        token = csrf.json().get("csrfToken") if csrf.status_code == 200 else None
+        _replace_cookie(session, "csrftoken", getattr(csrf, "cookies", {}).get("csrftoken"))
+        session.post(
+            _api("/auth/logout/"),
+            headers={"X-CSRFToken": token} if token else {},
+            timeout=TIMEOUT,
+        )
+    except (requests.RequestException, ValueError):
+        pass  # Best effort: the REGX session expires on its own.

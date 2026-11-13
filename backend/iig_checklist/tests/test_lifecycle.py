@@ -170,7 +170,7 @@ class TestChecklistVersionLifecycleApi:
         # disjoint built-in roles.
         membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp_user)
         doer_role, _ = Role.objects.get_or_create(
-            tenant=tenant_a, name="doer", defaults={"is_system": True}
+            tenant=None, name="doer", defaults={"is_system": True}
         )
         MembershipRole.objects.get_or_create(membership=membership, role=doer_role)
 
@@ -234,9 +234,7 @@ class TestChecklistVersionLifecycleApi:
         from tenancy.models import TenantMembership
 
         membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=vp_user)
-        role, _ = Role.objects.get_or_create(
-            tenant=tenant_a, name="vp", defaults={"is_system": True}
-        )
+        role, _ = Role.objects.get_or_create(tenant=None, name="vp", defaults={"is_system": True})
         MembershipRole.objects.get_or_create(membership=membership, role=role)
 
         v1 = ChecklistVersion.objects.create(

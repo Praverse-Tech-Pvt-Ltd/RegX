@@ -96,12 +96,13 @@ class TestCreateTenantUserCommand:
         assert sorted(roles.values_list("role__name", flat=True)) == ["doer", "reviewer"]
 
     def test_binds_the_platform_role_not_another_tenants_copy(self, tenant, user):
-        """Found on a real local database: tenant-scoped rows that reuse the
-        built-in names (e.g. `vp` in another tenant) with is_system=True."""
+        """A tenant may define its own role with a built-in name (e.g. `vp`); the
+        command must still bind the platform-wide built-in. (Tenant-scoped rows
+        with is_system=True are now impossible: constraint role_system_has_no_tenant.)"""
         from authorization.models import Role
 
         other = Tenant.objects.create(name="Other", slug="other")
-        Role.objects.create(name="vp", tenant=other, is_system=True)
+        Role.objects.create(name="vp", tenant=other, is_system=False)
         call_command(
             "create_tenant_user", "--tenant", tenant.slug, "--email", user.email,
             "--role", "vp",

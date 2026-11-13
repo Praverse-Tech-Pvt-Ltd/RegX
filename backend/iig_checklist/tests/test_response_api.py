@@ -82,7 +82,7 @@ def _make_execution_with_responses(tenant, cv, fv, user):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
-    role, _ = Role.objects.get_or_create(tenant=tenant, name="doer", defaults={"is_system": True})
+    role, _ = Role.objects.get_or_create(tenant=None, name="doer", defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
 
     return create_execution(
