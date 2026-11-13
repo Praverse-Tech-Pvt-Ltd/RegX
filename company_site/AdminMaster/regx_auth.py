@@ -295,7 +295,10 @@ def verify_code(pending_cookies, code):
     if not profile.get("email"):
         raise RegxUnavailable("REGX MFA step returned no email")
 
-    _carry_session_cookie(session)
+    # REGX rotates its session when the code is accepted, so the jar now holds
+    # the pending cookie we set and the new one from the response under the same
+    # name (different cookie domains). Keep only the new session.
+    _replace_cookie(session, "sessionid", response.cookies.get("sessionid"))
     role = _legacy_role(_roles_for(session))
     user = _provision(profile, role)
     _end_regx_session(session)
@@ -303,11 +306,22 @@ def verify_code(pending_cookies, code):
     return user
 
 
+def _replace_cookie(session, name, value):
+    """Leave exactly one cookie `name` in the jar, set without the Secure flag for the
+    internal plain-HTTP hop (see `_carry_session_cookie`). No-op when `value` is empty."""
+    if not value:
+        return
+    for cookie in [c for c in session.cookies if c.name == name]:
+        session.cookies.clear(cookie.domain, cookie.path, cookie.name)
+    session.cookies.set(name, value)
+
+
 def _end_regx_session(session):
     """Log the internal REGX session out; this application keeps only its own session."""
     try:
         csrf = session.get(_api("/auth/csrf/"), timeout=TIMEOUT)
         token = csrf.json().get("csrfToken") if csrf.status_code == 200 else None
+        _replace_cookie(session, "csrftoken", getattr(csrf, "cookies", {}).get("csrftoken"))
         session.post(
             _api("/auth/logout/"),
             headers={"X-CSRFToken": token} if token else {},
