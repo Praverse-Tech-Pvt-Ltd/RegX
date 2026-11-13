@@ -169,6 +169,53 @@ class TestAdminReset:
         assert resp.status_code == 403
         assert MFADevice.objects.filter(user=target).exists()
 
+    def test_the_view_enforces_the_rules_without_the_middleware_gate(self, make_member, settings):
+        """With no role gated by the middleware, the view alone still refuses an admin
+        without MFA and a self-reset (the rules do not depend on the #107 gate)."""
+        settings.REGX_MFA_REQUIRED_ROLES = ()
+        target = make_member("t6@reset.test", Role.BuiltIn.REVIEWER)
+        _enrol(target)
+        admin = make_member("nomfa6@reset.test", Role.BuiltIn.TENANT_ADMIN)
+        resp = _reset(admin, target)
+        assert resp.status_code == 403
+        assert resp.data["error_code"] == "mfa_required_for_reset"
+        _enrol(admin)
+        resp = _reset(admin, admin)
+        assert resp.status_code == 403
+        assert resp.data["error_code"] == "mfa_reset_self_forbidden"
+        assert MFADevice.objects.filter(user=target).exists()
+        assert MFADevice.objects.filter(user=admin).exists()
+        assert not AuditEvent.objects.filter(event_type="identity.mfa.reset").exists()
+
+    def test_platform_support_can_reset(self, make_member):
+        target = make_member("t7@reset.test", Role.BuiltIn.VP)
+        _enrol(target)
+        support = make_member("ps7@reset.test", Role.BuiltIn.PLATFORM_SUPPORT)
+        _enrol(support)
+        assert _reset(support, target).status_code == status.HTTP_200_OK
+        assert not MFADevice.objects.filter(user=target).exists()
+
+    def test_after_a_reset_the_target_cannot_write_until_they_enrol_again(
+        self, make_member, tenant
+    ):
+        target = make_member("t8@reset.test", Role.BuiltIn.VP)
+        _enrol(target)
+        admin = make_member("adm8@reset.test", Role.BuiltIn.TENANT_ADMIN)
+        _enrol(admin)
+        assert _reset(admin, target).status_code == status.HTTP_200_OK
+        client = APIClient()
+        assert (
+            client.post(
+                LOGIN, {"email": target.email, "password": PASSWORD}, format="json"
+            ).status_code
+            == 200
+        )
+        resp = client.post(
+            "/api/regx/v1/tenants/active/", {"tenant_id": str(tenant.public_id)}, format="json"
+        )
+        assert resp.status_code == status.HTTP_403_FORBIDDEN
+        assert resp.json()["error_code"] == "mfa_enrolment_required"
+
     def test_non_admin_is_refused(self, make_member):
         target = make_member("t2@reset.test", Role.BuiltIn.REVIEWER)
         _enrol(target)
@@ -205,3 +252,28 @@ class TestAdminReset:
         _enrol(admin)
         assert _reset(admin, target).status_code == 409
         assert not AuditEvent.objects.filter(event_type="identity.mfa.reset").exists()
+
+
+@pytest.mark.django_db
+class TestRecoveryRegressions:
+    def test_another_users_recovery_code_is_refused(self, make_member):
+        alice = make_member("alice@rec.test", Role.BuiltIn.REVIEWER)
+        bob = make_member("bob@rec.test", Role.BuiltIn.REVIEWER)
+        _enrol(alice)
+        bob_codes = _enrol(bob)
+        client = _password_step(alice.email)
+        resp = client.post(LOGIN_MFA, {"recovery_code": bob_codes[0]}, format="json")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert resp.data["error_code"] == "mfa_invalid_code"
+        assert client.get("/api/regx/v1/auth/me/").status_code == 403
+        assert RecoveryCode.objects.filter(device__user=bob, used_at__isnull=True).count() == 10
+
+    def test_the_older_recovery_endpoint_does_not_sign_anyone_in(self, make_member):
+        """`/mfa/recovery/` predates the sign-in path; it needs an existing session."""
+        user = make_member("old@rec.test", Role.BuiltIn.REVIEWER)
+        codes = _enrol(user)
+        client = APIClient()
+        resp = client.post("/api/regx/v1/mfa/recovery/", {"recovery_code": codes[0]}, format="json")
+        assert resp.status_code in (401, 403)
+        assert client.get("/api/regx/v1/auth/me/").status_code == 403
+        assert RecoveryCode.objects.filter(device__user=user, used_at__isnull=True).count() == 10
