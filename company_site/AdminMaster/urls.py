@@ -7,6 +7,7 @@ urlpatterns = [
     path('', views.homepage),
     path('adminbase',views.adminbase),
     path("login/",views.login,name="login"),
+    path("login/mfa/", views.login_mfa, name="login_mfa"),
     path("logout/",views.logout,name="logout"),
     path("view_users",views.view_users,name="view_users"),
     path("edit_user/<int:id>",views.edit_user,name="edit_user"),
