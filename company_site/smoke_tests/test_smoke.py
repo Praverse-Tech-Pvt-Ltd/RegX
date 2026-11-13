@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
+import requests
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase, override_settings
@@ -163,9 +164,11 @@ class GuardedTestCase(TestCase):
 
 
 class FakeResponse:
-    def __init__(self, status_code, payload):
+    def __init__(self, status_code, payload, cookies=None):
         self.status_code = status_code
         self._payload = payload
+        self.cookies = cookies or {}
+        self.headers = {}
 
     def json(self):
         return self._payload
@@ -228,10 +231,19 @@ class FakeRegxMfa:
 
         class Session:
             def __init__(self):
-                self.cookies = FakeCookies(csrftoken="fake-csrf")
+                # A real jar: like REGX, responses set cookies scoped to the REGX
+                # host, so a cookie set by hand and one from a response can share
+                # a name. This is what broke the first live run (500).
+                self.cookies = requests.cookies.RequestsCookieJar()
+                self.cookies.set("csrftoken", "fake-csrf", domain="regx.test")
+
+            def _snapshot(self):
+                return {c.name: c.value for c in self.cookies}
 
             def get(self, url, timeout=None):
                 fake.calls.append(("GET", url, {}))
+                if url.endswith("/permissions/mine/") and len([c for c in self.cookies if c.name == "sessionid"]) != 1:
+                    raise AssertionError("ambiguous sessionid cookies sent to REGX")
                 if url.endswith("/auth/csrf/"):
                     return FakeResponse(200, {"csrfToken": "fake-csrf"})
                 if url.endswith("/permissions/mine/"):
@@ -239,9 +251,9 @@ class FakeRegxMfa:
                 return FakeResponse(404, {})
 
             def post(self, url, json=None, headers=None, timeout=None):
-                fake.calls.append(("POST", url, dict(self.cookies)))
+                fake.calls.append(("POST", url, self._snapshot()))
                 if url.endswith("/auth/login/"):
-                    self.cookies["sessionid"] = "fake-pending-session"
+                    self.cookies.set("sessionid", "fake-pending-session", domain="regx.test")
                     return FakeResponse(200, {"mfa_required": True, "mfa_pending": True,
                                               "email": "vp@smoke.invalid"})
                 if url.endswith("/auth/login/mfa/"):
@@ -252,9 +264,10 @@ class FakeRegxMfa:
                     if (json or {}).get("code") != FakeRegxMfa.GOOD_CODE:
                         fake.failures += 1
                         return FakeResponse(400, {"error_code": "mfa_invalid_code"})
-                    self.cookies["sessionid"] = "fake-regx-session"
+                    self.cookies.set("sessionid", "fake-regx-session", domain="regx.test")
                     return FakeResponse(200, {"email": "vp@smoke.invalid", "full_name": "Smoke VP",
-                                              "is_active": True, "mfa_required": True})
+                                              "is_active": True, "mfa_required": True},
+                                        cookies={"sessionid": "fake-regx-session"})
                 if url.endswith("/auth/logout/"):
                     return FakeResponse(204, {})
                 return FakeResponse(404, {})
