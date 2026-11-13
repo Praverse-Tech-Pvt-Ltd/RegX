@@ -83,3 +83,99 @@ def mfa_status_view(request):
             "mfa_enrolment_required": mfa_policy.requires_mfa_enrolment(user),
         }
     )
+
+
+#: Roles allowed to reset another user's MFA (an administrator, never the user).
+MFA_RESET_ROLES = ("tenant_admin", "platform_support")
+MFA_RESET_REASON_MIN = 10
+
+
+@extend_schema(tags=["authorization"])
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def mfa_reset_view(request, public_id):
+    """Reset another user's MFA after they lost their authenticator and recovery codes.
+
+    Rules (all checked here, independently of the MFA middleware):
+    - the caller holds tenant_admin or platform_support in an active membership
+      of a tenant where the target also has an active membership;
+    - the caller is a different person from the target;
+    - the caller has a verified MFA device (an administrator without MFA cannot
+      remove someone else's);
+    - a reason of at least 10 characters is given.
+    Effect: the target's MFA device and recovery codes are deleted and
+    `mfa_required` cleared. A Reviewer/VP/admin target is then blocked from
+    writing until they enrol again (the #107 gate). Audited as
+    `identity.mfa.reset` with actor, target, shared tenant and reason.
+    """
+    from django.contrib.auth import get_user_model
+    from django.db import transaction
+
+    from audit.middleware import log_event
+    from identity.models import MFADevice
+    from tenancy.models import TenantMembership
+
+    caller = request.user
+    target = get_user_model().objects.filter(public_id=public_id).first()
+    if target is None:
+        return Response({"detail": "Not found."}, status=404)
+    if target.pk == caller.pk:
+        return Response(
+            {"detail": "You cannot reset your own MFA.", "error_code": "mfa_reset_self_forbidden"},
+            status=403,
+        )
+    if not MFADevice.objects.filter(user=caller, is_verified=True).exists():
+        return Response(
+            {
+                "detail": "Set up your own MFA before resetting someone else's.",
+                "error_code": "mfa_required_for_reset",
+            },
+            status=403,
+        )
+    target_tenants = TenantMembership.objects.filter(user=target, is_active=True).values(
+        "tenant_id"
+    )
+    admin_membership = (
+        MembershipRole.objects.filter(
+            membership__user=caller,
+            membership__is_active=True,
+            membership__tenant_id__in=target_tenants,
+            role__name__in=MFA_RESET_ROLES,
+            role__tenant__isnull=True,
+        )
+        .select_related("membership__tenant")
+        .first()
+    )
+    if admin_membership is None:
+        return Response(
+            {
+                "detail": "Only a tenant administrator of the user's organisation can reset MFA.",
+                "error_code": "mfa_reset_forbidden",
+            },
+            status=403,
+        )
+    reason = str(request.data.get("reason", "")).strip()
+    if len(reason) < MFA_RESET_REASON_MIN:
+        return Response(
+            {"detail": "Give a reason (at least 10 characters).", "error_code": "reason_required"},
+            status=400,
+        )
+    device = MFADevice.objects.filter(user=target).first()
+    if device is None:
+        return Response(
+            {"detail": "This user has no MFA device.", "error_code": "no_mfa_device"}, status=409
+        )
+    tenant = admin_membership.membership.tenant
+    with transaction.atomic():
+        device.delete()  # cascades to the recovery codes
+        target.mfa_required = False
+        target.save(update_fields=["mfa_required"])
+        log_event(
+            "identity.mfa.reset",
+            resource_type="user",
+            resource_id=str(target.public_id),
+            payload={"reason": reason, "by": str(caller.public_id)},
+            user=caller,
+            tenant=tenant,
+        )
+    return Response({"detail": "MFA reset. The user must set up MFA again before acting."})

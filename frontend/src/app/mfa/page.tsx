@@ -9,6 +9,7 @@ import { safeReturnTarget } from "@/lib/returnTarget";
 export default function MFAPage() {
   const router = useRouter();
   const [code, setCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,11 @@ export default function MFAPage() {
     try {
       // Second sign-in step: the password step at /signin left a pending
       // login; a valid code turns it into a session.
-      await auth.loginMfa(code);
+      if (useRecovery) {
+        await auth.loginRecovery(code.trim());
+      } else {
+        await auth.loginMfa(code);
+      }
       router.push(safeReturnTarget());
     } catch (err) {
       if (err instanceof ApiError) {
@@ -50,13 +55,13 @@ export default function MFAPage() {
         )}
 
         <div className="regx-auth__field regx-auth__field--otp">
-          <label htmlFor="otp">OTP Code</label>
+          <label htmlFor="otp">{useRecovery ? "Recovery code" : "OTP Code"}</label>
           <input
             id="otp"
             type="text"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            maxLength={6}
+            inputMode={useRecovery ? "text" : "numeric"}
+            pattern={useRecovery ? "[0-9a-fA-F]{20}" : "[0-9]{6}"}
+            maxLength={useRecovery ? 20 : 6}
             autoComplete="one-time-code"
             required
             placeholder="000000"
@@ -68,6 +73,18 @@ export default function MFAPage() {
 
         <button type="submit" className="regx-auth__button" disabled={loading}>
           {loading ? "Verifying..." : "Verify"}
+        </button>
+
+        <button
+          type="button"
+          className="regx-auth__link"
+          onClick={() => {
+            setUseRecovery((v) => !v);
+            setCode("");
+            setError(null);
+          }}
+        >
+          {useRecovery ? "Use the authenticator code instead" : "Lost your authenticator? Use a recovery code"}
         </button>
       </form>
     </AuthLayout>

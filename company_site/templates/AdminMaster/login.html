@@ -450,7 +450,8 @@
 
             {% if mfa_step %}
             <p class="login-subtitle">
-                Enter the 6-digit code from your authenticator app.
+                Enter the 6-digit code from your authenticator app, or one of your
+                recovery codes if you no longer have it.
             </p>
             {% else %}
             <p class="login-subtitle">
@@ -469,13 +470,12 @@
                 {% csrf_token %}
 
                 <div class="input-group-custom">
-                    <label for="code">CODE</label>
+                    <label for="code">CODE OR RECOVERY CODE</label>
                     <input type="text"
                            id="code"
                            name="code"
-                           inputmode="numeric"
-                           pattern="[0-9]{6}"
-                           maxlength="6"
+                           pattern="[0-9]{6}|[0-9a-fA-F]{20}"
+                           maxlength="20"
                            autocomplete="one-time-code"
                            required
                            placeholder="000000">
