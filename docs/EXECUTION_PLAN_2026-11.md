@@ -46,12 +46,14 @@
 
 **Dates at a glance [internal estimates]**
 
+> **2026-11-13: every Part 1 / M2 date below is SUPERSEDED — pending 483-AI-final reassessment** (kept, struck through, for the record). M3, REGX and IID dates stand. Caveat: in scenario 1 the M3 dates were sequenced after the 483 work, so they may move when Part 1 is re-based; they are not marked superseded, as instructed.
+
 | Milestone | Scenario 1: one developer | Scenario 2: two developers | Scenario 3: two developers + part-time DevOps |
 |---|---|---|---|
-| First technical demo (483 search → grounded AI answer → citation → feedback) | F3 (by 18 Dec 2026) | F2 (by 4 Dec 2026) | F2 (by 4 Dec 2026) |
-| Internal MVP (483) on internal staging | F9 (by 12 Mar 2027) | F7 (by 12 Feb 2027) | F6 (by 29 Jan 2027) |
-| Client UAT release (483) | F12 (by 23 Apr 2027) | F9 (by 12 Mar 2027) | F8 (by 26 Feb 2027) |
-| Accepted release (483, M2), if iCretegy UAT takes 2 fortnights | F14 (by 21 May 2027) | F11 (by 9 Apr 2027) | F10 (by 26 Mar 2027) |
+| First technical demo (483 search → grounded AI answer → citation → feedback) — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F3 (by 18 Dec 2026)~~ SUPERSEDED | ~~F2 (by 4 Dec 2026)~~ SUPERSEDED | ~~F2 (by 4 Dec 2026)~~ SUPERSEDED |
+| Internal MVP (483) on internal staging — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F9 (by 12 Mar 2027)~~ SUPERSEDED | ~~F7 (by 12 Feb 2027)~~ SUPERSEDED | ~~F6 (by 29 Jan 2027)~~ SUPERSEDED |
+| Client UAT release (483) — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F12 (by 23 Apr 2027)~~ SUPERSEDED | ~~F9 (by 12 Mar 2027)~~ SUPERSEDED | ~~F8 (by 26 Feb 2027)~~ SUPERSEDED |
+| Accepted release (483, M2), if iCretegy UAT takes 2 fortnights — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F14 (by 21 May 2027)~~ SUPERSEDED | ~~F11 (by 9 Apr 2027)~~ SUPERSEDED | ~~F10 (by 26 Mar 2027)~~ SUPERSEDED |
 | First real IID comparison (needs approved mappings) | F16 (by 18 Jun 2027) | F5 (by 15 Jan 2027) | F5 (by 15 Jan 2027) |
 | M3 regulatory AI accepted (needs signed Phase 2 scope) | F29 (Dec 2027) or later | F20 (Aug 2027) | F18 (Jul 2027) |
 
@@ -128,17 +130,17 @@ Fortnights start F1 = 9–20 Nov 2026. Each date assumes its blockers clear in t
 | | Scenario 1: one developer | Scenario 2: two developers | Scenario 3: two developers + part-time Azure/DevOps (about 0.5 FTE) |
 |---|---|---|---|
 | **Split** | Strict critical path: security → thin AI slice → 483 flow → 483 MVP → staging → UAT → units → regulatory | Dev A: AI + 483. Dev B: security, units, regulatory workflows, then staging | As scenario 2; DevOps builds environments from F2 so developers stay on features |
-| First technical demo | F3 (18 Dec 2026) | F2 (4 Dec 2026) | F2 (4 Dec 2026) |
-| Internal MVP (483) | F9 (12 Mar 2027) | F7 (12 Feb 2027) | F6 (29 Jan 2027) |
-| Client UAT release (483) | F12 (23 Apr 2027) | F9 (12 Mar 2027) | F8 (26 Feb 2027) |
-| Accepted release (M2) | F14 (21 May 2027) | F11 (9 Apr 2027) | F10 (26 Mar 2027) |
+| First technical demo — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F3 (18 Dec 2026)~~ SUPERSEDED | ~~F2 (4 Dec 2026)~~ SUPERSEDED | ~~F2 (4 Dec 2026)~~ SUPERSEDED |
+| Internal MVP (483) — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F9 (12 Mar 2027)~~ SUPERSEDED | ~~F7 (12 Feb 2027)~~ SUPERSEDED | ~~F6 (29 Jan 2027)~~ SUPERSEDED |
+| Client UAT release (483) — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F12 (23 Apr 2027)~~ SUPERSEDED | ~~F9 (12 Mar 2027)~~ SUPERSEDED | ~~F8 (26 Feb 2027)~~ SUPERSEDED |
+| Accepted release (M2) — **SUPERSEDED, pending 483-AI-final reassessment** | ~~F14 (21 May 2027)~~ SUPERSEDED | ~~F11 (9 Apr 2027)~~ SUPERSEDED | ~~F10 (26 Mar 2027)~~ SUPERSEDED |
 | First real IID comparison | F16 (18 Jun 2027) | F5 (15 Jan 2027) | F5 (15 Jan 2027) |
 | M3 accepted | F29 (Dec 2027) or later | F20 (Aug 2027) | F18 (Jul 2027) |
-| **Effort [Estimate]** | ~95–120 developer-days to M2; ~250–310 to M3 | Same work, split; ~10 % coordination overhead | Same, plus ~25–35 DevOps days for environments, IaC, CI/CD, backups, monitoring |
-| **Improvement vs scenario 1** | — | M2 ~6 weeks earlier; IID demo ~5 months earlier; M3 ~4 months earlier | M2 ~8 weeks earlier; M3 ~5 months earlier; staging exists from F4 instead of F9 |
+| **Effort [Estimate]** | ~95–120 developer-days to M2 (**M2 part SUPERSEDED**); ~250–310 to M3 | Same work, split; ~10 % coordination overhead | Same, plus ~25–35 DevOps days for environments, IaC, CI/CD, backups, monitoring |
+| **Improvement vs scenario 1** | — | M2 ~6 weeks earlier (**SUPERSEDED**); IID demo ~5 months earlier; M3 ~4 months earlier | M2 ~8 weeks earlier (**SUPERSEDED**); M3 ~5 months earlier; staging exists from F4 instead of F9 |
 | **Key dependencies** | Azure by F2; nothing else in parallel, so any blocker stalls the line | Reviewer by F4 for Dev B's IID work | Azure subscription and budget by F2 for DevOps to start |
 
-**Scenario 1 order of work [Estimate]:** F1 finish security PRs (#111–#114, recovery); F2 thin AI slice; F3 483 flow → first demo; F4 (½) benchmark report; F5–F6 summariser on the slice; F7–F8 Fast/Think + citation hardening; F9 spreadsheets out of image + internal staging (IaC, automated deploy) → internal MVP; F10 evaluation and accuracy review + clean seed; F11 UAT environment + production hardening; F12 client UAT release; F13–F14 UAT fixes → acceptance; F15–F16 units → first IID comparison; F17 Q8 (if answered) + bulk approval; F18–F27 Explain This Gap, chatbot, document gap feasibility and build (if agreed); F28–F29 Part 2 UAT → M3.
+**Scenario 1 order of work [Estimate]** (**SUPERSEDED — pending 483-AI-final reassessment:** the 483 steps F2–F14; REGX/IID steps stand): F1 finish security PRs (#111–#114, recovery); F2 thin AI slice; F3 483 flow → first demo; F4 (½) benchmark report; F5–F6 summariser on the slice; F7–F8 Fast/Think + citation hardening; F9 spreadsheets out of image + internal staging (IaC, automated deploy) → internal MVP; F10 evaluation and accuracy review + clean seed; F11 UAT environment + production hardening; F12 client UAT release; F13–F14 UAT fixes → acceptance; F15–F16 units → first IID comparison; F17 Q8 (if answered) + bulk approval; F18–F27 Explain This Gap, chatbot, document gap feasibility and build (if agreed); F28–F29 Part 2 UAT → M3.
 **If units go before the 483 MVP** (your §6 priority), every 483 date in scenario 1 moves about 1.5 fortnights later.
 
 ---
@@ -167,7 +169,7 @@ Fortnights start F1 = 9–20 Nov 2026. Each date assumes its blockers clear in t
 
 **Deferred to later increments:** full feedback framework (categories, review queue, monthly report), automated evaluation pipeline, multiple providers/adapter breadth, retrieval tuning and re-ranking, caching, prompt management UI, cost dashboards, streaming responses.
 
-**Benchmark right after connectivity (F3–F4, scenario 1):** Fast, Think and a representative 483 summarisation task; latency p50/p95 end to end at concurrency 1/5/10, output consistency (same input repeated), quality scored on a small reviewer-checked set. **Any gap against Fast < 5 s p95 / Think < 10 s p95 is reported before more development depends on it.**
+**Benchmark right after connectivity (F3–F4, scenario 1; the date is SUPERSEDED — pending 483-AI-final reassessment; the benchmark itself stands):** Fast, Think and a representative 483 summarisation task; latency p50/p95 end to end at concurrency 1/5/10, output consistency (same input repeated), quality scored on a small reviewer-checked set. **Any gap against Fast < 5 s p95 / Think < 10 s p95 is reported before more development depends on it.**
 
 ---
 
@@ -487,7 +489,7 @@ SOW fee INR 17,00,000; milestones 20 % / 40 % / 40 % (SOW page 15). **The paymen
 | Milestone (SOW wording) | Technically done | Demonstrated to iCretegy | Written acceptance | Outstanding | What completion means (proposed, to agree with iCretegy) | Payment received (Pratham) |
 |---|---|---|---|---|---|---|
 | **M1: 20 % "after completion of 2 milestones (483 AI) i.e., after 1 month"** | Unclear which two milestones (question E14). Legacy 483 app exists in `company_site/`; 483 AI limited to an unsafe summariser | Not recorded in the repository | Not recorded | Definition of the two milestones | The two named milestones, demonstrated and accepted in writing | |
-| **M2: 40 % "after deployment of 483 AI"** | No: summariser redesign not built; Fast/Think modes, dataset search with citations, filters, dashboards, exports per SOW 1.2–1.12 largely missing (A.1) | No | No | Part 1 feature set per agreed checklist; Azure model; deployment | The minimum first release in **G.1**, deployed on Azure for iCretegy, UAT signed, written acceptance; every other Part 1 item listed as a later deliverable, not dropped. Target **F17 (one developer) / F12 (two) [Estimate]** | |
+| **M2: 40 % "after deployment of 483 AI"** — **targets SUPERSEDED, pending 483-AI-final reassessment** | No: summariser redesign not built; Fast/Think modes, dataset search with citations, filters, dashboards, exports per SOW 1.2–1.12 largely missing (A.1) | No | No | Part 1 feature set per agreed checklist; Azure model; deployment | The minimum first release in **G.1**, deployed on Azure for iCretegy, UAT signed, written acceptance; every other Part 1 item listed as a later deliverable, not dropped. Target **F17 (one developer) / F12 (two) [Estimate]** | |
 | **M3: 40 % "after deployment of Regulatory AI Software"** | Partly: governed non-AI platform built (A.2); no AI; not deployed | Not recorded | No | AI features (2.6, 2.8, 2.10), blocked items (2.3, 2.7, 2.9) per Phase 2 scope; deployment | Signed Phase 2 scope (committed / specification-dependent / feasibility-dependent / change requests), committed items deployed, UAT and written acceptance. Target **F29 or later (one developer) / F20 (two) [Estimate]** | |
 | Part 3 API | Not a payment line on its own (bundled in the fee) | — | — | Everything in A.3 | Per phased acceptance plan (direction §11) | |
 | Maintenance | — | — | — | Starts at deployment | 1 year included; 24×7 support from year 2 at INR 1,50,000/year (SOW page 16) | |

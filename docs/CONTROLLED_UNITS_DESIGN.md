@@ -95,3 +95,52 @@ Every refusal returns a reason code (the existing `BASIS_REQUIRED`, `DENSITY_REQ
 | **Total** | **about 9–13 days** (1.5–2.5 fortnights for one developer), plus reviewer time for approvals |
 
 **First demonstrable result:** the 1,914 records with `mg` per dose unit, once their route and dosage-form mappings and the `mg` unit mapping are approved: REGX retrieves the IID record, compares the formulation's mg per dose unit against it, and shows the source row, the numbers and "at or below / above". Never "acceptable".
+
+## 7. Check of the 3,748 figure (2026-11-13, read-only)
+
+- **Re-run:** a fresh read-only export of the 9,071 IID records from the local database is **identical** to the 2026-11-06 export (same rows; only row order differed), and the classification gives the same result: **3,748** records with a per-unit potency in a supported unit (category 5). The 164 proposed route/form mappings are still treated as applied, as before. Script and output: `classify.py`, `sample20.py`, `evidence_iid_rerun_20261113.txt`, `evidence_iid_sample20.txt` (review hand-off; the exported record files are not included).
+- **"Supported" does not mean "comparable with every record in its group".** A record compares like for like only with records of the **same dimension** (mass per dose unit; volume per dose unit; mass per volume, where `mg/5ml` and `mg/1ml` convert exactly; percent **w/w**, **w/v** and **v/v** each on its own). Among the 3,748, grouped by route + dosage form (243 groups):
+  - **3,663** have at least one other record of the same dimension in their group; **85** have nothing to compare against.
+  - **60 groups (1,334 records) mix dimensions**, e.g. `%w/w` and `%w/v` in topical solutions, or `mg` and `mg/5ml` in oral solutions. Within those groups only same-dimension records compare; `%w/v` ↔ `mg/mL` becomes possible only after reviewer approval (section 4), and `%w/w` ↔ `%w/v` stays refused.
+- **20-record sample** (seeded, one record per representation class plus 15 random; public FDA IID data):
+
+| # | Record id | Route | Dosage form | Potency | Unit | Dimension | Comparable without an assumed conversion? |
+|---|---|---|---|---|---|---|---|
+| 1 | 269 | ORAL | SOLUTION | 0.11 | `mg/1ml` | mass per volume | Partly: 49 same-dimension records; 17 in other dimensions (incl. 12 in `mg` per dose unit) are not comparable |
+| 2 | 322 | ORAL | TABLET, FILM COATED | 8 | `mg` | mass per dose unit | Yes (167 others) |
+| 3 | 484 | ORAL | ELIXIR | 0.15 | `ml/5ml` | volume per volume | Barely: 1 other; 33 are mass-based |
+| 4 | 537 | ORAL | TABLET | 7.14 | `mg` | mass per dose unit | Yes (396) |
+| 5 | 575 | VAGINAL | SUPPOSITORY | 288.1 | `mg` | mass per dose unit | Yes (19) |
+| 6 | 699 | ORAL | TABLET, FILM COATED | 41.25 | `mg` | mass per dose unit | Yes (167) |
+| 7 | 948 | ORAL | SUSPENSION | 111.12 | `mg/5ml` | mass per volume | Partly: 57 same; 8 not |
+| 8 | 1128 | SUBLINGUAL | TABLET | 1.6 | `mg` | mass per dose unit | Yes (50) |
+| 9 | 1352 | TOPICAL | SWAB | 0.05 | `%w/w` | percent w/w | Yes (5) |
+| 10 | 1372 | TOPICAL | SOLUTION | 0.7 | `%w/w` | percent w/w | Partly: 53 same; 20 in `%w/v` are not |
+| 11 | 1945 | ORAL | TABLET, FILM COATED | 5.67 | `mg` | mass per dose unit | Yes (167) |
+| 12 | 2951 | INTRADERMAL | INJECTION | 1.6 | `%w/v` | percent w/v | Partly: 5 same; 5 in `mg` are not |
+| 13 | 3007 | TOPICAL | SOAP | 0.76 | `%w/w` | percent w/w | Yes (40) |
+| 14 | 3276 | NASAL | SPRAY | 10 | `ml` | volume per dose unit | Barely: 1 other; 7 not |
+| 15 | 4059 | TOPICAL | SOLUTION | 1.4 | `%w/w` | percent w/w | Partly: 53 same; 20 not |
+| 16 | 4735 | ORAL | TABLET | 25 | `mg` | mass per dose unit | Yes (396) |
+| 17 | 5312 | ORAL | TABLET, EXTENDED RELEASE | 6.75 | `mg` | mass per dose unit | Yes (135) |
+| 18 | 5537 | ORAL | TABLET, FILM COATED | 0.7 | `mg` | mass per dose unit | Yes (167) |
+| 19 | 5986 | TOPICAL | LIQUID | 1 | `%w/w` | percent w/w | Yes (14) |
+| 20 | 8819 | OPHTHALMIC | SOLUTION | 0.45 | `%w/v` | percent w/v | Partly: 36 same; 19 in `%w/w` are not |
+
+- **Verdict:** the 3,748 are real per-unit limits in units the minimal model can represent exactly, and 3,663 of them have a like-for-like comparator. The comparison must run **per dimension**, never across `%w/w` and `%w/v` or across per-dose and per-volume values. A first pass at this check of my own wrongly grouped `%w/w` with `%w/v`; it was corrected before these figures were written.
+
+## 8. Demo labels: "technically comparable" vs reviewed results
+
+Every comparison result carries **one basis**, worked out by the server (never typed by a user, never taken from the request):
+
+| Basis | When | What the user sees | Where it can appear |
+|---|---|---|---|
+| `technical_demo` | **Any** input is not signed off: a route or dosage-form mapping in `proposed` status (TEST approvals included), the unit mapping, a conversion that still needs reviewer approval, or checklist content outside the 20-item gate | A badge on every row and a banner above the table: **"Technically comparable (not regulatorily approved). Demonstration only: the mappings and units used have not had regulatory sign-off."** The same sentence is written into every export (PDF/Excel header and each row's note) | Demo and internal environments. In production it is hidden unless an administrator switches on a demo flag, and then it keeps the same label |
+| `reviewed` | **Every** input has documented sign-off (reviewer, date, decision record id) | A neutral label: **"Comparison inputs reviewed by [reviewer] on [date]."** with a link to the sign-off record. Still only "at or below / above the IID value", never "acceptable", "safe" or "approved by FDA" | Production |
+
+Rules:
+- **Fail closed:** if the server cannot prove every input is signed off, the result is `technical_demo`. Approval of one input never upgrades a result that also used an unapproved one.
+- The basis and the list of unapproved inputs are returned by the API next to the numbers (field `basis` and `unreviewed_inputs`), so the UI, exports and the audit trail all show the same thing.
+- The words stay within the platform's no-regulatory-claim rule (`common/tests/test_regulatory_claim_guard.py`): `reviewed` describes our internal sign-off, not an agency decision. The exact demo wording is checked against that guard when it is built.
+- Tests when this is built: a result with one proposed mapping is `technical_demo`; all approved gives `reviewed`; the export carries the label; production hides demo results by default.
+- **Not built.** Units build starts only after Pratham confirms on the call (direction, Step 6).
