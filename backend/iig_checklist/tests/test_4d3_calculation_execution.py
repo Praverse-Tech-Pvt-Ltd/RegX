@@ -1594,9 +1594,7 @@ class TestTenantIsolation:
         # actor needs a doer role in that tenant. This grants only what tenant B
         # needs; tenant A's guard is what the assertion is about.
         membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_b, user=user_a)
-        role, _ = Role.objects.get_or_create(
-            tenant=tenant_b, name="doer", defaults={"is_system": True}
-        )
+        role, _ = Role.objects.get_or_create(tenant=None, name="doer", defaults={"is_system": True})
         MembershipRole.objects.get_or_create(membership=membership, role=role)
 
         other_definition = ChecklistDefinition.objects.create(

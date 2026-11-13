@@ -243,7 +243,9 @@ class Command(BaseCommand):
             self._note(made, f"membership {role_name}")
 
             try:
-                role = Role.objects.get(name=role_name)
+                # Platform-wide built-in only (authorization/seed.py); never a
+                # tenant's own role that happens to share the name.
+                role = Role.objects.get(name=role_name, tenant__isnull=True, is_system=True)
             except Role.DoesNotExist as exc:
                 raise CommandError(
                     f"Built-in role {role_name!r} is missing. Run migrations first."

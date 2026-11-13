@@ -30,9 +30,7 @@ tenant, _ = Tenant.objects.get_or_create(
 def make_actor(email, full_name, role_name):
     user, _ = User.objects.get_or_create(email=email, defaults={"full_name": full_name})
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
-    role, _ = Role.objects.get_or_create(
-        tenant=tenant, name=role_name, defaults={"is_system": True}
-    )
+    role, _ = Role.objects.get_or_create(tenant=None, name=role_name, defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
     return user
 
@@ -251,9 +249,7 @@ other_user, _ = User.objects.get_or_create(
     email="ci-v2-other@example.com", defaults={"full_name": "CI Other v2"}
 )
 other_membership, _ = TenantMembership.objects.get_or_create(tenant=other_tenant, user=other_user)
-other_role, _ = Role.objects.get_or_create(
-    tenant=other_tenant, name="doer", defaults={"is_system": True}
-)
+other_role, _ = Role.objects.get_or_create(tenant=None, name="doer", defaults={"is_system": True})
 MembershipRole.objects.get_or_create(membership=other_membership, role=other_role)
 other_client = Client(SERVER_NAME="localhost")
 other_client.force_login(other_user)

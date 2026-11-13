@@ -200,9 +200,7 @@ class TestTenantIsolation:
         # Give user_b a doer role in tenant_b so permission checks pass;
         # only tenant scoping should be what blocks visibility.
         membership = TenantMembership.objects.create(tenant=tenant_b, user=user_b)
-        role, _ = Role.objects.get_or_create(
-            tenant=tenant_b, name="doer", defaults={"is_system": True}
-        )
+        role, _ = Role.objects.get_or_create(tenant=None, name="doer", defaults={"is_system": True})
         MembershipRole.objects.create(membership=membership, role=role)
 
         client_a = _client_for(user_a, tenant_a)
@@ -225,9 +223,7 @@ class TestTenantIsolation:
         from tenancy.models import TenantMembership
 
         membership = TenantMembership.objects.create(tenant=tenant_b, user=user_b)
-        role, _ = Role.objects.get_or_create(
-            tenant=tenant_b, name="doer", defaults={"is_system": True}
-        )
+        role, _ = Role.objects.get_or_create(tenant=None, name="doer", defaults={"is_system": True})
         MembershipRole.objects.create(membership=membership, role=role)
 
         client_a = _client_for(user_a, tenant_a)

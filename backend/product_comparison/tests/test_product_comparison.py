@@ -34,9 +34,7 @@ def _member(tenant, user, role_name):
     from tenancy.models import TenantMembership
 
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant, user=user)
-    role, _ = Role.objects.get_or_create(
-        tenant=tenant, name=role_name, defaults={"is_system": True}
-    )
+    role, _ = Role.objects.get_or_create(tenant=None, name=role_name, defaults={"is_system": True})
     MembershipRole.objects.get_or_create(membership=membership, role=role)
     return membership
 

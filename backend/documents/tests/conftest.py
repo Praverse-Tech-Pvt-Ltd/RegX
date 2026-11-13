@@ -107,7 +107,7 @@ def doer_membership(db, user_a, tenant_a):
     membership = TenantMembership.objects.create(tenant=tenant_a, user=user_a)
     role, _ = Role.objects.get_or_create(
         name="doer",
-        tenant=tenant_a,
+        tenant=None,
         defaults={"is_system": True},
     )
     MembershipRole.objects.create(membership=membership, role=role)
@@ -122,7 +122,7 @@ def reviewer_membership(db, user_b, tenant_a):
     membership = TenantMembership.objects.create(tenant=tenant_a, user=user_b)
     role, _ = Role.objects.get_or_create(
         name="reviewer",
-        tenant=tenant_a,
+        tenant=None,
         defaults={"is_system": True},
     )
     MembershipRole.objects.create(membership=membership, role=role)
@@ -137,7 +137,7 @@ def admin_membership(db, user_a, tenant_a):
     membership, _ = TenantMembership.objects.get_or_create(tenant=tenant_a, user=user_a)
     role, _ = Role.objects.get_or_create(
         name="tenant_admin",
-        tenant=tenant_a,
+        tenant=None,
         defaults={"is_system": True},
     )
     MembershipRole.objects.create(membership=membership, role=role)
