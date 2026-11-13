@@ -14,7 +14,10 @@
 
 ## Management view (one page)
 
+> **Correction found 2026-11-13, read this first.** The read-only scan of related org repositories found **`483-AI-final`**, a separate, private and **active 483 AI codebase** (2,760 commits, 150 branches, last push 2026-11-06; backend, frontend, evaluation and "think" acceptance sets, client QA reports, iCretegy feedback reconciliation, production compose files). This plan's Part 1 status (Annex 1, A.1) and the 483 work in sections B–C were written from `company_site/` alone and **assume the 483 AI is built from scratch**. If `483-AI-final` is the 483 product, Part 1 status, effort and the M2 dates change, possibly a lot. **Decision G2 below; no Part 1 date in this document should be used until it is answered.**
+
 **Progressing**
+- **company_site MFA code step live-checked on 2026-11-13: 8/8** (an enrolled VP signs in to company_site with a code). The first live run found a real bug (HTTP 500 from duplicate session cookies), fixed in #114 with a test that reproduces it.
 - **Security fixes, all with tests, open for review:** company_site no longer starts without a secret key (#111); duplicate tenant-scoped roles merged and forbidden (#112); MFA for Tenant Admin and Platform Support (#113); **company_site MFA code step** (#114, the deployment blocker from #107). MFA recovery (recovery codes at sign-in, audited admin reset) built on its own branch, not pushed.
 - **Regulatory data:** real FDA IID (9,071 rows) and Orange Book (48,761 products) load locally; blocker breakdown done (below); units design ready to build.
 - **Planning:** this plan, the regulatory review package (one document for the reviewer and iCretegy), the Azure checklist.
@@ -31,14 +34,15 @@
 | Credential revocation proof; image/registry/Render checks | Account owners (section A.2–A.3) | Pratham |
 
 **Needs your decision (prioritised; detail in section G)**
-1. **Revoke the Gemini API key found in the PUBLIC repo `iCretegy-AI483`** (history, `backend/.env`), and decide whether that repo stays public. The read-only scan of all related repos is done (`docs/CREDENTIAL_INVENTORY.md` §8): the 3 OpenAI keys and client spreadsheets ("For Cipla") are also in the private `booking-demo-final` and `Django-booking-demo-page`; neither public repo holds them.
-2. **Staffing:** is Dev (or another developer) available, and from when? Part-time Azure/DevOps?
-3. **Azure:** subscription owner, budget, and the dev model endpoint + credential.
-4. **Regulatory reviewer:** name and start date.
-5. **Credentials:** confirm revocation with the checklist in A.2.
-6. **Admin access** for the checks in A.3.
-7. **Units:** confirm the move-up (scenario 1 places units right after the 483 MVP; before it costs about 1.5 fortnights on the 483 dates).
-8. **M1 definition** and the delivery-stage agreement with iCretegy (section F).
+1. **Revoke the two Google API keys** (the Gemini key in the PUBLIC repo `iCretegy-AI483` and a different one in the private `483-AI-final`). For the public one: (history, `backend/.env`), and decide whether that repo stays public. The read-only scan of all related repos is done (`docs/CREDENTIAL_INVENTORY.md` §8): the 3 OpenAI keys and client spreadsheets ("For Cipla") are also in the private `booking-demo-final` and `Django-booking-demo-page`; neither public repo holds them.
+2. **Which codebase is the 483 product?** `483-AI-final` (separate repo, active) or a build inside company_site/REGX as this plan assumes. Answer before using any Part 1 date.
+3. **Staffing:** is Dev (or another developer) available, and from when? Part-time Azure/DevOps?
+4. **Azure:** subscription owner, budget, and the dev model endpoint + credential.
+5. **Regulatory reviewer:** name and start date.
+6. **Credentials:** confirm revocation with the checklist in A.2 (now including two Google API keys).
+7. **Admin access** for the checks in A.3 (GHCR: look for `ipharmai-api` / `ipharmai-nginx`).
+8. **Units:** confirm the move-up (scenario 1 places units right after the 483 MVP; before it costs about 1.5 fortnights on the 483 dates).
+9. **M1 definition** and the delivery-stage agreement with iCretegy (section F).
 
 **Dates at a glance [internal estimates]**
 
@@ -74,6 +78,8 @@ Fortnights start F1 = 9–20 Nov 2026. Each date assumes its blockers clear in t
 | S11 | Public org repositories related to this client | Pratham | **Scanned read-only 2026-11-06** (`docs/CREDENTIAL_INVENTORY.md` §8): no OpenAI key, no known leaked value, no client spreadsheets in either public repo; findings S17, S18 | Scan done; owner actions open | See S17 |
 | **S17** | **Google (Gemini) API key in the PUBLIC repo `iCretegy-AI483`** (`backend/.env`, commit `88a8cc4`, history only) | Pratham / Google Cloud project owner | Inventory §8.2 P1 (no value printed) | **Open, urgent** | **Yes**: revoke before anything else; confirm usage |
 | S18 | **Client spreadsheets (6 "For Cipla") and SQLite databases in the private repos `booking-demo-final` and `Django-booking-demo-page`**, plus the 3 OpenAI keys and SMTP password | Pratham | Inventory §8.3 R1–R6 | Open | **Yes for any deployment built from them**; access review of their 4 collaborators |
+| S20 | **A second Google API key, Django secret-key literals and test/UAT credentials in the private `483-AI-final`** | Pratham / repo owner | Inventory §8.3 R7–R10 | Open | Yes for any deployment of `483-AI-final` until rotated and triaged |
+| S21 | **Historical GHCR image-push workflow** in `483-AI-final` (`ipharmai-api`, `ipharmai-nginx`); 3 recorded runs, all failed before the push | Org owner | Inventory §8.3 R13 | Open (check GHCR) | Yes until GHCR shows no such packages, or their contents are checked |
 | S19 | `django-insecure` default in the PUBLIC repo `iPharmaAi-booking-demo-page` (branch `django-rewrite`, different value) and a live Vercel homepage | Pratham | Inventory §8.2 P4 | Open | Yes for any deployment of that branch without `DJANGO_SECRET_KEY` |
 | S12 | company_site summariser can call OpenAI on page load | Maanav (redesign approved) | §11 #10, #10e; no key set anywhere | Open; contained by "no key" | **Yes for setting any model key** |
 | S13 | Local Django superusers bypass REGX MFA in company_site | Pratham (decision) | Report in #113 | Open | Recommended: retire local admins before production |
@@ -97,7 +103,8 @@ Fortnights start F1 = 9–20 Nov 2026. Each date assumes its blockers clear in t
 
 | Where | Who must look | What to check |
 |---|---|---|
-| GitHub org `Praverse-Tech-Pvt-Ltd`: **Packages** (GHCR) | Org owner | Any container images; their tags, publish dates, who published; inspect any REGX/iPharmaAI image for client spreadsheets or `db.sqlite3` |
+| GitHub org `Praverse-Tech-Pvt-Ltd`: **Packages** (GHCR) | Org owner | Any container images, **specifically `ipharmai-api` and `ipharmai-nginx`** (pushed by a former `483-AI-final` workflow if it ever succeeded); tags, publish dates, who published; inspect any image for client data or `db.sqlite3` |
+| Repo `483-AI-final`: Actions secrets and run history | Org owner | Secrets `GHCR_TOKEN`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY` (names only): which accounts they belong to, rotate if the repo's history is exposed; confirm no deploy run succeeded |
 | GitHub org: installed **GitHub Apps** and OAuth apps | Org owner | Render or other deploy integrations; which repos they can read |
 | GitHub org: settings | Org owner | 2FA required for members (API did not return it), members/outside collaborators, "members can create public repositories" (currently **allowed**), audit log for package publishes and visibility changes |
 | Repo `RegX` | Org owner | Branch protection, deploy keys, Actions secrets (names only), environments, collaborators |
@@ -240,15 +247,16 @@ INJECTION matching (Orange Book side) and the white-paper calculations follow th
 
 ## G. Decisions needing Pratham (prioritised)
 
-1. **Public repositories (urgent):** revoke the Gemini key (S17); decide whether `iCretegy-AI483` and `iPharmaAi-booking-demo-page` stay public; review access to `booking-demo-final` and `Django-booking-demo-page` (client spreadsheets, keys); consider disallowing public repositories for members. `OCR-FDA` was outside the agreed scope and is not scanned.
-2. **Staffing:** second developer (who, from when) and part-time Azure/DevOps. Decides scenario 1, 2 or 3.
-3. **Azure:** subscription owner, budget, region; dev model endpoint and credential through a secure channel; the E.1 "synthetic" answers.
-4. **Regulatory reviewer:** name and start date (blocks all IID progress).
-5. **Credentials:** run the A.2 checklist with the account owners; confirm each revocation independently.
-6. **Admin checks:** the A.3 list (GHCR, apps, org settings, Render, OpenAI, Microsoft 365, other registries).
-7. **Units vs 483 order** in scenario 1 (units after the 483 MVP is the default here).
-8. **iCretegy:** send the regulatory review package and the M1 / delivery-stage questions; agree the first-release scope in writing.
-9. **Local admin accounts in company_site:** retire them in favour of REGX accounts (so MFA covers them), with `/admin/` limited to the operator network meanwhile.
+1. **Public repositories (urgent):** revoke the Gemini key (S17) and the second Google key (S20); decide whether `iCretegy-AI483` and `iPharmaAi-booking-demo-page` stay public; review access to `booking-demo-final` and `Django-booking-demo-page` (client spreadsheets, keys); consider disallowing public repositories for members. `OCR-FDA` was outside the agreed scope and is not scanned.
+2. **483 codebase:** confirm whether `483-AI-final` is the 483 product. If yes, the next plan revision assesses SOW Part 1 against it (status, effort, M2 dates) and the "build in company_site" path in sections B–C is replaced.
+3. **Staffing:** second developer (who, from when) and part-time Azure/DevOps. Decides scenario 1, 2 or 3.
+4. **Azure:** subscription owner, budget, region; dev model endpoint and credential through a secure channel; the E.1 "synthetic" answers.
+5. **Regulatory reviewer:** name and start date (blocks all IID progress).
+6. **Credentials:** run the A.2 checklist with the account owners; confirm each revocation independently.
+7. **Admin checks:** the A.3 list (GHCR, apps, org settings, Render, OpenAI, Microsoft 365, other registries).
+8. **Units vs 483 order** in scenario 1 (units after the 483 MVP is the default here).
+9. **iCretegy:** send the regulatory review package and the M1 / delivery-stage questions; agree the first-release scope in writing.
+10. **Local admin accounts in company_site:** retire them in favour of REGX accounts (so MFA covers them), with `/admin/` limited to the operator network meanwhile.
 
 ---
 
@@ -263,7 +271,7 @@ INJECTION matching (Orange Book side) and the white-paper calculations follow th
 
 # Annexes
 
-## Annex 1. Technical status against the SOW (from version 1, still current; PRs #111–#114 not yet reflected)
+## Annex 1. Technical status against the SOW (from version 1; PRs #111–#114 not yet reflected; **Part 1 rows looked only at `company_site/`, not at `483-AI-final`, see the correction at the top**)
 
 Ladder step shown as **"step N"** (see "How to read it"). **Built** = code, API, UI and tests exist; **Partly built**; **Missing**; **Blocked** = a specific external input is missing.
 
