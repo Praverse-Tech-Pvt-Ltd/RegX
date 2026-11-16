@@ -8,4 +8,5 @@ urlpatterns = [
     path("effective/", views.effective_permissions_view, name="permissions-effective"),
     path("mine/", views.my_roles_view, name="roles-mine"),
     path("mfa-status/", views.mfa_status_view, name="mfa-status"),
+    path("users/<uuid:public_id>/mfa-reset/", views.mfa_reset_view, name="mfa-reset"),
 ]

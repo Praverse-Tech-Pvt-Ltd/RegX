@@ -131,6 +131,13 @@ export const auth = {
       body: { code },
     }),
 
+  /** Second step with a single-use recovery code instead of the authenticator code. */
+  loginRecovery: (recovery_code: string) =>
+    apiRequest<UserProfile & { recovery_codes_remaining: number }>("/api/regx/v1/auth/login/mfa/", {
+      method: "POST",
+      body: { recovery_code },
+    }),
+
   logout: () =>
     apiRequest<void>("/api/regx/v1/auth/logout/", { method: "POST" }),
 

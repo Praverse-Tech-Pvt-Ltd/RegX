@@ -21,6 +21,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from audit.middleware import log_event
+
 from . import login_lockout
 from .models import MFADevice, RecoveryCode, User
 from .serializers import (
@@ -120,6 +122,9 @@ def login_mfa_view(request):
         )
 
     login_lockout.check(user.email)
+
+    if "recovery_code" in request.data:
+        return _login_with_recovery_code(request, user, device)
 
     s = MFAVerifySerializer(data=request.data)
     counter = _matching_counter(device, s.validated_data["code"]) if s.is_valid() else None
@@ -239,6 +244,36 @@ def mfa_recovery_view(request):
         return Response({"detail": "Invalid or already-used recovery code."}, status=400)
 
     return Response({"detail": "Recovery code accepted."})
+
+
+def _login_with_recovery_code(request, user, device):
+    """Second login step with a single-use recovery code instead of the TOTP code.
+
+    For a user who has lost their authenticator. Same lockout as wrong codes;
+    every use is audited. The code is spent whether or not the user then enrols
+    a new device.
+    """
+    s = MFARecoverySerializer(data=request.data)
+    if not s.is_valid() or not RecoveryCode.consume(device, s.validated_data["recovery_code"]):
+        login_lockout.record_failure(user.email)
+        return Response(
+            {"detail": "Invalid or already-used recovery code.", "error_code": "mfa_invalid_code"},
+            status=400,
+        )
+    remaining = device.recovery_codes.filter(used_at__isnull=True).count()
+    login_lockout.clear(user.email)
+    request.session.pop(_MFA_PENDING_KEY, None)
+    login(request, user)
+    log_event(
+        "identity.mfa.recovery_code_used",
+        resource_type="user",
+        resource_id=str(user.public_id),
+        payload={"recovery_codes_remaining": remaining},
+        user=user,
+    )
+    data = dict(UserPublicSerializer(user).data)
+    data["recovery_codes_remaining"] = remaining
+    return Response(data)
 
 
 def _verified_device(user) -> MFADevice | None:

@@ -218,6 +218,7 @@ class FakeRegxMfa:
     does) and answers 429 once `lock_after` refusals are reached."""
 
     GOOD_CODE = "123456"
+    GOOD_RECOVERY = "0123456789abcdef0123"
 
     def __init__(self, roles=("vp",), lock_after=5, pending=True):
         self.roles = list(roles)
@@ -261,7 +262,11 @@ class FakeRegxMfa:
                         return FakeResponse(400, {"error_code": "mfa_not_pending"})
                     if fake.failures >= fake.lock_after:
                         return FakeResponse(429, {"detail": "Locked."})
-                    if (json or {}).get("code") != FakeRegxMfa.GOOD_CODE:
+                    fake.last_payload = dict(json or {})
+                    good = (json or {}).get("code") == FakeRegxMfa.GOOD_CODE or (
+                        (json or {}).get("recovery_code") == FakeRegxMfa.GOOD_RECOVERY
+                    )
+                    if not good:
                         fake.failures += 1
                         return FakeResponse(400, {"error_code": "mfa_invalid_code"})
                     self.cookies.set("sessionid", "fake-regx-session", domain="regx.test")
@@ -437,6 +442,20 @@ class SharedRegxMfaCodeStepTests(GuardedTestCase):
         self.assertContains(response, "Your sign-in timed out")
         self.assertNotIn("_auth_user_id", other.session)
         self.assertEqual(len(self._mfa_posts()), 0)
+
+    def test_recovery_code_is_passed_through_to_regx(self):
+        """A user who lost the authenticator types a recovery code on the same page;
+        company_site sends it to REGX as `recovery_code`, and signs in only if REGX accepts."""
+        response = self._code(FakeRegxMfa.GOOD_RECOVERY)
+        self.assertRedirects(response, "/ratools/", fetch_redirect_response=False)
+        self.assertEqual(self.fake.last_payload, {"recovery_code": FakeRegxMfa.GOOD_RECOVERY})
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_wrong_recovery_code_is_refused(self):
+        response = self._code("ffffffffffffffffffff")
+        self.assertContains(response, "Invalid code.")
+        self.assertEqual(self.fake.last_payload, {"recovery_code": "ffffffffffffffffffff"})
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_the_totp_secret_is_never_stored(self):
         pending = self.client.session["regx_mfa_pending"]
