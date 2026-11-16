@@ -13,6 +13,12 @@ This module closes that gap without touching anything a reviewer has seen:
   or cleared.
 - One audit event per changed record (old -> new, with the mapping), plus one
   summary event. `--dry-run` reports the same changes and writes nothing.
+- Unit meanings (controlled units, increment 2): an IID record's empty
+  `potency_expression` is filled from the APPROVED, current `UnitMapping` for
+  its `potency_unit_raw`, and only when that meaning is in force (listed by the
+  ACTIVE controlled-units release). Same rules: never overwrite, never clear,
+  only before review. `potency_unit_normalized` and calculability are not
+  touched by this link.
 
 The generic part works on any record model with `route_raw`/`route_normalized`
 and `dosage_form_raw`/`dosage_form_normalized`. What differs per dataset (which
@@ -36,6 +42,7 @@ from .models import (
     FDAReleaseStatus,
     IIDPrecedentRecord,
     RouteMapping,
+    UnitMapping,
 )
 
 #: Statuses a release can have before anyone has been asked to review it.
@@ -116,6 +123,7 @@ def reresolve(release: FDADataSourceRelease, *, actor=None, dry_run: bool = Fals
                 "not been submitted for review can be re-resolved."
             )
         records = dataset.records(locked).select_for_update()
+        in_force = None  # meanings of the active controlled-units release, read once
         for record in records:
             filled: list[str] = []
             for prefix, mapping_model, target in _LINKS:
@@ -132,6 +140,32 @@ def reresolve(release: FDADataSourceRelease, *, actor=None, dry_run: bool = Fals
                 if not dry_run:
                     setattr(record, f"{prefix}_normalized", term)
                     filled.append(f"{prefix}_normalized")
+            if (
+                locked.dataset_type == FDADatasetType.FDA_IID
+                and record.potency_expression_id is None
+                and record.potency_unit_raw
+            ):
+                if in_force is None:
+                    from .controlled_units import in_force_expressions
+
+                    in_force = in_force_expressions()
+                mapping = _approved_mapping(
+                    UnitMapping, locked.dataset_type, record.potency_unit_raw
+                )
+                if mapping is not None and mapping.quantity_expression_id in in_force:
+                    expression = mapping.quantity_expression
+                    changes.append(
+                        Change(
+                            str(record.public_id),
+                            "potency_expression",
+                            record.potency_unit_raw,
+                            str(expression),
+                            str(mapping.public_id),
+                        )
+                    )
+                    if not dry_run:
+                        record.potency_expression = expression
+                        filled.append("potency_expression")
             if dry_run or not filled:
                 continue
             derived = dataset.recompute(record)

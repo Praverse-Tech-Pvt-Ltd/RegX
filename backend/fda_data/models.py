@@ -31,6 +31,9 @@ class FDADatasetType(models.TextChoices):
     FDA_SUBSTANCE_IDENTIFIERS = "fda_substance_identifiers", "FDA Substance Registration (UNII)"
     FDA_ROUTE_TERMINOLOGY = "fda_route_terminology", "FDA Route Terminology"
     FDA_DOSAGE_FORM_TERMINOLOGY = "fda_dosage_form_terminology", "FDA Dosage Form Terminology"
+    #: Not an FDA file: REGX's reviewed list of units and unit meanings
+    #: (fda_data/controlled_units.py). Platform-level, versioned like the others.
+    REGX_CONTROLLED_UNITS = "regx_controlled_units", "REGX Controlled Units (reviewed list)"
 
 
 class FDAReleaseStatus(models.TextChoices):

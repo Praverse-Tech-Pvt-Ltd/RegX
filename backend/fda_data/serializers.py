@@ -287,6 +287,9 @@ class TerminologyMappingSerializer(serializers.Serializer):
             "affected_record_count": affected_record_count,
             "created_at": instance.created_at,
         }
+        if mapping_type == "unit" and getattr(instance, "quantity_expression_id", None):
+            # A unit mapping onto a meaning (controlled units): show the meaning.
+            data["proposed_controlled_value"] = str(instance.quantity_expression)
         if mapping_type == "substance":
             data["proposed_unii"] = instance.proposed_unii or (
                 controlled.unii if controlled else None
