@@ -254,6 +254,100 @@ class TestAdminReset:
         assert not AuditEvent.objects.filter(event_type="identity.mfa.reset").exists()
 
 
+def _refusal():
+    return AuditEvent.objects.get(event_type="identity.mfa.reset_refused")
+
+
+@pytest.mark.django_db
+class TestRefusedResetsAreAudited:
+    """Every refused reset leaves an audit event: who tried, which user, why; never
+    the reason text, codes or secrets."""
+
+    def _assert_refusal(self, caller, target_id, code):
+        event = _refusal()
+        assert event.payload == {"by": str(caller.public_id), "refused": code}
+        assert event.resource_type == "user"
+        assert event.resource_id == str(target_id)
+        assert event.actor_id == caller.pk
+        return event
+
+    def test_self_reset(self, make_member):
+        admin = make_member("a1@refuse.test", Role.BuiltIn.TENANT_ADMIN)
+        _enrol(admin)
+        _reset(admin, admin)
+        self._assert_refusal(admin, admin.public_id, "mfa_reset_self_forbidden")
+
+    def test_admin_without_mfa(self, make_member, settings):
+        settings.REGX_MFA_REQUIRED_ROLES = ()  # let the request reach the view
+        target = make_member("t2@refuse.test", Role.BuiltIn.REVIEWER)
+        _enrol(target)
+        admin = make_member("a2@refuse.test", Role.BuiltIn.TENANT_ADMIN)
+        _reset(admin, target)
+        self._assert_refusal(admin, target.public_id, "mfa_required_for_reset")
+
+    def test_non_admin(self, make_member):
+        target = make_member("t3@refuse.test", Role.BuiltIn.REVIEWER)
+        _enrol(target)
+        peer = make_member("p3@refuse.test", Role.BuiltIn.VP)
+        _enrol(peer)
+        _reset(peer, target)
+        self._assert_refusal(peer, target.public_id, "mfa_reset_forbidden")
+
+    def test_admin_of_another_tenant(self, make_member):
+        from tenancy.models import Tenant
+
+        other = Tenant.objects.create(name="Refuse Org", slug="refuse-org")
+        target = make_member("t4@refuse.test", Role.BuiltIn.REVIEWER)
+        _enrol(target)
+        outsider = make_member("o4@refuse.test", Role.BuiltIn.TENANT_ADMIN, member_of=other)
+        _enrol(outsider)
+        _reset(outsider, target)
+        event = self._assert_refusal(outsider, target.public_id, "mfa_reset_forbidden")
+        assert event.tenant_id is None  # no shared tenant to record
+
+    def test_missing_reason_records_the_shared_tenant_but_not_the_text(self, make_member, tenant):
+        target = make_member("t5@refuse.test", Role.BuiltIn.REVIEWER)
+        _enrol(target)
+        admin = make_member("a5@refuse.test", Role.BuiltIn.TENANT_ADMIN)
+        _enrol(admin)
+        _reset(admin, target, reason="123456")
+        event = self._assert_refusal(admin, target.public_id, "reason_required")
+        assert event.tenant_id == tenant.pk
+        assert "123456" not in str(event.payload)
+
+    def test_target_without_a_device(self, make_member):
+        target = make_member("t6@refuse.test", Role.BuiltIn.REVIEWER)
+        admin = make_member("a6@refuse.test", Role.BuiltIn.TENANT_ADMIN)
+        _enrol(admin)
+        _reset(admin, target)
+        self._assert_refusal(admin, target.public_id, "no_mfa_device")
+
+    def test_unknown_user(self, make_member):
+        import uuid
+
+        admin = make_member("a7@refuse.test", Role.BuiltIn.TENANT_ADMIN)
+        _enrol(admin)
+        missing = uuid.uuid4()
+        client = APIClient()
+        client.force_login(admin)
+        resp = client.post(
+            f"/api/regx/v1/permissions/users/{missing}/mfa-reset/",
+            {"reason": "Lost phone; identity confirmed by call"},
+            format="json",
+        )
+        assert resp.status_code == 404
+        self._assert_refusal(admin, missing, "not_found")
+
+    def test_a_successful_reset_records_no_refusal(self, make_member):
+        target = make_member("t8@refuse.test", Role.BuiltIn.VP)
+        _enrol(target)
+        admin = make_member("a8@refuse.test", Role.BuiltIn.TENANT_ADMIN)
+        _enrol(admin)
+        assert _reset(admin, target).status_code == 200
+        assert not AuditEvent.objects.filter(event_type="identity.mfa.reset_refused").exists()
+        assert AuditEvent.objects.filter(event_type="identity.mfa.reset").count() == 1
+
+
 @pytest.mark.django_db
 class TestRecoveryRegressions:
     def test_another_users_recovery_code_is_refused(self, make_member):
