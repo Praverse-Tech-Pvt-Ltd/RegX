@@ -235,9 +235,9 @@ The repo contains **two unrelated codebases with no common git ancestor**:
 | `regx-main` | **REGX** — this platform. Backend + frontend + compose |
 | `main` | Legacy iPharmaAI Django monolith (`RATools`, `AIDatabase`, `AdminMaster`) |
 
-`main` is the repository default branch, so a plain `git clone` lands on the
-legacy app, whose UI is served on port 8000 — the same port REGX uses for its
-API. Opening `:8000` and getting a 404, or finding routes such as
+`regx-main` has been the repository default branch since 2026-11-16, so a plain
+`git clone` lands on REGX. Before that it was `main`, the legacy app, whose UI is
+served on port 8000 — the same port REGX uses for its API. Opening `:8000` and getting a 404, or finding routes such as
 `/ratools/...` missing, usually means the wrong branch is checked out rather
 than a broken install.
 

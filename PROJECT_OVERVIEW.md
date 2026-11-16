@@ -39,10 +39,8 @@ The discovery prompt's "Context I have" section came back empty. Until someone f
   - an operations dashboard
 - **Legacy app inside the repo:** the iPharmaAI Django monolith is carried in as `company_site/` and served beside REGX through nginx. One login works for both: company_site sends the password check to REGX's API. They do not share sessions.
 - **Repository quirk:** the GitHub repo `Praverse-Tech-Pvt-Ltd/RegX` (private) holds **two unrelated histories**:
-  - `main`, the default branch, is the legacy monolith.
-  - `regx-main` is REGX.
-
-  A plain `git clone` therefore lands on the wrong code.
+  - `main` is the legacy monolith (the default branch until 2026-11-16; now an archive).
+  - `regx-main` is REGX and, **since 2026-11-16, the default branch**, so a plain `git clone` lands on REGX.
 
 **Bottom line (scope: SOW Part 2 + applicable §4/§5):**
 - The last developer declared "ENGINEERING COMPLETE — EXTERNAL DECISIONS OUTSTANDING" (`docs/FINAL_ENGINEERING_CLOSURE_AUDIT.md`). That is accurate for the governed, non-AI platform:
