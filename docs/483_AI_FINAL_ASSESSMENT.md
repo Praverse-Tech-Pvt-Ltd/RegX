@@ -134,3 +134,6 @@ Row text as in plan v2 §1.1. "Present" means code exists for it; it does **not*
 6. Should 483-AI-final get CI, a lower failing-test baseline, enforced MFA for privileged roles and off-node backups before any further client release?
 7. Who is "Your GitHub Username" (44 commits, May 2026)?
 8. Data governance: written permission for iCretegy data in this repo's history, and who has access.
+9. **Takeover assumption corrected:** `Devpt1904` is still active on `483-AI-final` (last commit 2026-11-13). The owner should clarify roles: who owns Part 1, who maintains this repository, who decides its releases.
+10. **Hosting and AI data flow:** which hosting is the approved plan, Azure (our plan v2) or E2E Networks (where this product runs)? It calls Google Gemini: **has any iCretegy data been sent to Gemini, with which key, on which tier, and since when?** (Paid and free tiers have different data-use terms; check Google's current terms rather than relying on this note.)
+11. **IID demo figure:** for the REGX demo, the realistic count is **3,663** like-for-like comparisons, not 3,748 (`docs/CONTROLLED_UNITS_DESIGN.md` §7). Recorded here so the call uses one number.
