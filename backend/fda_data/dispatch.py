@@ -67,6 +67,11 @@ UNSUPPORTED_REASONS: dict[str, str] = {
         "`ControlledDosageForm` values are governed vocabulary, loaded only by "
         "`load_spl_terminology` from a saved FDA SPL snapshot."
     ),
+    FDADatasetType.REGX_CONTROLLED_UNITS: (
+        "Controlled units are governed vocabulary, loaded only by "
+        "`load_controlled_units` from the reviewed list in "
+        "`fda_data/reference/`, never through this API."
+    ),
 }
 
 

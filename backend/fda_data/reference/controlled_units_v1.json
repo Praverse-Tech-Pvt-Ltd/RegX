@@ -1,0 +1,31 @@
+{
+  "format": "regx_controlled_units:1",
+  "title": "REGX controlled units v1: units and unit meanings for the potency unit strings in the FDA IID (July 2026 file)",
+  "source": "docs/CONTROLLED_UNITS_DESIGN.md sections 2-3. Every meaning below is stated exactly; nothing converts between families or bases. mg/mg (no stated basis), NA and ADJ PH are deliberately absent.",
+  "units": [
+    {"code": "mg", "symbol": "mg", "dimension": "mass", "factor_to_base": "1000"},
+    {"code": "ml", "symbol": "mL", "dimension": "volume", "factor_to_base": "1000"}
+  ],
+  "meanings": [
+    {"family": "mass", "basis": "per_dose_unit", "numerator": "mg"},
+    {"family": "volume", "basis": "per_dose_unit", "numerator": "ml"},
+    {"family": "percentage", "basis": "w_w"},
+    {"family": "percentage", "basis": "w_v"},
+    {"family": "percentage", "basis": "v_v"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "0.1", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "0.2", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "1", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "2.5", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "5", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "10", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "15", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "20", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "100", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "120", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "140", "denominator_unit": "ml"},
+    {"family": "mass", "basis": "per_volume", "numerator": "mg", "denominator_amount": "1000", "denominator_unit": "ml"},
+    {"family": "volume", "basis": "per_volume", "numerator": "ml", "denominator_amount": "1", "denominator_unit": "ml"},
+    {"family": "volume", "basis": "per_volume", "numerator": "ml", "denominator_amount": "5", "denominator_unit": "ml"},
+    {"family": "volume", "basis": "per_volume", "numerator": "ml", "denominator_amount": "15", "denominator_unit": "ml"}
+  ]
+}

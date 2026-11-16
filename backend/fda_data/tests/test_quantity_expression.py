@@ -2,8 +2,8 @@
 
 Fixture `fixtures/iid/iir_ocomm_units_sample.csv` is copied byte-for-byte from the
 FDA file iig_july_2026.zip, member IIR_OCOMM.csv (SHA-256 4f3a8e37...436d302): the
-header plus the first row for each potency unit string in the file (all 21
-supported strings and `mg/mg`) and the first maximum-daily-exposure row. Public
+header plus the first row for each potency unit string in the file (the 20
+that state an exact meaning, and `mg/mg`) and the first maximum-daily-exposure row. Public
 FDA data. File line numbers: 2, 3, 5, 6, 19, 72, 172, 485, 566, 587, 648, 1062,
 1387, 1453, 1498, 1527, 1660, 2186, 2643, 3397, 4280, 8275.
 
