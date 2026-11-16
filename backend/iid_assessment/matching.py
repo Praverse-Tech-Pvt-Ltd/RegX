@@ -39,6 +39,9 @@ class MatchCandidate:
     maximum_daily_exposure: Decimal | None
     mde_unit: str | None
     calculability_status: str
+    #: The potency unit's meaning (controlled units), e.g. "mg/5mL"; None when
+    #: not established. `potency_unit` is derived from it (see below).
+    potency_meaning: str | None = None
 
 
 @dataclass(frozen=True)
@@ -80,10 +83,12 @@ def find_iid_candidates(
         release_id=active_release_id,
         release__status__in=[release.APPROVED, release.ACTIVE],
     ).select_related(
+        "release",
         "route_normalized",
         "dosage_form_normalized",
-        "potency_unit_normalized",
-        "mde_unit_normalized",
+        "potency_expression__numerator_unit",
+        "potency_expression__denominator_unit",
+        "mde_expression__numerator_unit",
     )
 
     records = list(qs)
@@ -101,16 +106,11 @@ def find_iid_candidates(
                 else r.dosage_form_raw
             ),
             potency_amount=r.potency_amount,
-            # .code (e.g. "milligram") is the canonical unit identifier that
-            # unit_conversion.py's lookup tables are keyed by -- .symbol
-            # (e.g. "MG") is a display-only abbreviation and must never be
-            # fed into the conversion engine.
-            potency_unit=r.potency_unit_normalized.code
-            if r.potency_unit_normalized
-            else r.potency_unit_raw,
+            potency_unit=_potency_unit(r),
             maximum_daily_exposure=r.maximum_daily_exposure,
-            mde_unit=r.mde_unit_normalized.code if r.mde_unit_normalized else r.mde_unit_raw,
+            mde_unit=_mde_unit(r),
             calculability_status=r.calculability_status,
+            potency_meaning=str(r.potency_expression) if r.potency_expression_id else None,
         )
         for r in records
     ]
@@ -119,8 +119,23 @@ def find_iid_candidates(
         return MatchResult(status=MatchStatus.MULTIPLE_EXACT_MATCHES, candidates=candidates)
 
     single = records[0]
-    if single.calculability_status == IIDCalculabilityStatus.POTENCY_MISSING:
-        return MatchResult(status=MatchStatus.POTENCY_UNAVAILABLE, candidates=candidates)
+    # One comparison path: availability comes from the record's amount and the
+    # MEANING of its unit, never from the legacy unit link or a stored flag.
+    if single.potency_amount is None:
+        reason = (
+            "DAILY_EXPOSURE_ONLY_NEEDS_Q8"
+            if single.maximum_daily_exposure is not None
+            else "NO_NUMERIC_LIMIT"
+        )
+        return MatchResult(
+            status=MatchStatus.POTENCY_UNAVAILABLE, candidates=candidates, reason_code=reason
+        )
+    if single.potency_expression_id is None:
+        return MatchResult(
+            status=MatchStatus.POTENCY_UNAVAILABLE,
+            candidates=candidates,
+            reason_code="IID_UNIT_MISSING",
+        )
     if single.calculability_status in (
         IIDCalculabilityStatus.INGREDIENT_AMBIGUOUS,
         IIDCalculabilityStatus.REVIEW_REQUIRED,
@@ -128,3 +143,35 @@ def find_iid_candidates(
         return MatchResult(status=MatchStatus.REVIEW_REQUIRED, candidates=candidates)
 
     return MatchResult(status=MatchStatus.EXACT_MATCH, candidates=candidates)
+
+
+def _potency_unit(record) -> str:
+    """The unit handed to the calculation engines, from the meaning only.
+
+    Per dose unit: the exact-factor unit key (e.g. "milligram"), which
+    `unit_conversion` and the IIG checklist registry understand. Any other
+    basis (per volume, percentage): the meaning's text (e.g. "mg/5mL"), which
+    no engine resolves, so a per-dose-only engine fails closed instead of
+    comparing across bases. No meaning: "" (fails closed too)."""
+    from .comparison import conversion_key
+
+    expression = record.potency_expression
+    if expression is None:
+        return ""
+    if expression.basis == "per_dose_unit" and expression.numerator_unit_id:
+        return conversion_key(expression.numerator_unit.code) or str(expression)
+    return str(expression)
+
+
+def _mde_unit(record) -> str:
+    """The maximum-daily-exposure unit, from the meaning only (mass per day).
+
+    Nothing fills `mde_expression` on real data yet: the per-day rule (Q8) is
+    out of scope, so the raw string is returned and every per-day calculation
+    fails closed. The legacy `mde_unit_normalized` link is never read."""
+    from .comparison import conversion_key
+
+    expression = record.mde_expression
+    if expression is not None and expression.basis == "per_day" and expression.numerator_unit_id:
+        return conversion_key(expression.numerator_unit.code) or record.mde_unit_raw
+    return record.mde_unit_raw

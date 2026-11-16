@@ -28,6 +28,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from fda_data.tests._meanings import per_day, per_dose_unit
 from iig_checklist import calculation_registry as registry_mod
 from iig_checklist import cascade as cascade_mod
 from iig_checklist.enums import (
@@ -95,10 +96,10 @@ def _iid_setup():
         dosage_form_normalized=dosage_form,
         potency_amount=Decimal("1.000000"),
         potency_unit_raw="G",
-        potency_unit_normalized=gram,
+        potency_expression=per_dose_unit(gram),
         maximum_daily_exposure=Decimal("2.000000"),
         mde_unit_raw="G",
-        mde_unit_normalized=gram,
+        mde_expression=per_day(gram),
         raw_row_checksum="f" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
     )

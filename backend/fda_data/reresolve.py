@@ -17,8 +17,9 @@ This module closes that gap without touching anything a reviewer has seen:
   `potency_expression` is filled from the APPROVED, current `UnitMapping` for
   its `potency_unit_raw`, and only when that meaning is in force (listed by the
   ACTIVE controlled-units release). Same rules: never overwrite, never clear,
-  only before review. `potency_unit_normalized` and calculability are not
-  touched by this link.
+  only before review. Calculability is recomputed from the meaning
+  (controlled units, increment 3: one comparison path); the legacy
+  `potency_unit_normalized` link is never read.
 
 The generic part works on any record model with `route_raw`/`route_normalized`
 and `dosage_form_raw`/`dosage_form_normalized`. What differs per dataset (which
@@ -69,7 +70,7 @@ def _recompute_iid(record: IIDPrecedentRecord) -> list[str]:
         route_normalized=record.route_normalized,
         dosage_form_normalized=record.dosage_form_normalized,
         potency_amount=record.potency_amount,
-        potency_unit=record.potency_unit_normalized,
+        potency_expression=record.potency_expression,
         mde_amount=record.maximum_daily_exposure,
         potency_unparsed=record.potency_amount is None and bool(record.potency_amount_raw),
     )

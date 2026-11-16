@@ -398,6 +398,9 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
         FdaImportRowResult.objects.filter(release=release).values_list("row_locator", flat=True)
     )
 
+    from .controlled_units import UnitMeaningLookup
+
+    unit_meanings = UnitMeaningLookup()
     for row in neutral_rows:
         locator = row["row_locator"]
         if locator in already_resulted:
@@ -451,12 +454,15 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
                     if flag
                 ]
 
+                # The unit's MEANING (controlled units) decides calculability; the
+                # legacy `potency_unit` link above is kept for history only.
+                potency_expression = unit_meanings.lookup(fields.get("potency_unit_raw", ""))
                 status = _determine_calculability(
                     ingredient=ingredient,
                     route_normalized=route_normalized,
                     dosage_form_normalized=dosage_form_normalized,
                     potency_amount=potency_amount,
-                    potency_unit=potency_unit,
+                    potency_expression=potency_expression,
                     mde_amount=mde_amount,
                     potency_unparsed=potency_unparsed,
                 )
@@ -473,6 +479,7 @@ def import_iid_rows(release: FDADataSourceRelease, neutral_rows: list[dict], act
                     potency_amount_raw=potency_text,
                     potency_unit_raw=fields.get("potency_unit_raw", ""),
                     potency_unit_normalized=potency_unit,
+                    potency_expression=potency_expression,
                     maximum_daily_exposure=mde_amount,
                     mde_amount_raw=mde_text,
                     mde_unit_raw=fields.get("mde_unit_raw", ""),
@@ -561,10 +568,14 @@ def _determine_calculability(
     route_normalized,
     dosage_form_normalized,
     potency_amount,
-    potency_unit,
+    potency_expression,
     mde_amount,
     potency_unparsed=False,
 ) -> str:
+    """One comparison path (controlled units, increment 3): a potency counts
+    only when its unit has an established meaning (`QuantityExpression`, set
+    from an approved unit mapping whose meaning is in force). The legacy
+    `potency_unit_normalized` link never makes a record calculable."""
     if ingredient is None:
         return IIDCalculabilityStatus.INGREDIENT_AMBIGUOUS
     if route_normalized is None:
@@ -575,7 +586,7 @@ def _determine_calculability(
         if potency_unparsed:
             return IIDCalculabilityStatus.POTENCY_UNPARSEABLE
         return IIDCalculabilityStatus.POTENCY_MISSING
-    if potency_unit is None:
+    if potency_expression is None:
         return IIDCalculabilityStatus.POTENCY_UNIT_MISSING
     if mde_amount is None:
         # A record can still be CALCULABLE for potency-only comparison;

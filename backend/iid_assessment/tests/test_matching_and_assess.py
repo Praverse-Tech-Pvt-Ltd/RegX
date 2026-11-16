@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from fda_data.tests._meanings import per_dose_unit
 from iid_assessment.assess import run_preview
 from iid_assessment.decisions import PrecedentDecisionStatus
 from iid_assessment.matching import MatchStatus, find_iid_candidates
@@ -67,7 +68,7 @@ class TestFindIidCandidates:
             dosage_form_normalized=active_iid_setup["dosage_form"],
             potency_amount=Decimal("75"),
             potency_unit_raw="MG",
-            potency_unit_normalized=active_iid_setup["unit"],
+            potency_expression=per_dose_unit(active_iid_setup["unit"]),
             raw_row_checksum="2" * 64,
             calculability_status="calculable",
         )

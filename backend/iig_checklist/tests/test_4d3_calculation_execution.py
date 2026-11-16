@@ -26,6 +26,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from fda_data.tests._meanings import per_day, per_dose_unit
 from iid_assessment import calculations as engine
 from iig_checklist import calculation_execution as execution_mod
 from iig_checklist import calculation_registry as registry_mod
@@ -225,10 +226,10 @@ def _iid_setup(*, potency="1.000000", mde="2.000000"):
         dosage_form_normalized=dosage_form,
         potency_amount=Decimal(potency),
         potency_unit_raw="G",
-        potency_unit_normalized=gram,
+        potency_expression=per_dose_unit(gram),
         maximum_daily_exposure=Decimal(mde),
         mde_unit_raw="G",
-        mde_unit_normalized=gram,
+        mde_expression=per_day(gram),
         raw_row_checksum="b" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
     )
