@@ -160,3 +160,23 @@ One row per credential across every repository scanned (sections 2 and 8). **No 
 
 **Correction to section 8.2 P1:** the key is in commits up to 2026-04-08 (`89dbf8b`), not only until 2026-02-20; it is still not at any branch tip.
 **Correction to section 3:** the earliest copy of OpenAI keys A–C and the Django key is `Django-booking-demo-page` commit `62c63c0` (2026-06-24), three weeks before RegX `main`'s `dff6856`.
+
+## 10. Evidence to preserve before revocation (2026-11-16)
+
+**Why:** revoking a key is right, but some of the evidence of *what a key was used for* is tied to the key, its project or the account, and can become harder to see afterwards (a deleted key or project, a closed account, logs past their retention). The data-flow question for the call (`docs/483_CALL_PACK.md` §1.4) depends on this evidence. **Rule: export first, then revoke. Disable or regenerate a key; do not delete its project or account.** Retention periods differ by provider and plan and are not stated here as facts: **check each provider's current retention before relying on it.**
+
+| Register row | Credential | Preserve evidence first? | What to keep (export or screenshot, store in the company drive, never in git) |
+|---|---|---|---|
+| C1 | Google API key, public repo (`iCretegy-AI483`) | **Yes** | Key metadata (project, name, created, last used, restrictions); Generative Language API metrics per method and day since 2026-02-20; billing report for the project; the project's Cloud Audit Logs (Admin Activity; Data Access if enabled) |
+| C2 | Google API key, `483-AI-final` | **Yes, most important** | As C1, since 2026-05-04 (first Gemini code). Split `embedContent` vs `generateContent` usage: it shows whether client content was embedded only, or also sent for generation. Note the tier (free/paid) for each period |
+| C3–C5 | OpenAI keys A, B, C | **Yes** | Usage export per key/project since 2026-06-24 (requests, models, tokens by day); invoices; the organisation's audit log if enabled; list of members and projects |
+| C6 | SMTP / Microsoft 365 mailbox | **Yes** | Entra ID sign-in logs for the mailbox; Purview unified audit log entries; message trace for sent mail. All since 2026-07-13, exported before the password change |
+| C7, C8, C9 | Django secret keys | No (not an account) | Nothing to export; record which environments used each (from server configs) |
+| C10 | 483-AI-final test/UAT passwords, JWT secret | Partly | Before changing the JWT secret or UAT passwords on the server: the app's own audit/login records for the UAT window, and the Stage 4 ledgers [repo doc] |
+| C11 | Unknown password literal | If it is real | Sign-in history of the matching account, once identified |
+| C12–C16 | CI throwaways, demo passwords, hashes | No | — |
+| C17 | `483-AI-final` Actions secrets (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `TAVILY_API_KEY`, `GHCR_TOKEN`) | **Yes** | The repository's Actions run history and logs (2026-05-01 to 2026-07-02); org audit log entries for the secrets; provider usage for each key before rotating it |
+| C18 | Keys on the 483-AI-final server (OpenAI key file, DB passwords, Caddy) | **Yes** | OpenAI usage for that key (by model, by day); the server's Stage 4 / web-mode / planner ledgers and model traces (`backend/logs/traces.jsonl` per the README) [repo doc]; the server environment's list of variable **names** (not values) with dates; Postgres role list |
+| C19 | `sk-` pattern in a data file | No (probably not a key) | — |
+
+**Also preserve:** the GitHub org audit log (visibility changes, collaborator changes, package events; `docs/ADMIN_VERIFICATION_CHECKLIST.md` G1–G7) and Render/Vercel deployment and environment-variable history (R1–R4, V1–V4). Each export gets a date, who took it, and a short note; the register row is then marked "evidence kept: yes".
