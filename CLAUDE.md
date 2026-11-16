@@ -12,7 +12,7 @@ The GitHub repo `Praverse-Tech-Pvt-Ltd/RegX` holds **two unrelated git histories
 `regx/feat/legacy-port-and-sso` (PR #49) has been merged into `regx-main`. Do not build on that branch; `regx-main` is about 70 commits ahead of it.
 
 **Read before proposing anything**, in this order:
-1. `PROJECT_OVERVIEW.md` (repo root). The takeover overview: state, risks, open questions. Append to its Work Log at the end of each session; do not create a new overview file.
+1. `PROJECT_OVERVIEW.md` (repo root). The takeover overview: state, risks, open questions. Append to its Work Log at the end of each session; do not create a new overview file. Entries dated before 2026-11-01 were moved, unchanged, to `docs/WORK_LOG_ARCHIVE.md`.
    - **`PROJECT_OVERVIEW.md` and this `CLAUDE.md` are tracked in git** (since 2026-11-05). A Work Log entry or rule change is therefore a commit: put it on the session's working branch, or in a small docs PR when the session has no branch. Never commit them straight to `regx-main`.
 2. `docs/FINAL_ENGINEERING_CLOSURE_AUDIT.md` and `docs/P0_P14_HANDOFF.md`. The latest declared state (covers P0–P15).
 3. `docs/EXTERNAL_BLOCKER_READINESS.md`. What is blocked, and on whom.
@@ -42,7 +42,7 @@ session and carrying anything over makes them lie about this one.
 3. **Report:** every helper or sub-agent report, in full, not a summary. Extract the agent's final message from its transcript with a script; never paste it by hand.
 4. **Evidence:** every script written during the session, plus its raw output (test runs, audits, live-check transcripts).
 5. **Patches:** one `git format-patch` per commit (`patch__<sha>__<label>.patch`).
-6. **Session log:** this session's Work Log section, extracted to `session-log__PROJECT_OVERVIEW.md__<date>.md`. **`PROJECT_OVERVIEW.md`'s Work Log is the only session log.** Do not create `docs/log/` files or any other session log.
+6. **Session log:** this session's Work Log section, extracted to `session-log__PROJECT_OVERVIEW.md__<date>.md`. **`PROJECT_OVERVIEW.md`'s Work Log is the only session log**, and `docs/WORK_LOG_ARCHIVE.md` (older entries moved out of it unchanged, in order) is the only other log file allowed. New entries always go into `PROJECT_OVERVIEW.md`. Do not create `docs/log/` files or any other session log.
 
 ### Naming
 
