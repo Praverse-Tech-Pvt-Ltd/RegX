@@ -347,6 +347,15 @@ class UnitMapping(_BaseTerminologyMapping):
     controlled_unit = models.ForeignKey(
         ControlledUnit, on_delete=models.SET_NULL, null=True, blank=True, related_name="mappings"
     )
+    #: The structured meaning of the raw string (e.g. `mg/5ml` -> mass per 5 mL).
+    #: Used only once the mapping is approved.
+    quantity_expression = models.ForeignKey(
+        "QuantityExpression",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="unit_mappings",
+    )
 
     class Meta:
         constraints = [
@@ -359,6 +368,174 @@ class UnitMapping(_BaseTerminologyMapping):
 
     def __str__(self):
         return f"{self.source_raw_value} -> {self.controlled_unit}"
+
+
+class QuantityFamily(models.TextChoices):
+    """What the published number measures."""
+
+    MASS = "mass", "Mass"
+    VOLUME = "volume", "Volume"
+    PERCENTAGE = "percentage", "Percentage"
+
+
+class QuantityBasis(models.TextChoices):
+    """What the published number is relative to. Part of the unit, never assumed."""
+
+    PER_DOSE_UNIT = "per_dose_unit", "Per dose unit"
+    PER_VOLUME = "per_volume", "Per stated volume"
+    PER_DAY = "per_day", "Per day (maximum daily exposure)"
+    W_W = "w_w", "w/w"
+    W_V = "w_v", "w/v"
+    V_V = "v_v", "v/v"
+
+
+#: The only family/basis pairs a quantity can have (also enforced by a CHECK constraint).
+QUANTITY_BASES_BY_FAMILY = {
+    QuantityFamily.MASS: (
+        QuantityBasis.PER_DOSE_UNIT,
+        QuantityBasis.PER_VOLUME,
+        QuantityBasis.PER_DAY,
+    ),
+    QuantityFamily.VOLUME: (QuantityBasis.PER_DOSE_UNIT, QuantityBasis.PER_VOLUME),
+    QuantityFamily.PERCENTAGE: (QuantityBasis.W_W, QuantityBasis.W_V, QuantityBasis.V_V),
+}
+
+
+class QuantityExpression(PublicIDModel, TimeStampedModel):
+    """The structured meaning of a published unit string such as `mg/5ml` or `%w/v`
+    (docs/CONTROLLED_UNITS_DESIGN.md section 3B). One row per distinct meaning, shared
+    by every record that uses it; the amount stays on the record.
+
+    Two quantities are of the same kind only if family AND basis are equal. Nothing
+    here converts between families or bases; that is refused by design.
+
+    - mass/volume: `numerator_unit` is a ControlledUnit of that dimension.
+    - percentage: no units; the basis (w/w, w/v, v/v) is the whole meaning.
+    - per_volume: `denominator_amount` + `denominator_unit` (a volume) state the
+      volume, e.g. mg per **5** mL. Other bases have no denominator.
+
+    Rows are immutable once saved: a different meaning is a new row.
+    """
+
+    family = models.CharField(max_length=20, choices=QuantityFamily.choices)
+    basis = models.CharField(max_length=20, choices=QuantityBasis.choices)
+    numerator_unit = models.ForeignKey(
+        ControlledUnit, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+    denominator_amount = models.DecimalField(max_digits=20, decimal_places=6, null=True, blank=True)
+    denominator_unit = models.ForeignKey(
+        ControlledUnit, on_delete=models.PROTECT, null=True, blank=True, related_name="+"
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                name="quantity_family_basis_allowed",
+                condition=(
+                    models.Q(
+                        family=QuantityFamily.MASS,
+                        basis__in=[b.value for b in QUANTITY_BASES_BY_FAMILY[QuantityFamily.MASS]],
+                    )
+                    | models.Q(
+                        family=QuantityFamily.VOLUME,
+                        basis__in=[
+                            b.value for b in QUANTITY_BASES_BY_FAMILY[QuantityFamily.VOLUME]
+                        ],
+                    )
+                    | models.Q(
+                        family=QuantityFamily.PERCENTAGE,
+                        basis__in=[
+                            b.value for b in QUANTITY_BASES_BY_FAMILY[QuantityFamily.PERCENTAGE]
+                        ],
+                    )
+                ),
+            ),
+            models.CheckConstraint(
+                name="quantity_numerator_unit_matches_family",
+                condition=(
+                    models.Q(family=QuantityFamily.PERCENTAGE, numerator_unit__isnull=True)
+                    | (
+                        ~models.Q(family=QuantityFamily.PERCENTAGE)
+                        & models.Q(numerator_unit__isnull=False)
+                    )
+                ),
+            ),
+            models.CheckConstraint(
+                name="quantity_denominator_only_per_volume",
+                condition=(
+                    models.Q(
+                        basis=QuantityBasis.PER_VOLUME,
+                        # isnull is explicit: in SQL "NULL > 0" is NULL, which a CHECK accepts.
+                        denominator_amount__isnull=False,
+                        denominator_amount__gt=0,
+                        denominator_unit__isnull=False,
+                    )
+                    | (
+                        ~models.Q(basis=QuantityBasis.PER_VOLUME)
+                        & models.Q(denominator_amount__isnull=True, denominator_unit__isnull=True)
+                    )
+                ),
+            ),
+            models.UniqueConstraint(
+                fields=[
+                    "family",
+                    "basis",
+                    "numerator_unit",
+                    "denominator_amount",
+                    "denominator_unit",
+                ],
+                nulls_distinct=False,
+                name="unique_quantity_expression",
+            ),
+        ]
+
+    def clean(self):
+        errors = []
+        if self.basis not in QUANTITY_BASES_BY_FAMILY.get(self.family, ()):
+            errors.append(f"Basis {self.basis!r} is not allowed for family {self.family!r}.")
+        if self.family in (QuantityFamily.MASS, QuantityFamily.VOLUME):
+            if self.numerator_unit is None:
+                errors.append("A mass or volume quantity needs a numerator unit.")
+            elif self.numerator_unit.dimension != self.family:
+                unit = self.numerator_unit
+                errors.append(
+                    f"Numerator unit {unit.code!r} is {unit.dimension}, not {self.family}."
+                )
+        elif self.numerator_unit_id is not None:
+            errors.append("A percentage has no numerator unit; its basis is the meaning.")
+        if self.basis == QuantityBasis.PER_VOLUME:
+            if not self.denominator_amount or self.denominator_amount <= 0:
+                errors.append("A per-volume quantity needs a positive denominator amount.")
+            if self.denominator_unit is None:
+                errors.append("A per-volume quantity needs a denominator unit.")
+            elif self.denominator_unit.dimension != UnitDimension.VOLUME:
+                errors.append(f"Denominator unit {self.denominator_unit.code!r} is not a volume.")
+        elif self.denominator_amount is not None or self.denominator_unit_id is not None:
+            errors.append("Only a per-volume quantity has a denominator.")
+        if self.pk:
+            original = type(self).objects.filter(pk=self.pk).first()
+            if original and any(
+                getattr(original, f) != getattr(self, f)
+                for f in (
+                    "family",
+                    "basis",
+                    "numerator_unit_id",
+                    "denominator_amount",
+                    "denominator_unit_id",
+                )
+            ):
+                errors.append("A quantity expression is immutable; create a new one instead.")
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        if self.family == QuantityFamily.PERCENTAGE:
+            return f"%{self.get_basis_display()}"
+        num = self.numerator_unit.symbol if self.numerator_unit_id else "?"
+        if self.basis == QuantityBasis.PER_VOLUME:
+            den = self.denominator_unit.symbol if self.denominator_unit_id else "?"
+            return f"{num}/{self.denominator_amount.normalize():f}{den}"
+        return f"{num} {self.get_basis_display().lower()}"
 
 
 class StrengthParseStatus(models.TextChoices):
@@ -585,6 +762,14 @@ class IIDPrecedentRecord(PublicIDModel, TimeStampedModel):
         ControlledUnit, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
     mde_basis = models.CharField(max_length=255, blank=True)
+    #: Structured meaning of potency_unit_raw / mde_unit_raw, set only from an
+    #: approved UnitMapping. Null means "not established": never compared.
+    potency_expression = models.ForeignKey(
+        "QuantityExpression", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    mde_expression = models.ForeignKey(
+        "QuantityExpression", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
     source_row_locator = models.CharField(max_length=255, blank=True)
     raw_row_payload = models.JSONField(default=dict)
     raw_row_checksum = models.CharField(max_length=64, blank=True)
