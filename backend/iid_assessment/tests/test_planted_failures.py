@@ -29,6 +29,7 @@ from fda_data.models import (
     RouteMapping,
 )
 from fda_data.terminology import lookup_route_mapping
+from fda_data.tests._meanings import per_dose_unit
 from fda_data.views import _csv_safe_cell
 from formulations.models import FormulationVersion, ProductDevelopmentRecord
 from iid_assessment import unit_conversion
@@ -158,7 +159,7 @@ def test_3_missing_potency_never_coerced_to_zero():
         route_normalized=route,
         dosage_form_normalized=dosage_form,
         potency_amount=None,
-        potency_unit=None,
+        potency_expression=None,
         mde_amount=None,
     )
     # DETECT: it doesn't -- missing potency is its own explicit status.
@@ -240,7 +241,7 @@ def test_5_highest_potency_never_auto_selected():
         dosage_form_normalized=dosage_form,
         potency_amount=Decimal("10"),
         potency_unit_raw="MG",
-        potency_unit_normalized=unit,
+        potency_expression=per_dose_unit(unit),
         raw_row_checksum="1" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
     )
@@ -254,7 +255,7 @@ def test_5_highest_potency_never_auto_selected():
         dosage_form_normalized=dosage_form,
         potency_amount=Decimal("500"),
         potency_unit_raw="MG",
-        potency_unit_normalized=unit,
+        potency_expression=per_dose_unit(unit),
         raw_row_checksum="2" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
     )

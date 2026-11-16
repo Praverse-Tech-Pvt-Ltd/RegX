@@ -4,6 +4,8 @@ from decimal import Decimal
 
 import pytest
 
+from fda_data.tests._meanings import per_day, per_dose_unit
+
 
 @pytest.fixture
 def tenant_a(db):
@@ -101,10 +103,10 @@ def active_iid_setup(db):
         dosage_form_normalized=dosage_form,
         potency_amount=Decimal("50"),
         potency_unit_raw="MG",
-        potency_unit_normalized=mg_unit,
+        potency_expression=per_dose_unit(mg_unit),
         maximum_daily_exposure=Decimal("200"),
         mde_unit_raw="MG",
-        mde_unit_normalized=mg_unit,
+        mde_expression=per_day(mg_unit),
         raw_row_checksum="1" * 64,
         calculability_status=IIDCalculabilityStatus.CALCULABLE,
     )

@@ -149,20 +149,45 @@ def run_preview(
     converted_daily_exposure = None
     mde_available = False
 
+    cannot_compare_reason = None
     if selected is not None:
-        conversion = unit_conversion.convert(
-            proposed_quantity_per_unit,
-            proposed_quantity_unit,
-            selected.potency_unit,
-            density_g_per_ml=density_g_per_ml,
+        # One comparison path (controlled units, increment 3): the potency is
+        # compared only through the unit's meaning, same family and same basis.
+        # A formulation component's quantity is per dosage unit by definition.
+        from fda_data.models import IIDPrecedentRecord
+
+        from .comparison import (
+            active_unit_list_release_public_id,
+            compare,
+            per_dose_unit_quantity,
         )
-        calculations["unit_conversion"] = asdict(conversion)
-        if conversion.ok:
-            converted_proposed_quantity = conversion.converted_value
+
+        record = IIDPrecedentRecord.objects.select_related(
+            "release", "potency_expression__numerator_unit", "potency_expression__denominator_unit"
+        ).get(public_id=selected.precedent_record_public_id)
+        comparison = compare(
+            per_dose_unit_quantity(proposed_quantity_per_unit, proposed_quantity_unit),
+            record,
+            unit_list_release_public_id=active_unit_list_release_public_id(),
+        )
+        calculations["potency_comparison"] = comparison.as_dict()
+        calculations["unit_conversion"] = asdict(
+            unit_conversion.ConversionResult(
+                ok=comparison.comparable,
+                original_value=proposed_quantity_per_unit,
+                original_unit=proposed_quantity_unit,
+                converted_value=Decimal(comparison.proposed_value)
+                if comparison.comparable
+                else None,
+                converted_unit=selected.potency_unit if comparison.comparable else None,
+                reason_code=comparison.reason_code,
+            )
+        )
+        if comparison.comparable:
+            converted_proposed_quantity = Decimal(comparison.proposed_value)
         else:
             unit_conversion_ok = False
-            if conversion.reason_code == unit_conversion.ConversionReasonCode.DENSITY_REQUIRED:
-                density_or_basis_required = True
+            cannot_compare_reason = comparison.reason_code
 
         pct_ww = calculate_percentage_w_w(
             quantity_per_unit_grams=(
@@ -229,6 +254,7 @@ def run_preview(
         multiple_candidates=(match.status == "MULTIPLE_EXACT_MATCHES"),
         source_release_superseded=(release.status == "superseded" if release else False),
         density_or_basis_required=density_or_basis_required,
+        cannot_compare_reason=cannot_compare_reason,
     )
 
     return AssessmentPreview(

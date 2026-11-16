@@ -76,6 +76,7 @@ def decide(
     multiple_candidates: bool = False,
     source_release_superseded: bool = False,
     density_or_basis_required: bool = False,
+    cannot_compare_reason: str | None = None,
 ) -> PrecedentDecision:
     """Combines a matching-engine result and (if matched) the calculation
     results into a final precedent decision. This function never itself
@@ -94,6 +95,17 @@ def decide(
             status=PrecedentDecisionStatus.NOT_COMPARABLE,
             note=f"{match_status}: route and dosage form must match exactly.",
             reason_codes=[match_status],
+        )
+
+    if cannot_compare_reason is not None:
+        # From the like-for-like comparison service (iid_assessment.comparison):
+        # one specific reason, e.g. different basis, or daily exposure only (Q8).
+        from .comparison import REASON_TEXT
+
+        return PrecedentDecision(
+            status=PrecedentDecisionStatus.NOT_COMPARABLE,
+            note=REASON_TEXT.get(cannot_compare_reason, "cannot compare"),
+            reason_codes=[cannot_compare_reason],
         )
 
     if not unit_conversion_ok or density_or_basis_required:

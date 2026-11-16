@@ -221,8 +221,12 @@ class TestOrangeBookImport:
 @pytest.mark.django_db
 class TestIidImport:
     def test_valid_potency_calculable(self, iid_rows, user_a):
+        # One comparison path: calculable needs the unit's MEANING (an approved
+        # unit mapping whose meaning is in force), not the legacy unit link.
+        from fda_data.tests._meanings import per_dose_unit, put_in_force
+
         _approve_route_and_dosage_form("fda_iid")
-        _ensure_mg_unit()
+        put_in_force(per_dose_unit(_ensure_mg_unit()), "MG")
         release = importer.register_release(
             dataset_type="fda_iid",
             source_name="FDA IID",
@@ -238,6 +242,29 @@ class TestIidImport:
         )
         assert record.potency_amount is not None
         assert record.calculability_status == IIDCalculabilityStatus.CALCULABLE
+        assert str(record.potency_expression) == "MG per dose unit"
+
+    def test_the_legacy_unit_link_alone_never_makes_a_record_calculable(self, iid_rows, user_a):
+        """The old path: an ACTIVE legacy ControlledUnit that `lookup_unit` finds.
+        It is still recorded for history, but the record is not calculable."""
+        _approve_route_and_dosage_form("fda_iid")
+        unit = _ensure_mg_unit()
+        assert unit.active is True
+        release = importer.register_release(
+            dataset_type="fda_iid",
+            source_name="FDA IID",
+            official_source_reference="ref",
+            file_obj=make_release_file(iid_rows),
+            original_filename="iid.json",
+            imported_by=user_a,
+        )
+        importer.import_iid_rows(release, fda_iid_adapter(iid_rows), user_a)
+        record = IIDPrecedentRecord.objects.get(
+            release=release, ingredient_name_raw="SYNTHETIC-STARCH"
+        )
+        assert record.potency_unit_normalized == unit  # history only
+        assert record.potency_expression is None
+        assert record.calculability_status == IIDCalculabilityStatus.POTENCY_UNIT_MISSING
 
     def test_missing_potency_never_forced_to_zero(self, iid_rows, user_a):
         # PLANTED VIOLATION (detected): a blank potency must remain null,

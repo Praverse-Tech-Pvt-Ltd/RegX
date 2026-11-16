@@ -17,6 +17,7 @@ from decimal import Decimal
 
 import pytest
 
+from fda_data.tests._meanings import per_day, per_dose_unit
 from iid_assessment.models import AssessmentSnapshot
 from iid_assessment.services import (
     ActiveReleaseUnavailable,
@@ -429,10 +430,10 @@ class TestReleaseDrift:
             dosage_form_normalized=world["iid"]["dosage_form"],
             potency_amount=Decimal(potency),
             potency_unit_raw="MG",
-            potency_unit_normalized=world["iid"]["unit"],
+            potency_expression=per_dose_unit(world["iid"]["unit"]),
             maximum_daily_exposure=Decimal(mde),
             mde_unit_raw="MG",
-            mde_unit_normalized=world["iid"]["unit"],
+            mde_expression=per_day(world["iid"]["unit"]),
             raw_row_checksum="8" * 64,
             calculability_status=IIDCalculabilityStatus.CALCULABLE,
         )

@@ -311,6 +311,36 @@ def in_force_expressions() -> set[int]:
     )
 
 
+class UnitMeaningLookup:
+    """The meaning of an IID unit string, for the importer and re-resolve: the
+    `quantity_expression` of the APPROVED, current unit mapping for the string,
+    and only while that meaning is in force. None otherwise. Reads the in-force
+    set once per instance."""
+
+    def __init__(self):
+        self._in_force: set[int] | None = None
+
+    def lookup(self, raw: str) -> QuantityExpression | None:
+        if not raw:
+            return None
+        if self._in_force is None:
+            self._in_force = in_force_expressions()
+        if not self._in_force:
+            return None
+        mapping = (
+            UnitMapping.objects.filter(
+                source_dataset=FDADatasetType.FDA_IID,
+                source_raw_value=raw,
+                is_current=True,
+                status=MappingDecisionStatus.APPROVED,
+                quantity_expression_id__in=self._in_force,
+            )
+            .select_related("quantity_expression")
+            .first()
+        )
+        return mapping.quantity_expression if mapping else None
+
+
 # --- IID unit strings --------------------------------------------------------
 
 _PER_DOSE = re.compile(r"^(mg|ml)$")

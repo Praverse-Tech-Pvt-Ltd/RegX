@@ -29,6 +29,7 @@ from fda_data.models import (
     SubstanceMappingStatus,
     SubstanceSynonymMapping,
 )
+from fda_data.tests._meanings import per_dose_unit
 from iid_assessment.assess import run_preview
 from iid_assessment.matching import MatchStatus
 from iid_assessment.models import AssessmentSnapshot
@@ -68,7 +69,7 @@ def _iid_setup():
         dosage_form_normalized=dosage_form,
         potency_amount=Decimal("50"),
         potency_unit_raw="MG",
-        potency_unit_normalized=unit,
+        potency_expression=per_dose_unit(unit),
         raw_row_checksum="9" * 64,
         calculability_status="calculable",
     )
