@@ -27,6 +27,39 @@ interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+/**
+ * The message for a failed request.
+ *
+ * REGX's exception handler (`common.exceptions.regx_exception_handler`) wraps
+ * every DRF error as `{"error": {"status": 400, "detail": <DRF body>}}`, where
+ * the DRF body is either `{"detail": "..."}` or, for a serializer validation
+ * failure, per-field lists such as `{"route_code": ["This field may not be
+ * blank."]}`. Views that build their own refusal return `{"detail": ...}`
+ * unwrapped. Reading only a top-level `detail` turned all of the wrapped ones
+ * into "Request failed", which hid which input was wrong.
+ */
+export function errorMessage(body: unknown): string {
+  if (!isRecord(body)) return "Request failed";
+  let payload: unknown = body;
+  if (isRecord(body.error) && "detail" in body.error) payload = body.error.detail;
+  if (typeof payload === "string") return payload || "Request failed";
+  if (!isRecord(payload)) return "Request failed";
+  if (typeof payload.detail === "string" && payload.detail) return payload.detail;
+  const parts = Object.entries(payload).map(([field, value]) => {
+    const text = Array.isArray(value)
+      ? value.map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(" ")
+      : typeof value === "string"
+        ? value
+        : JSON.stringify(value);
+    return `${field}: ${text}`;
+  });
+  return parts.length ? parts.join("; ") : "Request failed";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export async function apiRequest<T>(
   path: string,
   { method = "GET", body, headers = {} }: RequestOptions = {}
@@ -50,10 +83,8 @@ export async function apiRequest<T>(
   });
 
   if (!resp.ok) {
-    const error = (await resp.json().catch(() => ({ detail: "Request failed" }))) as {
-      detail?: string;
-    };
-    throw new ApiError(resp.status, error.detail ?? "Request failed");
+    const error = await resp.json().catch(() => ({ detail: "Request failed" }));
+    throw new ApiError(resp.status, errorMessage(error));
   }
 
   if (resp.status === 204) return undefined as T;

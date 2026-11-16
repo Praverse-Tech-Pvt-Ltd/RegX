@@ -114,6 +114,19 @@ test.describe("sidebar", () => {
     ).toHaveAttribute("href", "/ratools/show_sss");
   });
 
+  test("REGX links carry the current tenant so a click stays in the workspace", async ({ page }) => {
+    await page.goto(`/documents?tenant=${TENANT}`);
+    const sidebar = page.locator("nav.dashboard-sidebar");
+    await expect(sidebar.getByRole("link", { name: "Formulations" })).toHaveAttribute(
+      "href",
+      `/formulations?tenant=${TENANT}`,
+    );
+    // Legacy company tools have no tenant and keep their own URLs.
+    await expect(
+      sidebar.getByRole("link", { name: "DMF Review Checklist" }),
+    ).toHaveAttribute("href", "/ratools/show_dmf_table");
+  });
+
   test("is 270px wide and offsets the content panel by the same amount", async ({ page }) => {
     await page.goto(`/documents?tenant=${TENANT}`);
     await expect(page.locator("nav.dashboard-sidebar")).toHaveCSS("width", "270px");
@@ -164,11 +177,11 @@ test.describe("sidebar", () => {
   test("marks the active route and opens the submenu that owns it", async ({ page }) => {
     await page.goto(`/documents?tenant=${TENANT}`);
     await expect(
-      page.locator('.dashboard-sidebar a[href="/documents"]'),
+      page.locator(`.dashboard-sidebar a[href="/documents?tenant=${TENANT}"]`),
     ).toHaveAttribute("aria-current", "page");
 
     await page.goto(`/fda-data/releases?tenant=${TENANT}`);
-    const releases = page.locator('.dashboard-sidebar a[href="/fda-data/releases"]');
+    const releases = page.locator(`.dashboard-sidebar a[href="/fda-data/releases?tenant=${TENANT}"]`);
     await expect(releases).toHaveAttribute("aria-current", "page");
     // Its parent group expands so the active child is reachable.
     await expect(releases).toBeVisible();
@@ -179,10 +192,10 @@ test.describe("sidebar", () => {
     // user is under /iig-checklists/executions.
     await page.goto(`/iig-checklists/executions?tenant=${TENANT}`);
     await expect(
-      page.locator('.dashboard-sidebar a[href="/iig-checklists/executions"]'),
+      page.locator(`.dashboard-sidebar a[href="/iig-checklists/executions?tenant=${TENANT}"]`),
     ).toHaveAttribute("aria-current", "page");
     await expect(
-      page.locator('.dashboard-sidebar a[href="/iig-checklists"]'),
+      page.locator(`.dashboard-sidebar a[href="/iig-checklists?tenant=${TENANT}"]`),
     ).not.toHaveAttribute("aria-current", "page");
   });
 });

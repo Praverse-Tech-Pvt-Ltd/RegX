@@ -240,6 +240,19 @@ const LEGACY_TOOLS: Item[] = [
   },
 ];
 
+/**
+ * Carry the current tenant onto a REGX link.
+ *
+ * Every REGX page reads its tenant from `?tenant=` and sends the user back to
+ * /tenants without it, so a sidebar link that drops the parameter is a link
+ * back to the organisation list. Legacy company links never get it: the
+ * company site has no tenants. /tenants itself is where a tenant is chosen.
+ */
+export function withTenant(href: string, tenantSlug: string): string {
+  if (!tenantSlug || href === "/tenants") return href;
+  return `${href}?tenant=${encodeURIComponent(tenantSlug)}`;
+}
+
 function isActive(pathname: string, href: string): boolean {
   if (href === "/iid-assessments/preview") {
     // The entry points at the preview screen, but it represents the whole
@@ -268,9 +281,12 @@ function isActive(pathname: string, href: string): boolean {
 export default function RegxSidebar({
   collapsed,
   onToggle,
+  tenantSlug = "",
 }: {
   collapsed: boolean;
   onToggle: () => void;
+  /** From the page URL's `?tenant=`; empty when no tenant is selected yet. */
+  tenantSlug?: string;
 }) {
   const pathname = usePathname() ?? "";
 
@@ -308,7 +324,7 @@ export default function RegxSidebar({
           ) : (
             <Link
               className={className}
-              href={item.href!}
+              href={withTenant(item.href!, tenantSlug)}
               data-tooltip={item.label}
               aria-current={active ? "page" : undefined}
             >
@@ -354,7 +370,7 @@ export default function RegxSidebar({
                 className={`dashboard-sidebar-link sub-sidebar-link${
                   isActive(pathname, child.href) ? " active" : ""
                 }`}
-                href={child.href}
+                href={withTenant(child.href, tenantSlug)}
                 key={child.href}
                 aria-current={isActive(pathname, child.href) ? "page" : undefined}
               >

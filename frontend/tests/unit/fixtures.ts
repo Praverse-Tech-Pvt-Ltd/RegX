@@ -243,6 +243,29 @@ export function makeMatchCandidate(overrides: Partial<MatchCandidate> = {}): Mat
   };
 }
 
+/** Shape of `iid_assessment.comparison.ComparisonResult.as_dict()`. */
+export function makePotencyComparison(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    comparable: true,
+    reason_code: null,
+    reason: "compared like for like (same family and basis)",
+    result: "at_or_below",
+    proposed_value: "30",
+    iid_value: "50",
+    unit: "mg per dose unit",
+    rounded_for_display: false,
+    conversion: "none needed",
+    label: "technically comparable (not regulatorily approved)",
+    iid_record_public_id: "prec-1",
+    iid_release_public_id: "release-public-0001",
+    iid_source_row: { source_row_locator: "row 2", ingredient_name: "Synthetic Starch" },
+    unit_list_release_public_id: "units-release-0001",
+    ...overrides,
+  };
+}
+
 export function makeAssessmentPreview(
   overrides: Partial<AssessmentPreview> = {},
 ): AssessmentPreview {
@@ -251,7 +274,8 @@ export function makeAssessmentPreview(
     candidates: [makeMatchCandidate()],
     selected_record: makeMatchCandidate(),
     calculations: {
-      unit_conversion: { status: "OK", ok: true },
+      potency_comparison: makePotencyComparison(),
+      unit_conversion: { ok: true, original_value: "30.000000", original_unit: "milligram", converted_value: "30", converted_unit: "milligram", reason_code: null },
       percentage_w_w: { status: "OK", value: "6", unit: "percent_w_w" },
       daily_exposure: { status: "OK", value: "120" },
       percentage_of_iid_potency: { status: "OK", value: "60", unit: "percent_of_potency" },

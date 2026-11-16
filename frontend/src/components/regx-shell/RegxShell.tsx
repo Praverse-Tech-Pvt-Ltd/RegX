@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import CompanyNavbar from "./CompanyNavbar";
 import RegxSidebar from "./RegxSidebar";
 import MfaEnrolmentBanner from "./MfaEnrolmentBanner";
@@ -27,6 +28,17 @@ import MfaEnrolmentBanner from "./MfaEnrolmentBanner";
  * Per Phase 10 the marketing hero is deliberately absent here: it belongs to
  * the /ratools/ landing, which the company site still renders itself.
  */
+/**
+ * The sidebar with the current tenant taken from the URL. `useSearchParams`
+ * must sit under a Suspense boundary or Next.js refuses to prerender the
+ * page, so the shell renders this inside one, with a tenant-less sidebar as
+ * the fallback.
+ */
+function TenantSidebar(props: { collapsed: boolean; onToggle: () => void }) {
+  const tenantSlug = useSearchParams()?.get("tenant") ?? "";
+  return <RegxSidebar {...props} tenantSlug={tenantSlug} />;
+}
+
 export default function RegxShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -40,10 +52,13 @@ export default function RegxShell({ children }: { children: React.ReactNode }) {
         }`}
         id="dashboardLayout"
       >
-        <RegxSidebar
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((v) => !v)}
-        />
+        <Suspense
+          fallback={
+            <RegxSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+          }
+        >
+          <TenantSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+        </Suspense>
 
         <div
           className="main-panel dashboard-main-panel"
