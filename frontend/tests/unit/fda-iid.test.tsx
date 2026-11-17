@@ -520,7 +520,10 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
     render(<IidPreviewPage />);
     await screen.findByRole("option", { name: "mg/5mL" });
     await submitPreviewForm(user);
-    expect(api.preview.mock.calls[0][1]).not.toHaveProperty("proposed_quantity_expression_public_id");
+    expect(api.preview).toHaveBeenCalledTimes(1);
+    const sent = api.preview.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(sent).toBeDefined();
+    expect(sent).not.toHaveProperty("proposed_quantity_expression_public_id");
   });
 
   it("offers only the default when no unit list is in force", async () => {
