@@ -65,13 +65,28 @@ test.describe("company navbar", () => {
       "href",
       "/ratools/",
     );
-    await expect(nav.getByRole("link", { name: "Login" })).toHaveAttribute(
-      "href",
-      "/adminmaster/login/",
-    );
+    // Signed in (the stub answers /auth/me/): no Login at all, and never the
+    // company site's own login, which on a REGX page read as a second login.
+    await expect(nav.getByRole("link", { name: "Schedule Consultation" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Login" })).toHaveCount(0);
+    await expect(nav.locator('a[href="/adminmaster/login/"]')).toHaveCount(0);
     await expect(
       nav.getByRole("link", { name: "Schedule Consultation" }),
     ).toHaveAttribute("href", "/ratools/requestdemo");
+  });
+
+  test("when not signed in, Login goes to REGX's /signin, never the company login", async ({ page }) => {
+    await page.route("**/api/regx/v1/auth/me/", (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { status: 403, detail: { detail: "Authentication credentials were not provided." } } }),
+      }),
+    );
+    await page.goto(`/documents?tenant=${TENANT}`);
+    const nav = page.locator("nav.custom-navbar");
+    await expect(nav.getByRole("link", { name: "Login" })).toHaveAttribute("href", "/signin");
+    await expect(nav.locator('a[href="/adminmaster/login/"]')).toHaveCount(0);
   });
 
   test("keeps the RegX entry lit while inside an operational module", async ({ page }) => {
