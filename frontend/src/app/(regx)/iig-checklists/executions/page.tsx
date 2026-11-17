@@ -96,8 +96,10 @@ function ExecutionListPageInner() {
 
 export default function ExecutionListPage() {
   return (
-    <Suspense fallback={<p>Loading…</p>}>
-      <ExecutionListPageInner />
-    </Suspense>
+    <main style={{ maxWidth: 1100, margin: "2rem auto", padding: "0 1rem" }}>
+      <Suspense fallback={<p>Loading…</p>}>
+        <ExecutionListPageInner />
+      </Suspense>
+    </main>
   );
 }

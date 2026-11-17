@@ -88,8 +88,10 @@ function NewExecutionPageInner() {
 
 export default function NewExecutionPage() {
   return (
-    <Suspense fallback={<p>Loading…</p>}>
-      <NewExecutionPageInner />
-    </Suspense>
+    <main style={{ maxWidth: 1100, margin: "2rem auto", padding: "0 1rem" }}>
+      <Suspense fallback={<p>Loading…</p>}>
+        <NewExecutionPageInner />
+      </Suspense>
+    </main>
   );
 }
