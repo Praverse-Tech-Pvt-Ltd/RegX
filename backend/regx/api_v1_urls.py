@@ -26,4 +26,5 @@ urlpatterns = [
     path("", include("submission_operations.urls")),
     path("", include("submission_packages.urls")),
     path("", include("external_integrations.urls")),
+    path("", include("ai_gateway.urls")),
 ]

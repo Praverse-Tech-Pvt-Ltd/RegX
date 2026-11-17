@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     "submission_operations",
     "submission_packages",
     "external_integrations",
+    "ai_gateway",
     # Composition root for demo/handoff setup: management commands only, no
     # models, no URLs, no runtime behaviour. It is last because it is allowed
     # to import every domain above it and nothing may import it back.
@@ -289,6 +290,30 @@ CELERY_TIMEZONE = "UTC"
 # rest of the system and outside the allow-list formatter. Handing logging back
 # to LOGGING below is what makes the worker emit the same structured records.
 CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
+# ---------------------------------------------------------------------------
+# AI gateway (ai_gateway; HTTP adapter in external_integrations.ai_http)
+# ---------------------------------------------------------------------------
+# Every value is empty or off by default. Real values go in the local .env only,
+# never in a committed file. AI runs only when REGX_AI_ENABLED is true AND the
+# platform-level switch (ai_gateway.AISwitch, off by default) is on; the gateway
+# checks both on every call. See docs/AI_INTEGRATION_RUNBOOK.md.
+REGX_AI_ENABLED = config("REGX_AI_ENABLED", cast=bool, default=False)
+# "stub" (deterministic, no network), "e2e" or "openai".
+REGX_AI_PROVIDER = config("REGX_AI_PROVIDER", default="stub")
+REGX_AI_E2E_BASE_URL = config("REGX_AI_E2E_BASE_URL", default="")
+REGX_AI_E2E_API_KEY = config("REGX_AI_E2E_API_KEY", default="")
+REGX_AI_E2E_MODEL = config("REGX_AI_E2E_MODEL", default="")
+REGX_AI_OPENAI_API_KEY = config("REGX_AI_OPENAI_API_KEY", default="")
+REGX_AI_OPENAI_MODEL = config("REGX_AI_OPENAI_MODEL", default="")
+# Call limits. Code constants, not environment: they are tuned from the
+# benchmark (manage.py ai_benchmark), not per deployment.
+AI_CALL_TIMEOUT_SECONDS = 30.0  # whole call, retries included
+AI_MAX_RETRIES = 2  # extra attempts after the first, for retryable failures only
+AI_RETRY_BACKOFF_SECONDS = 0.5  # multiplied by the attempt number
+AI_MAX_RESPONSE_BYTES = 1024 * 1024
+AI_BREAKER_FAILURE_THRESHOLD = 5  # consecutive failed calls before the breaker opens
+AI_BREAKER_COOLDOWN_SECONDS = 60
 
 # ---------------------------------------------------------------------------
 # MFA encryption key (Fernet symmetric key, base64-encoded)

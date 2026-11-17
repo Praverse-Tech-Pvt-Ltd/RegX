@@ -41,3 +41,6 @@ LOGGING["root"]["level"] = "WARNING"  # noqa: F405
 # Override to predictable test value
 MFA_ENCRYPTION_KEY = "test_key_not_for_production_use_only_32b"
 APP_VERSION = "test"
+
+# No sleeping between AI retries under test; the retry count is still exercised.
+AI_RETRY_BACKOFF_SECONDS = 0.0

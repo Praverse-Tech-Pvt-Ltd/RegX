@@ -68,6 +68,15 @@ services:
       # Tags every structured log line so backend and worker output can be told
       # apart -- they run the same image with the same settings.
       REGX_SERVICE_NAME: backend
+      # AI gateway: off, offline stub and empty unless the local .env sets them
+      # (docs/AI_INTEGRATION_RUNBOOK.md). Backend only -- never company_site.
+      REGX_AI_ENABLED: ${REGX_AI_ENABLED:-false}
+      REGX_AI_PROVIDER: ${REGX_AI_PROVIDER:-stub}
+      REGX_AI_E2E_BASE_URL: ${REGX_AI_E2E_BASE_URL:-}
+      REGX_AI_E2E_API_KEY: ${REGX_AI_E2E_API_KEY:-}
+      REGX_AI_E2E_MODEL: ${REGX_AI_E2E_MODEL:-}
+      REGX_AI_OPENAI_API_KEY: ${REGX_AI_OPENAI_API_KEY:-}
+      REGX_AI_OPENAI_MODEL: ${REGX_AI_OPENAI_MODEL:-}
     volumes:
       - document_storage:/app/document_storage
       # common/tests/test_task_reliability_doc.py checks that

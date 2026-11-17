@@ -16,3 +16,8 @@ class ExternalIntegrationsConfig(AppConfig):
     def ready(self):
         # Discovery only: enforcement reads ROLE_PERMISSIONS, not this table.
         post_migrate.connect(_register, sender=self)
+        # The AI gateway's HTTP providers live here, at the network edge, and
+        # are handed to the gateway rather than imported by it.
+        from .ai_http import register
+
+        register()
