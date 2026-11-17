@@ -434,6 +434,16 @@ describe("ChecklistResponses — governed calculated-result display", () => {
     expect(value).toHaveTextContent("12.5000000000");
   });
 
+  it("shows a percentage outcome at 3 decimals, exact value in the tooltip", async () => {
+    api.responsesList.mockResolvedValue([calculated(2, outcome({ value: "142.8571428571", unit: "percent_of_potency" }))]);
+    renderResponses();
+
+    const pct = await screen.findByTestId("percent-value");
+    expect(pct.firstChild?.textContent).toBe("142.857");
+    expect(pct).toHaveAttribute("title", "Exact value: 142.8571428571");
+    expect(screen.getByTestId("calculation-unit")).toHaveTextContent("percent_of_potency");
+  });
+
   it("shows the unit alongside a complete value", async () => {
     api.responsesList.mockResolvedValue([calculated(2, outcome({ unit: "gram" }))]);
     renderResponses();

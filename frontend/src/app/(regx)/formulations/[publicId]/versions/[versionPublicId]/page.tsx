@@ -11,6 +11,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
+import { PercentValue } from "@/components/PercentValue";
 
 function VersionDetailInner() {
   const router = useRouter();
@@ -183,7 +184,11 @@ function VersionDetailInner() {
                     {c.quantity_per_dosage_unit} {c.quantity_unit}
                   </td>
                   <td style={{ padding: "6px 8px" }}>
-                    {c.percentage_w_w_snapshot ?? "not yet calculated"}
+                    {c.percentage_w_w_snapshot != null ? (
+                      <PercentValue value={c.percentage_w_w_snapshot} />
+                    ) : (
+                      "not yet calculated"
+                    )}
                   </td>
                 </tr>
               ))}

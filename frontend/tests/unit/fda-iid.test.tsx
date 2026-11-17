@@ -450,6 +450,26 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
     expect(await screen.findByText(/NO MATCHING IID PRECEDENT/)).toBeInTheDocument();
   });
 
+  it("shows calculated percentages at 3 decimals with the exact value as tooltip", async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue(
+      makeAssessmentPreview({
+        calculations: {
+          percentage_of_iid_potency: { status: "OK", value: "142.8571428571428571428571429", unit: "percent_of_potency" },
+          difference_from_iid_potency: { status: "OK", value: "-30.000000" },
+        },
+      }),
+    );
+    render(<IidPreviewPage />);
+    await submitPreviewForm(user);
+
+    const pct = await screen.findByTestId("percent-value");
+    expect(pct.firstChild?.textContent).toBe("142.857");
+    expect(pct).toHaveAttribute("title", "Exact value: 142.8571428571428571428571429");
+    // A non-percentage calculation is shown exactly as before.
+    expect(screen.getByText(/-30\.000000/)).toBeInTheDocument();
+  });
+
   it("every FDA-sourced field carries an FDA SOURCE provenance label", async () => {
     const user = userEvent.setup();
     api.preview.mockResolvedValue(makeAssessmentPreview());
@@ -787,7 +807,10 @@ describe("VersionDetailPage — components and dosing regimen", () => {
     api.componentsList.mockResolvedValue([makeFormulationComponent()]);
     render(<VersionDetailPage />);
     expect(await screen.findByText("Synthetic Starch")).toBeInTheDocument();
-    expect(screen.getByText("6.000000")).toBeInTheDocument();
+    // Shown at 3 decimals; the exact stored value stays in the tooltip.
+    const pct = screen.getByTestId("percent-value");
+    expect(pct.firstChild?.textContent).toBe("6.000");
+    expect(pct).toHaveAttribute("title", "Exact value: 6.000000");
   });
 
   it("adds an inactive component via the form", async () => {

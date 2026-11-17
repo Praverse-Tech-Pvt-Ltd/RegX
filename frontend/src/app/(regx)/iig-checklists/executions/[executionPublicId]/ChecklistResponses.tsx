@@ -27,6 +27,8 @@ import {
   type ChecklistResponse,
 } from "@/lib/api";
 import { ProvenanceLabel, type Provenance } from "@/components/ProvenanceLabel";
+import { PercentValue } from "@/components/PercentValue";
+import { isPercentUnit } from "@/lib/percent";
 
 /** Mirrors the backend EDITABLE_EXECUTION_STATUSES. */
 const EDITABLE_EXECUTION_STATUSES = new Set(["draft", "returned"]);
@@ -310,7 +312,7 @@ export function CalculationResult({ calculation }: { calculation: CalculationOut
   if (status === "complete") {
     return (
       <p data-testid="calculation-value" data-status="complete" style={{ margin: "0.25rem 0" }}>
-        <strong>{value ?? "—"}</strong>
+        <strong>{value != null && isPercentUnit(unit) ? <PercentValue value={value} /> : (value ?? "—")}</strong>
         {unit && <span data-testid="calculation-unit"> {unit}</span>}
       </p>
     );
