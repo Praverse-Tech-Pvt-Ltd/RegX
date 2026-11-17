@@ -390,7 +390,7 @@ function ExternalIntegrationsPage() {
                 <tr key={connector.public_id} data-testid="connector-row">
                   <td style={cell}>
                     <Link
-                      href={`/external-integrations/${connector.public_id}`}
+                      href={`/external-integrations/${connector.public_id}?tenant=${encodeURIComponent(tenantSlug)}`}
                       style={{ color: T.blue, fontWeight: 600 }}
                     >
                       {connector.name}
