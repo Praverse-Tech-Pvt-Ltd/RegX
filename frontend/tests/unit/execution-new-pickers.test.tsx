@@ -95,6 +95,13 @@ describe("New checklist execution — choose, don't paste IDs", () => {
     expect(await screen.findByText(/No formulation version is approved yet/)).toBeInTheDocument();
   });
 
+  it("arriving from a draft version's link: says it is not approved and does not offer to create", async () => {
+    nav.query = "tenant=alpha&formulationVersion=fv-2";
+    render(<NewExecutionPage />);
+    expect(await screen.findByText(/This formulation version is not approved/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create execution/i })).toBeDisabled();
+  });
+
   it("is pre-filled from the formulation version's link", () => {
     nav.query = "tenant=alpha&formulationVersion=fv-1";
     render(<NewExecutionPage />);

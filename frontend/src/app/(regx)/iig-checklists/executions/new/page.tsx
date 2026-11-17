@@ -65,9 +65,13 @@ function NewExecutionPageInner() {
     };
   }, [tenantSlug]);
 
+  const chosenNotApproved = formulationChoices.some(
+    (c) => c.disabled && c.id === formulationVersionPublicId.trim(),
+  );
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!checklistVersionPublicId.trim() || !formulationVersionPublicId.trim()) return;
+    if (!checklistVersionPublicId.trim() || !formulationVersionPublicId.trim() || chosenNotApproved) return;
     setSubmitting(true);
     setActionError(null);
     iigChecklists.executions
@@ -133,6 +137,11 @@ function NewExecutionPageInner() {
             </select>
           </label>
         </div>
+        {chosenNotApproved && (
+          <p role="alert">
+            This formulation version is not approved, so a checklist cannot be run on it yet.
+          </p>
+        )}
         {formulationChoices.length > 0 && !formulationChoices.some((c) => !c.disabled) && (
           <p role="note">
             No formulation version is approved yet. A checklist can only be run on an approved
@@ -165,7 +174,7 @@ function NewExecutionPageInner() {
             />
           </label>
         </div>
-        <button type="submit" disabled={submitting}>
+        <button type="submit" disabled={submitting || chosenNotApproved}>
           {submitting ? "Creating…" : "Create execution"}
         </button>
       </form>
