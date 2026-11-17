@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { tenants, type Tenant, ApiError } from "@/lib/api";
 
 export default function TenantsPage() {
@@ -30,13 +31,19 @@ export default function TenantsPage() {
   return (
     <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
       <h1>Your organisations</h1>
+      <p>Choose an organisation to open its workspace.</p>
       {items.length === 0 ? (
         <p>No organisations found.</p>
       ) : (
         <ul>
           {items.map((t) => (
             <li key={t.id}>
-              <strong>{t.name}</strong> ({t.slug}) &mdash; {t.status}
+              {/* Every REGX page reads its tenant from ?tenant=, so choosing an
+                  organisation means entering REGX with it set. */}
+              <Link href={`/dashboard?tenant=${encodeURIComponent(t.slug)}`}>
+                <strong>{t.name}</strong>
+              </Link>{" "}
+              ({t.slug}) &mdash; {t.status}
             </li>
           ))}
         </ul>

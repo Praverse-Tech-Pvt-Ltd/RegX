@@ -5,6 +5,8 @@ import { useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
 import { iidAssessments, type AssessmentSnapshotDetail, ApiError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
+import { PercentValue } from "@/components/PercentValue";
+import { isPercentUnit } from "@/lib/percent";
 
 const DECISION_STATUS_LABELS: Record<string, string> = {
   PASS_WITH_IID_PRECEDENT: "Within IID precedent",
@@ -30,7 +32,8 @@ function CalculationBlock({ label, calc }: { label: string; calc: Record<string,
       <strong>{label}</strong> <ProvenanceLabel kind="CALCULATED" />
       {ok ? (
         <span style={{ marginLeft: 8 }}>
-          {String(calc.value)} {calc.unit ? String(calc.unit) : ""}
+          {isPercentUnit(calc.unit) ? <PercentValue value={calc.value} /> : String(calc.value)}{" "}
+          {calc.unit ? String(calc.unit) : ""}
         </span>
       ) : (
         <span style={{ marginLeft: 8, color: "#8a5a10" }}>Blocked: {String(calc.status)}</span>

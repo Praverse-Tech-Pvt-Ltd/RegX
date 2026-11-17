@@ -14,7 +14,8 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element */
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { auth } from "@/lib/api";
 
 /**
  * Port of company_site/templates/navbar.html.
@@ -68,9 +69,27 @@ const REGX_AREA_PREFIXES = [
   "/workflows",
 ];
 
+/** The sign-in screens use this navbar too; a "Login" there would point at itself. */
+const ON_AUTH_PAGE = ["/signin", "/mfa"];
+
 export default function CompanyNavbar() {
   const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
+  // null while unknown. The template's "Login" went to the company site's own
+  // login (/adminmaster/login/); on a REGX page, where the user is already
+  // signed in to REGX, that read as a second, different REGX login. REGX pages
+  // now show no login when signed in, and REGX's /signin when not.
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    auth
+      .me()
+      .then(() => !cancelled && setSignedIn(true))
+      .catch(() => !cancelled && setSignedIn(false));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Every operational page sits under the company's "RegX" nav entry, so that
   // entry stays lit while the user works inside the module pages.
@@ -134,9 +153,11 @@ export default function CompanyNavbar() {
           </ul>
 
           <div className="d-flex align-items-center gap-3 mt-4 mt-lg-0 ms-lg-auto">
-            <a href="/adminmaster/login/" className="login-btn">
-              Login
-            </a>
+            {signedIn === false && !ON_AUTH_PAGE.some((p) => pathname.startsWith(p)) && (
+              <a href="/signin" className="login-btn">
+                Login
+              </a>
+            )}
             <a href="/ratools/requestdemo" className="demo-btn">
               Schedule Consultation
             </a>

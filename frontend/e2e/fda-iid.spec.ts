@@ -340,7 +340,7 @@ test.describe("IID assessment preview", () => {
         calculability_status: "calculable",
       },
       calculations: {
-        unit_conversion: { status: "OK", ok: true },
+        unit_conversion: { ok: true, original_value: "30.000000", original_unit: "milligram", converted_value: "30", converted_unit: "milligram", reason_code: null },
         percentage_w_w: { status: "OK", value: "6", unit: "percent_w_w" },
         daily_exposure: { status: "OK", value: "120" },
         percentage_of_iid_potency: { status: "OK", value: "60", unit: "percent_of_potency" },
@@ -434,7 +434,7 @@ test.describe("IID assessment preview", () => {
         calculability_status: "calculable",
       },
       calculations: {
-        unit_conversion: { status: "OK", ok: true },
+        unit_conversion: { ok: true, original_value: "30.000000", original_unit: "milligram", converted_value: "30", converted_unit: "milligram", reason_code: null },
       },
       decision_status: "EXCEEDS_IID_PRECEDENT",
       decision_note:
@@ -508,7 +508,7 @@ test.describe("IID assessment preview", () => {
         calculability_status: "calculable",
       },
       calculations: {
-        unit_conversion: { status: "UNIT_MISMATCH", ok: false },
+        unit_conversion: { ok: false, original_value: "30.000000", original_unit: "millilitre", converted_value: null, converted_unit: null, reason_code: "DENSITY_REQUIRED" },
       },
       decision_status: "NOT_COMPARABLE",
       decision_note: "Unit or basis could not be reconciled between the proposed formulation and the selected IID record.",
@@ -516,7 +516,7 @@ test.describe("IID assessment preview", () => {
     });
     await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
     await fillAndRun(page);
-    await expect(page.getByText(/Blocked: UNIT_MISMATCH/)).toBeVisible();
+    await expect(page.getByText(/Blocked: DENSITY_REQUIRED/)).toBeVisible();
     await expect(page.getByText(/Not comparable/i)).toBeVisible();
   });
 
@@ -536,7 +536,7 @@ test.describe("IID assessment preview", () => {
         calculability_status: "calculable",
       },
       calculations: {
-        unit_conversion: { status: "OK", ok: true },
+        unit_conversion: { ok: true, original_value: "30.000000", original_unit: "milligram", converted_value: "30", converted_unit: "milligram", reason_code: null },
         percentage_of_iid_potency: { status: "OK", value: "60", unit: "percent_of_potency" },
       },
       decision_status: "REVIEW_REQUIRED",
@@ -568,7 +568,7 @@ test.describe("IID assessment preview", () => {
         calculability_status: "calculable",
       },
       calculations: {
-        unit_conversion: { status: "OK", ok: true },
+        unit_conversion: { ok: true, original_value: "30.000000", original_unit: "milligram", converted_value: "30", converted_unit: "milligram", reason_code: null },
         percentage_w_w: { status: "OK", value: "6", unit: "percent_w_w" },
         daily_exposure: { status: "OK", value: "120" },
       },
@@ -580,7 +580,9 @@ test.describe("IID assessment preview", () => {
     await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
     await fillAndRun(page);
     await expect(page.getByText(/Percentage w\/w/i)).toBeVisible();
-    await expect(page.getByText("6 percent_w_w")).toBeVisible();
+    // Percentages show at 3 decimals; the exact value is the tooltip.
+    await expect(page.getByText("6.000 percent_w_w")).toBeVisible();
+    await expect(page.getByTestId("percent-value")).toHaveAttribute("title", "Exact value: 6");
     await expect(page.getByText(/Daily exposure/i)).toBeVisible();
     await expect(page.getByText("120")).toBeVisible();
   });

@@ -87,17 +87,46 @@ _GENERATED_PASSWORD_BYTES = 12
 
 ROLES = ("doer", "reviewer", "vp", "tenant_admin")
 
-#: A minimal, valid PDF. Generated here rather than committed as a binary
-#: fixture so the repository carries no opaque file, and so it is obvious that
-#: the demo document contains nothing.
-_MINIMAL_PDF = (
-    b"%PDF-1.4\n"
-    b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
-    b"2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
-    b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
-    b"trailer<</Root 1 0 R>>\n"
-    b"%%EOF\n"
-)
+
+def _build_minimal_pdf(text: str) -> bytes:
+    """A one-page PDF that a strict reader accepts: every object, a
+    cross-reference table with exact byte offsets, a trailer and `startxref`.
+
+    The previous 193-byte placeholder had no cross-reference table, so pypdf
+    refused it ("startxref not found") and the demo document always showed
+    processing "failed". Built here rather than committed as a binary fixture,
+    so the repository carries no opaque file and it is obvious what the demo
+    document contains: one line of text saying it is synthetic. `text` must be
+    plain ASCII with no parentheses or backslashes (PDF string syntax).
+    """
+    content = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode("ascii")
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]"
+        b" /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for number, body in enumerate(objects, start=1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % number + body + b"\nendobj\n"
+    xref_at = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
+        len(objects) + 1,
+        xref_at,
+    )
+    return bytes(out)
+
+
+#: The demo document: a valid one-page PDF whose only content says it is
+#: synthetic (see `_build_minimal_pdf`).
+DEMO_PDF_TEXT = "DEMO - synthetic document for the REGX demo tenant. No real content."
+_MINIMAL_PDF = _build_minimal_pdf(DEMO_PDF_TEXT)
 
 
 class Command(BaseCommand):

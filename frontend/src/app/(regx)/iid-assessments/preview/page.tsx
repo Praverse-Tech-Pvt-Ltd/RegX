@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { iidAssessments, type AssessmentPreview, type MatchCandidate, ApiError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
+import { PercentValue } from "@/components/PercentValue";
+import { isPercentUnit } from "@/lib/percent";
 
 // Human-readable labels for every match/decision status the backend can
 // return. Never SAFE / FDA APPROVED / AUTOMATICALLY ACCEPTABLE /
@@ -69,11 +71,86 @@ function CalculationBlock({ label, calc }: { label: string; calc: Record<string,
       <strong>{label}</strong> <ProvenanceLabel kind="CALCULATED" />
       {ok ? (
         <span style={{ marginLeft: 8 }}>
-          {String(calc.value)} {calc.unit ? String(calc.unit) : ""}
+          {isPercentUnit(calc.unit) ? <PercentValue value={calc.value} /> : String(calc.value)}{" "}
+          {calc.unit ? String(calc.unit) : ""}
         </span>
       ) : (
         <span style={{ marginLeft: 8, color: "#8a5a10" }}>Blocked: {String(calc.status)}</span>
       )}
+    </div>
+  );
+}
+
+/**
+ * The unit conversion result has its own shape (`ok`, `converted_value`,
+ * `converted_unit`, `reason_code` -- `unit_conversion.ConversionResult` in the
+ * backend), not the `status`/`value` shape of the other calculations. Read
+ * through CalculationBlock it always showed "Blocked: undefined".
+ */
+function ConversionBlock({ calc }: { calc: Record<string, unknown> | undefined }) {
+  if (!calc) return null;
+  return (
+    <div style={{ marginBottom: 8, fontSize: 13 }}>
+      <strong>Unit conversion</strong> <ProvenanceLabel kind="CALCULATED" />
+      {calc.ok === true ? (
+        <span style={{ marginLeft: 8 }}>
+          {String(calc.original_value)} {String(calc.original_unit ?? "")} ={" "}
+          {String(calc.converted_value)} {String(calc.converted_unit ?? "")}
+        </span>
+      ) : (
+        <span style={{ marginLeft: 8, color: "#8a5a10" }}>
+          Blocked: {String(calc.reason_code ?? "UNIT_NOT_CONVERTIBLE")}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const COMPARISON_RESULT_TEXT: Record<string, string> = {
+  at_or_below: "at or below the IID value",
+  above: "above the IID value",
+};
+
+/**
+ * The like-for-like comparison (`iid_assessment/comparison.py`): the only
+ * path that decides whether the proposed amount and the IID record's limit
+ * can be compared. The label and the reason text are the backend's own, shown
+ * as sent, so the wording is defined in one place.
+ */
+function ComparisonBlock({ calc }: { calc: Record<string, unknown> | undefined }) {
+  if (!calc) return null;
+  const sourceRow = (calc.iid_source_row ?? {}) as Record<string, unknown>;
+  return (
+    <div
+      data-testid="potency-comparison"
+      style={{ marginBottom: 16, fontSize: 13, border: "1px solid #dce7f4", borderRadius: 8, padding: "0.75rem 1rem" }}
+    >
+      <strong>Like-for-like comparison</strong> <ProvenanceLabel kind="CALCULATED" />
+      {calc.comparable === true ? (
+        <>
+          <p style={{ margin: "6px 0 0" }}>
+            Proposed {String(calc.proposed_value)} {String(calc.unit ?? "")} is{" "}
+            <strong>{COMPARISON_RESULT_TEXT[String(calc.result)] ?? String(calc.result)}</strong>{" "}
+            of {String(calc.iid_value)} {String(calc.unit ?? "")}.
+          </p>
+          <p style={{ margin: "4px 0 0", color: "#66768b" }}>
+            Conversion: {String(calc.conversion || "none needed")}
+            {calc.rounded_for_display === true && " (proposed value rounded for display only)"}
+          </p>
+          {calc.label ? (
+            <p style={{ margin: "4px 0 0", color: "#8a5a10", fontWeight: 600 }}>{String(calc.label)}</p>
+          ) : null}
+        </>
+      ) : (
+        <p style={{ margin: "6px 0 0", color: "#8a5a10" }}>
+          {String(calc.reason ?? calc.reason_code ?? "cannot compare")}
+        </p>
+      )}
+      {sourceRow.source_row_locator ? (
+        <p style={{ margin: "4px 0 0", color: "#66768b" }}>
+          IID source row: {String(sourceRow.source_row_locator)}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -255,8 +332,9 @@ function IidPreviewInner() {
           )}
 
           <div style={{ marginBottom: 16 }}>
+            <ComparisonBlock calc={preview.calculations.potency_comparison} />
             <h3 style={{ fontSize: 14 }}>Calculations</h3>
-            <CalculationBlock label="Unit conversion" calc={preview.calculations.unit_conversion} />
+            <ConversionBlock calc={preview.calculations.unit_conversion} />
             <CalculationBlock label="Percentage w/w" calc={preview.calculations.percentage_w_w} />
             <CalculationBlock label="Daily exposure" calc={preview.calculations.daily_exposure} />
             <CalculationBlock label="Percentage of IID potency" calc={preview.calculations.percentage_of_iid_potency} />

@@ -161,6 +161,24 @@ jobs:
           dosage_form, _ = ControlledDosageForm.objects.get_or_create(code='tablet', defaults={'canonical_label': 'Tablet', 'lifecycle': 'active'})
           DosageFormMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='TABLET', defaults={'controlled_dosage_form': dosage_form, 'status': 'approved'})
           ControlledUnit.objects.get_or_create(code='milligram', defaults={'symbol': 'MG', 'dimension': 'mass', 'active': True})
+          # Since controlled units increment 3 (#120) a potency is used only through an
+          # in-force unit meaning: the reviewed unit list (an ACTIVE regx_controlled_units
+          # release, loaded by one user and approved and activated by another) plus an
+          # APPROVED unit mapping for the IID unit string. Without it the record is
+          # POTENCY_UNAVAILABLE. The legacy ControlledUnit above is stored but never read.
+          import pathlib
+          from fda_data import controlled_units
+          from fda_data.models import QuantityExpression, UnitMapping
+          if controlled_units.active_release() is None:
+              units_raw = pathlib.Path('fda_data/reference/controlled_units_v1.json').read_bytes()
+              units_release, _ = controlled_units.load_snapshot(raw=units_raw, filename='controlled_units_v1.json', source_reference='REGX controlled units v1 (CI smoke)', actor=importer_user)
+              units_release = lifecycle.submit_for_review(units_release, importer_user)
+              units_release = lifecycle.approve(units_release, approver_user, 'CI smoke')
+              units_release = lifecycle.activate(units_release, approver_user)
+              assert units_release.status == 'active', 'UNITS FAIL: unit list release is %s' % units_release.status
+          mg_per_dose = QuantityExpression.objects.get(family='mass', basis='per_dose_unit', numerator_unit__code='mg')
+          assert mg_per_dose.pk in controlled_units.in_force_expressions(), 'UNITS FAIL: mg per dose unit is not in force'
+          UnitMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='MG', is_current=True, defaults={'status': 'approved', 'quantity_expression': mg_per_dose})
 
           rows = [{'Ingredient Name': 'SYNTHETIC-CI-SMOKE', 'UNII': 'CISMOKE01', 'Route': 'ORAL', 'Dosage Form': 'TABLET', 'Potency': '50', 'Unit': 'MG', 'Maximum Daily Exposure': '200', 'MDE Unit': 'MG'}]
           file_obj = io.BytesIO(json.dumps(rows).encode('utf-8'))
@@ -179,8 +197,16 @@ jobs:
           ingredient = IIDIngredient.objects.get(normalized_name='SYNTHETIC-CI-SMOKE')
           preview = run_preview(ingredient_public_id=ingredient.public_id, route_code='oral', dosage_form_code='tablet', active_release_public_id=release.public_id, proposed_quantity_per_unit=Decimal('30'), proposed_quantity_unit='milligram', total_dosage_unit_weight=Decimal('500'), total_dosage_unit_weight_unit='milligram', maximum_dosage_units_per_day=Decimal('4'))
           assert preview.match_status == 'EXACT_MATCH', preview.match_status
-          assert preview.decision_status == 'PASS_WITH_IID_PRECEDENT', preview.decision_status
-          assert 'not an automatic safety' in preview.decision_note.lower()
+          comparison = preview.calculations['potency_comparison']
+          assert comparison['comparable'] is True and comparison['result'] == 'at_or_below', comparison
+          assert comparison['label'] == 'technically comparable (not regulatorily approved)', comparison['label']
+          # No governed path fills the per-day meaning until the per-day rule (Q8) is decided,
+          # so a result within the potency limit is REVIEW_REQUIRED with escalation, never
+          # PASS_WITH_IID_PRECEDENT (controlled units increment 3, #120). The pass path is
+          # covered by the iid_assessment unit tests, which attach a per-day meaning directly.
+          assert preview.decision_status == 'REVIEW_REQUIRED', preview.decision_status
+          assert preview.escalation_required is True
+          assert 'maximum daily exposure precedent is unavailable' in preview.decision_note.lower(), preview.decision_note
           print('SMOKE FLOW: PASS')
           "
 
@@ -248,6 +274,24 @@ jobs:
           dosage_form, _ = ControlledDosageForm.objects.get_or_create(code='tablet', defaults={'canonical_label': 'Tablet', 'lifecycle': 'active'})
           DosageFormMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='TABLET', defaults={'controlled_dosage_form': dosage_form, 'status': 'approved'})
           ControlledUnit.objects.get_or_create(code='milligram', defaults={'symbol': 'MG', 'dimension': 'mass', 'active': True})
+          # Since controlled units increment 3 (#120) a potency is used only through an
+          # in-force unit meaning: the reviewed unit list (an ACTIVE regx_controlled_units
+          # release, loaded by one user and approved and activated by another) plus an
+          # APPROVED unit mapping for the IID unit string. Without it the record is
+          # POTENCY_UNAVAILABLE. The legacy ControlledUnit above is stored but never read.
+          import pathlib
+          from fda_data import controlled_units
+          from fda_data.models import QuantityExpression, UnitMapping
+          if controlled_units.active_release() is None:
+              units_raw = pathlib.Path('fda_data/reference/controlled_units_v1.json').read_bytes()
+              units_release, _ = controlled_units.load_snapshot(raw=units_raw, filename='controlled_units_v1.json', source_reference='REGX controlled units v1 (CI smoke)', actor=doer)
+              units_release = lifecycle.submit_for_review(units_release, doer)
+              units_release = lifecycle.approve(units_release, vp_release_approver, 'CI smoke')
+              units_release = lifecycle.activate(units_release, vp_release_approver)
+              assert units_release.status == 'active', 'UNITS FAIL: unit list release is %s' % units_release.status
+          mg_per_dose = QuantityExpression.objects.get(family='mass', basis='per_dose_unit', numerator_unit__code='mg')
+          assert mg_per_dose.pk in controlled_units.in_force_expressions(), 'UNITS FAIL: mg per dose unit is not in force'
+          UnitMapping.objects.get_or_create(source_dataset='fda_iid', source_raw_value='MG', is_current=True, defaults={'status': 'approved', 'quantity_expression': mg_per_dose})
 
           rows = [{'Ingredient Name': 'SYNTHETIC-CI-SYNONYM-BASE', 'UNII': 'CISYN0001', 'Route': 'ORAL', 'Dosage Form': 'TABLET', 'Potency': '50', 'Unit': 'MG', 'Maximum Daily Exposure': '200', 'MDE Unit': 'MG'}]
           file_obj = io.BytesIO(json.dumps(rows).encode('utf-8'))
@@ -393,7 +437,9 @@ jobs:
           resolved_name = preview_approved.selected_record['ingredient_name']
           assert resolved_name == ingredient.canonical_name, 'STEP 12 FAIL: resolved to unexpected ingredient %s' % resolved_name
           assert preview_approved.substance_mapping_public_id == str(mapping.public_id), 'STEP 15 FAIL: assessment omits or mismatches mapping provenance'
-          assert preview_approved.decision_status == 'PASS_WITH_IID_PRECEDENT', 'STEP 14 FAIL: decision status is %s' % preview_approved.decision_status
+          assert preview_approved.calculations['potency_comparison']['comparable'] is True, 'STEP 14 FAIL: no like-for-like comparison: %s' % preview_approved.calculations['potency_comparison']
+          # Within the potency limit with no per-day meaning (Q8 undecided): REVIEW_REQUIRED, never PASS (#120).
+          assert preview_approved.decision_status == 'REVIEW_REQUIRED', 'STEP 14 FAIL: decision status is %s' % preview_approved.decision_status
           print('STEP 11-12 approved synonym resolved to expected canonical ingredient: OK')
 
           forbidden_words = ['SAFE', 'FDA APPROVED', 'AUTOMATICALLY ACCEPTABLE', 'REGULATORILY CLEARED']
@@ -401,7 +447,8 @@ jobs:
           for word in forbidden_words:
               ok = (word not in note_upper) or ('NOT AN AUTOMATIC' in note_upper)
               assert ok, 'STEP 15 FAIL: forbidden wording found: %s' % word
-          assert 'not an automatic safety' in preview_approved.decision_note.lower(), 'STEP 15 FAIL: required disclaimer missing'
+          assert preview_approved.escalation_required is True, 'STEP 15 FAIL: review required without escalation'
+          assert 'maximum daily exposure precedent is unavailable' in preview_approved.decision_note.lower(), 'STEP 15 FAIL: unexpected note %s' % preview_approved.decision_note
           print('STEP 15 no forbidden safety/approval wording: OK')
 
           snapshot = AssessmentSnapshot.objects.create(

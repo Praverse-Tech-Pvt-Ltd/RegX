@@ -10,6 +10,7 @@ import {
   makeFormulationVersion,
   makeMatchCandidate,
   makeOrangeBookProduct,
+  makePotencyComparison,
   makeProduct,
   makeReconciliationReport,
   makeSnapshotDetail,
@@ -406,7 +407,7 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
     api.preview.mockResolvedValue(
       makeAssessmentPreview({
         calculations: {
-          unit_conversion: { status: "OK", ok: true },
+          unit_conversion: { ok: true, original_value: "30.000000", original_unit: "milligram", converted_value: "30", converted_unit: "milligram", reason_code: null },
           percentage_w_w: { status: "OK", value: "6", unit: "percent_w_w" },
           daily_exposure: { status: "DATA_REQUIRED" },
         },
@@ -450,6 +451,26 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
     expect(await screen.findByText(/NO MATCHING IID PRECEDENT/)).toBeInTheDocument();
   });
 
+  it("shows calculated percentages at 3 decimals with the exact value as tooltip", async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue(
+      makeAssessmentPreview({
+        calculations: {
+          percentage_of_iid_potency: { status: "OK", value: "142.8571428571428571428571429", unit: "percent_of_potency" },
+          difference_from_iid_potency: { status: "OK", value: "-30.000000" },
+        },
+      }),
+    );
+    render(<IidPreviewPage />);
+    await submitPreviewForm(user);
+
+    const pct = await screen.findByTestId("percent-value");
+    expect(pct.firstChild?.textContent).toBe("142.857");
+    expect(pct).toHaveAttribute("title", "Exact value: 142.8571428571428571428571429");
+    // A non-percentage calculation is shown exactly as before.
+    expect(screen.getByText(/-30\.000000/)).toBeInTheDocument();
+  });
+
   it("every FDA-sourced field carries an FDA SOURCE provenance label", async () => {
     const user = userEvent.setup();
     api.preview.mockResolvedValue(makeAssessmentPreview());
@@ -460,6 +481,111 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
     const labels = screen.getAllByTestId("provenance-label");
     expect(labels.some((l) => l.textContent === "FDA SOURCE")).toBe(true);
     expect(labels.some((l) => l.textContent === "CALCULATED")).toBe(true);
+  });
+
+  // The backend's unit conversion result is `ok`/`converted_value`/
+  // `converted_unit`/`reason_code` (unit_conversion.ConversionResult). The page
+  // read it as `status`, so a successful conversion showed "Blocked: undefined".
+  it("shows a successful unit conversion as values, never 'Blocked: undefined'", async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue(
+      makeAssessmentPreview({
+        calculations: {
+          unit_conversion: {
+            ok: true,
+            original_value: "0.070000",
+            original_unit: "gram",
+            converted_value: "70",
+            converted_unit: "milligram",
+            reason_code: null,
+          },
+        },
+      }),
+    );
+    render(<IidPreviewPage />);
+    await submitPreviewForm(user);
+
+    expect(await screen.findByText(/0\.070000 gram = 70 milligram/)).toBeInTheDocument();
+    expect(screen.queryByText(/Blocked: undefined/)).not.toBeInTheDocument();
+  });
+
+  it("shows a failed unit conversion with the backend's reason code", async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue(
+      makeAssessmentPreview({
+        calculations: {
+          unit_conversion: {
+            ok: false,
+            original_value: "30.000000",
+            original_unit: "millilitre",
+            converted_value: null,
+            converted_unit: null,
+            reason_code: "DENSITY_REQUIRED",
+          },
+        },
+      }),
+    );
+    render(<IidPreviewPage />);
+    await submitPreviewForm(user);
+
+    expect(await screen.findByText(/Blocked: DENSITY_REQUIRED/)).toBeInTheDocument();
+  });
+
+  it("shows the like-for-like comparison with the backend's label and result", async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue(makeAssessmentPreview());
+    render(<IidPreviewPage />);
+    await submitPreviewForm(user);
+
+    const block = await screen.findByTestId("potency-comparison");
+    expect(block).toHaveTextContent("Like-for-like comparison");
+    expect(block).toHaveTextContent("Proposed 30 mg per dose unit is at or below the IID value of 50 mg per dose unit.");
+    expect(block).toHaveTextContent("Conversion: none needed");
+    expect(block).toHaveTextContent("technically comparable (not regulatorily approved)");
+    expect(block).toHaveTextContent("IID source row: row 2");
+  });
+
+  it("shows why a comparison is refused, with no result or label", async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue(
+      makeAssessmentPreview({
+        decision_status: "NOT_COMPARABLE",
+        decision_note: "cannot compare: different basis (e.g. per dose unit vs per volume, w/w vs w/v)",
+        calculations: {
+          potency_comparison: makePotencyComparison({
+            comparable: false,
+            reason_code: "DIFFERENT_BASIS",
+            reason: "cannot compare: different basis (e.g. per dose unit vs per volume, w/w vs w/v)",
+            result: null,
+            proposed_value: null,
+            iid_value: null,
+            unit: null,
+            conversion: "",
+            label: null,
+          }),
+        },
+      }),
+    );
+    render(<IidPreviewPage />);
+    await submitPreviewForm(user);
+
+    const block = await screen.findByTestId("potency-comparison");
+    expect(block).toHaveTextContent("cannot compare: different basis");
+    expect(block).not.toHaveTextContent(/at or below|above the IID value/);
+    expect(block).not.toHaveTextContent("technically comparable");
+  });
+
+  it("names the invalid field when the API rejects the request", async () => {
+    const user = userEvent.setup();
+    api.preview.mockRejectedValue(
+      new ApiError(400, "active_release_public_id: Must be a valid UUID."),
+    );
+    render(<IidPreviewPage />);
+    await submitPreviewForm(user);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "active_release_public_id: Must be a valid UUID.",
+    );
   });
 });
 
@@ -787,7 +913,10 @@ describe("VersionDetailPage — components and dosing regimen", () => {
     api.componentsList.mockResolvedValue([makeFormulationComponent()]);
     render(<VersionDetailPage />);
     expect(await screen.findByText("Synthetic Starch")).toBeInTheDocument();
-    expect(screen.getByText("6.000000")).toBeInTheDocument();
+    // Shown at 3 decimals; the exact stored value stays in the tooltip.
+    const pct = screen.getByTestId("percent-value");
+    expect(pct.firstChild?.textContent).toBe("6.000");
+    expect(pct).toHaveAttribute("title", "Exact value: 6.000000");
   });
 
   it("adds an inactive component via the form", async () => {
