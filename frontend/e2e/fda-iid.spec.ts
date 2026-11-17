@@ -580,7 +580,9 @@ test.describe("IID assessment preview", () => {
     await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
     await fillAndRun(page);
     await expect(page.getByText(/Percentage w\/w/i)).toBeVisible();
-    await expect(page.getByText("6 percent_w_w")).toBeVisible();
+    // Percentages show at 3 decimals; the exact value is the tooltip.
+    await expect(page.getByText("6.000 percent_w_w")).toBeVisible();
+    await expect(page.getByTestId("percent-value")).toHaveAttribute("title", "Exact value: 6");
     await expect(page.getByText(/Daily exposure/i)).toBeVisible();
     await expect(page.getByText("120")).toBeVisible();
   });
