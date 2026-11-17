@@ -51,7 +51,7 @@ Verified at `regx-main` `47021f7`. Analysis scripts and raw counts: `D:/Praverse
 
 | Checklist (purpose) | ID prefix | Checkpoints | Sections inside the table | Answer columns | Rows with "if / where applicable" style wording | Rows with a number + unit | Rows citing a source |
 |---|---|---:|---|---|---:|---:|---:|
-| Quality System | `QS` | 100 | none (flat) | Yes · No · NA (empty ☐), Evidence / Remarks (blank) | 0 | 0 | 0 |
+| Quality System | `QS` | 100 | none (flat) | Yes · No · NA (an empty checkbox each), Evidence / Remarks (blank) | 0 | 0 | 0 |
 | Facilities & Equipment System | `FE` | 100 | none | same | 2 | 0 | 0 |
 | Materials System | `MS` | 100 | none | same | 2 | 0 | 0 |
 | Production & Process Controls System | `PC` | 100 | none | same | 7 | 0 | 0 |
