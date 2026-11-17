@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { iigChecklists, type ChecklistDefinition, ApiError } from "@/lib/api";
+import { iigChecklists, type ChecklistDefinition, isSignedOut, loadError } from "@/lib/api";
 
 function DefinitionsPageInner() {
   const router = useRouter();
@@ -21,10 +21,10 @@ function DefinitionsPageInner() {
       .list(tenantSlug)
       .then((resp) => setItems(resp.results))
       .catch((err: unknown) => {
-        if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+        if (isSignedOut(err)) {
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
-          setError("Failed to load checklist definitions.");
+          setError(loadError(err, "Failed to load checklist definitions."));
         }
       })
       .finally(() => setLoading(false));

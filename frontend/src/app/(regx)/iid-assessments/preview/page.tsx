@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { iidAssessments, type AssessmentPreview, type MatchCandidate, ApiError } from "@/lib/api";
+import { iidAssessments, type AssessmentPreview, type MatchCandidate, ApiError, isSignedOut } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
 import { PercentValue } from "@/components/PercentValue";
@@ -198,7 +198,7 @@ function IidPreviewInner() {
       });
       setPreview(result);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+      if (isSignedOut(err)) {
         router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       } else {
         setError(err instanceof ApiError ? err.message : "Preview failed.");

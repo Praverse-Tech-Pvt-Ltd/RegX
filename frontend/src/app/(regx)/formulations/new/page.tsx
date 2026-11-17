@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { formulations, ApiError } from "@/lib/api";
+import { formulations, ApiError, isSignedOut } from "@/lib/api";
 
 function NewProductPageInner() {
   const router = useRouter();
@@ -32,7 +32,7 @@ function NewProductPageInner() {
       });
       router.push(`/formulations/${product.public_id}?tenant=${tenantSlug}`);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+      if (isSignedOut(err)) {
         router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         return;
       }

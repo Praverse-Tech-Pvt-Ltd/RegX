@@ -3,12 +3,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import {
-  submissionDossiers,
-  ApiError,
-  type DossierDetail,
-  type DossierSection,
-} from "@/lib/api";
+import { submissionDossiers, ApiError, type DossierDetail, type DossierSection, isSignedOut, loadError } from "@/lib/api";
 import { DossierStatusBadge, ReadinessBadge } from "../readiness-badge";
 import { SectionTree } from "../section-tree";
 import { BlueprintProvenanceLine } from "./blueprint-provenance";
@@ -104,11 +99,11 @@ function DossierInner() {
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) setNotFound(true);
-        else if (err instanceof ApiError && (err.status === 403 || err.status === 401))
+        else if (isSignedOut(err))
           router.push(
             `/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`
           );
-        else setError("Failed to load this dossier.");
+        else setError(loadError(err, "Failed to load this dossier."));
       })
       .finally(() => setLoading(false));
   }

@@ -33,6 +33,9 @@ function apiError(status: number): Error {
 }
 
 vi.mock("@/lib/api", () => ({
+  isSignedOut: (e: { status?: number } | undefined) => e?.status === 401,
+  loadError: (e: { status?: number; message?: string } | undefined, fallback: string) =>
+    e?.status === 403 ? (e.message ?? fallback) : fallback,
   ApiError: class extends Error {
     status: number;
     constructor(status: number, message = "err") {

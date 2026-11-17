@@ -3,12 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  fdaData,
-  type TerminologyMapping,
-  type AffectedRecord,
-  ApiError,
-} from "@/lib/api";
+import { fdaData, type TerminologyMapping, type AffectedRecord, ApiError, isSignedOut, loadError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 
 function MappingDetailInner() {
@@ -42,9 +37,9 @@ function MappingDetailInner() {
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) setError("Mapping not found.");
-        else if (err instanceof ApiError && (err.status === 403 || err.status === 401))
+        else if (isSignedOut(err))
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
-        else setError("Failed to load affected records.");
+        else setError(loadError(err, "Failed to load affected records."));
       })
       .finally(() => setLoading(false));
   }

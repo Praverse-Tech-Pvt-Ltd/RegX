@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
-import { iidAssessments, type AssessmentSnapshotDetail, ApiError } from "@/lib/api";
+import { iidAssessments, type AssessmentSnapshotDetail, ApiError, isSignedOut, loadError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 import { PercentValue } from "@/components/PercentValue";
 import { isPercentUnit } from "@/lib/percent";
@@ -64,9 +64,9 @@ function SnapshotDetailInner() {
       .then(setSnapshot)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) setError("Assessment snapshot not found.");
-        else if (err instanceof ApiError && (err.status === 403 || err.status === 401))
+        else if (isSignedOut(err))
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
-        else setError("Failed to load assessment snapshot.");
+        else setError(loadError(err, "Failed to load assessment snapshot."));
       })
       .finally(() => setLoading(false));
   }, [tenantSlug, publicId]); // eslint-disable-line react-hooks/exhaustive-deps

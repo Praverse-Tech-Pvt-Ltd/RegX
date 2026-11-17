@@ -3,13 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  iigChecklists,
-  type ChecklistDefinition,
-  type ChecklistVersion,
-  type ChecklistVersionStatus,
-  ApiError,
-} from "@/lib/api";
+import { iigChecklists, type ChecklistDefinition, type ChecklistVersion, type ChecklistVersionStatus, ApiError, isSignedOut, loadError } from "@/lib/api";
 
 const STATUS_COLOURS: Record<ChecklistVersionStatus, string> = {
   draft: "#314155",
@@ -68,10 +62,10 @@ function DefinitionDetailInner() {
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) {
           setError("Checklist definition not found.");
-        } else if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+        } else if (isSignedOut(err)) {
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
-          setError("Failed to load checklist definition.");
+          setError(loadError(err, "Failed to load checklist definition."));
         }
       })
       .finally(() => setLoading(false));
