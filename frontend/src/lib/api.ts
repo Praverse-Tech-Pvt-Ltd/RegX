@@ -27,6 +27,60 @@ interface RequestOptions {
   headers?: Record<string, string>;
 }
 
+/** Shown for any 5xx: the body of a server error is never shown to the user. */
+export const SERVER_ERROR_MESSAGE =
+  "The server could not complete this request. Try again; if it keeps happening, contact support.";
+/** Shown for a 401/403 whose body carries no plain sentence. */
+export const PERMISSION_MESSAGE = "You do not have permission to do this.";
+const MAX_MESSAGE = 300;
+
+/**
+ * The message for a failed request, safe to show to the user.
+ *
+ * REGX's exception handler (`common.exceptions.regx_exception_handler`) wraps
+ * every DRF error as `{"error": {"status": 400, "detail": <DRF body>}}`, where
+ * the DRF body is either `{"detail": "..."}` or, for a serializer validation
+ * failure, per-field lists such as `{"route_code": ["This field may not be
+ * blank."]}`. Views that build their own refusal return `{"detail": ...}`
+ * unwrapped.
+ *
+ * What is shown, by status:
+ *   - 5xx: always SERVER_ERROR_MESSAGE. A server error's body can carry
+ *     internals (exception text, paths), so it is never shown.
+ *   - 401/403: the refusal's own sentence (`detail`), else PERMISSION_MESSAGE.
+ *   - other 4xx: `detail`, else each invalid field with its messages. Only
+ *     plain strings are shown; a nested value is reported as "is invalid",
+ *     never as raw JSON.
+ * Anything unreadable is "Request failed". Messages are capped in length.
+ */
+export function errorMessage(body: unknown, status = 400): string {
+  if (status >= 500) return SERVER_ERROR_MESSAGE;
+  const denied = status === 401 || status === 403;
+  const fallback = denied ? PERMISSION_MESSAGE : "Request failed";
+  if (!isRecord(body)) return fallback;
+  let payload: unknown = body;
+  if (isRecord(body.error) && "detail" in body.error) payload = body.error.detail;
+  if (typeof payload === "string") return cap(payload) || fallback;
+  if (!isRecord(payload)) return fallback;
+  if (typeof payload.detail === "string" && payload.detail) return cap(payload.detail);
+  if (denied) return fallback;
+  const parts = Object.entries(payload).map(([field, value]) => {
+    const texts = (Array.isArray(value) ? value : [value]).filter(
+      (v): v is string => typeof v === "string" && v.length > 0,
+    );
+    return `${field}: ${texts.length ? texts.join(" ") : "is invalid"}`;
+  });
+  return parts.length ? cap(parts.join("; ")) : fallback;
+}
+
+function cap(text: string): string {
+  return text.length > MAX_MESSAGE ? `${text.slice(0, MAX_MESSAGE - 1)}…` : text;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export async function apiRequest<T>(
   path: string,
   { method = "GET", body, headers = {} }: RequestOptions = {}
@@ -50,10 +104,8 @@ export async function apiRequest<T>(
   });
 
   if (!resp.ok) {
-    const error = (await resp.json().catch(() => ({ detail: "Request failed" }))) as {
-      detail?: string;
-    };
-    throw new ApiError(resp.status, error.detail ?? "Request failed");
+    const error = await resp.json().catch(() => ({ detail: "Request failed" }));
+    throw new ApiError(resp.status, errorMessage(error, resp.status));
   }
 
   if (resp.status === 204) return undefined as T;

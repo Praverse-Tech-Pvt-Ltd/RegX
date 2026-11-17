@@ -87,6 +87,30 @@ test.describe("company navbar", () => {
   });
 });
 
+test.describe("editing ?tenant= to another organisation", () => {
+  test("shows the refusal, loads no data and does not bounce to sign-in", async ({ page }) => {
+    // stubApi lists the user's organisations as ["alpha"] only. The property
+    // that matters: no request ever asks the API for organisation "beta"'s
+    // data, i.e. nothing is sent with X-Tenant-Slug: beta. (User-level calls
+    // such as the MFA banner's status carry no tenant and are not data.)
+    const dataRequests: string[] = [];
+    page.on("request", (req) => {
+      if (req.headers()["x-tenant-slug"] === "beta") dataRequests.push(req.url());
+    });
+    await page.goto("/documents?tenant=beta");
+
+    await expect(page.getByRole("heading", { name: "No access to this organisation" })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
+      "You are not a member of the organisation “beta”",
+    );
+    await expect(page).toHaveURL(/\/documents\?tenant=beta$/);
+    expect(dataRequests).toEqual([]);
+
+    await page.getByRole("link", { name: "Choose one of your organisations" }).click();
+    await expect(page).toHaveURL(/\/tenants$/);
+  });
+});
+
 test.describe("sidebar", () => {
   test("lists the REGX modules and the company's own tools", async ({ page }) => {
     await page.goto(`/documents?tenant=${TENANT}`);
@@ -112,6 +136,19 @@ test.describe("sidebar", () => {
     await expect(
       sidebar.getByRole("link", { name: "Size Shape & Score" }),
     ).toHaveAttribute("href", "/ratools/show_sss");
+  });
+
+  test("REGX links carry the current tenant so a click stays in the workspace", async ({ page }) => {
+    await page.goto(`/documents?tenant=${TENANT}`);
+    const sidebar = page.locator("nav.dashboard-sidebar");
+    await expect(sidebar.getByRole("link", { name: "Formulations" })).toHaveAttribute(
+      "href",
+      `/formulations?tenant=${TENANT}`,
+    );
+    // Legacy company tools have no tenant and keep their own URLs.
+    await expect(
+      sidebar.getByRole("link", { name: "DMF Review Checklist" }),
+    ).toHaveAttribute("href", "/ratools/show_dmf_table");
   });
 
   test("is 270px wide and offsets the content panel by the same amount", async ({ page }) => {
@@ -164,11 +201,11 @@ test.describe("sidebar", () => {
   test("marks the active route and opens the submenu that owns it", async ({ page }) => {
     await page.goto(`/documents?tenant=${TENANT}`);
     await expect(
-      page.locator('.dashboard-sidebar a[href="/documents"]'),
+      page.locator(`.dashboard-sidebar a[href="/documents?tenant=${TENANT}"]`),
     ).toHaveAttribute("aria-current", "page");
 
     await page.goto(`/fda-data/releases?tenant=${TENANT}`);
-    const releases = page.locator('.dashboard-sidebar a[href="/fda-data/releases"]');
+    const releases = page.locator(`.dashboard-sidebar a[href="/fda-data/releases?tenant=${TENANT}"]`);
     await expect(releases).toHaveAttribute("aria-current", "page");
     // Its parent group expands so the active child is reachable.
     await expect(releases).toBeVisible();
@@ -179,10 +216,10 @@ test.describe("sidebar", () => {
     // user is under /iig-checklists/executions.
     await page.goto(`/iig-checklists/executions?tenant=${TENANT}`);
     await expect(
-      page.locator('.dashboard-sidebar a[href="/iig-checklists/executions"]'),
+      page.locator(`.dashboard-sidebar a[href="/iig-checklists/executions?tenant=${TENANT}"]`),
     ).toHaveAttribute("aria-current", "page");
     await expect(
-      page.locator('.dashboard-sidebar a[href="/iig-checklists"]'),
+      page.locator(`.dashboard-sidebar a[href="/iig-checklists?tenant=${TENANT}"]`),
     ).not.toHaveAttribute("aria-current", "page");
   });
 });
