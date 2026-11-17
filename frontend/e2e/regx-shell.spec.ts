@@ -89,18 +89,20 @@ test.describe("company navbar", () => {
 
 test.describe("editing ?tenant= to another organisation", () => {
   test("shows the refusal, loads no data and does not bounce to sign-in", async ({ page }) => {
-    // stubApi lists the user's organisations as ["alpha"] only.
+    // stubApi lists the user's organisations as ["alpha"] only. The property
+    // that matters: no request ever asks the API for organisation "beta"'s
+    // data, i.e. nothing is sent with X-Tenant-Slug: beta. (User-level calls
+    // such as the MFA banner's status carry no tenant and are not data.)
     const dataRequests: string[] = [];
     page.on("request", (req) => {
-      const url = req.url();
-      if (url.includes("/api/regx/v1/") && !url.includes("/tenants/") && !url.includes("/auth/") && !url.includes("/mfa/")) {
-        dataRequests.push(url);
-      }
+      if (req.headers()["x-tenant-slug"] === "beta") dataRequests.push(req.url());
     });
     await page.goto("/documents?tenant=beta");
 
     await expect(page.getByRole("heading", { name: "No access to this organisation" })).toBeVisible();
-    await expect(page.getByRole("alert")).toContainText("You are not a member of the organisation “beta”");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText(
+      "You are not a member of the organisation “beta”",
+    );
     await expect(page).toHaveURL(/\/documents\?tenant=beta$/);
     expect(dataRequests).toEqual([]);
 

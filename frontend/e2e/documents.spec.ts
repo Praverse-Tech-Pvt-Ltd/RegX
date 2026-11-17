@@ -324,17 +324,21 @@ test.describe("Document flow: detail page", () => {
     await mockDocumentDetail(page, makeDocument());
     await mockVersionStatus(page, { scan_status: "clean", processing_status: "complete" });
 
-    let versionsCallCount = 0;
+    // The second version exists only once the upload has been POSTed. Keying on
+    // the POST, not on how many GETs came first, keeps this independent of how
+    // often the page loads its versions on mount (React StrictMode in the dev
+    // server mounts a page twice when it mounts after the shell's access check).
+    let uploaded = false;
     await page.route(`${API}/api/regx/v1/documents/${DOC_ID}/versions/`, async (route) => {
       if (route.request().method() === "GET") {
-        versionsCallCount += 1;
-        const results = versionsCallCount === 1 ? [makeVersion()] : [makeVersion({ public_id: "ver-e2e-0002", version_number: 2 }), makeVersion()];
+        const results = uploaded ? [makeVersion({ public_id: "ver-e2e-0002", version_number: 2 }), makeVersion()] : [makeVersion()];
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({ count: results.length, next: null, previous: null, results }),
         });
       } else if (route.request().method() === "POST") {
+        uploaded = true;
         await route.fulfill({
           status: 201,
           contentType: "application/json",
