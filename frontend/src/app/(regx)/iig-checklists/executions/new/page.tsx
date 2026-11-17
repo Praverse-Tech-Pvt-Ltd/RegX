@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formulations, iigChecklists, ApiError } from "@/lib/api";
 
-type Choice = { id: string; label: string };
+type Choice = { id: string; label: string; disabled?: boolean };
 
 function NewExecutionPageInner() {
   const router = useRouter();
@@ -48,7 +48,14 @@ function NewExecutionPageInner() {
       for (const p of products) {
         const versions = (await formulations.versions.list(tenantSlug, p.public_id)).results ?? [];
         for (const v of versions) {
-          choices.push({ id: v.public_id, label: `${p.product_code} — ${p.proposed_product_name} (v${v.version_number}, ${v.status})` });
+          // The API runs a checklist only on an APPROVED formulation version, so
+          // other versions are shown but cannot be chosen.
+          const approved = v.status === "approved";
+          choices.push({
+            id: v.public_id,
+            label: `${p.product_code} — ${p.proposed_product_name} (v${v.version_number}, ${approved ? "approved" : `${v.status} — not approved`})`,
+            disabled: !approved,
+          });
         }
       }
       if (!cancelled) setFormulationChoices(choices);
@@ -119,13 +126,19 @@ function NewExecutionPageInner() {
             >
               <option value="">—</option>
               {formulationChoices.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.id} disabled={c.disabled}>
                   {c.label}
                 </option>
               ))}
             </select>
           </label>
         </div>
+        {formulationChoices.length > 0 && !formulationChoices.some((c) => !c.disabled) && (
+          <p role="note">
+            No formulation version is approved yet. A checklist can only be run on an approved
+            formulation version.
+          </p>
+        )}
         <div>
           <label>
             Checklist Version Public ID

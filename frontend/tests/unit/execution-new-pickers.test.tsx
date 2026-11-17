@@ -51,7 +51,12 @@ beforeEach(() => {
     ]),
   );
   api.products.mockResolvedValue(page([{ public_id: "p-1", product_code: "SYN-1", proposed_product_name: "Synthetic Tablet" }]));
-  api.formulationVersions.mockResolvedValue(page([{ public_id: "fv-1", version_number: 1, status: "draft" }]));
+  api.formulationVersions.mockResolvedValue(
+    page([
+      { public_id: "fv-1", version_number: 1, status: "approved" },
+      { public_id: "fv-2", version_number: 2, status: "draft" },
+    ]),
+  );
   api.create.mockResolvedValue({ publicId: "exec-1" });
 });
 
@@ -63,7 +68,7 @@ describe("New checklist execution — choose, don't paste IDs", () => {
     await waitFor(() => expect(screen.getByRole("option", { name: /DEMO-IIG — Demo checklist \(v1\)/ })).toBeInTheDocument());
     expect(screen.queryByRole("option", { name: /\(v2\)/ })).not.toBeInTheDocument();
     await user.selectOptions(checklist, "cv-active");
-    await waitFor(() => expect(screen.getByRole("option", { name: /SYN-1 — Synthetic Tablet/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("option", { name: /SYN-1 — Synthetic Tablet \(v1, approved\)/ })).toBeInTheDocument());
     await user.selectOptions(screen.getByLabelText(/choose a formulation version/i), "fv-1");
     expect(screen.getByLabelText(/checklist version public id/i)).toHaveValue("cv-active");
     expect(screen.getByLabelText(/formulation version public id/i)).toHaveValue("fv-1");
@@ -75,6 +80,19 @@ describe("New checklist execution — choose, don't paste IDs", () => {
       }),
     );
     expect(nav.push).toHaveBeenCalledWith("/iig-checklists/executions/exec-1?tenant=alpha");
+  });
+
+  it("shows a draft formulation version but does not let it be chosen (the API refuses it)", async () => {
+    render(<NewExecutionPage />);
+    const draft = await screen.findByRole("option", { name: /v2, draft — not approved/ });
+    expect(draft).toBeDisabled();
+    expect(screen.getByRole("option", { name: /v1, approved/ })).toBeEnabled();
+  });
+
+  it("explains when no formulation version is approved", async () => {
+    api.formulationVersions.mockResolvedValue(page([{ public_id: "fv-2", version_number: 2, status: "draft" }]));
+    render(<NewExecutionPage />);
+    expect(await screen.findByText(/No formulation version is approved yet/)).toBeInTheDocument();
   });
 
   it("is pre-filled from the formulation version's link", () => {
