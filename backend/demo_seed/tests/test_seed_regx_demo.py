@@ -275,6 +275,33 @@ class TestGovernedChainIsCreated:
         assert version.sha256_checksum  # computed by ingest, not supplied
         assert version.size_bytes > 0
 
+    def test_demo_pdf_is_valid_for_a_strict_reader(self):
+        """The old placeholder had no cross-reference table; pypdf refused it
+        ("startxref not found") and the demo document always showed
+        processing "failed"."""
+        import pypdf
+
+        from demo_seed.management.commands.seed_regx_demo import DEMO_PDF_TEXT, _MINIMAL_PDF
+
+        reader = pypdf.PdfReader(io.BytesIO(_MINIMAL_PDF), strict=True)
+        assert len(reader.pages) == 1
+        assert DEMO_PDF_TEXT in reader.pages[0].extract_text()
+
+    def test_demo_document_processes_successfully(self, django_capture_on_commit_callbacks):
+        """Through the real pipeline: ingest queues the scan with
+        transaction.on_commit, which a test transaction never fires, so the
+        callbacks are executed explicitly (eager Celery, stub scanner in
+        tests). Scanned clean, then text extracted, so the Documents list no
+        longer shows processing "failed"."""
+        from documents.models import Document
+
+        with django_capture_on_commit_callbacks(execute=True):
+            _seed()
+        version = Document.objects.get(tenant__slug="demo").versions.get()
+        assert version.scan_status == "clean"
+        assert version.processing_status == "complete"
+        assert version.source_metadata.get("page_count") == 1
+
     def test_document_scan_status_is_never_written_by_the_seed(self):
         """The seed must never assert a scan result. Whatever the configured
         scanner produces is what the row says -- pending when no worker has
