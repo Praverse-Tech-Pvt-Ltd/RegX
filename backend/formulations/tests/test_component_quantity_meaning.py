@@ -148,3 +148,35 @@ class TestShowingTheMeaning:
         assert s2.is_valid(), s2.errors
         assert s2.validated_data["quantity_expression"] is None
         assert meaning is not None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_migration_is_add_only_and_reversible():
+    """formulations 0002 only adds a nullable column; rolling back removes it."""
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    def columns():
+        with connection.cursor() as cursor:
+            return {
+                c.name
+                for c in connection.introspection.get_table_description(
+                    cursor, "formulations_formulationcomponent"
+                )
+            }
+
+    def migrate(targets):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(targets)
+
+    assert "quantity_expression_id" in columns()
+    try:
+        migrate([("formulations", "0001_initial")])
+        assert "quantity_expression_id" not in columns()
+        assert {"quantity_per_dosage_unit", "quantity_unit"} <= columns()
+    finally:
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        migrate(executor.loader.graph.leaf_nodes())
+    assert "quantity_expression_id" in columns()
