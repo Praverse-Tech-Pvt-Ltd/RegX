@@ -87,6 +87,7 @@ _GENERATED_PASSWORD_BYTES = 12
 
 ROLES = ("doer", "reviewer", "vp", "tenant_admin")
 
+
 def _build_minimal_pdf(text: str) -> bytes:
     """A one-page PDF that a strict reader accepts: every object, a
     cross-reference table with exact byte offsets, a trailer and `startxref`.

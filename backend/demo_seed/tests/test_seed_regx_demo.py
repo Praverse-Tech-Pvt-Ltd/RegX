@@ -281,7 +281,7 @@ class TestGovernedChainIsCreated:
         processing "failed"."""
         import pypdf
 
-        from demo_seed.management.commands.seed_regx_demo import DEMO_PDF_TEXT, _MINIMAL_PDF
+        from demo_seed.management.commands.seed_regx_demo import _MINIMAL_PDF, DEMO_PDF_TEXT
 
         reader = pypdf.PdfReader(io.BytesIO(_MINIMAL_PDF), strict=True)
         assert len(reader.pages) == 1
