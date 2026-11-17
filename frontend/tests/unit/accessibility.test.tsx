@@ -70,6 +70,7 @@ const api = vi.hoisted(() => ({
 }));
 
 const fdaApi = vi.hoisted(() => ({
+  meanings: vi.fn(),
   releasesList: vi.fn(),
   releasesGet: vi.fn(),
   releasesReconciliationJson: vi.fn(),
@@ -98,6 +99,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     ...actual,
     documents: { ...actual.documents, ...api },
     fdaData: {
+      meanings: fdaApi.meanings,
       releases: {
         ...actual.fdaData.releases,
         list: fdaApi.releasesList,
@@ -163,6 +165,7 @@ beforeEach(() => {
   nav.versionPublicId = "version-public-0001";
   Object.values(api).forEach((fn) => fn.mockReset());
   Object.values(fdaApi).forEach((fn) => fn.mockReset());
+  fdaApi.meanings.mockResolvedValue({ unit_list_release_public_id: null, meanings: [] });
   Object.values(checklistApi).forEach((fn) => fn.mockReset());
   api.versionStatus.mockResolvedValue({ scan_status: "clean", processing_status: "complete" });
   fdaApi.versionsList.mockResolvedValue(paginate([]));

@@ -514,6 +514,36 @@ class ControlledUnitListView(APIView):
         return Response(ControlledUnitSerializer(qs, many=True).data)
 
 
+class ControlledUnitMeaningListView(APIView):
+    """The quantity meanings a formulation may state (controlled units,
+    increment 4): every meaning listed by the ACTIVE controlled-units release,
+    except per-day ones (those need the Q8 rule). Empty when no unit list is in
+    force. Read-only; platform-level reference data."""
+
+    def get_permissions(self):
+        return [CanViewFdaData()]
+
+    def get(self, request):
+        from .controlled_units import active_release, in_force_meanings
+
+        release = active_release()
+        return Response(
+            {
+                "unit_list_release_public_id": str(release.public_id) if release else None,
+                "meanings": [
+                    {
+                        "public_id": str(e.public_id),
+                        "label": str(e),
+                        "family": e.family,
+                        "basis": e.basis,
+                        "numerator_unit": e.numerator_unit.code if e.numerator_unit_id else None,
+                    }
+                    for e in in_force_meanings()
+                ],
+            }
+        )
+
+
 def _affected_record_count(mapping_type: str, mapping) -> int:
     """Best-effort count of records referencing this raw value -- used only
     to inform a reviewer's decision, never to gate it."""

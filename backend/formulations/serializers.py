@@ -163,6 +163,13 @@ class FormulationVersionCreateSerializer(serializers.Serializer):
 
 
 class FormulationComponentSerializer(serializers.ModelSerializer):
+    #: The meaning of `quantity_per_dosage_unit` (controlled units, increment 4).
+    #: Omitted or null: an amount per dosage unit in `quantity_unit`, as before.
+    quantity_expression_public_id = serializers.UUIDField(
+        required=False, allow_null=True, write_only=True
+    )
+    quantity_meaning = serializers.SerializerMethodField()
+
     class Meta:
         model = FormulationComponent
         fields = [
@@ -175,6 +182,8 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
             "grade",
             "quantity_per_dosage_unit",
             "quantity_unit",
+            "quantity_expression_public_id",
+            "quantity_meaning",
             "percentage_w_w_snapshot",
             "quantity_per_batch",
             "batch_quantity_unit",
@@ -190,6 +199,44 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         if value <= 0:
             raise serializers.ValidationError("quantity_per_dosage_unit must be greater than zero.")
         return value
+
+    def validate(self, attrs):
+        from fda_data.controlled_units import in_force_expression, stated_amount_problem
+
+        attrs = super().validate(attrs)
+        if "quantity_expression_public_id" not in attrs:
+            return attrs  # not mentioned: keep what is stored (or the default, none)
+        public_id = attrs.pop("quantity_expression_public_id")
+        if public_id is None:
+            attrs["quantity_expression"] = None  # explicitly cleared
+            return attrs
+        expression = in_force_expression(public_id)
+        if expression is None:
+            raise serializers.ValidationError(
+                {
+                    "quantity_expression_public_id": (
+                        "No such meaning in the active controlled-units list."
+                    )
+                }
+            )
+        unit = attrs.get("quantity_unit", getattr(self.instance, "quantity_unit", ""))
+        problem = stated_amount_problem(expression, unit)
+        if problem:
+            raise serializers.ValidationError({"quantity_expression_public_id": problem})
+        attrs["quantity_expression"] = expression
+        return attrs
+
+    def get_quantity_meaning(self, obj) -> str:
+        expression = obj.quantity_expression
+        if expression is None:
+            return f"{obj.quantity_unit} per dosage unit"
+        return str(expression)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        expression = instance.quantity_expression
+        data["quantity_expression_public_id"] = str(expression.public_id) if expression else None
+        return data
 
 
 class DosingRegimenSerializer(serializers.ModelSerializer):

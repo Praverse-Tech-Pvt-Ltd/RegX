@@ -11,6 +11,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
+import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
 import { PercentValue } from "@/components/PercentValue";
 
 function VersionDetailInner() {
@@ -32,6 +33,7 @@ function VersionDetailInner() {
   const [componentName, setComponentName] = useState("");
   const [componentQty, setComponentQty] = useState("");
   const [componentUnit, setComponentUnit] = useState("milligram");
+  const [componentMeaning, setComponentMeaning] = useState("");
   const [componentSubmitting, setComponentSubmitting] = useState(false);
   const [componentError, setComponentError] = useState<string | null>(null);
 
@@ -82,11 +84,13 @@ function VersionDetailInner() {
         ingredient_name: componentName,
         quantity_per_dosage_unit: componentQty,
         quantity_unit: componentUnit,
+        ...(componentMeaning ? { quantity_expression_public_id: componentMeaning } : {}),
       });
       setComponents((prev) => [...prev, c]);
       setShowComponentForm(false);
       setComponentName("");
       setComponentQty("");
+      setComponentMeaning("");
     } catch (err) {
       setComponentError(
         err instanceof ApiError
@@ -181,7 +185,8 @@ function VersionDetailInner() {
                   <td style={{ padding: "6px 8px" }}>{c.ingredient_name}</td>
                   <td style={{ padding: "6px 8px", color: "#66768b" }}>{c.component_type}</td>
                   <td style={{ padding: "6px 8px" }}>
-                    {c.quantity_per_dosage_unit} {c.quantity_unit}
+                    {c.quantity_per_dosage_unit}{" "}
+                    {c.quantity_expression_public_id ? c.quantity_meaning : c.quantity_unit}
                   </td>
                   <td style={{ padding: "6px 8px" }}>
                     {c.percentage_w_w_snapshot != null ? (
@@ -226,6 +231,18 @@ function VersionDetailInner() {
                 Unit
                 <input value={componentUnit} onChange={(e) => setComponentUnit(e.target.value)} required style={inputStyle} />
               </label>
+            </div>
+            <div style={{ marginBottom: 8, maxWidth: 360 }}>
+              <QuantityMeaningSelect
+                tenantSlug={tenantSlug}
+                label="What the quantity means"
+                value={componentMeaning}
+                onChange={(id, meaning) => {
+                  setComponentMeaning(id);
+                  if (meaning?.family === "percentage") setComponentUnit("percent");
+                  else if (meaning?.numerator_unit) setComponentUnit(meaning.numerator_unit);
+                }}
+              />
             </div>
             {componentError && (
               <p role="alert" style={{ color: "#c0392b", fontSize: 13, marginBottom: 8 }}>

@@ -28,6 +28,24 @@ class MatchPreviewRequestSerializer(serializers.Serializer):
         max_digits=20, decimal_places=6, required=False, allow_null=True
     )
     selected_precedent_record_public_id = serializers.UUIDField(required=False, allow_null=True)
+    #: The meaning of the proposed quantity (controlled units, increment 4):
+    #: a controlled-units meaning such as "mg/5mL" or "%w/w". Omitted: per
+    #: dosage unit in `proposed_quantity_unit`, as before.
+    proposed_quantity_expression_public_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate_proposed_quantity_expression_public_id(self, value):
+        if value is None:
+            return None
+        from fda_data.models import QuantityExpression
+
+        expression = (
+            QuantityExpression.objects.select_related("numerator_unit", "denominator_unit")
+            .filter(public_id=value)
+            .first()
+        )
+        if expression is None:
+            raise serializers.ValidationError("No such quantity meaning.")
+        return expression
 
 
 class SnapshotRequestSerializer(MatchPreviewRequestSerializer):
@@ -50,7 +68,12 @@ class SnapshotRequestSerializer(MatchPreviewRequestSerializer):
     """
 
     #: Fields the persisted endpoint refuses rather than accepts or drops.
-    PROHIBITED_FIELDS = ("maximum_dosage_units_per_day",)
+    PROHIBITED_FIELDS = (
+        "maximum_dosage_units_per_day",
+        # The persisted snapshot reads the meaning from the governed component
+        # row, never from the request.
+        "proposed_quantity_expression_public_id",
+    )
 
     formulation_component_public_id = serializers.UUIDField()
     formulation_version_public_id = serializers.UUIDField()

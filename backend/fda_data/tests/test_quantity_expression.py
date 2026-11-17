@@ -274,13 +274,22 @@ class TestLinks:
 
 
 BEFORE = [("fda_data", "0006_iidprecedentrecord_mde_amount_raw_and_more")]
-AFTER = [("fda_data", "0007_quantity_expression")]
 
 
 def _migrate(targets):
     executor = MigrationExecutor(connection)
     executor.loader.build_graph()
     executor.migrate(targets)
+
+
+def _migrate_to_latest():
+    """Every app back to its latest migration. Stepping fda_data back also
+    unapplies migrations of other apps that depend on it (formulations 0002,
+    increment 4), so restoring only fda_data would leave the schema behind for
+    the transactional tests that run afterwards."""
+    executor = MigrationExecutor(connection)
+    executor.loader.build_graph()
+    executor.migrate(executor.loader.graph.leaf_nodes())
 
 
 def _columns(table):
@@ -300,6 +309,6 @@ def test_migration_is_add_only_and_reversible():
         )
         assert "quantity_expression_id" not in _columns("fda_data_unitmapping")
     finally:
-        _migrate(AFTER)
+        _migrate_to_latest()
     assert "fda_data_quantityexpression" in connection.introspection.table_names()
     assert "quantity_expression_id" in _columns("fda_data_unitmapping")

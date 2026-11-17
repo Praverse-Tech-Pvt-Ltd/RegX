@@ -189,6 +189,20 @@ class FormulationComponent(PublicIDModel, TimeStampedModel):
     grade = models.CharField(max_length=255, blank=True)
     quantity_per_dosage_unit = models.DecimalField(max_digits=20, decimal_places=6)
     quantity_unit = models.CharField(max_length=50)
+    #: What `quantity_per_dosage_unit` means (controlled units, increment 4;
+    #: design section 3E). Null keeps the original meaning: an amount per dosage
+    #: unit in `quantity_unit`. Set, it is an in-force controlled-units meaning
+    #: (per dose unit, per stated volume, or a percentage of one basis), and the
+    #: amount is in that meaning's numerator unit (or a percentage). Only then
+    #: can the amount be compared with an IID limit of the same family and
+    #: basis. Never a per-day meaning: that needs the Q8 rule.
+    quantity_expression = models.ForeignKey(
+        "fda_data.QuantityExpression",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
     percentage_w_w_snapshot = models.DecimalField(
         max_digits=10, decimal_places=6, null=True, blank=True
     )

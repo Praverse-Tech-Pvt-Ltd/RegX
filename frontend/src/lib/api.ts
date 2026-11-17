@@ -810,7 +810,25 @@ export interface FdaReconciliationReport {
   results: FdaImportRowResultItem[];
 }
 
+/** A quantity meaning a formulation may state (GET /fda-data/controlled-units/meanings/). */
+export interface QuantityMeaning {
+  public_id: string;
+  label: string;
+  family: "mass" | "volume" | "percentage";
+  basis: string;
+  numerator_unit: string | null;
+}
+
+export interface QuantityMeaningList {
+  unit_list_release_public_id: string | null;
+  meanings: QuantityMeaning[];
+}
+
 export const fdaData = {
+  meanings: (tenantSlug: string) =>
+    apiRequest<QuantityMeaningList>("/api/regx/v1/fda-data/controlled-units/meanings/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
   releases: {
     list: (tenantSlug: string, params?: { dataset_type?: string; page?: number }) => {
       const qs = new URLSearchParams();
@@ -1058,6 +1076,10 @@ export interface FormulationComponent {
   grade: string;
   quantity_per_dosage_unit: string;
   quantity_unit: string;
+  /** The stated meaning of the amount (controlled units, increment 4); null = per dosage unit. */
+  quantity_expression_public_id: string | null;
+  /** e.g. "mg/5mL", "%w/w", or "milligram per dosage unit" when none is stated. */
+  quantity_meaning: string;
   percentage_w_w_snapshot: string | null;
   quantity_per_batch: string | null;
   batch_quantity_unit: string;
@@ -1172,6 +1194,7 @@ export const formulations = {
         ingredient_name: string;
         quantity_per_dosage_unit: string;
         quantity_unit: string;
+        quantity_expression_public_id?: string | null;
         function?: string;
         justification?: string;
       }
@@ -1283,6 +1306,8 @@ export interface PreviewRequest {
   maximum_dosage_units_per_day?: string;
   density_g_per_ml?: string;
   selected_precedent_record_public_id?: string;
+  /** The meaning of the proposed quantity (increment 4); omitted = per dosage unit. */
+  proposed_quantity_expression_public_id?: string;
 }
 
 export const iidAssessments = {

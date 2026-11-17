@@ -206,6 +206,9 @@ def _preview_arguments(formulation_version, component, release, maximum_dosage_u
         "active_release_public_id": release.public_id,
         "proposed_quantity_per_unit": component.quantity_per_dosage_unit,
         "proposed_quantity_unit": component.quantity_unit,
+        # The governed component's stated meaning (increment 4); None keeps
+        # "per dosage unit". Never taken from the request.
+        "proposed_quantity_expression": component.quantity_expression,
         "total_dosage_unit_weight": formulation_version.total_dosage_unit_weight,
         "total_dosage_unit_weight_unit": formulation_version.total_dosage_unit_weight_unit,
         # Used exactly as supplied. No fallback to the version field: the

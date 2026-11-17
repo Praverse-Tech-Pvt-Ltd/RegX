@@ -1135,6 +1135,8 @@ test.describe("Formulation version creation, component entry, and dosing regimen
             grade: "",
             quantity_per_dosage_unit: body.quantity_per_dosage_unit,
             quantity_unit: body.quantity_unit,
+            quantity_expression_public_id: body.quantity_expression_public_id ?? null,
+            quantity_meaning: `${body.quantity_unit} per dosage unit`,
             percentage_w_w_snapshot: null,
             quantity_per_batch: null,
             batch_quantity_unit: "",

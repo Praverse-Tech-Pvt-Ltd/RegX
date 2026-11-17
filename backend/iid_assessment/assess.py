@@ -54,6 +54,7 @@ def run_preview(
     substance_name: str = "",
     substance_unii: str = "",
     substance_cas: str = "",
+    proposed_quantity_expression=None,
 ) -> AssessmentPreview:
     route = ControlledRoute.objects.filter(code=route_code, lifecycle="active").first()
     dosage_form = ControlledDosageForm.objects.filter(
@@ -153,20 +154,38 @@ def run_preview(
     if selected is not None:
         # One comparison path (controlled units, increment 3): the potency is
         # compared only through the unit's meaning, same family and same basis.
-        # A formulation component's quantity is per dosage unit by definition.
+        # Without a stated meaning a formulation amount is per dosage unit, as
+        # before. With one (increment 4), it is read with that meaning, so a
+        # per-volume or percentage amount can meet an IID limit of the same
+        # family and basis -- and nothing else.
         from fda_data.models import IIDPrecedentRecord
 
         from .comparison import (
             active_unit_list_release_public_id,
             compare,
             per_dose_unit_quantity,
+            stated_quantity,
         )
 
         record = IIDPrecedentRecord.objects.select_related(
             "release", "potency_expression__numerator_unit", "potency_expression__denominator_unit"
         ).get(public_id=selected.precedent_record_public_id)
+        proposed = (
+            stated_quantity(proposed_quantity_per_unit, proposed_quantity_expression)
+            if proposed_quantity_expression is not None
+            else per_dose_unit_quantity(proposed_quantity_per_unit, proposed_quantity_unit)
+        )
+        per_dose_amount = proposed.basis == "per_dose_unit"
+        # The unit the per-dose calculations convert from: with a stated meaning,
+        # that meaning's own unit key (e.g. "milligram" for "mg"); otherwise the
+        # unit as entered, as before.
+        calc_unit = (
+            proposed.unit
+            if proposed_quantity_expression is not None and proposed.unit
+            else proposed_quantity_unit
+        )
         comparison = compare(
-            per_dose_unit_quantity(proposed_quantity_per_unit, proposed_quantity_unit),
+            proposed,
             record,
             unit_list_release_public_id=active_unit_list_release_public_id(),
         )
@@ -189,25 +208,37 @@ def run_preview(
             unit_conversion_ok = False
             cannot_compare_reason = comparison.reason_code
 
-        pct_ww = calculate_percentage_w_w(
-            quantity_per_unit_grams=(
-                unit_conversion.convert(
-                    proposed_quantity_per_unit, proposed_quantity_unit, "gram"
-                ).converted_value
-            ),
-            total_dosage_unit_weight_grams=(
-                unit_conversion.convert(
-                    total_dosage_unit_weight, total_dosage_unit_weight_unit, "gram"
-                ).converted_value
-            ),
-        )
-        calculations["percentage_w_w"] = asdict(pct_ww)
+        if not per_dose_amount:
+            # % w/w and daily exposure read the amount as per dosage unit. An
+            # amount per stated volume or a percentage is not that, so both are
+            # refused with a reason rather than computed on the wrong basis.
+            calculations["percentage_w_w"] = asdict(
+                _not_per_dose_unit("percentage_w_w", proposed_quantity_per_unit)
+            )
+            calculations["daily_exposure"] = asdict(
+                _not_per_dose_unit("daily_exposure", proposed_quantity_per_unit)
+            )
+            pct_ww = daily_exposure_result = None
+        else:
+            pct_ww = calculate_percentage_w_w(
+                quantity_per_unit_grams=(
+                    unit_conversion.convert(
+                        proposed_quantity_per_unit, calc_unit, "gram"
+                    ).converted_value
+                ),
+                total_dosage_unit_weight_grams=(
+                    unit_conversion.convert(
+                        total_dosage_unit_weight, total_dosage_unit_weight_unit, "gram"
+                    ).converted_value
+                ),
+            )
+            calculations["percentage_w_w"] = asdict(pct_ww)
 
-        daily_exposure_result = calculate_daily_exposure(
-            quantity_per_dosage_unit=proposed_quantity_per_unit,
-            maximum_dosage_units_per_day=maximum_dosage_units_per_day,
-        )
-        calculations["daily_exposure"] = asdict(daily_exposure_result)
+            daily_exposure_result = calculate_daily_exposure(
+                quantity_per_dosage_unit=proposed_quantity_per_unit,
+                maximum_dosage_units_per_day=maximum_dosage_units_per_day,
+            )
+            calculations["daily_exposure"] = asdict(daily_exposure_result)
 
         if unit_conversion_ok:
             pct_potency = calculate_percentage_of_potency(
@@ -221,10 +252,14 @@ def run_preview(
             )
             calculations["difference_from_iid_potency"] = asdict(diff_potency)
 
-            if selected.maximum_daily_exposure is not None and daily_exposure_result.ok:
+            if (
+                selected.maximum_daily_exposure is not None
+                and daily_exposure_result is not None
+                and daily_exposure_result.ok
+            ):
                 mde_conversion = unit_conversion.convert(
                     daily_exposure_result.value,
-                    proposed_quantity_unit,
+                    calc_unit,
                     selected.mde_unit,
                     density_g_per_ml=density_g_per_ml,
                 )
@@ -276,3 +311,20 @@ def _decimal_safe(value):
     if isinstance(value, Decimal):
         return str(value)
     return value
+
+
+def _not_per_dose_unit(formula_id: str, amount):
+    """A per-dose-unit calculation refused because the stated amount is not per
+    dosage unit (per stated volume, or a percentage). Never computed."""
+    from datetime import UTC, datetime
+
+    from .calculations import FORMULA_VERSION, CalculationResult, CalculationStatus
+
+    return CalculationResult(
+        formula_identifier=formula_id,
+        formula_version=FORMULA_VERSION,
+        status=CalculationStatus.BASIS_UNCLEAR,
+        reason_code="NOT_PER_DOSE_UNIT",
+        inputs={"proposed_quantity": str(amount)},
+        generated_at=datetime.now(tz=UTC).isoformat(),
+    )
