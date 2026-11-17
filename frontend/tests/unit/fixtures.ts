@@ -216,6 +216,8 @@ export function makeFormulationComponent(
     grade: "",
     quantity_per_dosage_unit: "30.000000",
     quantity_unit: "milligram",
+    quantity_expression_public_id: null,
+    quantity_meaning: "milligram per dosage unit",
     percentage_w_w_snapshot: "6.000000",
     quantity_per_batch: null,
     batch_quantity_unit: "",

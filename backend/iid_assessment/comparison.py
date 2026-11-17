@@ -153,6 +153,9 @@ class ComparisonResult:
     iid_release_public_id: str
     iid_source_row: dict
     unit_list_release_public_id: str | None
+    #: The meaning the proposed amount was read with (increment 4), e.g.
+    #: "mg per dose unit", "mg/5mL", "%w/w". None when it has none.
+    proposed_meaning: str | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -190,6 +193,12 @@ def compare(
 ) -> ComparisonResult:
     """Compare a proposed amount with one IID record's potency limit."""
     base = {
+        "proposed_meaning": (
+            proposed.display_unit()
+            if proposed.family in ("mass", "volume", "percentage")
+            and (proposed.family == "percentage" or proposed.unit)
+            else None
+        ),
         "iid_record_public_id": str(record.public_id),
         "iid_release_public_id": str(record.release.public_id),
         "iid_source_row": _source_row(record),
@@ -274,6 +283,21 @@ def compare(
         label=LABEL,
         **base,
     )
+
+
+def stated_quantity(amount, expression) -> Quantity:
+    """A formulation amount with the meaning it states (increment 4).
+
+    Only a meaning in force (listed by the active controlled-units release) is
+    used. Anything else yields a quantity with no family, which `compare()`
+    refuses with PROPOSED_UNIT_MISSING: a meaning the reviewed list does not
+    carry is never compared.
+    """
+    from fda_data.controlled_units import in_force_expressions
+
+    if expression is None or expression.pk not in in_force_expressions():
+        return Quantity(amount=amount, family="", basis="")
+    return Quantity.from_expression(amount, expression)
 
 
 def per_dose_unit_quantity(amount, unit: str | None) -> Quantity:

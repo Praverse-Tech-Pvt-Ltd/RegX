@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -49,6 +49,7 @@ vi.mock("next/link", () => ({
 }));
 
 const api = vi.hoisted(() => ({
+  meanings: vi.fn(),
   releasesList: vi.fn(),
   releasesGet: vi.fn(),
   releasesRegister: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   return {
     ...actual,
     fdaData: {
+      meanings: api.meanings,
       releases: {
         list: api.releasesList,
         get: api.releasesGet,
@@ -143,6 +145,8 @@ beforeEach(() => {
   nav.tenant = "alpha";
   nav.publicId = "fda-release-public-0001";
   Object.values(api).forEach((fn) => fn.mockReset());
+  // GET /fda-data/controlled-units/meanings/ with no unit list in force.
+  api.meanings.mockResolvedValue({ unit_list_release_public_id: null, meanings: [] });
 });
 
 describe("FdaReleasesPage — inventory", () => {
@@ -305,6 +309,15 @@ describe("FormulationDetailPage — explicit reference selection, no auto-fill",
     );
   });
 });
+
+const MEANINGS = {
+  unit_list_release_public_id: "units-release-0001",
+  meanings: [
+    { public_id: "m-mg-dose", label: "mg per dose unit", family: "mass", basis: "per_dose_unit", numerator_unit: "mg" },
+    { public_id: "m-mg-5ml", label: "mg/5mL", family: "mass", basis: "per_volume", numerator_unit: "mg" },
+    { public_id: "m-pct-ww", label: "%w/w", family: "percentage", basis: "w_w", numerator_unit: null },
+  ],
+};
 
 describe("IidPreviewPage — matching, calculation, and safety language", () => {
   const submitPreviewForm = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -469,6 +482,52 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
     expect(pct).toHaveAttribute("title", "Exact value: 142.8571428571428571428571429");
     // A non-percentage calculation is shown exactly as before.
     expect(screen.getByText(/-30\.000000/)).toBeInTheDocument();
+  });
+
+  // Controlled units, increment 4: the proposed quantity can state its meaning.
+  it("sends the chosen quantity meaning and switches the unit to that meaning's unit", async () => {
+    const user = userEvent.setup();
+    api.meanings.mockResolvedValue(MEANINGS);
+    api.preview.mockResolvedValue(makeAssessmentPreview());
+    render(<IidPreviewPage />);
+
+    const select = await screen.findByLabelText(/what the proposed quantity means/i);
+    await screen.findByRole("option", { name: "mg/5mL" });
+    await user.selectOptions(select, "m-mg-5ml");
+    expect(screen.getByLabelText(/proposed quantity unit/i)).toHaveValue("mg");
+    expect(screen.getByText("Enter the amount in “mg”.")).toBeInTheDocument();
+    await submitPreviewForm(user);
+
+    expect(api.preview).toHaveBeenCalledWith(
+      "alpha",
+      expect.objectContaining({ proposed_quantity_expression_public_id: "m-mg-5ml", proposed_quantity_unit: "mg" }),
+    );
+  });
+
+  it("a percentage meaning sets the unit to percent", async () => {
+    const user = userEvent.setup();
+    api.meanings.mockResolvedValue(MEANINGS);
+    render(<IidPreviewPage />);
+    await screen.findByRole("option", { name: "%w/w" });
+    await user.selectOptions(screen.getByLabelText(/what the proposed quantity means/i), "m-pct-ww");
+    expect(screen.getByLabelText(/proposed quantity unit/i)).toHaveValue("percent");
+  });
+
+  it("sends no meaning when none is chosen (per dosage unit, as before)", async () => {
+    const user = userEvent.setup();
+    api.meanings.mockResolvedValue(MEANINGS);
+    api.preview.mockResolvedValue(makeAssessmentPreview());
+    render(<IidPreviewPage />);
+    await screen.findByRole("option", { name: "mg/5mL" });
+    await submitPreviewForm(user);
+    expect(api.preview.mock.calls[0][1]).not.toHaveProperty("proposed_quantity_expression_public_id");
+  });
+
+  it("offers only the default when no unit list is in force", async () => {
+    render(<IidPreviewPage />);
+    const select = await screen.findByLabelText(/what the proposed quantity means/i);
+    await waitFor(() => expect(api.meanings).toHaveBeenCalled());
+    expect(within(select).getAllByRole("option")).toHaveLength(1);
   });
 
   it("every FDA-sourced field carries an FDA SOURCE provenance label", async () => {
@@ -935,6 +994,36 @@ describe("VersionDetailPage — components and dosing regimen", () => {
       "version-public-0001",
       expect.objectContaining({ ingredient_name: "New Excipient", component_type: "inactive" }),
     );
+  });
+
+  it("adds a component with a stated quantity meaning", async () => {
+    const user = userEvent.setup();
+    api.meanings.mockResolvedValue(MEANINGS);
+    api.componentsCreate.mockResolvedValue(
+      makeFormulationComponent({
+        ingredient_name: "Syrup Base",
+        quantity_per_dosage_unit: "40.000000",
+        quantity_unit: "mg",
+        quantity_expression_public_id: "m-mg-5ml",
+        quantity_meaning: "mg/5mL",
+      }),
+    );
+    render(<VersionDetailPage />);
+    await screen.findByText(/No components added yet/i);
+
+    await user.click(screen.getByRole("button", { name: /add component/i }));
+    await user.type(screen.getByLabelText(/ingredient name/i), "Syrup Base");
+    await user.type(screen.getByLabelText(/quantity per dosage unit/i), "40");
+    await screen.findByRole("option", { name: "mg/5mL" });
+    await user.selectOptions(screen.getByLabelText(/what the quantity means/i), "m-mg-5ml");
+    await user.click(screen.getByRole("button", { name: /^add$/i }));
+
+    expect(api.componentsCreate).toHaveBeenCalledWith(
+      "alpha",
+      "version-public-0001",
+      expect.objectContaining({ quantity_expression_public_id: "m-mg-5ml", quantity_unit: "mg" }),
+    );
+    expect(await screen.findByText(/40\.000000\s+mg\/5mL/)).toBeInTheDocument();
   });
 
   it("adds a dosing regimen via the form", async () => {

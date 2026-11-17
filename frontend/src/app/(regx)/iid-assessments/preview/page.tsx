@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { iidAssessments, type AssessmentPreview, type MatchCandidate, ApiError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
+import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
 import { PercentValue } from "@/components/PercentValue";
 import { isPercentUnit } from "@/lib/percent";
 
@@ -166,6 +167,7 @@ function IidPreviewInner() {
   const [releaseId, setReleaseId] = useState("");
   const [proposedQty, setProposedQty] = useState("");
   const [proposedUnit, setProposedUnit] = useState("milligram");
+  const [proposedMeaning, setProposedMeaning] = useState("");
   const [totalWeight, setTotalWeight] = useState("");
   const [totalWeightUnit, setTotalWeightUnit] = useState("milligram");
   const [maxUnitsPerDay, setMaxUnitsPerDay] = useState("");
@@ -192,6 +194,7 @@ function IidPreviewInner() {
         total_dosage_unit_weight_unit: totalWeightUnit,
         maximum_dosage_units_per_day: maxUnitsPerDay || undefined,
         selected_precedent_record_public_id: selectedRecordId,
+        ...(proposedMeaning ? { proposed_quantity_expression_public_id: proposedMeaning } : {}),
       });
       setPreview(result);
     } catch (err) {
@@ -257,6 +260,16 @@ function IidPreviewInner() {
             Proposed quantity unit
             <input value={proposedUnit} onChange={(e) => setProposedUnit(e.target.value)} required style={inputStyle} />
           </label>
+          <QuantityMeaningSelect
+            tenantSlug={tenantSlug}
+            label="What the proposed quantity means"
+            value={proposedMeaning}
+            onChange={(id, meaning) => {
+              setProposedMeaning(id);
+              if (meaning?.family === "percentage") setProposedUnit("percent");
+              else if (meaning?.numerator_unit) setProposedUnit(meaning.numerator_unit);
+            }}
+          />
           <label style={{ fontSize: 13 }}>
             Total dosage-unit weight
             <input value={totalWeight} onChange={(e) => setTotalWeight(e.target.value)} required style={inputStyle} />

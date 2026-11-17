@@ -165,9 +165,21 @@ _FORMULATION_VERSION_UNIT_FIELDS: MappingProxyType[str, Any] = MappingProxyType(
     }
 )
 
+
+def _states_per_dose_unit(component) -> bool:
+    expression = getattr(component, "quantity_expression", None)
+    return expression is None or expression.basis == "per_dose_unit"
+
+
 _FORMULATION_COMPONENT_VALUE_FIELDS: MappingProxyType[str, Any] = MappingProxyType(
     {
-        "quantity_per_dosage_unit": lambda c: c.quantity_per_dosage_unit,
+        # Only an amount per dosage unit (no stated meaning, or a per-dose-unit
+        # one) feeds the per-dose formulas. An amount per stated volume or a
+        # percentage (controlled units, increment 4) resolves to no value, so
+        # the calculation fails closed instead of computing on the wrong basis.
+        "quantity_per_dosage_unit": lambda c: (
+            c.quantity_per_dosage_unit if _states_per_dose_unit(c) else None
+        ),
         "quantity_per_batch": lambda c: c.quantity_per_batch,
         "overage_amount": lambda c: c.overage_amount,
         "percentage_w_w_snapshot": lambda c: c.percentage_w_w_snapshot,
@@ -1353,12 +1365,22 @@ def _resolve_formulation_field(
 
     raw_value = accessor(target_object)
     if raw_value is None:
+        stated_other_basis = (
+            value_fields is _FORMULATION_COMPONENT_VALUE_FIELDS
+            and field_name == "quantity_per_dosage_unit"
+            and not _states_per_dose_unit(target_object)
+        )
         _fail(
             failures,
             kwarg=kwarg,
             code=F_FORMULATION_FIELD_MISSING,
             source_kind=source_kind,
-            message=f"{obj!r}.{field_name} holds no value.",
+            message=(
+                f"{obj!r}.{field_name} is stated per volume or as a percentage, "
+                "not per dosage unit, so it cannot feed this calculation."
+                if stated_other_basis
+                else f"{obj!r}.{field_name} holds no value."
+            ),
             public_uuid=public_uuid,
         )
         return None

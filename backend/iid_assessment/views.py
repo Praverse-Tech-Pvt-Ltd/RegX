@@ -49,7 +49,11 @@ class MatchPreviewView(APIView):
         tenant = _get_tenant(request)
         serializer = MatchPreviewRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        preview = run_preview(**serializer.validated_data)
+        data = dict(serializer.validated_data)
+        data["proposed_quantity_expression"] = data.pop(
+            "proposed_quantity_expression_public_id", None
+        )
+        preview = run_preview(**data)
         emit(
             event_type=IidAssessmentEvent.MATCH_PREVIEW_GENERATED,
             resource_id="",

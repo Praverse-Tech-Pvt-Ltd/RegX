@@ -74,6 +74,11 @@ urlpatterns = [
         views.ControlledUnitListView.as_view(),
         name="controlled-unit-list",
     ),
+    path(
+        "fda-data/controlled-units/meanings/",
+        views.ControlledUnitMeaningListView.as_view(),
+        name="controlled-unit-meaning-list",
+    ),
     path("fda-data/mappings/", views.TerminologyMappingListView.as_view(), name="mapping-list"),
     path(
         "fda-data/mappings/substances/proposals/",

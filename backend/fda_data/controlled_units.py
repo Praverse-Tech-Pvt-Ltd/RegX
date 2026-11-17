@@ -480,3 +480,66 @@ def propose_unit_mappings(
                 },
             )
     return report
+
+
+# --- Formulation-side meanings (increment 4, design section 3E) ---------------
+
+#: Spellings of a formulation's `quantity_unit` and the ControlledUnit code they
+#: name. Only exact names; nothing is guessed.
+_UNIT_SPELLINGS = {
+    "mg": "mg",
+    "milligram": "mg",
+    "milligrams": "mg",
+    "ml": "ml",
+    "millilitre": "ml",
+    "milliliter": "ml",
+    "millilitres": "ml",
+    "milliliters": "ml",
+}
+PERCENT_UNIT = "percent"
+
+
+def in_force_expression(public_id) -> QuantityExpression | None:
+    """The meaning with this public id, only while the active unit list lists it."""
+    expression = (
+        QuantityExpression.objects.select_related("numerator_unit", "denominator_unit")
+        .filter(public_id=public_id)
+        .first()
+    )
+    if expression is None or expression.pk not in in_force_expressions():
+        return None
+    return expression
+
+
+def stated_amount_problem(expression: QuantityExpression, quantity_unit: str) -> str | None:
+    """Why a formulation amount entered in `quantity_unit` cannot carry this
+    meaning, or None when it can.
+
+    The amount is read in the meaning's own numerator unit (a percentage for a
+    percentage meaning), so the entered unit must be exactly that. A per-day
+    meaning is refused: comparing per day needs the Q8 rule.
+    """
+    unit = (quantity_unit or "").strip().lower()
+    if expression.basis == QuantityBasis.PER_DAY:
+        return "a per-day meaning cannot be stated yet: it needs the per-day rule (Q8)"
+    if expression.family == QuantityFamily.PERCENTAGE:
+        if unit != PERCENT_UNIT:
+            return f"a percentage meaning needs the amount entered with unit '{PERCENT_UNIT}'"
+        return None
+    numerator = expression.numerator_unit.code.lower() if expression.numerator_unit_id else ""
+    if _UNIT_SPELLINGS.get(unit) != numerator:
+        return (
+            f"the amount must be entered in '{numerator}', the unit this meaning states "
+            f"(got '{quantity_unit}')"
+        )
+    return None
+
+
+def in_force_meanings() -> list[QuantityExpression]:
+    """Every meaning a formulation may state: in force, and not per day."""
+    return list(
+        QuantityExpression.objects.select_related("numerator_unit", "denominator_unit")
+        .filter(pk__in=in_force_expressions())
+        .exclude(basis=QuantityBasis.PER_DAY)
+        .order_by("family", "basis", "denominator_amount", "pk")
+    )
