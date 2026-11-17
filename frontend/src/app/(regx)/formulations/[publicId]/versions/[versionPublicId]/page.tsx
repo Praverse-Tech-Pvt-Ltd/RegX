@@ -302,6 +302,12 @@ function VersionDetailInner() {
           style={{ ...smallButtonStyle, textDecoration: "none", display: "inline-block" }}
         >
           Run IID assessment preview →
+        </Link>{" "}
+        <Link
+          href={`/iig-checklists/executions/new?tenant=${tenantSlug}&formulationVersion=${version.public_id}`}
+          style={{ ...smallButtonStyle, textDecoration: "none", display: "inline-block" }}
+        >
+          Run IIG checklist on this version →
         </Link>
       </div>
     </main>
