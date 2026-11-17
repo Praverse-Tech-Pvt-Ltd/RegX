@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 
 import localConfig from "../../playwright.config";
 import integratedConfig from "../../playwright.integrated.config";
+import realConfig from "../../playwright.real.config";
 
 /** The port the compose stack publishes the frontend container on. */
 const DOCKER_FRONTEND_PORT = "3000";
@@ -76,5 +77,20 @@ describe("the two configs cannot collide", () => {
     expect(String(localConfig.use?.baseURL)).not.toBe(
       String(integratedConfig.use?.baseURL),
     );
+  });
+});
+
+describe("the real-stack config (scripts/real_stack_smoke.sh)", () => {
+  // Its specs sign in to a running stack and create records; the mocked suite
+  // (npm run test:e2e, run in CI) must never pick them up, and vice versa.
+  it("has its own test directory, outside the mocked suite's", () => {
+    expect(realConfig.testDir).toBe("./e2e-real");
+    expect(localConfig.testDir).toBe("./e2e");
+    expect(integratedConfig.testDir).toBe("./e2e");
+  });
+
+  it("runs one worker in order (the flows depend on each other)", () => {
+    expect(realConfig.workers).toBe(1);
+    expect(realConfig.fullyParallel).toBe(false);
   });
 });
