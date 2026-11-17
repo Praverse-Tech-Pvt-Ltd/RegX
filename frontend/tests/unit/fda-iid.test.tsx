@@ -50,6 +50,8 @@ vi.mock("next/link", () => ({
 
 const api = vi.hoisted(() => ({
   meanings: vi.fn(),
+  controlledRoutes: vi.fn(),
+  controlledDosageForms: vi.fn(),
   releasesList: vi.fn(),
   releasesGet: vi.fn(),
   releasesRegister: vi.fn(),
@@ -89,6 +91,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
     ...actual,
     fdaData: {
       meanings: api.meanings,
+      controlledRoutes: api.controlledRoutes,
+      controlledDosageForms: api.controlledDosageForms,
       releases: {
         list: api.releasesList,
         get: api.releasesGet,
@@ -318,6 +322,57 @@ const MEANINGS = {
     { public_id: "m-pct-ww", label: "%w/w", family: "percentage", basis: "w_w", numerator_unit: null },
   ],
 };
+
+describe("IidPreviewPage — usable without internal IDs (found on the real stack)", () => {
+  it("takes names, sends the controlled codes and the substance name, and fills the active release", async () => {
+    const user = userEvent.setup();
+    api.controlledRoutes.mockResolvedValue([
+      { public_id: "r1", code: "C38288", canonical_label: "ORAL", lifecycle: "active" },
+    ]);
+    api.controlledDosageForms.mockResolvedValue([
+      { public_id: "f1", code: "C42998", canonical_label: "TABLET", lifecycle: "active" },
+    ]);
+    api.releasesList.mockResolvedValue(
+      paginate([
+        makeFdaRelease({ public_id: "old-release", status: "superseded" }),
+        makeFdaRelease({ public_id: "active-release", status: "active" }),
+      ]),
+    );
+    api.preview.mockResolvedValue(makeAssessmentPreview());
+    render(<IidPreviewPage />);
+
+    await waitFor(() => expect(screen.getByLabelText(/active fda release id/i)).toHaveValue("active-release"));
+    await user.type(screen.getByLabelText(/ingredient name/i), "magnesium stearate");
+    await user.type(screen.getByLabelText(/^route code/i), "oral");
+    await user.type(screen.getByLabelText(/dosage form code/i), "Tablet");
+    await user.type(screen.getByLabelText(/proposed quantity per unit/i), "5");
+    await user.type(screen.getByLabelText(/total dosage-unit weight/i), "250");
+    await user.click(screen.getByRole("button", { name: /run preview/i }));
+
+    await waitFor(() => expect(api.preview).toHaveBeenCalled());
+    const body = api.preview.mock.calls[0]![1];
+    expect(body).toMatchObject({
+      substance_name: "MAGNESIUM STEARATE",
+      route_code: "C38288",
+      dosage_form_code: "C42998",
+      active_release_public_id: "active-release",
+    });
+    expect(body).not.toHaveProperty("ingredient_public_id");
+  });
+
+  it("asks for an ingredient when neither the name nor the ID is given", async () => {
+    const user = userEvent.setup();
+    render(<IidPreviewPage />);
+    await user.type(screen.getByLabelText(/active fda release id/i), "rel-1");
+    await user.type(screen.getByLabelText(/^route code/i), "C38288");
+    await user.type(screen.getByLabelText(/dosage form code/i), "C42998");
+    await user.type(screen.getByLabelText(/proposed quantity per unit/i), "5");
+    await user.type(screen.getByLabelText(/total dosage-unit weight/i), "250");
+    await user.click(screen.getByRole("button", { name: /run preview/i }));
+    expect(await screen.findByText(/enter the ingredient name/i)).toBeInTheDocument();
+    expect(api.preview).not.toHaveBeenCalled();
+  });
+});
 
 describe("IidPreviewPage — matching, calculation, and safety language", () => {
   const submitPreviewForm = async (user: ReturnType<typeof userEvent.setup>) => {

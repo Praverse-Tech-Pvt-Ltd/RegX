@@ -850,7 +850,25 @@ export interface QuantityMeaningList {
   meanings: QuantityMeaning[];
 }
 
+/** An entry of a controlled vocabulary (FDA SPL route or dosage form, NCI code). */
+export interface ControlledTerm {
+  public_id: string;
+  code: string;
+  canonical_label: string;
+  lifecycle: string;
+}
+
 export const fdaData = {
+  controlledRoutes: (tenantSlug: string) =>
+    apiRequest<ControlledTerm[]>("/api/regx/v1/fda-data/controlled-routes/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  controlledDosageForms: (tenantSlug: string) =>
+    apiRequest<ControlledTerm[]>("/api/regx/v1/fda-data/controlled-dosage-forms/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
   meanings: (tenantSlug: string) =>
     apiRequest<QuantityMeaningList>("/api/regx/v1/fda-data/controlled-units/meanings/", {
       headers: { "X-Tenant-Slug": tenantSlug },

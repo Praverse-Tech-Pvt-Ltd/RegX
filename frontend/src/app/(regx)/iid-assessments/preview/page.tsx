@@ -1,9 +1,17 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { iidAssessments, type AssessmentPreview, type MatchCandidate, ApiError, isSignedOut } from "@/lib/api";
+import {
+  fdaData,
+  iidAssessments,
+  type AssessmentPreview,
+  type ControlledTerm,
+  type MatchCandidate,
+  ApiError,
+  isSignedOut,
+} from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
 import { PercentValue } from "@/components/PercentValue";
@@ -162,6 +170,9 @@ function IidPreviewInner() {
   const tenantSlug = searchParams.get("tenant") ?? "";
 
   const [ingredientId, setIngredientId] = useState("");
+  const [ingredientName, setIngredientName] = useState("");
+  const [routes, setRoutes] = useState<ControlledTerm[]>([]);
+  const [dosageForms, setDosageForms] = useState<ControlledTerm[]>([]);
   const [routeCode, setRouteCode] = useState("");
   const [dosageFormCode, setDosageFormCode] = useState("");
   const [releaseId, setReleaseId] = useState("");
@@ -177,16 +188,59 @@ function IidPreviewInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // What a user can actually know: route and dosage-form NAMES (the controlled
+  // vocabularies, offered as suggestions), and which IID release is active.
+  // Found on the real stack (2026-11-17): the form accepted only NCI codes and
+  // UUIDs that no screen shows, so a user could not run a preview at all.
+  useEffect(() => {
+    if (!tenantSlug) return;
+    let cancelled = false;
+    const quietly = <T,>(load: () => Promise<T>, use: (value: T) => void) =>
+      Promise.resolve()
+        .then(load)
+        .then((value) => {
+          if (!cancelled) use(value);
+        })
+        .catch(() => undefined); // suggestions only: the form still works without them
+    quietly(() => fdaData.controlledRoutes(tenantSlug), (list) => setRoutes(Array.isArray(list) ? list : []));
+    quietly(() => fdaData.controlledDosageForms(tenantSlug), (list) => setDosageForms(Array.isArray(list) ? list : []));
+    quietly(
+      () => fdaData.releases.list(tenantSlug, { dataset_type: "fda_iid" }),
+      (page) => {
+        const active = (page?.results ?? []).find((r) => r.status === "active");
+        if (active) setReleaseId((current) => current || active.public_id);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSlug]);
+
+  /** A typed name ("ORAL") or a code ("C38288") -> the code the API expects. */
+  function toCode(typed: string, terms: ControlledTerm[]): string {
+    const value = typed.trim();
+    const hit = terms.find(
+      (t) => t.canonical_label.toUpperCase() === value.toUpperCase() || t.code.toUpperCase() === value.toUpperCase(),
+    );
+    return hit ? hit.code : value;
+  }
+
   async function runPreview(e?: React.FormEvent) {
     e?.preventDefault();
     if (!tenantSlug) return;
+    if (!ingredientId.trim() && !ingredientName.trim()) {
+      setError("Enter the ingredient name (as listed in the IID) or its ingredient ID.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const result = await iidAssessments.preview(tenantSlug, {
-        ingredient_public_id: ingredientId,
-        route_code: routeCode,
-        dosage_form_code: dosageFormCode,
+        ...(ingredientId.trim()
+          ? { ingredient_public_id: ingredientId.trim() }
+          : { substance_name: ingredientName.trim().toUpperCase() }),
+        route_code: toCode(routeCode, routes),
+        dosage_form_code: toCode(dosageFormCode, dosageForms),
         active_release_public_id: releaseId,
         proposed_quantity_per_unit: proposedQty,
         proposed_quantity_unit: proposedUnit,
@@ -231,20 +285,51 @@ function IidPreviewInner() {
       <form onSubmit={runPreview} style={{ border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem", marginBottom: "1.5rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
           <label style={{ fontSize: 13 }}>
-            Ingredient ID <ProvenanceLabel kind="USER_INPUT" />
-            <input value={ingredientId} onChange={(e) => setIngredientId(e.target.value)} required style={inputStyle} />
+            Ingredient name (as listed in the IID) <ProvenanceLabel kind="USER_INPUT" />
+            <input
+              value={ingredientName}
+              onChange={(e) => setIngredientName(e.target.value)}
+              placeholder="e.g. MAGNESIUM STEARATE"
+              style={inputStyle}
+            />
+          </label>
+          <label style={{ fontSize: 13 }}>
+            Ingredient ID (optional, instead of the name)
+            <input value={ingredientId} onChange={(e) => setIngredientId(e.target.value)} style={inputStyle} />
           </label>
           <label style={{ fontSize: 13 }}>
             Active FDA release ID
             <input value={releaseId} onChange={(e) => setReleaseId(e.target.value)} required style={inputStyle} />
           </label>
           <label style={{ fontSize: 13 }}>
-            Route code
-            <input value={routeCode} onChange={(e) => setRouteCode(e.target.value)} required style={inputStyle} />
+            Route code (name or code, e.g. ORAL)
+            <input
+              value={routeCode}
+              onChange={(e) => setRouteCode(e.target.value)}
+              required
+              list="iid-route-options"
+              style={inputStyle}
+            />
+            <datalist id="iid-route-options">
+              {routes.map((t) => (
+                <option key={t.code} value={t.canonical_label} />
+              ))}
+            </datalist>
           </label>
           <label style={{ fontSize: 13 }}>
-            Dosage form code
-            <input value={dosageFormCode} onChange={(e) => setDosageFormCode(e.target.value)} required style={inputStyle} />
+            Dosage form code (name or code, e.g. TABLET)
+            <input
+              value={dosageFormCode}
+              onChange={(e) => setDosageFormCode(e.target.value)}
+              required
+              list="iid-dosage-form-options"
+              style={inputStyle}
+            />
+            <datalist id="iid-dosage-form-options">
+              {dosageForms.map((t) => (
+                <option key={t.code} value={t.canonical_label} />
+              ))}
+            </datalist>
           </label>
           <label style={{ fontSize: 13 }}>
             Proposed quantity per unit
