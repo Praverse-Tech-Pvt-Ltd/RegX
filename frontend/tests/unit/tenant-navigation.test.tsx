@@ -32,7 +32,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 
 import RegxSidebar, { withTenant } from "@/components/regx-shell/RegxSidebar";
 import TenantsPage from "@/app/(regx)/tenants/page";
-import { errorMessage } from "@/lib/api";
+import { apiRequest, errorMessage, PERMISSION_MESSAGE, SERVER_ERROR_MESSAGE } from "@/lib/api";
 
 beforeEach(() => {
   nav.pathname = "/documents";
@@ -144,6 +144,53 @@ describe("errorMessage", () => {
     expect(errorMessage({ error_code: "self_registration_disabled", detail: "Self-registration is disabled." })).toBe(
       "Self-registration is disabled.",
     );
+  });
+
+  // Step 2 of the 2026-11-17 plan: no raw JSON, no internals.
+  it("never shows a 500's body, even when it carries a detail", () => {
+    const body = {
+      error: { status: 500, detail: "Traceback (most recent call last): File /app/iid_assessment/assess.py" },
+    };
+    expect(errorMessage(body, 500)).toBe(SERVER_ERROR_MESSAGE);
+    expect(errorMessage("<html>Server Error (500)</html>", 502)).toBe(SERVER_ERROR_MESSAGE);
+    expect(errorMessage({ detail: "Request failed" }, 500)).toBe(SERVER_ERROR_MESSAGE);
+  });
+
+  it("shows a permission refusal's sentence, or a plain fallback, never JSON", () => {
+    expect(errorMessage({ detail: "User is not a member of this tenant." }, 403)).toBe(
+      "User is not a member of this tenant.",
+    );
+    const structured = { error: { status: 403, detail: { error_code: "x", reasons: ["a"] } } };
+    expect(errorMessage(structured, 403)).toBe(PERMISSION_MESSAGE);
+    expect(errorMessage({}, 401)).toBe(PERMISSION_MESSAGE);
+  });
+
+  it("reports a nested validation value as 'is invalid', never as raw JSON", () => {
+    const msg = errorMessage(
+      { error: { status: 400, detail: { components: [{ quantity: ["Too large."] }], route_code: ["Required."] } } },
+      400,
+    );
+    expect(msg).toBe("components: is invalid; route_code: Required.");
+    expect(msg).not.toMatch(/[{}[\]]/);
+  });
+
+  it("caps a very long message", () => {
+    expect(errorMessage({ detail: "x".repeat(1000) }, 400)).toHaveLength(300);
+  });
+
+  it("apiRequest turns a 500 into the generic message and keeps the middleware's 403 sentence", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: { status: 500, detail: "KeyError at /app/x.py line 12" } }), { status: 500 }),
+    );
+    await expect(apiRequest("/api/regx/v1/x/")).rejects.toMatchObject({ status: 500, message: SERVER_ERROR_MESSAGE });
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ detail: "User is not a member of this tenant." }), { status: 403 }),
+    );
+    await expect(apiRequest("/api/regx/v1/x/")).rejects.toMatchObject({
+      status: 403,
+      message: "User is not a member of this tenant.",
+    });
   });
 
   it("falls back to 'Request failed' for an empty or unreadable body", () => {
