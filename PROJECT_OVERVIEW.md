@@ -1641,9 +1641,41 @@ Orange Book matching (Phase 3) also needs the reviewed workbook and approved Ora
 - **Owner decisions recorded in §12 (2026-11-18):** Option A approved; Reviewers may attach documents (VP unchanged).
 - Tester pack `D:/Praverse/session-work/2026-11-18/external-test/RULES_FOR_TESTER.md` updated (previous kept beside it). #129 left open, not merged.
 
+### 2026-11-18 (twenty-second session) — hands-on browser test of REGX as all four roles; report only, nothing fixed (Claude Code)
+
+**Owner's direction (2026-11-18):** confirm #132 is merged, then test REGX in the in-app browser the way a real user would, as Doer, Reviewer, VP and Tenant Admin; report only, no fixes; docs PR to `regx-main`, not merged. The after-#132 tasks set earlier the same day (update #129, Option A, Reviewer upload) were not started in this session. The 21st session's Work Log entry is not on `regx-main` and is still owed.
+
+- **#132 confirmed merged** (`66b32d6`, 2026-11-18 07:53 UTC). Old hand-off deleted at session start.
+- **Set-up:**
+  - Dev DB backed up (`D:/Praverse/backups/regx-local-db/2026-11-18/regx_s22_session_start.dump`, sha256 starts `9528fc04781a250f`; 105 tables, 71 migrations).
+  - Fresh compose project `regx-qa` from `regx-main@66b32d6`, migrated, `seed_regx_demo`.
+  - Public FDA IID July 2026, SPL routes and dosage forms, and the unit list loaded with the operator commands. Approved through the API with **local test approvals** (184 mappings; 67 DROPS rows unmapped, as before).
+- **Set-up lesson:** an IID release imported and activated before the route/form mappings are approved has every row unlinked, and every preview then says "no precedent". `reresolve_terminology` only works before submit, so it needed a re-import; the duplicate-bytes guard refused the identical file, and a line-ending variant was used. Recorded as QA-07.
+- **Report:** `docs/QA_BROWSER_TEST_2026-11-18.md`.
+  - 28 issues: 1 blocker, 10 major, 13 minor, 4 cosmetic. Plus "works but confusing", "not tested" and a top 5.
+  - Screenshots in `D:/Praverse/session-work/2026-11-18/qa-browser/` (37 files; the MFA set-up shots that show a test key were not kept).
+- **Headline findings:**
+  - **QA-01 (blocker):** a new formulation still cannot be approved, so it cannot be checklisted (Option A pending).
+  - **QA-02:** the component unit is free text ("furlongs", "mg/5mL" on a tablet line, "150 % w/w" all accepted).
+  - **QA-03:** a negative maximum units/day is accepted.
+  - **QA-05:** the IID preview keeps the old result under a new validation error.
+  - **QA-06:** misleading IID reasons for unmapped/unknown inputs.
+  - **QA-08:** no sign-out or user menu.
+  - **QA-09:** phone width unusable.
+  - **QA-11:** Supersede/Reject act on one click.
+- **What held:**
+  - server-side permissions for every forbidden action tried;
+  - `?tenant=` tampering;
+  - the MFA flows (wrong code, recovery code, reuse refused);
+  - double-click safety;
+  - the #132 amount rules (when the meaning is chosen);
+  - all pages under 0.6 s;
+  - the "technically comparable (not regulatorily approved)" label on every comparable result.
+- **End:** dev DB restored from the session-start backup with `pg_restore --clean`, then verified: table counts and the migration list are identical to the session start (105 tables, 71 migrations). CI not run (GitHub Actions disabled); docs-only change.
+
 ### 2026-11-18 (twenty-third session) — input validation and honest IID preview: QA-02, QA-03, QA-05, QA-06, QA-07 (+ QA-13 buttons) (Claude Code)
 
-**Owner's direction (2026-11-18):** one PR from `regx-main` fixing QA-02/03/05/06/07 of `docs/QA_BROWSER_TEST_2026-11-18.md` (and, if small, the QA-13 button cases); tests through the real API and the real stack, each failing on the old code; full local verification plus the real-stack smoke; update the tester rules; do not start Option A; stop for review. #133 (the report itself) was still open; the twenty-second session's Work Log entry is on that branch, not here.
+**Owner's direction (2026-11-18):** one PR from `regx-main` fixing QA-02/03/05/06/07 of `docs/QA_BROWSER_TEST_2026-11-18.md` (and, if small, the QA-13 button cases); tests through the real API and the real stack, each failing on the old code; full local verification plus the real-stack smoke; update the tester rules; do not start Option A; stop for review. #133 (the report itself) was still open at the time; it was merged later the same day, and the twenty-second session's entry now sits above this one.
 
 - **Branch** `regx/fix/input-validation-honest-preview` (worktree `D:/Praverse/session-work/2026-11-18/s23/wt`), four commits:
   - **QA-02/03 (formulations):** the component unit must be one REGX can convert or read (mg, g, kg, µg, mL, L, %); a percentage in any spelling is stored as "percent", capped at 100 and needs its basis; a per-volume meaning (mg/5mL, %w/v, %v/v) is **refused** on a clearly solid product (`formulations/dosage_forms.py`; refused rather than warned because a warning can be clicked past and the amount could then only meet a liquid product's IID limit); maximum dosage units per day 1 to 1,000 (versions, dosing regimens and the preview; 1,000 because realistic regimens are a few dozen a day and it still catches extra zeros). Old rows are never changed: `unit_recognised: false` flags them. **Dev DB count:** 21 components, all "mg"/"milligram", so **0** with an unrecognised unit; 5 versions, all 2 units/day.
