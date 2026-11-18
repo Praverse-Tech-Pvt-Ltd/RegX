@@ -76,7 +76,10 @@ _CONVERSION_KEY = {
     "mg": "milligram",
     "mcg": "microgram",
     "ug": "microgram",
+    "µg": "microgram",  # micro sign
+    "μg": "microgram",  # Greek small letter mu
     "g": "gram",
+    "kg": "kilogram",
     "ml": "millilitre",
     "l": "litre",
 }
@@ -123,6 +126,7 @@ class Quantity:
             "milligram": "mg",
             "microgram": "mcg",
             "gram": "g",
+            "kilogram": "kg",
             "millilitre": "mL",
             "litre": "L",
         }

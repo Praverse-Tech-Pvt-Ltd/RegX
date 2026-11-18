@@ -47,6 +47,24 @@ class MatchPreviewRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError("No such quantity meaning.")
         return expression
 
+    def validate(self, attrs):
+        # The same amount limits as a formulation component (iid_assessment/amount_limits.py):
+        # a zero amount is refused here too, and so are absurdly large ones.
+        from iid_assessment.amount_limits import amount_problem
+
+        attrs = super().validate(attrs)
+        expression = attrs.get("proposed_quantity_expression_public_id")
+        unit = (attrs.get("proposed_quantity_unit") or "").strip()
+        is_percentage = (expression is not None and expression.family == "percentage") or (
+            unit.lower() in ("percent", "%")
+        )
+        problem = amount_problem(
+            attrs.get("proposed_quantity_per_unit"), unit, is_percentage=is_percentage
+        )
+        if problem:
+            raise serializers.ValidationError({"proposed_quantity_per_unit": problem})
+        return attrs
+
 
 class SnapshotRequestSerializer(MatchPreviewRequestSerializer):
     """Transport shape for the **persisted** snapshot endpoint.
