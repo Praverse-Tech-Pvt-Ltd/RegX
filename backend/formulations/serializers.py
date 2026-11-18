@@ -161,6 +161,14 @@ class FormulationVersionCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError("total_dosage_unit_weight must be greater than zero.")
         return value
 
+    def validate_maximum_dosage_units_per_day(self, value):
+        from iid_assessment.amount_limits import dosage_units_per_day_problem
+
+        problem = dosage_units_per_day_problem(value)
+        if problem:
+            raise serializers.ValidationError(problem)
+        return value
+
 
 class FormulationComponentSerializer(serializers.ModelSerializer):
     #: The meaning of `quantity_per_dosage_unit` (controlled units, increment 4).
@@ -169,6 +177,10 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         required=False, allow_null=True, write_only=True
     )
     quantity_meaning = serializers.SerializerMethodField()
+    #: False for a component saved before units were checked whose unit REGX
+    #: cannot convert or read (e.g. "furlongs"). Shown as "unit not recognised -
+    #: cannot be compared"; the row itself is never changed.
+    unit_recognised = serializers.SerializerMethodField()
 
     class Meta:
         model = FormulationComponent
@@ -184,6 +196,7 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
             "quantity_unit",
             "quantity_expression_public_id",
             "quantity_meaning",
+            "unit_recognised",
             "percentage_w_w_snapshot",
             "quantity_per_batch",
             "batch_quantity_unit",
@@ -201,11 +214,24 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        attrs = self._resolve_meaning(super().validate(attrs))
-        # The same amount limits as the IID preview (iid_assessment/amount_limits.py).
-        from iid_assessment.amount_limits import amount_problem
+        from iid_assessment.amount_limits import (
+            PERCENT_UNIT,
+            amount_problem,
+            is_percentage_unit,
+            unit_problem,
+        )
 
         current = self.instance
+        # The unit must be one REGX can convert or read (QA-02). Any spelling of
+        # a percentage is stored as "percent", the spelling a percentage meaning needs.
+        if "quantity_unit" in attrs:
+            problem = unit_problem(attrs["quantity_unit"])
+            if problem:
+                raise serializers.ValidationError({"quantity_unit": problem})
+            if is_percentage_unit(attrs["quantity_unit"]):
+                attrs["quantity_unit"] = PERCENT_UNIT
+        attrs = self._resolve_meaning(super().validate(attrs))
+        # The same amount limits as the IID preview (iid_assessment/amount_limits.py).
         expression = (
             attrs["quantity_expression"]
             if "quantity_expression" in attrs
@@ -215,12 +241,28 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         value = attrs.get(
             "quantity_per_dosage_unit", getattr(current, "quantity_per_dosage_unit", None)
         )
-        is_percentage = (expression is not None and expression.family == "percentage") or (
-            unit.strip().lower() in ("percent", "%")
-        )
+        is_percentage = (
+            expression is not None and expression.family == "percentage"
+        ) or is_percentage_unit(unit)
         problem = amount_problem(value, unit, is_percentage=is_percentage)
         if problem:
             raise serializers.ValidationError({"quantity_per_dosage_unit": problem})
+        if is_percentage_unit(unit) and expression is None:
+            raise serializers.ValidationError(
+                {
+                    "quantity_expression_public_id": (
+                        "A percentage needs its basis: choose %w/w, %w/v or %v/v under "
+                        "'What the quantity means'."
+                    )
+                }
+            )
+        version = self.context.get("formulation_version")
+        if version is not None:
+            from .dosage_forms import per_volume_on_solid_problem
+
+            problem = per_volume_on_solid_problem(version.product.dosage_form, expression)
+            if problem:
+                raise serializers.ValidationError({"quantity_expression_public_id": problem})
         return attrs
 
     def _resolve_meaning(self, attrs):
@@ -247,6 +289,11 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"quantity_expression_public_id": problem})
         attrs["quantity_expression"] = expression
         return attrs
+
+    def get_unit_recognised(self, obj) -> bool:
+        from iid_assessment.amount_limits import recognised_unit
+
+        return recognised_unit(obj.quantity_unit) is not None
 
     def get_quantity_meaning(self, obj) -> str:
         expression = obj.quantity_expression
@@ -281,6 +328,9 @@ class DosingRegimenSerializer(serializers.ModelSerializer):
         return value
 
     def validate_maximum_units_per_day(self, value):
-        if value <= 0:
-            raise serializers.ValidationError("maximum_units_per_day must be greater than zero.")
+        from iid_assessment.amount_limits import dosage_units_per_day_problem
+
+        problem = dosage_units_per_day_problem(value)
+        if problem:
+            raise serializers.ValidationError(problem)
         return value

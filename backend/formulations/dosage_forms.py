@@ -1,0 +1,61 @@
+"""Which dosage forms are solid, for the per-volume rule on formulation components.
+
+A component of a tablet or capsule cannot sensibly be stated per volume
+(mg/5mL) or as a w/v or v/v percentage: there is no volume to be "per". Such an
+amount could only ever meet an IID limit of the same per-volume basis, which
+belongs to liquid products, so the comparison would look like-for-like when it
+is not. The amount is therefore refused (not merely warned about) on a product
+whose dosage form is clearly solid.
+
+"Clearly solid" is deliberately narrow: the product's dosage form (free text)
+names a solid unit such as TABLET or CAPSULE, and does not say it is made into a
+liquid before use ("... FOR SUSPENSION", "... FOR SOLUTION", "... FOR
+INJECTION"), where a per-volume amount after reconstitution is legitimate. A
+blank or unknown dosage form is never treated as solid.
+"""
+
+from __future__ import annotations
+
+import re
+
+SOLID_WORDS = (
+    "TABLET",
+    "TABLETS",
+    "CAPSULE",
+    "CAPSULES",
+    "CAPLET",
+    "LOZENGE",
+    "TROCHE",
+    "PASTILLE",
+    "PELLET",
+    "PELLETS",
+    "IMPLANT",
+    "SUPPOSITORY",
+    "WAFER",
+    "GUM",
+)
+_MADE_INTO_LIQUID = re.compile(r"\bFOR\s+(ORAL\s+)?(SUSPENSION|SOLUTION|INJECTION)\b")
+
+#: Bases that need a volume to be relative to.
+PER_VOLUME_BASES = ("per_volume", "w_v", "v_v")
+
+
+def is_solid_dosage_form(dosage_form: str | None) -> bool:
+    text = (dosage_form or "").upper()
+    if not text.strip() or _MADE_INTO_LIQUID.search(text):
+        return False
+    words = set(re.findall(r"[A-Z]+", text))
+    return any(word in words for word in SOLID_WORDS)
+
+
+def per_volume_on_solid_problem(dosage_form: str | None, expression) -> str | None:
+    """None unless a per-volume meaning is stated for a component of a solid product."""
+    if expression is None or expression.basis not in PER_VOLUME_BASES:
+        return None
+    if not is_solid_dosage_form(dosage_form):
+        return None
+    return (
+        f"'{expression}' is an amount per volume, but this product's dosage form is "
+        f"{dosage_form.strip()}, a solid. State the amount per dosage unit (or as % w/w); "
+        "if the product is made into a liquid before use, record that in its dosage form."
+    )
