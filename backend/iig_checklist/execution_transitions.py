@@ -28,3 +28,34 @@ def validate_execution_transition(current_status: str, action: str) -> str:
             f"Action {action!r} is not legal from status {current_status!r}."
         )
     return resulting_status
+
+
+#: action -> the permission codename its endpoint checks (iig_checklist/views.py).
+ACTION_PERMISSIONS = {
+    "submit_review": "iig_checklist.submit_execution",
+    "approve": "iig_checklist.approve_execution",
+    "return": "iig_checklist.review_execution",
+    "reject": "iig_checklist.approve_execution",
+    "cancel": "iig_checklist.cancel_execution",
+    "supersede": "iig_checklist.supersede_execution",
+}
+
+
+def available_actions(execution, user, has_permission) -> list[str]:
+    """The actions this user could take on this execution now, for the screen.
+
+    Display only: every action endpoint still checks its permission, the legal
+    transition and (for approve) that the approver is not the submitter. This
+    list just stops the screen offering buttons that would be refused.
+    `has_permission(codename) -> bool` is the caller's tenant-scoped check.
+    """
+    actions = []
+    for action, (legal_from, _resulting) in _EXECUTION_TRANSITIONS.items():
+        if execution.status not in legal_from:
+            continue
+        if not has_permission(ACTION_PERMISSIONS[action]):
+            continue
+        if action == "approve" and execution.submitted_by_id == getattr(user, "id", None):
+            continue  # SelfApprovalForbidden
+        actions.append(action)
+    return actions
