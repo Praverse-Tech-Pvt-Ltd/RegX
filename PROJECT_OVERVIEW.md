@@ -1628,3 +1628,35 @@ Orange Book matching (Phase 3) also needs the reviewed workbook and approved Ora
 - **Round 3 prep (outside the repo):** `D:/Praverse/session-work/2026-11-18/external-test/iid_sample.csv` (58 public IID rows covering every case type; the July 2026 file has no row with both a potency and a daily maximum) and `RULES_FOR_TESTER.md` (plain-language rules and the JSON input format for an independent tester).
 - **Local CI on the branch:** backend 20/20 (4,520 passed, 2 skipped, coverage 96.00%; a first run failed import-linter because a new test in `common` imported domain apps; moved to `fda_data`); frontend 11/11 (vitest 645, Playwright 260); both lock checks; company_site smoke; operational scripts 17/17; docker-integration 28/28. CI not run on GitHub (disabled); verified locally.
 - **Docker Desktop crashed on start (2026-11-18):** leftover Unix-socket files (`AppData\Local\Docker\run\*`, `AppData\Local\docker-secrets-engine\engine.sock`) from an unclean exit cannot be opened or deleted from Windows on this build (error 1920), so Docker failed on "initializing Inference manager" / "Secrets Engine". Deleted from inside WSL; Docker AI and Model Runner switched off. Owner's instruction: stopping services now runs `D:\Praverse\tools\docker-clean-stop.ps1` (stops containers and Docker Desktop, deletes the socket files via WSL, shuts WSL down, must report `CLEAN`; never deletes volumes). Whether Docker's "unsupported" notice is about this Windows Insider build (10.0.26300) is **unconfirmed**.
+
+### 2026-11-18 (twenty-second session) — hands-on browser test of REGX as all four roles; report only, nothing fixed (Claude Code)
+
+**Owner's direction (2026-11-18):** confirm #132 is merged, then test REGX in the in-app browser the way a real user would, as Doer, Reviewer, VP and Tenant Admin; report only, no fixes; docs PR to `regx-main`, not merged. The after-#132 tasks set earlier the same day (update #129, Option A, Reviewer upload) were not started in this session. The 21st session's Work Log entry is not on `regx-main` and is still owed.
+
+- **#132 confirmed merged** (`66b32d6`, 2026-11-18 07:53 UTC). Old hand-off deleted at session start.
+- **Set-up:**
+  - Dev DB backed up (`D:/Praverse/backups/regx-local-db/2026-11-18/regx_s22_session_start.dump`, sha256 starts `9528fc04781a250f`; 105 tables, 71 migrations).
+  - Fresh compose project `regx-qa` from `regx-main@66b32d6`, migrated, `seed_regx_demo`.
+  - Public FDA IID July 2026, SPL routes and dosage forms, and the unit list loaded with the operator commands. Approved through the API with **local test approvals** (184 mappings; 67 DROPS rows unmapped, as before).
+- **Set-up lesson:** an IID release imported and activated before the route/form mappings are approved has every row unlinked, and every preview then says "no precedent". `reresolve_terminology` only works before submit, so it needed a re-import; the duplicate-bytes guard refused the identical file, and a line-ending variant was used. Recorded as QA-07.
+- **Report:** `docs/QA_BROWSER_TEST_2026-11-18.md`.
+  - 28 issues: 1 blocker, 10 major, 13 minor, 4 cosmetic. Plus "works but confusing", "not tested" and a top 5.
+  - Screenshots in `D:/Praverse/session-work/2026-11-18/qa-browser/` (37 files; the MFA set-up shots that show a test key were not kept).
+- **Headline findings:**
+  - **QA-01 (blocker):** a new formulation still cannot be approved, so it cannot be checklisted (Option A pending).
+  - **QA-02:** the component unit is free text ("furlongs", "mg/5mL" on a tablet line, "150 % w/w" all accepted).
+  - **QA-03:** a negative maximum units/day is accepted.
+  - **QA-05:** the IID preview keeps the old result under a new validation error.
+  - **QA-06:** misleading IID reasons for unmapped/unknown inputs.
+  - **QA-08:** no sign-out or user menu.
+  - **QA-09:** phone width unusable.
+  - **QA-11:** Supersede/Reject act on one click.
+- **What held:**
+  - server-side permissions for every forbidden action tried;
+  - `?tenant=` tampering;
+  - the MFA flows (wrong code, recovery code, reuse refused);
+  - double-click safety;
+  - the #132 amount rules (when the meaning is chosen);
+  - all pages under 0.6 s;
+  - the "technically comparable (not regulatorily approved)" label on every comparable result.
+- **End:** dev DB restored from the session-start backup with `pg_restore --clean`, then verified: table counts and the migration list are identical to the session start (105 tables, 71 migrations). CI not run (GitHub Actions disabled); docs-only change.
