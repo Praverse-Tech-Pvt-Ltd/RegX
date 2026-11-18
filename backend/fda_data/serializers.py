@@ -36,6 +36,9 @@ class FDADataSourceReleaseSerializer(serializers.ModelSerializer):
     activated_by_email = serializers.EmailField(
         source="activated_by.email", read_only=True, default=None
     )
+    #: IID only: how many records have no route/dosage-form link and what to do
+    #: (fda_data.release_health). None for other dataset types.
+    link_health = serializers.SerializerMethodField()
 
     class Meta:
         model = FDADataSourceRelease
@@ -53,6 +56,7 @@ class FDADataSourceReleaseSerializer(serializers.ModelSerializer):
             "record_count_extracted",
             "record_count_imported",
             "record_count_failed",
+            "link_health",
             "status",
             "approved_by_email",
             "approved_at",
@@ -63,6 +67,11 @@ class FDADataSourceReleaseSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_link_health(self, obj) -> dict | None:
+        from .release_health import iid_link_health
+
+        return iid_link_health(obj)
 
 
 class FDADataSourceReleaseRawSerializer(FDADataSourceReleaseSerializer):

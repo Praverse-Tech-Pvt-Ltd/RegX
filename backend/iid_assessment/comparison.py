@@ -55,7 +55,8 @@ REASON_TEXT = {
     + "the IID record's route or dosage form is not mapped",
     CannotCompare.NO_NUMERIC_LIMIT: _P + "the IID record has no numeric limit",
     CannotCompare.DAILY_EXPOSURE_ONLY_NEEDS_Q8: (
-        _P + "the IID record states only a maximum daily exposure; needs the per-day rule (Q8)"
+        _P + "the IID record states only a maximum daily exposure; comparing per day is not "
+        "supported yet"
     ),
     CannotCompare.IID_UNIT_MISSING: _P + "the IID record's unit has no established meaning",
     CannotCompare.PROPOSED_VALUE_MISSING: _P + "the proposed amount is missing",

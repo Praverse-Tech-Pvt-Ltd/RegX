@@ -314,9 +314,11 @@ class TestCannotCompare:
         assert result.reason.startswith("cannot compare: ")
         assert result.iid_source_row["ingredient_name"] == key[0]
 
-    def test_daily_exposure_only_names_the_per_day_rule(self, world):
+    def test_daily_exposure_only_says_per_day_is_not_supported(self, world):
+        # QA-06: plain words, no internal decision number ("Q8") on screen.
         result = cmp.compare(mg("1"), _rec(world, ".ALPHA.-TOCOPHEROL", "ORAL", "CAPSULE"))
-        assert "per-day rule (Q8)" in result.reason
+        assert "comparing per day is not supported yet" in result.reason
+        assert "Q8" not in result.reason
 
 
 def test_no_verdict_words_outside_the_required_label():
@@ -384,4 +386,5 @@ class TestWiredIntoTheAssessment:
         )
         preview = self._preview(world, key, "1")
         assert preview.decision_status == "NOT_COMPARABLE"
-        assert "per-day rule (Q8)" in preview.decision_note
+        assert "comparing per day is not supported yet" in preview.decision_note
+        assert "Q8" not in preview.decision_note

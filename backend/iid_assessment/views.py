@@ -76,6 +76,9 @@ class MatchPreviewView(APIView):
                 "escalation_required": preview.escalation_required,
                 "substance_mapping_public_id": preview.substance_mapping_public_id,
                 "substance_resolution_status": preview.substance_resolution_status,
+                "match_reason_code": preview.match_reason_code,
+                "match_reason_heading": preview.match_reason_heading,
+                "release_health": preview.release_health,
             }
         )
 

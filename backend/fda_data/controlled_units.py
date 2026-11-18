@@ -521,7 +521,7 @@ def stated_amount_problem(expression: QuantityExpression, quantity_unit: str) ->
     """
     unit = (quantity_unit or "").strip().lower()
     if expression.basis == QuantityBasis.PER_DAY:
-        return "a per-day meaning cannot be stated yet: it needs the per-day rule (Q8)"
+        return "a per-day meaning cannot be stated yet: comparing per day is not supported yet"
     if expression.family == QuantityFamily.PERCENTAGE:
         if unit != PERCENT_UNIT:
             return f"a percentage meaning needs the amount entered with unit '{PERCENT_UNIT}'"
