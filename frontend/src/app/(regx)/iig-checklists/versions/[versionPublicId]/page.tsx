@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
-import { iigChecklists, type ChecklistVersion, ApiError } from "@/lib/api";
+import { iigChecklists, type ChecklistVersion, ApiError, isSignedOut, loadError } from "@/lib/api";
 
 function VersionDetailInner() {
   const router = useRouter();
@@ -27,10 +27,10 @@ function VersionDetailInner() {
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) {
           setError("Checklist version not found.");
-        } else if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+        } else if (isSignedOut(err)) {
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
-          setError("Failed to load checklist version.");
+          setError(loadError(err, "Failed to load checklist version."));
         }
       })
       .finally(() => setLoading(false));

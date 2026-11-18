@@ -3,7 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { fdaData, ApiError } from "@/lib/api";
+import { fdaData, ApiError, isSignedOut } from "@/lib/api";
 
 const DATASET_TYPES = [
   "orange_book_products",
@@ -51,7 +51,7 @@ function NewReleasePageInner() {
       });
       router.push(`/fda-data/releases/${release.public_id}?tenant=${tenantSlug}`);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+      if (isSignedOut(err)) {
         router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         return;
       }

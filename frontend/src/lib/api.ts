@@ -105,7 +105,9 @@ export async function apiRequest<T>(
 
   if (!resp.ok) {
     const error = await resp.json().catch(() => ({ detail: "Request failed" }));
-    throw new ApiError(resp.status, errorMessage(error, resp.status));
+    const code = errorCode(error);
+    const status = resp.status === 403 && code === "not_authenticated" ? 401 : resp.status;
+    throw new ApiError(status, errorMessage(error, resp.status), code);
   }
 
   if (resp.status === 204) return undefined as T;
@@ -133,11 +135,35 @@ export function toApiPath(link: string): string {
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
-    message: string
+    message: string,
+    /** The API's single reason code, e.g. "not_authenticated", when it gives one. */
+    public readonly code?: string
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+/**
+ * True only when the caller is signed out, so the page should go to /signin.
+ *
+ * Session authentication answers a signed-out request with 403, the same status
+ * as "signed in but not allowed". `apiRequest` turns the first into a 401 using
+ * the API's `error.code`, so a 403 here always means "not allowed": the page
+ * must say so, not send a signed-in user to the sign-in page.
+ */
+export function isSignedOut(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 401;
+}
+
+/** The refusal's own sentence for a 403; `fallback` for any other failure. */
+export function loadError(err: unknown, fallback: string): string {
+  return err instanceof ApiError && err.status === 403 ? err.message : fallback;
+}
+
+function errorCode(body: unknown): string | undefined {
+  if (!isRecord(body) || !isRecord(body.error)) return undefined;
+  return typeof body.error.code === "string" ? body.error.code : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -824,7 +850,25 @@ export interface QuantityMeaningList {
   meanings: QuantityMeaning[];
 }
 
+/** An entry of a controlled vocabulary (FDA SPL route or dosage form, NCI code). */
+export interface ControlledTerm {
+  public_id: string;
+  code: string;
+  canonical_label: string;
+  lifecycle: string;
+}
+
 export const fdaData = {
+  controlledRoutes: (tenantSlug: string) =>
+    apiRequest<ControlledTerm[]>("/api/regx/v1/fda-data/controlled-routes/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
+  controlledDosageForms: (tenantSlug: string) =>
+    apiRequest<ControlledTerm[]>("/api/regx/v1/fda-data/controlled-dosage-forms/", {
+      headers: { "X-Tenant-Slug": tenantSlug },
+    }),
+
   meanings: (tenantSlug: string) =>
     apiRequest<QuantityMeaningList>("/api/regx/v1/fda-data/controlled-units/meanings/", {
       headers: { "X-Tenant-Slug": tenantSlug },

@@ -3,14 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import {
-  workflows,
-  WORKFLOW_REASON_REQUIRED,
-  type WorkflowAction,
-  type WorkflowItem,
-  type WorkflowTransitionRecord,
-  ApiError,
-} from "@/lib/api";
+import { workflows, WORKFLOW_REASON_REQUIRED, type WorkflowAction, type WorkflowItem, type WorkflowTransitionRecord, ApiError, isSignedOut, loadError } from "@/lib/api";
 import { StateBadge } from "../state-badge";
 import { EvidenceSection } from "./evidence-section";
 
@@ -51,12 +44,12 @@ function WorkflowDetailInner() {
         setError(null);
       })
       .catch((err: unknown) => {
-        if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+        if (isSignedOut(err)) {
           router.push(
             `/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`
           );
         } else if (err instanceof ApiError && err.status === 404) {
-          setError("Workflow item not found.");
+          setError(loadError(err, "Workflow item not found."));
         } else {
           setError("Failed to load workflow item.");
         }

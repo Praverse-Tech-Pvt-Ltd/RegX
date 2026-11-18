@@ -3,13 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
-import {
-  formulations,
-  type FormulationVersion,
-  type FormulationComponent,
-  type DosingRegimen,
-  ApiError,
-} from "@/lib/api";
+import { formulations, type FormulationVersion, type FormulationComponent, type DosingRegimen, ApiError, isSignedOut, loadError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
 import { PercentValue } from "@/components/PercentValue";
@@ -59,9 +53,9 @@ function VersionDetailInner() {
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) setError("Formulation version not found.");
-        else if (err instanceof ApiError && (err.status === 403 || err.status === 401))
+        else if (isSignedOut(err))
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
-        else setError("Failed to load formulation version.");
+        else setError(loadError(err, "Failed to load formulation version."));
       })
       .finally(() => setLoading(false));
   }
@@ -308,6 +302,12 @@ function VersionDetailInner() {
           style={{ ...smallButtonStyle, textDecoration: "none", display: "inline-block" }}
         >
           Run IID assessment preview →
+        </Link>{" "}
+        <Link
+          href={`/iig-checklists/executions/new?tenant=${tenantSlug}&formulationVersion=${version.public_id}`}
+          style={{ ...smallButtonStyle, textDecoration: "none", display: "inline-block" }}
+        >
+          Run IIG checklist on this version →
         </Link>
       </div>
     </main>

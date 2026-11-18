@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { fdaData, type OrangeBookProduct, ApiError } from "@/lib/api";
+import { fdaData, type OrangeBookProduct, isSignedOut, loadError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 
 function OrangeBookSearchInner() {
@@ -48,10 +48,10 @@ function OrangeBookSearchInner() {
       setPage(targetPage);
       setSearched(true);
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+      if (isSignedOut(err)) {
         router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       } else {
-        setError("Search failed.");
+        setError(loadError(err, "Search failed."));
       }
     } finally {
       setLoading(false);

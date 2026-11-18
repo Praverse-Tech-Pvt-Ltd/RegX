@@ -121,10 +121,22 @@ describe("DefinitionsPage — list", () => {
     expect(link).toHaveAttribute("href", expect.stringContaining("/iig-checklists/new"));
   });
 
-  it("redirects to signin on 401/403", async () => {
-    api.definitionsList.mockRejectedValue(new ApiError(403, "Forbidden"));
+  // Changed 2026-11-17: this test used to send a 403 to the sign-in page. On
+  // the real stack that bounced signed-in users who were merely not allowed.
+  // A 401 (signed out) goes to sign-in; a 403 shows the refusal.
+  it("redirects to signin on 401 (signed out)", async () => {
+    api.definitionsList.mockRejectedValue(new ApiError(401, "Authentication credentials were not provided."));
     render(<DefinitionsPage />);
     await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith(expect.stringMatching(/^\/signin(\?|$)/)));
+  });
+
+  it("shows the refusal on 403 (signed in, not allowed) and stays on the page", async () => {
+    api.definitionsList.mockRejectedValue(
+      new ApiError(403, "You do not have permission to perform this action.", "permission_denied"),
+    );
+    render(<DefinitionsPage />);
+    expect(await screen.findByText("You do not have permission to perform this action.")).toBeInTheDocument();
+    expect(nav.push).not.toHaveBeenCalledWith(expect.stringMatching(/^\/signin(\?|$)/));
   });
 });
 

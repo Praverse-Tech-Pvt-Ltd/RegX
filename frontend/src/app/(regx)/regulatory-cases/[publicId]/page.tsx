@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { regulatoryCases, ApiError, type CaseDetail } from "@/lib/api";
+import { regulatoryCases, ApiError, type CaseDetail, isSignedOut, loadError } from "@/lib/api";
 import { CaseStatusBadge } from "../status-badge";
 import { PackagePanel } from "./package-panel";
 import { CaseDossiersPanel } from "./dossiers-panel";
@@ -148,12 +148,12 @@ function CaseDetailInner() {
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) {
           setNotFound(true);
-        } else if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+        } else if (isSignedOut(err)) {
           router.push(
             `/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`
           );
         } else {
-          setError("Failed to load this case.");
+          setError(loadError(err, "Failed to load this case."));
         }
       })
       .finally(() => setLoading(false));

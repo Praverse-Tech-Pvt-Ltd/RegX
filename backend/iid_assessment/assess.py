@@ -163,9 +163,16 @@ def run_preview(
         from .comparison import (
             active_unit_list_release_public_id,
             compare,
+            conversion_key,
             per_dose_unit_quantity,
             stated_quantity,
         )
+
+        def unit_key(unit):
+            # "mg", "g", "mcg", "ml" -> the converter's names, exactly as the
+            # comparison reads them; anything else is passed on unchanged and
+            # the converter refuses it as before.
+            return conversion_key(unit) or unit
 
         record = IIDPrecedentRecord.objects.select_related(
             "release", "potency_expression__numerator_unit", "potency_expression__denominator_unit"
@@ -182,7 +189,7 @@ def run_preview(
         calc_unit = (
             proposed.unit
             if proposed_quantity_expression is not None and proposed.unit
-            else proposed_quantity_unit
+            else unit_key(proposed_quantity_unit)
         )
         comparison = compare(
             proposed,
@@ -228,7 +235,7 @@ def run_preview(
                 ),
                 total_dosage_unit_weight_grams=(
                     unit_conversion.convert(
-                        total_dosage_unit_weight, total_dosage_unit_weight_unit, "gram"
+                        total_dosage_unit_weight, unit_key(total_dosage_unit_weight_unit), "gram"
                     ).converted_value
                 ),
             )

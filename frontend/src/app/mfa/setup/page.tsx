@@ -68,7 +68,7 @@ export default function MfaSetupPage() {
       <AuthLayout title="Two-step sign-in is on" subtitle="MFA is active for your account.">
         <p>From your next sign-in, you will be asked for a code from your authenticator app.</p>
         <p>
-          <a href="/dashboard">Continue to the dashboard</a>
+          <a href="/tenants">Continue to your organisations</a>
         </p>
       </AuthLayout>
     );

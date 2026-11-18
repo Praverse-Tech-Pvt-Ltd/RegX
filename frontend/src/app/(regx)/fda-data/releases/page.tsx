@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { fdaData, type FdaDataSourceRelease, type FdaReleaseStatus, ApiError } from "@/lib/api";
+import { fdaData, type FdaDataSourceRelease, type FdaReleaseStatus, isSignedOut, loadError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 
 const STATUS_COLOURS: Record<FdaReleaseStatus, string> = {
@@ -52,10 +52,10 @@ function FdaReleasesPageInner() {
       .list(tenantSlug, datasetFilter ? { dataset_type: datasetFilter } : undefined)
       .then((resp) => setItems(resp.results))
       .catch((err: unknown) => {
-        if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+        if (isSignedOut(err)) {
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
-          setError("Failed to load FDA data-source releases.");
+          setError(loadError(err, "Failed to load FDA data-source releases."));
         }
       })
       .finally(() => setLoading(false));
