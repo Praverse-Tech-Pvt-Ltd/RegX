@@ -234,6 +234,7 @@ CI runs them in this order: type-check → lint → test → build → e2e.
 
 ## Hard constraints (summarised from `constraints.md`; read it in full)
 
+- **GitHub Actions is disabled for the whole repository by the owner (2026-11-18). Never re-enable it, or any workflow, without the owner's explicit instruction. Verify everything locally** (the workflows' own steps via the local runner, plus `scripts/real_stack_smoke.sh`) and put the evidence and "CI not run; verified locally" in every PR. Re-enable steps: PROJECT_OVERVIEW.md §11 item 31.
 - Do not weaken anything in `regx/settings/production.py` (cookie `Secure` flags, the scanner stub refusal) to make something work.
 - `identity.User` is off-limits without prior approval.
 - Do not share session cookies between the two Django apps. Do not try again to split company_site's admin surface into its own app; that failed three times.
