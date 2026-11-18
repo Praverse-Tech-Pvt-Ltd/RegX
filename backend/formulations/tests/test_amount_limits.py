@@ -47,11 +47,27 @@ class TestComponentAmountLimits:
     def test_zero_is_still_refused(self, api_client_a, version_url):
         assert _add(api_client_a, version_url, "0", "mg").status_code == 400
 
-    def test_one_million_is_the_upper_limit(self, api_client_a, version_url):
-        assert _add(api_client_a, version_url, "1000000", "mg").status_code == 201
-        resp = _add(api_client_a, version_url, "1000001", "mg")
+    @pytest.mark.parametrize(
+        ("amount", "unit"), [("2000000", "µg"), ("2000", "mg"), ("1000000", "mg"), ("1000", "l")]
+    )
+    def test_accepted_up_to_one_million_in_the_base_unit(
+        self, api_client_a, version_url, amount, unit
+    ):
+        assert _add(api_client_a, version_url, amount, unit).status_code == 201
+
+    @pytest.mark.parametrize(
+        ("amount", "unit", "message"),
+        [
+            ("1000001", "mg", "(you entered 1,000,001 mg)"),
+            ("900000", "kg", "(you entered 900,000 kg = 900,000,000,000 mg)"),
+            ("1000", "kg", "(you entered 1,000 kg = 1,000,000,000 mg)"),
+        ],
+    )
+    def test_refused_above_one_million_mg(self, api_client_a, version_url, amount, unit, message):
+        resp = _add(api_client_a, version_url, amount, unit)
         assert resp.status_code == 400
-        assert "cannot be more than 1,000,000" in _error(resp)
+        assert "cannot be more than 1,000,000 mg" in _error(resp)
+        assert message in _error(resp)
 
     def test_a_percentage_cannot_exceed_100(self, api_client_a, version_url):
         assert _add(api_client_a, version_url, "100", "percent").status_code == 201
@@ -59,6 +75,9 @@ class TestComponentAmountLimits:
         assert resp.status_code == 400
         assert _error(resp) == "A percentage cannot be more than 100."
 
-    @pytest.mark.parametrize("unit", ["kg", "µg", "ug", "mcg"])
-    def test_new_mass_spellings_are_accepted(self, api_client_a, version_url, unit):
-        assert _add(api_client_a, version_url, "2", unit).status_code == 201
+    # 0.5 kg = 500,000 mg, inside the limit (2 kg would be 2,000,000 mg and is refused).
+    @pytest.mark.parametrize(
+        ("amount", "unit"), [("0.5", "kg"), ("2", "µg"), ("2", "ug"), ("2", "mcg")]
+    )
+    def test_new_mass_spellings_are_accepted(self, api_client_a, version_url, amount, unit):
+        assert _add(api_client_a, version_url, amount, unit).status_code == 201

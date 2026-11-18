@@ -202,8 +202,8 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         attrs = self._resolve_meaning(super().validate(attrs))
-        # The same amount limits as the IID preview (common/amount_limits.py).
-        from common.amount_limits import amount_problem
+        # The same amount limits as the IID preview (iid_assessment/amount_limits.py).
+        from iid_assessment.amount_limits import amount_problem
 
         current = self.instance
         expression = (
@@ -218,7 +218,7 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         is_percentage = (expression is not None and expression.family == "percentage") or (
             unit.strip().lower() in ("percent", "%")
         )
-        problem = amount_problem(value, is_percentage=is_percentage)
+        problem = amount_problem(value, unit, is_percentage=is_percentage)
         if problem:
             raise serializers.ValidationError({"quantity_per_dosage_unit": problem})
         return attrs

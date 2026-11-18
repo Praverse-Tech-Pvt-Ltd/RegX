@@ -1,5 +1,8 @@
 """Amount limits, through the real IID preview endpoint.
 
+Owner change (2026-11-18): the upper limit applies after converting to the
+family's base unit (mg for mass, mL for volume).
+
 From the real-stack demo run (2026-11-17, Round 2): the preview compared a zero
 amount while a formulation component refused it; a 14-digit amount was accepted
 and gave a % w/w of 39,999,999,999,999.6 %; "kg" and "µg" were refused as unknown
@@ -46,14 +49,58 @@ class TestAmountLimits:
     def test_the_smallest_positive_amount_is_accepted(self, api_client_doer, active_iid_setup):
         assert _preview(api_client_doer, active_iid_setup, "0.000001", "mg").status_code == 200
 
-    def test_one_million_is_the_upper_limit(self, api_client_doer, active_iid_setup):
-        ok = _preview(api_client_doer, active_iid_setup, "1000000", "mg")
-        assert ok.status_code == 200
-        assert ok.json()["calculations"]["potency_comparison"]["result"] == "above"
-        too_big = _preview(api_client_doer, active_iid_setup, "1000000.000001", "mg")
-        assert too_big.status_code == 400
-        assert "cannot be more than 1,000,000" in _field_error(too_big)
-        assert "239,360" in _field_error(too_big)
+    # The limit is 1,000,000 in the family's base unit (mg / mL), after converting
+    # what was typed (owner, 2026-11-18).
+    @pytest.mark.parametrize(
+        ("amount", "unit"),
+        [
+            ("2000000", "µg"),  # 2 g
+            ("2000", "mg"),
+            ("1000000", "mg"),  # exactly the limit
+            ("1000", "g"),  # = 1,000,000 mg
+            ("1000000", "ml"),
+            ("1000", "l"),  # = 1,000,000 mL
+        ],
+    )
+    def test_accepted_up_to_one_million_in_the_base_unit(
+        self, api_client_doer, active_iid_setup, amount, unit
+    ):
+        resp = _preview(api_client_doer, active_iid_setup, amount, unit)
+        assert resp.status_code == 200, resp.json()
+
+    @pytest.mark.parametrize(
+        ("amount", "unit", "message"),
+        [
+            ("1000001", "mg", "cannot be more than 1,000,000 mg (you entered 1,000,001 mg)"),
+            (
+                "900000",
+                "kg",
+                "cannot be more than 1,000,000 mg (you entered 900,000 kg = 900,000,000,000 mg)",
+            ),
+            (
+                "1000",
+                "kg",
+                "cannot be more than 1,000,000 mg (you entered 1,000 kg = 1,000,000,000 mg)",
+            ),
+            ("1000000.000001", "mg", "(you entered 1,000,000.000001 mg)"),
+            ("1001", "l", "cannot be more than 1,000,000 mL (you entered 1,001 l = 1,001,000 mL)"),
+        ],
+    )
+    def test_refused_above_one_million_in_the_base_unit(
+        self, api_client_doer, active_iid_setup, amount, unit, message
+    ):
+        resp = _preview(api_client_doer, active_iid_setup, amount, unit)
+        assert resp.status_code == 400
+        assert message in _field_error(resp)
+        assert "239,360 mg" in _field_error(resp)
+
+    def test_a_unit_that_cannot_be_converted_is_held_to_one_million_as_typed(
+        self, api_client_doer, active_iid_setup
+    ):
+        assert _preview(api_client_doer, active_iid_setup, "1000000", "tonnes").status_code == 200
+        resp = _preview(api_client_doer, active_iid_setup, "1000001", "tonnes")
+        assert resp.status_code == 400
+        assert "in the unit entered" in _field_error(resp)
 
     def test_the_old_fourteen_digit_case_is_refused(self, api_client_doer, active_iid_setup):
         resp = _preview(api_client_doer, active_iid_setup, "99999999999999", "mg")
