@@ -201,9 +201,31 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        attrs = self._resolve_meaning(super().validate(attrs))
+        # The same amount limits as the IID preview (common/amount_limits.py).
+        from common.amount_limits import amount_problem
+
+        current = self.instance
+        expression = (
+            attrs["quantity_expression"]
+            if "quantity_expression" in attrs
+            else getattr(current, "quantity_expression", None)
+        )
+        unit = attrs.get("quantity_unit", getattr(current, "quantity_unit", "")) or ""
+        value = attrs.get(
+            "quantity_per_dosage_unit", getattr(current, "quantity_per_dosage_unit", None)
+        )
+        is_percentage = (expression is not None and expression.family == "percentage") or (
+            unit.strip().lower() in ("percent", "%")
+        )
+        problem = amount_problem(value, is_percentage=is_percentage)
+        if problem:
+            raise serializers.ValidationError({"quantity_per_dosage_unit": problem})
+        return attrs
+
+    def _resolve_meaning(self, attrs):
         from fda_data.controlled_units import in_force_expression, stated_amount_problem
 
-        attrs = super().validate(attrs)
         if "quantity_expression_public_id" not in attrs:
             return attrs  # not mentioned: keep what is stored (or the default, none)
         public_id = attrs.pop("quantity_expression_public_id")
