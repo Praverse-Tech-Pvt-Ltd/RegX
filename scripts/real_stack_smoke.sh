@@ -12,6 +12,9 @@
 # Flows (--flows): Doer creates a product, a formulation version and two
 # components, runs an IID preview, answers and submits the seeded draft IIG
 # checklist execution, uploads a PDF; the VP approves the execution.
+# Then e2e-real/qa-fixes.spec.ts checks the fixes for QA-02/03/05/06/07/13 of
+# docs/QA_BROWSER_TEST_2026-11-18.md (input checks, no stale IID result, honest
+# reasons, release link health, buttons that follow permissions).
 #
 # Prerequisites (the script checks nothing it cannot see and changes nothing):
 #   * a stack migrated and seeded with `manage.py seed_regx_demo` (tenant "demo");
@@ -61,12 +64,12 @@ cd "$(dirname "$0")/../frontend"
 
 specs=(e2e-real/pages.spec.ts)
 if [ "$FLOWS" = 1 ]; then
-    specs+=(e2e-real/flows.spec.ts)
+    specs+=(e2e-real/flows.spec.ts e2e-real/qa-fixes.spec.ts)
 fi
 
 status=0
 npx playwright test -c playwright.real.config.ts "${specs[@]}" || status=$?
 
 echo
-echo "Results: $OUT/pages.jsonl$([ "$FLOWS" = 1 ] && echo " and $OUT/flows.jsonl"), screenshots in $OUT/screenshots/"
+echo "Results: $OUT/pages.jsonl$([ "$FLOWS" = 1 ] && echo ", $OUT/flows.jsonl and $OUT/qa-fixes.jsonl"), screenshots in $OUT/screenshots/"
 exit "$status"

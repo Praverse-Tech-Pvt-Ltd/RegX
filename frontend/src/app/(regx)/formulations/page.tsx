@@ -11,6 +11,9 @@ function FormulationsPageInner() {
   const tenantSlug = searchParams.get("tenant") ?? "";
 
   const [items, setItems] = useState<ProductDevelopmentRecord[]>([]);
+  // QA-13: show "New product record" only when the server says this user may
+  // create one here (the POST still checks). Unknown until loaded: hidden.
+  const [canCreate, setCanCreate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +22,10 @@ function FormulationsPageInner() {
     setLoading(true);
     formulations.products
       .list(tenantSlug)
-      .then((resp) => setItems(resp.results))
+      .then((resp) => {
+        setItems(resp.results);
+        setCanCreate(resp.can_create !== false);
+      })
       .catch((err: unknown) => {
         if (isSignedOut(err)) {
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
@@ -51,6 +57,7 @@ function FormulationsPageInner() {
         }}
       >
         <h1 style={{ margin: 0 }}>Product Development Records</h1>
+        {canCreate && (
         <Link
           href={`/formulations/new?tenant=${tenantSlug}`}
           style={{
@@ -67,6 +74,7 @@ function FormulationsPageInner() {
         >
           New product record
         </Link>
+        )}
       </div>
 
       {loading && <p>Loading…</p>}

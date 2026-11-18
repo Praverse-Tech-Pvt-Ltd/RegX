@@ -75,6 +75,11 @@ function ExecutionDetailPageInner() {
   if (!execution) return <p>Not found.</p>;
 
   const isTerminal = TERMINAL_STATUSES.has(execution.status);
+  // QA-13: offer only what the server says this user may do now. The server
+  // still checks every action; this only stops refused buttons being shown.
+  // Without the list (an older response) fall back to the status alone.
+  const can = (action: string) => execution.availableActions?.includes(action) ?? true;
+  const offersNothing = execution.availableActions !== undefined && execution.availableActions.length === 0;
 
   return (
     <div>
@@ -128,9 +133,13 @@ function ExecutionDetailPageInner() {
       {!isTerminal && (
         <div style={{ marginTop: "1rem" }}>
           <h2>Actions</h2>
+          {offersNothing && (
+            <p data-testid="no-actions">No actions are available to you in this state.</p>
+          )}
 
           {(execution.status === "draft" || execution.status === "returned") && (
             <>
+              {can("submit_review") && (
               <button
                 disabled={acting}
                 onClick={() =>
@@ -139,7 +148,9 @@ function ExecutionDetailPageInner() {
               >
                 Submit for review
               </button>
+              )}
               {" "}
+              {can("cancel") && (
               <button
                 disabled={acting}
                 onClick={() =>
@@ -148,11 +159,13 @@ function ExecutionDetailPageInner() {
               >
                 Cancel
               </button>
+              )}
             </>
           )}
 
           {execution.status === "submitted_for_review" && (
             <>
+              {can("approve") && (
               <div>
                 <label>
                   Reviewer conclusion note (required to approve)
@@ -177,7 +190,11 @@ function ExecutionDetailPageInner() {
                   Approve
                 </button>
               </div>
+              )}
+              {(can("return") || can("reject")) && (
               <div style={{ marginTop: "0.5rem" }}>
+                {can("return") && (
+                <>
                 <label>
                   Return reason
                   <br />
@@ -199,7 +216,10 @@ function ExecutionDetailPageInner() {
                 >
                   Return
                 </button>
+                </>
+                )}
                 {" "}
+                {can("reject") && (
                 <button
                   disabled={acting}
                   onClick={() =>
@@ -208,11 +228,13 @@ function ExecutionDetailPageInner() {
                 >
                   Reject
                 </button>
+                )}
               </div>
+              )}
             </>
           )}
 
-          {execution.status === "approved" && (
+          {execution.status === "approved" && can("supersede") && (
             <button
               disabled={acting}
               onClick={() =>

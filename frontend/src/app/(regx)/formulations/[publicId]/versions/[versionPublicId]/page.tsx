@@ -6,6 +6,23 @@ import Link from "next/link";
 import { formulations, type FormulationVersion, type FormulationComponent, type DosingRegimen, ApiError, isSignedOut, loadError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
+
+/** The units a component may use (iid_assessment/amount_limits.py COMPONENT_UNITS). */
+const COMPONENT_UNITS = [
+  { value: "mg", label: "mg" },
+  { value: "g", label: "g" },
+  { value: "kg", label: "kg" },
+  { value: "µg", label: "µg" },
+  { value: "mL", label: "mL" },
+  { value: "L", label: "L" },
+  { value: "percent", label: "% (choose w/w, w/v or v/v below)" },
+];
+
+/** A meaning's numerator unit ("mg", "ml") -> the matching option value. */
+function toUnitOption(unit: string): string {
+  const hit = COMPONENT_UNITS.find((u) => u.value.toLowerCase() === unit.toLowerCase());
+  return hit ? hit.value : unit;
+}
 import { PercentValue } from "@/components/PercentValue";
 
 function VersionDetailInner() {
@@ -26,7 +43,7 @@ function VersionDetailInner() {
   const [componentType, setComponentType] = useState<"active" | "inactive">("inactive");
   const [componentName, setComponentName] = useState("");
   const [componentQty, setComponentQty] = useState("");
-  const [componentUnit, setComponentUnit] = useState("milligram");
+  const [componentUnit, setComponentUnit] = useState("mg");
   const [componentMeaning, setComponentMeaning] = useState("");
   const [componentSubmitting, setComponentSubmitting] = useState(false);
   const [componentError, setComponentError] = useState<string | null>(null);
@@ -181,6 +198,11 @@ function VersionDetailInner() {
                   <td style={{ padding: "6px 8px" }}>
                     {c.quantity_per_dosage_unit}{" "}
                     {c.quantity_expression_public_id ? c.quantity_meaning : c.quantity_unit}
+                    {c.unit_recognised === false && (
+                      <span data-testid="unit-not-recognised" style={{ display: "block", color: "#8f2c20", fontSize: 12 }}>
+                        unit not recognised – cannot be compared
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: "6px 8px" }}>
                     {c.percentage_w_w_snapshot != null ? (
@@ -223,7 +245,21 @@ function VersionDetailInner() {
               </label>
               <label style={{ fontSize: 13 }}>
                 Unit
-                <input value={componentUnit} onChange={(e) => setComponentUnit(e.target.value)} required style={inputStyle} />
+                {/* QA-02: only units REGX can convert or read (the server refuses others). */}
+                <select
+                  value={componentUnit}
+                  onChange={(e) => setComponentUnit(e.target.value)}
+                  required
+                  style={inputStyle}
+                  aria-label="Unit"
+                  data-testid="component-unit"
+                >
+                  {COMPONENT_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
             <div style={{ marginBottom: 8, maxWidth: 360 }}>
@@ -234,7 +270,7 @@ function VersionDetailInner() {
                 onChange={(id, meaning) => {
                   setComponentMeaning(id);
                   if (meaning?.family === "percentage") setComponentUnit("percent");
-                  else if (meaning?.numerator_unit) setComponentUnit(meaning.numerator_unit);
+                  else if (meaning?.numerator_unit) setComponentUnit(toUnitOption(meaning.numerator_unit));
                 }}
               />
             </div>

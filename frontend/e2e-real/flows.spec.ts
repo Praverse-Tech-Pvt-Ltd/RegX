@@ -78,7 +78,8 @@ test("Doer: product, formulation version, two components", async ({ page }) => {
       await page.getByRole("button", { name: "Add component" }).click();
       await page.getByLabel("Ingredient name").fill(name);
       await page.getByLabel("Quantity per dosage unit").fill(qty);
-      await page.getByLabel("Unit", { exact: true }).fill("mg");
+      // QA-02: the component unit is chosen from a list (it was free text).
+      await page.getByLabel("Unit", { exact: true }).selectOption("mg");
       await page.getByRole("button", { name: "Add", exact: true }).click();
       await expect(page.getByRole("cell", { name })).toBeVisible();
     });
