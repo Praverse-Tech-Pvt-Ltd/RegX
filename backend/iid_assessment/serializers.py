@@ -50,19 +50,27 @@ class MatchPreviewRequestSerializer(serializers.Serializer):
     def validate(self, attrs):
         # The same amount limits as a formulation component (iid_assessment/amount_limits.py):
         # a zero amount is refused here too, and so are absurdly large ones.
-        from iid_assessment.amount_limits import amount_problem
+        from iid_assessment.amount_limits import (
+            amount_problem,
+            dosage_units_per_day_problem,
+            is_percentage_unit,
+        )
 
         attrs = super().validate(attrs)
         expression = attrs.get("proposed_quantity_expression_public_id")
         unit = (attrs.get("proposed_quantity_unit") or "").strip()
-        is_percentage = (expression is not None and expression.family == "percentage") or (
-            unit.lower() in ("percent", "%")
-        )
+        # Any spelling of a percentage ("% w/w", "%w/v", "percent") is capped at 100.
+        is_percentage = (
+            expression is not None and expression.family == "percentage"
+        ) or is_percentage_unit(unit)
         problem = amount_problem(
             attrs.get("proposed_quantity_per_unit"), unit, is_percentage=is_percentage
         )
         if problem:
             raise serializers.ValidationError({"proposed_quantity_per_unit": problem})
+        per_day = dosage_units_per_day_problem(attrs.get("maximum_dosage_units_per_day"))
+        if per_day:
+            raise serializers.ValidationError({"maximum_dosage_units_per_day": per_day})
         return attrs
 
 

@@ -70,7 +70,11 @@ class TestComponentAmountLimits:
         assert message in _error(resp)
 
     def test_a_percentage_cannot_exceed_100(self, api_client_a, version_url):
-        assert _add(api_client_a, version_url, "100", "percent").status_code == 201
+        # Since QA-02 a percentage also needs its basis (w/w, w/v, v/v): 100 is
+        # within the cap but refused for the missing basis, 120 for the cap.
+        resp = _add(api_client_a, version_url, "100", "percent")
+        assert resp.status_code == 400
+        assert "needs its basis" in str(resp.json())
         resp = _add(api_client_a, version_url, "120", "percent")
         assert resp.status_code == 400
         assert _error(resp) == "A percentage cannot be more than 100."

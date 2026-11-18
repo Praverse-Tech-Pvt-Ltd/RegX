@@ -41,6 +41,8 @@ export interface ChecklistExecutionDTO {
   reviewer_conclusion_note: string;
   created_at: string;
   updated_at: string;
+  /** Detail and action responses only: what this user may do now (display only). */
+  available_actions?: string[];
 }
 
 /**
@@ -121,6 +123,12 @@ export interface ChecklistExecution {
   reviewerConclusionNote: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The actions this user may take now (submit_review, approve, return, reject,
+   * cancel, supersede), from the server. Undefined when the response did not
+   * carry it (list pages): the screen then falls back to the status alone.
+   */
+  availableActions?: string[];
 }
 
 export interface CalculationOutcomeSummary {
@@ -199,6 +207,7 @@ export function toChecklistExecution(dto: ChecklistExecutionDTO): ChecklistExecu
     reviewerConclusionNote: dto.reviewer_conclusion_note,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,
+    availableActions: dto.available_actions,
   };
 }
 

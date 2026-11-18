@@ -188,6 +188,21 @@ function IidPreviewInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // QA-05: a result belongs to the inputs it was run with. Any change to an
+  // input clears it (and any error, and a chosen precedent), so the screen can
+  // never show a result next to numbers it was not computed from.
+  function clearResult() {
+    setPreview(null);
+    setError(null);
+    setSelectedRecordId(undefined);
+  }
+  const edited =
+    <T,>(set: (value: T) => void) =>
+    (value: T) => {
+      set(value);
+      clearResult();
+    };
+
   // What a user can actually know: route and dosage-form NAMES (the controlled
   // vocabularies, offered as suggestions), and which IID release is active.
   // Found on the real stack (2026-11-17): the form accepted only NCI codes and
@@ -234,6 +249,7 @@ function IidPreviewInner() {
     }
     setLoading(true);
     setError(null);
+    setPreview(null); // never show the previous result while (or after) this run fails
     try {
       const result = await iidAssessments.preview(tenantSlug, {
         ...(ingredientId.trim()
@@ -288,24 +304,24 @@ function IidPreviewInner() {
             Ingredient name (as listed in the IID) <ProvenanceLabel kind="USER_INPUT" />
             <input
               value={ingredientName}
-              onChange={(e) => setIngredientName(e.target.value)}
+              onChange={(e) => edited(setIngredientName)(e.target.value)}
               placeholder="e.g. MAGNESIUM STEARATE"
               style={inputStyle}
             />
           </label>
           <label style={{ fontSize: 13 }}>
             Ingredient ID (optional, instead of the name)
-            <input value={ingredientId} onChange={(e) => setIngredientId(e.target.value)} style={inputStyle} />
+            <input value={ingredientId} onChange={(e) => edited(setIngredientId)(e.target.value)} style={inputStyle} />
           </label>
           <label style={{ fontSize: 13 }}>
             Active FDA release ID
-            <input value={releaseId} onChange={(e) => setReleaseId(e.target.value)} required style={inputStyle} />
+            <input value={releaseId} onChange={(e) => edited(setReleaseId)(e.target.value)} required style={inputStyle} />
           </label>
           <label style={{ fontSize: 13 }}>
             Route code (name or code, e.g. ORAL)
             <input
               value={routeCode}
-              onChange={(e) => setRouteCode(e.target.value)}
+              onChange={(e) => edited(setRouteCode)(e.target.value)}
               required
               list="iid-route-options"
               style={inputStyle}
@@ -320,7 +336,7 @@ function IidPreviewInner() {
             Dosage form code (name or code, e.g. TABLET)
             <input
               value={dosageFormCode}
-              onChange={(e) => setDosageFormCode(e.target.value)}
+              onChange={(e) => edited(setDosageFormCode)(e.target.value)}
               required
               list="iid-dosage-form-options"
               style={inputStyle}
@@ -335,7 +351,7 @@ function IidPreviewInner() {
             Proposed quantity per unit
             <input
               value={proposedQty}
-              onChange={(e) => setProposedQty(e.target.value)}
+              onChange={(e) => edited(setProposedQty)(e.target.value)}
               required
               placeholder="Enter your own value — never pre-filled from IID"
               style={inputStyle}
@@ -343,13 +359,14 @@ function IidPreviewInner() {
           </label>
           <label style={{ fontSize: 13 }}>
             Proposed quantity unit
-            <input value={proposedUnit} onChange={(e) => setProposedUnit(e.target.value)} required style={inputStyle} />
+            <input value={proposedUnit} onChange={(e) => edited(setProposedUnit)(e.target.value)} required style={inputStyle} />
           </label>
           <QuantityMeaningSelect
             tenantSlug={tenantSlug}
             label="What the proposed quantity means"
             value={proposedMeaning}
             onChange={(id, meaning) => {
+              clearResult();
               setProposedMeaning(id);
               if (meaning?.family === "percentage") setProposedUnit("percent");
               else if (meaning?.numerator_unit) setProposedUnit(meaning.numerator_unit);
@@ -357,15 +374,15 @@ function IidPreviewInner() {
           />
           <label style={{ fontSize: 13 }}>
             Total dosage-unit weight
-            <input value={totalWeight} onChange={(e) => setTotalWeight(e.target.value)} required style={inputStyle} />
+            <input value={totalWeight} onChange={(e) => edited(setTotalWeight)(e.target.value)} required style={inputStyle} />
           </label>
           <label style={{ fontSize: 13 }}>
             Total weight unit
-            <input value={totalWeightUnit} onChange={(e) => setTotalWeightUnit(e.target.value)} required style={inputStyle} />
+            <input value={totalWeightUnit} onChange={(e) => edited(setTotalWeightUnit)(e.target.value)} required style={inputStyle} />
           </label>
           <label style={{ fontSize: 13 }}>
             Maximum dosage units/day
-            <input value={maxUnitsPerDay} onChange={(e) => setMaxUnitsPerDay(e.target.value)} style={inputStyle} />
+            <input value={maxUnitsPerDay} onChange={(e) => edited(setMaxUnitsPerDay)(e.target.value)} style={inputStyle} />
           </label>
         </div>
         <button type="submit" disabled={loading} style={smallButtonStyle}>
@@ -381,9 +398,24 @@ function IidPreviewInner() {
 
       {preview && (
         <section aria-label="Assessment result">
-          <h2 style={{ fontSize: 16 }}>
-            Match status: {MATCH_STATUS_LABELS[preview.match_status] ?? preview.match_status}
+          <h2 style={{ fontSize: 16 }} data-testid="match-heading">
+            {preview.match_reason_heading
+              ? preview.match_reason_heading
+              : `Match status: ${MATCH_STATUS_LABELS[preview.match_status] ?? preview.match_status}`}
           </h2>
+
+          {preview.release_health && preview.release_health.unlinked_records > 0 && (
+            <div
+              data-testid="preview-release-health"
+              style={{ border: "1px solid #e8c77a", background: "#fff8e6", borderRadius: 8, padding: "0.5rem 0.75rem", marginBottom: 12, fontSize: 13 }}
+            >
+              <strong>About the active IID release: </strong>
+              {preview.release_health.message}
+              {preview.release_health.operator_action && (
+                <span> What to do: {preview.release_health.operator_action}</span>
+              )}
+            </div>
+          )}
 
           {preview.match_status === "MULTIPLE_EXACT_MATCHES" && (
             <div style={{ marginBottom: 16 }}>

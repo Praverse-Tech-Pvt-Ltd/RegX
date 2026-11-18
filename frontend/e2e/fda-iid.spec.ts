@@ -1187,7 +1187,7 @@ test.describe("Formulation version creation, component entry, and dosing regimen
     await page.getByRole("button", { name: /add component/i }).click();
     await page.getByLabel(/ingredient name/i).fill("Synthetic Starch");
     await page.getByLabel(/quantity per dosage unit/i).fill("30");
-    await page.getByLabel(/^unit$/i).fill("milligram");
+    await page.getByLabel(/^unit$/i).selectOption("mg"); // QA-02: the unit is chosen from a list
     await page.getByRole("button", { name: /^add$/i }).click();
     await expect(page.getByText("Synthetic Starch")).toBeVisible();
 

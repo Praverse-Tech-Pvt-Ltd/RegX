@@ -36,6 +36,11 @@ class AssessmentPreview:
     escalation_required: bool
     substance_mapping_public_id: str | None = None
     substance_resolution_status: str | None = None
+    #: A specific reason when nothing could be compared (iid_assessment.reasons).
+    match_reason_code: str | None = None
+    match_reason_heading: str | None = None
+    #: Link health of the release used (fda_data.release_health); None if not IID.
+    release_health: dict | None = None
 
 
 def run_preview(
@@ -127,6 +132,20 @@ def run_preview(
                 candidates=[],
                 reason_code=substance_resolution.reason_code,
             )
+
+    from .reasons import refine
+
+    reason = refine(
+        match=match,
+        release=release,
+        route=route,
+        dosage_form=dosage_form,
+        route_code=route_code,
+        dosage_form_code=dosage_form_code,
+        ingredient_public_id=resolved_ingredient_public_id,
+        ingredient_name=substance_name,
+        substance_status=(substance_resolution.status if substance_resolution else None),
+    )
 
     candidates_data = [asdict(c) for c in match.candidates]
 
@@ -297,7 +316,10 @@ def run_preview(
         source_release_superseded=(release.status == "superseded" if release else False),
         density_or_basis_required=density_or_basis_required,
         cannot_compare_reason=cannot_compare_reason,
+        explanation=reason.text if reason else None,
+        potency_reason=match.reason_code,
     )
+    from fda_data.release_health import iid_link_health
 
     return AssessmentPreview(
         match_status=match.status,
@@ -309,6 +331,9 @@ def run_preview(
         escalation_required=decision.escalation_required,
         substance_mapping_public_id=selected_substance_mapping_public_id,
         substance_resolution_status=(substance_resolution.status if substance_resolution else None),
+        match_reason_code=reason.code if reason else None,
+        match_reason_heading=reason.heading if reason else None,
+        release_health=iid_link_health(release),
     )
 
 

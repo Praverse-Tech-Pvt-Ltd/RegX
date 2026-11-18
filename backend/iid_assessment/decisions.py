@@ -46,6 +46,23 @@ REQUIRED_PRECEDENT_NOTE = (
 )
 
 
+#: Why the selected IID record has no usable potency, in plain words.
+_POTENCY_NOTES = {
+    "NO_NUMERIC_LIMIT": (
+        "The selected IID record has no numeric limit (for example 'NA' or 'ADJ PH'), so "
+        "there is nothing to compare against; a reviewer must decide."
+    ),
+    "IID_UNIT_MISSING": (
+        "The selected IID record's unit (for example 'mg/mg') has no agreed meaning in REGX "
+        "yet, so it cannot be compared; a reviewer must decide."
+    ),
+    "DAILY_EXPOSURE_ONLY_NEEDS_Q8": (
+        "The selected IID record gives only a maximum daily exposure, not an amount per "
+        "unit; comparing per day is not supported yet, so a reviewer must decide."
+    ),
+}
+
+
 @dataclass(frozen=True)
 class PrecedentDecision:
     status: str
@@ -77,23 +94,35 @@ def decide(
     source_release_superseded: bool = False,
     density_or_basis_required: bool = False,
     cannot_compare_reason: str | None = None,
+    explanation: str | None = None,
+    potency_reason: str | None = None,
 ) -> PrecedentDecision:
     """Combines a matching-engine result and (if matched) the calculation
     results into a final precedent decision. This function never itself
     performs unit conversion or the underlying calculations -- callers
-    must have already run those and pass in their outcomes."""
+    must have already run those and pass in their outcomes.
+
+    `explanation` (from `iid_assessment.reasons`) replaces the generic sentence
+    when the match found nothing to compare against; the status is unchanged.
+    `potency_reason` is the match engine's reason for an unusable IID value."""
     reason_codes: list[str] = []
 
     if match_status == MatchStatus.NO_MATCHING_IID_PRECEDENT:
         return PrecedentDecision(
             status=PrecedentDecisionStatus.NO_MATCH,
-            note="No exact ingredient/route/dosage-form IID precedent record exists.",
+            note=explanation
+            or "No exact ingredient/route/dosage-form IID precedent record exists.",
         )
 
     if match_status in (MatchStatus.ROUTE_MISMATCH, MatchStatus.DOSAGE_FORM_MISMATCH):
         return PrecedentDecision(
             status=PrecedentDecisionStatus.NOT_COMPARABLE,
-            note=f"{match_status}: route and dosage form must match exactly.",
+            note=explanation
+            or (
+                "The route entered is not a recognised controlled route."
+                if match_status == MatchStatus.ROUTE_MISMATCH
+                else "The dosage form entered is not a recognised controlled dosage form."
+            ),
             reason_codes=[match_status],
         )
 
@@ -128,7 +157,8 @@ def decide(
     if match_status in (MatchStatus.INGREDIENT_AMBIGUOUS, MatchStatus.REVIEW_REQUIRED):
         return PrecedentDecision(
             status=PrecedentDecisionStatus.REVIEW_REQUIRED,
-            note="Ingredient identity/synonym mapping requires reviewer confirmation "
+            note=explanation
+            or "Ingredient identity/synonym mapping requires reviewer confirmation "
             "before this can be compared.",
             escalation_required=True,
             reason_codes=[match_status],
@@ -137,7 +167,10 @@ def decide(
     if match_status == MatchStatus.POTENCY_UNAVAILABLE or selected_potency_amount is None:
         return PrecedentDecision(
             status=PrecedentDecisionStatus.REVIEW_REQUIRED,
-            note="Selected IID record has no usable potency value; regulatory review required.",
+            note=_POTENCY_NOTES.get(
+                potency_reason,
+                "Selected IID record has no usable potency value; regulatory review required.",
+            ),
             escalation_required=True,
             reason_codes=["POTENCY_UNAVAILABLE"],
         )

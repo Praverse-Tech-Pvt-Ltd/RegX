@@ -17,7 +17,13 @@ from .models import (
     FormulationVersion,
     ProductDevelopmentRecord,
 )
-from .permissions import CanCreateFormulations, CanEditDraftFormulations, CanViewFormulations
+from .permissions import (
+    PERM_CREATE,
+    CanCreateFormulations,
+    CanEditDraftFormulations,
+    CanViewFormulations,
+    has_formulation_permission,
+)
 from .serializers import (
     DosingRegimenSerializer,
     FormulationComponentSerializer,
@@ -87,9 +93,13 @@ class ProductListView(APIView):
         qs = ProductDevelopmentRecord.objects.for_tenant(tenant).order_by("product_code")
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(qs, request)
-        return paginator.get_paginated_response(
+        response = paginator.get_paginated_response(
             ProductDevelopmentRecordSerializer(page, many=True).data
         )
+        # Display only: whether this user may create a product in this tenant,
+        # so the screen does not offer a button the POST would refuse.
+        response.data["can_create"] = has_formulation_permission(request.user, tenant, PERM_CREATE)
+        return response
 
     def post(self, request):
         tenant = _get_tenant(request)
@@ -244,7 +254,10 @@ class FormulationComponentListView(APIView):
     def post(self, request, public_id):
         tenant = _get_tenant(request)
         version = _get_version_or_404(public_id, tenant)
-        serializer = FormulationComponentSerializer(data=request.data)
+        # The version gives the product's dosage form, for the per-volume rule.
+        serializer = FormulationComponentSerializer(
+            data=request.data, context={"formulation_version": version}
+        )
         serializer.is_valid(raise_exception=True)
         with _integrity_error_as_validation_error(
             "Formulation component could not be created with the given values."

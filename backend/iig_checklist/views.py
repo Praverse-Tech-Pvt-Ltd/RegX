@@ -22,7 +22,7 @@ from tenancy.context import TenantScopeMissing, current_tenant
 from .audit import IigChecklistEvent, emit
 from .codes import CodeValidationError
 from .enums import ChecklistVersionStatus
-from .execution_transitions import IllegalExecutionTransition
+from .execution_transitions import IllegalExecutionTransition, available_actions
 from .models import (
     ApplicabilityRule,
     ChecklistDefinition,
@@ -1182,6 +1182,15 @@ class ChecklistExecutionListCreateView(APIView):
         )
 
 
+def _execution_payload(execution, user, tenant) -> dict:
+    """The execution as serialized, plus the actions this user may take now."""
+    data = dict(ChecklistExecutionSerializer(execution).data)
+    data["available_actions"] = available_actions(
+        execution, user, lambda codename: has_iig_checklist_permission(user, tenant, codename)
+    )
+    return data
+
+
 class ChecklistExecutionDetailView(APIView):
     def get(self, request, public_id):
         tenant = _require_tenant()
@@ -1189,7 +1198,7 @@ class ChecklistExecutionDetailView(APIView):
         execution = _get_execution_or_404(public_id, tenant)
         if not has_iig_checklist_permission(request.user, tenant, PERM_VIEW_EXECUTION):
             raise PermissionDenied()
-        return Response(ChecklistExecutionSerializer(execution).data)
+        return Response(_execution_payload(execution, request.user, tenant))
 
 
 class _ChecklistExecutionActionViewBase(APIView):
@@ -1251,7 +1260,7 @@ class _ChecklistExecutionActionViewBase(APIView):
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
-        return Response(ChecklistExecutionSerializer(updated).data)
+        return Response(_execution_payload(updated, request.user, tenant))
 
 
 class ChecklistExecutionSubmitView(_ChecklistExecutionActionViewBase):

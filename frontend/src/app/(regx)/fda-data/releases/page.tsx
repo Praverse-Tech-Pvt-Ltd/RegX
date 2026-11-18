@@ -151,6 +151,12 @@ function FdaReleasesPageInner() {
         <p style={{ color: "#66768b" }}>No FDA data-source releases registered yet.</p>
       )}
 
+      {items
+        .filter((r) => r.status === "active" && (r.link_health?.unlinked_records ?? 0) > 0)
+        .map((r) => (
+          <LinkHealthNotice key={r.public_id} release={r} />
+        ))}
+
       {items.length > 0 && (
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
           <thead>
@@ -193,7 +199,7 @@ function FdaReleasesPageInner() {
                   <StatusBadge status={release.status} />
                 </td>
                 <td style={{ padding: "10px 12px", color: "#66768b", fontSize: 12 }}>
-                  {release.record_count_imported}/{release.record_count_extracted}
+                  <RecordCounts release={release} />
                 </td>
               </tr>
             ))}
@@ -201,6 +207,60 @@ function FdaReleasesPageInner() {
         </table>
       )}
     </main>
+  );
+}
+
+const n = (value: number) => value.toLocaleString("en-US");
+
+/**
+ * QA-07: "0/9071" said nothing. Rows read, rows imported cleanly, rows imported
+ * with a review flag and rows that failed, in words; for an IID release also
+ * how many records have no route/dosage-form link (a preview can never match
+ * those).
+ */
+function RecordCounts({ release }: { release: FdaDataSourceRelease }) {
+  const flagged = Math.max(
+    0,
+    release.record_count_extracted - release.record_count_imported - release.record_count_failed,
+  );
+  const health = release.link_health;
+  return (
+    <span data-testid="record-counts">
+      {n(release.record_count_extracted)} rows read
+      <br />
+      {n(release.record_count_imported)} imported without a flag
+      {flagged > 0 && `, ${n(flagged)} flagged for review`}
+      {release.record_count_failed > 0 && `, ${n(release.record_count_failed)} failed`}
+      {health && health.unlinked_records > 0 && (
+        <>
+          <br />
+          <span style={{ color: "#8a5a10" }}>
+            {n(health.unlinked_records)} not linked to a route or dosage form
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function LinkHealthNotice({ release }: { release: FdaDataSourceRelease }) {
+  const health = release.link_health!;
+  const unmapped = [...health.unmapped_routes, ...health.unmapped_dosage_forms];
+  return (
+    <div
+      role="status"
+      data-testid="release-link-health"
+      style={{ border: "1px solid #e8c77a", background: "#fff8e6", borderRadius: 8, padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: 13 }}
+    >
+      <strong>{release.source_name}: </strong>
+      {health.message}
+      {health.operator_action && <p style={{ margin: "6px 0 0" }}>What to do: {health.operator_action}</p>}
+      {unmapped.length > 0 && (
+        <p style={{ margin: "6px 0 0", color: "#66768b" }}>
+          Not yet mapped: {unmapped.map((u) => `${u.raw_value} (${n(u.records)})`).join(", ")}
+        </p>
+      )}
+    </div>
   );
 }
 

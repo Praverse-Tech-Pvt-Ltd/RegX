@@ -723,6 +723,17 @@ export type FdaReleaseStatus =
   | "superseded"
   | "rejected";
 
+export interface ReleaseLinkHealth {
+  total_records: number;
+  linked_records: number;
+  unlinked_records: number;
+  fillable_by_approved_mappings: number;
+  unmapped_routes: { raw_value: string; records: number }[];
+  unmapped_dosage_forms: { raw_value: string; records: number }[];
+  message: string;
+  operator_action: string;
+}
+
 export interface FdaDataSourceRelease {
   public_id: string;
   dataset_type: string;
@@ -737,6 +748,8 @@ export interface FdaDataSourceRelease {
   record_count_extracted: number;
   record_count_imported: number;
   record_count_failed: number;
+  /** IID releases only: records without a route/dosage-form link, and what to do. */
+  link_health?: ReleaseLinkHealth | null;
   status: FdaReleaseStatus;
   approved_by_email: string | null;
   approved_at: string | null;
@@ -1124,6 +1137,8 @@ export interface FormulationComponent {
   quantity_expression_public_id: string | null;
   /** e.g. "mg/5mL", "%w/w", or "milligram per dosage unit" when none is stated. */
   quantity_meaning: string;
+  /** False for an old row whose unit REGX cannot convert or read: not comparable. */
+  unit_recognised?: boolean;
   percentage_w_w_snapshot: string | null;
   quantity_per_batch: string | null;
   batch_quantity_unit: string;
@@ -1150,7 +1165,7 @@ export const formulations = {
       const qs = new URLSearchParams();
       if (params?.page) qs.set("page", String(params.page));
       const query = qs.toString() ? `?${qs}` : "";
-      return apiRequest<PaginatedResponse<ProductDevelopmentRecord>>(
+      return apiRequest<PaginatedResponse<ProductDevelopmentRecord> & { can_create?: boolean }>(
         `/api/regx/v1/formulations/products/${query}`,
         { headers: { "X-Tenant-Slug": tenantSlug } }
       );
@@ -1329,6 +1344,11 @@ export interface AssessmentPreview {
   // lookup rather than an already-known ingredient_public_id.
   substance_mapping_public_id?: string | null;
   substance_resolution_status?: string | null;
+  /** A specific, plain reason when nothing could be compared (iid_assessment/reasons.py). */
+  match_reason_code?: string | null;
+  match_reason_heading?: string | null;
+  /** Link health of the IID release used for the preview. */
+  release_health?: ReleaseLinkHealth | null;
 }
 
 export interface PreviewRequest {
