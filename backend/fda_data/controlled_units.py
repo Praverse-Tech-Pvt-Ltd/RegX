@@ -535,6 +535,84 @@ def stated_amount_problem(expression: QuantityExpression, quantity_unit: str) ->
     return None
 
 
+#: The percentage bases a typed unit may name, after the percent sign, with spaces,
+#: brackets and letter case ignored: "% w/v", "%(w/v)", "% WT/VOL" all read w/v.
+#: Exactly these; any other text after the percent sign is refused, never read
+#: as plain percent. m/m and m/v are the mass forms of w/w and w/v.
+PERCENTAGE_BASIS_SPELLINGS = {
+    "w/w": "w_w",
+    "wt/wt": "w_w",
+    "m/m": "w_w",
+    "w/v": "w_v",
+    "wt/vol": "w_v",
+    "wt/v": "w_v",
+    "m/v": "w_v",
+    "v/v": "v_v",
+    "vol/vol": "v_v",
+}
+_PERCENT_PREFIXES = ("percentage", "percent", "%")  # longest first
+
+
+def parse_percentage_unit(unit: str | None) -> tuple[bool, str | None, bool]:
+    """(is a percentage, basis code or None, basis text recognised).
+
+    A percentage is any unit starting with "%" or "percent", or exactly "pct"
+    (the same test the amount limits have always used). A bare percentage
+    ("%", "percent") names no basis and is recognised.
+    """
+    text = (unit or "").strip().lower().replace(" ", "")
+    if text == "pct":
+        return True, None, True
+    prefix = next((p for p in _PERCENT_PREFIXES if text.startswith(p)), None)
+    if prefix is None:
+        return False, None, False
+    rest = text[len(prefix) :].strip("()[]")
+    if not rest:
+        return True, None, True
+    basis = PERCENTAGE_BASIS_SPELLINGS.get(rest)
+    return True, basis, basis is not None
+
+
+def percentage_unit_problem(unit: str | None) -> str | None:
+    """Why a percentage unit's written basis cannot be read, or None."""
+    is_percentage, _basis, recognised = parse_percentage_unit(unit)
+    if is_percentage and not recognised:
+        return (
+            f"'{(unit or '').strip()}' names a percentage basis REGX does not recognise; "
+            "write %w/w, %w/v or %v/v (also accepted: wt/wt, m/m, wt/vol, wt/v, m/v, "
+            "vol/vol), or just 'percent'"
+        )
+    return None
+
+
+def unit_meaning_problem(expression: QuantityExpression, unit: str | None) -> str | None:
+    """THE rule for a typed unit stated with a meaning; None when they agree.
+
+    Used by formulation components and the IID preview, so both accept and
+    refuse the same pairs. With a meaning, an amount is read in the meaning's
+    own unit, so the typed unit must be that unit (any spelling
+    `stated_amount_problem` accepts). A percentage meaning takes any recognised
+    percentage spelling, but a basis written in the unit must be the meaning's.
+    """
+    problem = percentage_unit_problem(unit)
+    if problem:
+        return problem
+    is_percentage, basis, _recognised = parse_percentage_unit(unit)
+    if is_percentage:
+        if (
+            basis is not None
+            and expression.family == QuantityFamily.PERCENTAGE
+            and basis != expression.basis
+        ):
+            return (
+                f"the unit says %{basis.replace('_', '/')} but the meaning chosen is "
+                f"%{expression.basis.replace('_', '/')}; choose the meaning that matches, "
+                f"or type the unit as '{PERCENT_UNIT}'"
+            )
+        unit = PERCENT_UNIT
+    return stated_amount_problem(expression, unit or "")
+
+
 def in_force_meanings() -> list[QuantityExpression]:
     """Every meaning a formulation may state: in force, and not per day."""
     return list(

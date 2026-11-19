@@ -47,8 +47,9 @@ def _shown(value: Decimal) -> str:
 
 def is_percentage_unit(unit: str | None) -> bool:
     """True for any spelling of a percentage: "%", "% w/w", "%w/v", "percent", "pct"."""
-    text = (unit or "").strip().lower().replace(" ", "")
-    return text.startswith("%") or text in ("pct", "percentage") or text.startswith("percent")
+    from fda_data.controlled_units import parse_percentage_unit
+
+    return parse_percentage_unit(unit)[0]
 
 
 def recognised_unit(unit: str | None) -> str | None:

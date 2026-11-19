@@ -2,32 +2,6 @@ from rest_framework import serializers
 
 from .models import AssessmentSnapshot
 
-_PERCENT_BASES = {"w/w": "w_w", "w/v": "w_v", "v/v": "v_v"}
-
-
-def _unit_meaning_problem(expression, unit: str) -> str | None:
-    """Why the typed unit cannot carry this meaning, or None when it can.
-
-    Mass and volume meanings: the unit must be the meaning's own unit, in any
-    spelling a formulation component accepts ("mg", "milligram"; "mL",
-    "millilitre"). Percentage meanings: any percentage spelling ("%", "% w/w",
-    "percent"), but a basis written in the unit must be the meaning's basis.
-    """
-    from fda_data.controlled_units import PERCENT_UNIT, stated_amount_problem
-    from iid_assessment.amount_limits import is_percentage_unit
-
-    if is_percentage_unit(unit):
-        text = unit.lower().replace(" ", "")
-        typed = next((code for spelled, code in _PERCENT_BASES.items() if spelled in text), None)
-        if typed is not None and expression.family == "percentage" and typed != expression.basis:
-            return (
-                f"the unit says %{typed.replace('_', '/')} but the meaning chosen is "
-                f"%{expression.basis.replace('_', '/')}; choose the meaning that matches, "
-                f"or type the unit as '{PERCENT_UNIT}'"
-            )
-        unit = PERCENT_UNIT
-    return stated_amount_problem(expression, unit)
-
 
 class MatchPreviewRequestSerializer(serializers.Serializer):
     # Exactly one identity path must be supplied: either an already-resolved
@@ -85,14 +59,19 @@ class MatchPreviewRequestSerializer(serializers.Serializer):
         attrs = super().validate(attrs)
         expression = attrs.get("proposed_quantity_expression_public_id")
         unit = (attrs.get("proposed_quantity_unit") or "").strip()
-        if expression is not None:
-            # With a meaning, the amount is read in the meaning's own unit, so the
-            # typed unit must be exactly that unit. Without this check "0.03 g" with
-            # "mg per dose unit" was read as 0.03 mg (validation report 2026-11-19,
-            # F-1). Same rule as a formulation component (stated_amount_problem).
-            problem = _unit_meaning_problem(expression, unit)
-            if problem:
-                raise serializers.ValidationError({"proposed_quantity_unit": problem})
+        # With a meaning, the amount is read in the meaning's own unit, so the
+        # typed unit must agree with it (F-1, #138). One rule, shared with
+        # formulation components: fda_data.controlled_units.unit_meaning_problem.
+        # A percentage basis REGX cannot read is refused even without a meaning.
+        from fda_data.controlled_units import percentage_unit_problem, unit_meaning_problem
+
+        problem = (
+            unit_meaning_problem(expression, unit)
+            if expression is not None
+            else percentage_unit_problem(unit)
+        )
+        if problem:
+            raise serializers.ValidationError({"proposed_quantity_unit": problem})
         # Any spelling of a percentage ("% w/w", "%w/v", "percent") is capped at 100.
         is_percentage = (
             expression is not None and expression.family == "percentage"

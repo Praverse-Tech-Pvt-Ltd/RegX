@@ -242,6 +242,7 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        from fda_data.controlled_units import percentage_unit_problem
         from iid_assessment.amount_limits import (
             PERCENT_UNIT,
             amount_problem,
@@ -250,15 +251,20 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
         )
 
         current = self.instance
+        # The unit as typed, before normalising: its written percentage basis is
+        # checked against the meaning (shared rule, unit_meaning_problem).
+        typed_unit = attrs.get("quantity_unit")
         # The unit must be one REGX can convert or read (QA-02). Any spelling of
         # a percentage is stored as "percent", the spelling a percentage meaning needs.
         if "quantity_unit" in attrs:
-            problem = unit_problem(attrs["quantity_unit"])
+            problem = unit_problem(attrs["quantity_unit"]) or percentage_unit_problem(
+                attrs["quantity_unit"]
+            )
             if problem:
                 raise serializers.ValidationError({"quantity_unit": problem})
             if is_percentage_unit(attrs["quantity_unit"]):
                 attrs["quantity_unit"] = PERCENT_UNIT
-        attrs = self._resolve_meaning(super().validate(attrs))
+        attrs = self._resolve_meaning(super().validate(attrs), typed_unit)
         # The same amount limits as the IID preview (iid_assessment/amount_limits.py).
         expression = (
             attrs["quantity_expression"]
@@ -293,8 +299,8 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({"quantity_expression_public_id": problem})
         return attrs
 
-    def _resolve_meaning(self, attrs):
-        from fda_data.controlled_units import in_force_expression, stated_amount_problem
+    def _resolve_meaning(self, attrs, typed_unit=None):
+        from fda_data.controlled_units import in_force_expression, unit_meaning_problem
 
         if "quantity_expression_public_id" not in attrs:
             return attrs  # not mentioned: keep what is stored (or the default, none)
@@ -311,8 +317,12 @@ class FormulationComponentSerializer(serializers.ModelSerializer):
                     )
                 }
             )
-        unit = attrs.get("quantity_unit", getattr(self.instance, "quantity_unit", ""))
-        problem = stated_amount_problem(expression, unit)
+        unit = (
+            typed_unit
+            if typed_unit is not None
+            else attrs.get("quantity_unit", getattr(self.instance, "quantity_unit", ""))
+        )
+        problem = unit_meaning_problem(expression, unit)
         if problem:
             raise serializers.ValidationError({"quantity_expression_public_id": problem})
         attrs["quantity_expression"] = expression
