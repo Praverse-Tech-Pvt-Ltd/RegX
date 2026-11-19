@@ -94,6 +94,24 @@ class FDADataSourceRelease(PublicIDModel, TimeStampedModel):
     #: this value while keeping distinct `source_checksum_sha256`, so the
     #: provenance stays distinguishable.
     normalized_payload_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    #: Fingerprint of the normalised content (sorted per-row hashes, ignoring line
+    #: endings and trailing whitespace; `checksums.content_fingerprint`). The
+    #: duplicate check compares it, so the same data in a re-saved copy of the
+    #: file is refused too. Blank on releases imported before it existed.
+    content_fingerprint_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    #: A DELIBERATE re-import of data already imported (owner decision
+    #: 2026-11-18): the release whose content this one repeats, and the
+    #: operator's written reason. Only `import_fda_release --deliberate-reimport`
+    #: sets them. The new release goes through the whole lifecycle; on
+    #: activation it supersedes the active release, which stays as history.
+    reimport_of = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="deliberate_reimports",
+    )
+    reimport_reason = models.TextField(blank=True)
     #: Size of the supplied source bytes. Recorded alongside the checksum
     #: because a length mismatch is the cheapest first signal that a file is
     #: not the one somebody believes it is.
@@ -149,9 +167,16 @@ class FDADataSourceRelease(PublicIDModel, TimeStampedModel):
 
     class Meta:
         constraints = [
+            # The same bytes once per dataset type, except a deliberate re-import.
             models.UniqueConstraint(
                 fields=["dataset_type", "source_checksum_sha256"],
+                condition=models.Q(reimport_of__isnull=True),
                 name="unique_release_checksum_per_dataset_type",
+            ),
+            # A deliberate re-import always carries a written reason.
+            models.CheckConstraint(
+                check=models.Q(reimport_of__isnull=True) | ~models.Q(reimport_reason=""),
+                name="deliberate_reimport_has_reason",
             ),
             models.UniqueConstraint(
                 fields=["dataset_type"],

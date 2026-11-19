@@ -5,6 +5,8 @@ from audit.models import AuditEvent
 
 class FdaDataEvent:
     RELEASE_REGISTERED = "fda_data.release.registered"
+    #: A deliberate re-import of data already imported (owner decision 2026-11-18).
+    RELEASE_REIMPORT_REGISTERED = "fda_data.release.reimport_registered"
     FILE_STORED = "fda_data.release.file_stored"
     IMPORT_STARTED = "fda_data.release.import_started"
     SCHEMA_VALIDATED = "fda_data.release.schema_validated"

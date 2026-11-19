@@ -140,13 +140,22 @@ class FdaReleaseListView(APIView):
 
         # The same payload used to return the existing release with 201 after
         # a no-op import, which looked like a successful new import.
-        duplicate = importer.find_imported_duplicate(data["dataset_type"], file_obj)
+        # The same data in any form is refused: same bytes, or the same
+        # normalised content (owner decision 2026-11-18). A deliberate
+        # re-import is a management-command action only.
+        from .checksums import content_fingerprint
+
+        neutral = adapter(rows)
+        fingerprint = content_fingerprint([n["fields"] for n in neutral])
+        duplicate = importer.find_imported_duplicate(
+            data["dataset_type"], file_obj, content_fingerprint=fingerprint
+        )
         if duplicate:
             return Response(
                 {
                     "error_code": "duplicate_release",
                     "detail": (
-                        "These exact rows are already imported as release "
+                        "The same rows are already imported as release "
                         f"{duplicate.public_id} (status: {duplicate.status}). Nothing was changed."
                     ),
                     "existing_release_public_id": str(duplicate.public_id),
@@ -165,6 +174,7 @@ class FdaReleaseListView(APIView):
             schema_version=data.get("schema_version", ""),
             publication_date=data.get("publication_date"),
             imported_by=request.user,
+            content_fingerprint=fingerprint,
         )
 
         # Explicit, resolved above. The previous
@@ -172,7 +182,7 @@ class FdaReleaseListView(APIView):
         # exclusivity through the PRODUCTS adapter, which turned a patent row
         # into an OrangeBookProduct with an empty ingredient and strength and
         # counted it as imported.
-        import_rows(release, adapter(rows), request.user)
+        import_rows(release, neutral, request.user)
 
         release.refresh_from_db()
         return Response(

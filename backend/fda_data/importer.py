@@ -33,6 +33,7 @@ from .models import (
     FDADataSourceRelease,
     FdaImportRowResult,
     FdaImportRowResultType,
+    FDAReleaseStatus,
     IIDCalculabilityStatus,
     IIDIngredient,
     IIDPrecedentRecord,
@@ -50,9 +51,23 @@ from .terminology import (
 )
 
 
-def find_imported_duplicate(dataset_type: str, file_obj) -> FDADataSourceRelease | None:
-    """The existing release with these exact bytes, if anything was already
+def find_imported_duplicate(
+    dataset_type: str,
+    file_obj,
+    *,
+    content_fingerprint: str = "",
+    normalized_payload_sha256: str = "",
+) -> FDADataSourceRelease | None:
+    """The existing release with the same data, if anything was already
     imported into it.
+
+    The same data means (owner decision 2026-11-18) any of: the exact bytes;
+    the same normalised CONTENT (`checksums.content_fingerprint`: sorted
+    per-row hashes, ignoring line endings and trailing whitespace), so a copy
+    of the file re-saved with CRLF line endings is refused too; or, for a
+    release imported before the fingerprint existed, the same canonical rows
+    (`normalized_payload_sha256`). An active release is preferred, then the
+    newest.
 
     `register_release` is idempotent on (dataset_type, checksum): it hands back
     the existing release rather than creating one. Callers must not then run
@@ -61,12 +76,29 @@ def find_imported_duplicate(dataset_type: str, file_obj) -> FDADataSourceRelease
     = 0, and the old check let the same file through a second time as a
     silent no-op that looked like a fresh import.
     """
+    from django.db.models import Case, IntegerField, Q, Value, When
+
     checksum = compute_sha256(file_obj)
-    existing = FDADataSourceRelease.objects.filter(
-        dataset_type=dataset_type, source_checksum_sha256=checksum
-    ).first()
-    if existing and FdaImportRowResult.objects.filter(release=existing).exists():
-        return existing
+    file_obj.seek(0)
+    same = Q(source_checksum_sha256=checksum)
+    if content_fingerprint:
+        same |= Q(content_fingerprint_sha256=content_fingerprint)
+    if normalized_payload_sha256:
+        same |= Q(normalized_payload_sha256=normalized_payload_sha256)
+    candidates = (
+        FDADataSourceRelease.objects.filter(same, dataset_type=dataset_type)
+        .annotate(
+            active_first=Case(
+                When(status=FDAReleaseStatus.ACTIVE, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        )
+        .order_by("active_first", "-created_at")
+    )
+    for existing in candidates:
+        if FdaImportRowResult.objects.filter(release=existing).exists():
+            return existing
     return None
 
 
@@ -83,6 +115,9 @@ def register_release(
     imported_by=None,
     normalized_payload_sha256: str = "",
     parser_identifier: str = "",
+    content_fingerprint: str = "",
+    reimport_of: FDADataSourceRelease | None = None,
+    reimport_reason: str = "",
 ) -> FDADataSourceRelease:
     """Idempotent by (dataset_type, checksum): re-registering the exact
     same bytes for the same dataset_type returns the existing release
@@ -102,9 +137,17 @@ def register_release(
     file_obj.seek(0, 2)
     size_bytes = file_obj.tell()
     file_obj.seek(0)
-    existing = FDADataSourceRelease.objects.filter(
-        dataset_type=dataset_type, source_checksum_sha256=checksum
-    ).first()
+    if reimport_of is not None and not reimport_reason.strip():
+        raise ValueError("A deliberate re-import needs a written reason.")
+    existing = (
+        None
+        if reimport_of is not None  # a deliberate re-import is always a NEW release
+        else FDADataSourceRelease.objects.filter(
+            dataset_type=dataset_type,
+            source_checksum_sha256=checksum,
+            reimport_of__isnull=True,
+        ).first()
+    )
     if existing:
         return existing
 
@@ -129,7 +172,24 @@ def register_release(
         publication_date=publication_date,
         retrieved_at=timezone.now(),
         imported_by=imported_by,
+        content_fingerprint_sha256=content_fingerprint,
+        reimport_of=reimport_of,
+        reimport_reason=reimport_reason.strip(),
     )
+    if reimport_of is not None:
+        emit(
+            event_type=FdaDataEvent.RELEASE_REIMPORT_REGISTERED,
+            resource_id=str(release.public_id),
+            payload={
+                "dataset_type": dataset_type,
+                "reimport_of": str(reimport_of.public_id),
+                "reimport_of_status": reimport_of.status,
+                "reason": release.reimport_reason,
+                "content_fingerprint": content_fingerprint,
+            },
+            actor_id=getattr(imported_by, "id", None),
+            actor_email=getattr(imported_by, "email", ""),
+        )
     emit(
         event_type=FdaDataEvent.RELEASE_REGISTERED,
         resource_id=str(release.public_id),
