@@ -261,7 +261,7 @@ function FormulationDetailInner() {
               </label>
               <label style={{ fontSize: 13 }}>
                 Maximum dosage units/day
-                <input value={maxUnitsPerDay} onChange={(e) => setMaxUnitsPerDay(e.target.value)} style={inputStyle} />
+                <input type="number" min={1} max={1000} step="any" value={maxUnitsPerDay} onChange={(e) => setMaxUnitsPerDay(e.target.value)} style={inputStyle} />
               </label>
             </div>
             {versionError && (
