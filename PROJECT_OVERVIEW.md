@@ -1711,6 +1711,21 @@ Orange Book matching (Phase 3) also needs the reviewed workbook and approved Ora
 - **Both PRs open, not merged; both up to date with `regx-main` when opened.** The dev DB was not used this session (all testing on the `regx-s20` stack and scratch test databases); at the end its table counts (105) and migration list (71) were identical to the twenty-third session's end state, so no restore was needed.
 - **Session notes:** the shell tool halves double backslashes in heredocs, which broke two scripted edits (caught by tests and fixed; edits are now done from script files). A first CI run started from a broken copy of the run script; its leftover processes and containers were stopped and removed, and no earlier evidence was overwritten.
 
+### 2026-11-19 (twenty-fifth session) — validation report: GPT blind test (37/37), Orange Book, built-in formulas; report only (Claude Code)
+
+**Owner's direction (2026-11-19):** confirm #135 and #136 are merged; report only, no product code changes. Part 1: run the 40 GPT blind-test cases through the real IID preview on a clean stack, with an explicit result-name mapping. Part 2: Orange Book import, search, flags and reference selection; state that the SOW 2.3 calculators are not built, and test the six built-in formulas instead. Docs PR with `docs/VALIDATION_REPORT_2026-11-19.md`.
+
+- **#135 and #136 confirmed merged** (2026-11-19 07:45 and 07:46 UTC). Old hand-off deleted at session start.
+- **Stack:** new compose project `regx-val` from `regx-main@d14e286`, on its own ports (18000/18080/13000; postgres and redis not published), because another stack (`regx-codex`, from a Codex worktree) was already using the standard ports; that stack was not touched. Migrated, seeded, MFA enrolled for Reviewer/VP/Tenant Admin (new local secrets file, not in the hand-off).
+- **Reference data, all LOCAL TEST approvals:**
+  - units list, then the SPL route and dosage-form lists, then the IID July 2026 file, in the order the twenty-second session learned: mappings approved (184, 0 failures) and `reresolve_terminology` run **before** submit; 67 DROPS rows unlinked, as designed;
+  - Orange Book `EOBZIP_2026_08`: 48,761 of 48,761 rows imported, then validate, submit, approve, activate;
+  - for one test, a second Orange Book release (products.txt minus its last line) was registered and left inactive; the deliberate re-import from #135 is IID only.
+- **Part 1:** 37/37 scored cases pass, no numerical discrepancy; T031, T032 and T040 (rule unclear) all differ from the tester and all three need a rule decision, not a code fix. Case results are in the external-test folder (`gpt_actual.csv`, `gpt_comparison.md`, `gpt_raw.json`), not in the repo.
+- **Defect found outside the cases (F-1, high):** the IID preview ignores the typed unit when a meaning is chosen ("0.03 g" with "mg per dose unit" is read as 0.03 mg and shown as at or below); formulation components already refuse this through `stated_amount_problem`, the preview does not.
+- **Part 2:** Orange Book import, search by trade name and by 212379 / N212379 / NDA212379 (API), 5/5 flags against the raw file and 7/7 reference-selection checks pass; the search page has no trade-name or application-number field (F-4) and reference selection needs two UUIDs typed by hand (F-5). Six registry formulas: engine 20/20, end to end through the preview 17/17. No IID July 2026 row has both a potency and a daily maximum, so formulas E/F never run on real data and "Pass with IID precedent" cannot occur (F-3, for the owner's information).
+- **Not fixed** (report only). Confirmed defects and rule clarifications are listed separately in the report.
+- **End:** the dev DB was not used; it was started read-only to check it, and its table counts (105) and migration list (71) are identical to the twenty-fourth session's end state, so no restore was needed. CI not run (GitHub Actions disabled); docs-only change.
 ### 2026-11-19 (twenty-fifth session, continued) — F-1 fixed: the IID preview refuses a unit that disagrees with the chosen meaning (Claude Code)
 
 **Owner's direction (2026-11-19):** "Yes, fix F-1" (from `docs/VALIDATION_REPORT_2026-11-19.md`, PR #137, written earlier in this session; that entry is on the #137 branch).
