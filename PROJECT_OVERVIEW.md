@@ -1728,7 +1728,7 @@ Orange Book matching (Phase 3) also needs the reviewed workbook and approved Ora
 - **End:** the dev DB was not used; it was started read-only to check it, and its table counts (105) and migration list (71) are identical to the twenty-fourth session's end state, so no restore was needed. CI not run (GitHub Actions disabled); docs-only change.
 ### 2026-11-19 (twenty-fifth session, continued) — F-1 fixed: the IID preview refuses a unit that disagrees with the chosen meaning (Claude Code)
 
-**Owner's direction (2026-11-19):** "Yes, fix F-1" (from `docs/VALIDATION_REPORT_2026-11-19.md`, PR #137, written earlier in this session; that entry is on the #137 branch).
+**Owner's direction (2026-11-19):** "Yes, fix F-1" (from `docs/VALIDATION_REPORT_2026-11-19.md`, PR #137, written earlier in this session and since merged; its entry is directly above).
 
 - **Branch** `regx/fix/preview-unit-meaning` from `regx-main@d14e286` (worktree `D:/Praverse/session-work/2026-11-19/s25/fixwt`), one commit.
 - **Defect:** with a meaning chosen, the preview read the amount in the meaning's unit and dropped the typed unit: "0.03 g" with "mg per dose unit" was compared as 0.03 mg (false "at or below" against 0.03 mg; really 30 mg).
