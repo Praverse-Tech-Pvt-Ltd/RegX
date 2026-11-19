@@ -138,6 +138,45 @@ class FormulationVersion(PublicIDModel, TimeStampedModel):
         null=True,
         related_name="created_formulation_versions",
     )
+    # -- review and approval (Option A, owner decision 2026-11-18) ----------
+    # Set only by formulations.approval. The database freezes them with the
+    # rest of the version once it leaves draft (migration 0004).
+    submitted_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="submitted_formulation_versions",
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    returned_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="returned_formulation_versions",
+    )
+    returned_at = models.DateTimeField(null=True, blank=True)
+    return_reason = models.TextField(blank=True)
+    rejected_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rejected_formulation_versions",
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    reject_reason = models.TextField(blank=True)
+    approved_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_formulation_versions",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approval_note = models.TextField(blank=True)
+    superseded_at = models.DateTimeField(null=True, blank=True)
 
     objects = RelatedTenantScopedManager()
 

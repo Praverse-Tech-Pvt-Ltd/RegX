@@ -227,6 +227,34 @@ class FormulationVersionListCreateView(APIView):
         )
 
 
+def _version_payload(version, user, tenant) -> dict:
+    """The version, what this user may do with it now, and its history."""
+    from .approval import available_actions, history
+
+    data = dict(FormulationVersionSerializer(version).data)
+    data["available_actions"] = available_actions(version, user, tenant)
+    data["history"] = history(version)
+    return data
+
+
+def _require_draft(version) -> None:
+    """Components and dosing regimens change only while the version is a draft
+    (the database refuses it too, migration 0004)."""
+    from .models import FormulationStatus
+
+    if version.status != FormulationStatus.DRAFT:
+        raise ValidationError(
+            {
+                "error_code": "version_not_draft",
+                "detail": (
+                    f"This version is {version.get_status_display().lower()}, so it cannot be "
+                    "changed. A version can be changed only while it is a draft (a reviewer can "
+                    "return it to draft); an approved version never changes: create a new version."
+                ),
+            }
+        )
+
+
 class FormulationVersionDetailView(APIView):
     def get_permissions(self):
         return [CanViewFormulations()]
@@ -234,7 +262,39 @@ class FormulationVersionDetailView(APIView):
     def get(self, request, public_id):
         tenant = _get_tenant(request)
         version = _get_version_or_404(public_id, tenant)
-        return Response(FormulationVersionSerializer(version).data)
+        return Response(_version_payload(version, request.user, tenant))
+
+
+class FormulationVersionTransitionView(APIView):
+    """POST submit-review / return / reject / approve (formulations.approval).
+
+    Permission, status, reasons and separation of duties are all checked in
+    the service, which raises ApprovalRefused with the HTTP status to use."""
+
+    action: str = ""
+
+    def get_permissions(self):
+        return [CanViewFormulations()]
+
+    def post(self, request, public_id):
+        from .approval import ApprovalRefused, approve, reject, return_to_draft, submit
+
+        tenant = _get_tenant(request)
+        version = _get_version_or_404(public_id, tenant)
+        try:
+            if self.action == "submit":
+                version = submit(version, request.user, tenant)
+            elif self.action == "return":
+                version = return_to_draft(
+                    version, request.user, tenant, request.data.get("reason", "")
+                )
+            elif self.action == "reject":
+                version = reject(version, request.user, tenant, request.data.get("reason", ""))
+            else:
+                version = approve(version, request.user, tenant, request.data.get("note", ""))
+        except ApprovalRefused as exc:
+            return Response({"error_code": exc.code, "detail": exc.message}, status=exc.status)
+        return Response(_version_payload(version, request.user, tenant))
 
 
 class FormulationComponentListView(APIView):
@@ -254,6 +314,7 @@ class FormulationComponentListView(APIView):
     def post(self, request, public_id):
         tenant = _get_tenant(request)
         version = _get_version_or_404(public_id, tenant)
+        _require_draft(version)
         # The version gives the product's dosage form, for the per-volume rule.
         serializer = FormulationComponentSerializer(
             data=request.data, context={"formulation_version": version}
@@ -293,6 +354,7 @@ class DosingRegimenListView(APIView):
     def post(self, request, public_id):
         tenant = _get_tenant(request)
         version = _get_version_or_404(public_id, tenant)
+        _require_draft(version)
         serializer = DosingRegimenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         with _integrity_error_as_validation_error(

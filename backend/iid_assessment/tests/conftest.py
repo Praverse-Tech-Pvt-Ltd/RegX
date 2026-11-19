@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 
 from fda_data.tests._meanings import per_day, per_dose_unit
+from formulations.testing import create_on_any_version
 
 
 @pytest.fixture
@@ -154,7 +155,8 @@ def snapshot_formulation(db, tenant_a, user_a, active_iid_setup):
         maximum_dosage_units_per_day=Decimal("4.0000"),
         created_by=user_a,
     )
-    component = FormulationComponent.objects.create(
+    component = create_on_any_version(
+        FormulationComponent,
         formulation_version=formulation_version,
         component_type="inactive",
         ingredient_name="Synthetic Starch",

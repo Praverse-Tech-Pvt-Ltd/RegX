@@ -19,6 +19,7 @@ from decimal import Decimal
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
 
+from formulations.testing import formulation_guards_off
 from iig_checklist.enums import (
     AnswerType,
     ApplicabilityOutcome,
@@ -141,7 +142,8 @@ def _subject_component(formulation_version, name="SYNTHETIC-EXCIPIENT"):
         display_order=1,
     )
     component.full_clean()
-    component.save()
+    with formulation_guards_off():  # fixture versions are approved
+        component.save()
     return component
 
 

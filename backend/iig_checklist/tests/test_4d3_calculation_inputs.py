@@ -17,6 +17,7 @@ from types import MappingProxyType
 
 import pytest
 
+from formulations.testing import create_on_any_version, formulation_guards_off
 from iid_assessment import calculations as engine
 from iig_checklist import calculation_inputs as inputs_mod
 from iig_checklist import calculation_registry as registry_mod
@@ -75,7 +76,8 @@ def _formulation(product, user, *, weight="1.000000", unit="gram", max_units=Non
 def _component(formulation, *, quantity="0.250000", unit="gram", ctype="inactive", order=1):
     from formulations.models import FormulationComponent
 
-    return FormulationComponent.objects.create(
+    return create_on_any_version(
+        FormulationComponent,
         formulation_version=formulation,
         component_type=ctype,
         ingredient_name="Synthetic Excipient",
@@ -88,7 +90,8 @@ def _component(formulation, *, quantity="0.250000", unit="gram", ctype="inactive
 def _regimen(formulation, *, maximum="4.0000", population=""):
     from formulations.models import DosingRegimen
 
-    return DosingRegimen.objects.create(
+    return create_on_any_version(
+        DosingRegimen,
         formulation_version=formulation,
         units_per_administration=Decimal("1.0000"),
         administrations_per_day=Decimal("4.0000"),
@@ -803,7 +806,8 @@ class TestFormBFormulationField:
 
     def test_wrong_component_type_is_rejected(self, world):
         world["component"].component_type = "active"
-        world["component"].save(update_fields=["component_type", "updated_at"])
+        with formulation_guards_off():
+            world["component"].save(update_fields=["component_type", "updated_at"])
         result = _resolve(world)
         assert "FORMULATION_COMPONENT_TYPE_MISMATCH" in _codes(result)
 
@@ -833,7 +837,8 @@ class TestFormBFormulationFreshness:
 
         other = FormulationVersion.objects.get(pk=world["formulation"].pk)
         other.total_dosage_unit_weight = Decimal("2.000000")
-        other.save(update_fields=["total_dosage_unit_weight", "updated_at"])
+        with formulation_guards_off():
+            other.save(update_fields=["total_dosage_unit_weight", "updated_at"])
 
         # Without this the test would prove nothing: the cache must still be old.
         assert execution.formulation_version.total_dosage_unit_weight == Decimal("1.000000")
@@ -856,13 +861,14 @@ class TestFormBFormulationFreshness:
         other = FormulationVersion.objects.get(pk=world["formulation"].pk)
         other.total_dosage_unit_weight = Decimal("1000.000000")
         other.total_dosage_unit_weight_unit = "milligram"
-        other.save(
-            update_fields=[
-                "total_dosage_unit_weight",
-                "total_dosage_unit_weight_unit",
-                "updated_at",
-            ]
-        )
+        with formulation_guards_off():
+            other.save(
+                update_fields=[
+                    "total_dosage_unit_weight",
+                    "total_dosage_unit_weight_unit",
+                    "updated_at",
+                ]
+            )
         assert execution.formulation_version.total_dosage_unit_weight_unit == "gram"
 
         result = _resolve(world)
@@ -888,7 +894,8 @@ class TestFormBFormulationFreshness:
 
         other = FormulationVersion.objects.get(pk=world["formulation"].pk)
         other.total_dosage_unit_weight = Decimal("3.500000")
-        other.save(update_fields=["total_dosage_unit_weight", "updated_at"])
+        with formulation_guards_off():
+            other.save(update_fields=["total_dosage_unit_weight", "updated_at"])
 
         fresh = current_formulation_version(execution.formulation_version_id)
         result = _resolve(world)
@@ -946,7 +953,8 @@ class TestFormCMaximumDailyUnits:
     def test_scalar_only(self, world, monkeypatch):
         _mdu_registry(monkeypatch)
         world["formulation"].maximum_dosage_units_per_day = Decimal("6.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         result = _resolve(world, identifier="mdu")
         assert result.resolved
         assert result.kwargs["x"] == Decimal("6.0000")
@@ -961,7 +969,8 @@ class TestFormCMaximumDailyUnits:
     def test_scalar_higher_wins(self, world, monkeypatch):
         _mdu_registry(monkeypatch)
         world["formulation"].maximum_dosage_units_per_day = Decimal("10.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], maximum="4.0000")
         result = _resolve(world, identifier="mdu")
         assert result.kwargs["x"] == Decimal("10.0000")
@@ -969,7 +978,8 @@ class TestFormCMaximumDailyUnits:
     def test_regimen_higher_wins(self, world, monkeypatch):
         _mdu_registry(monkeypatch)
         world["formulation"].maximum_dosage_units_per_day = Decimal("4.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], maximum="12.0000")
         result = _resolve(world, identifier="mdu")
         assert result.kwargs["x"] == Decimal("12.0000")
@@ -986,7 +996,8 @@ class TestFormCMaximumDailyUnits:
     def test_equal_candidates_record_agreement(self, world, monkeypatch):
         _mdu_registry(monkeypatch)
         world["formulation"].maximum_dosage_units_per_day = Decimal("4.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], maximum="4.0000")
         result = _resolve(world, identifier="mdu")
         assert result.kwargs["x"] == Decimal("4.0000")

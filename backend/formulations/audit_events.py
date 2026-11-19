@@ -10,6 +10,11 @@ class FormulationEvent:
     COMPONENT_ADDED = "formulations.component.added"
     COMPONENT_CHANGED = "formulations.component.changed"
     DOSING_REGIMEN_CHANGED = "formulations.dosing_regimen.changed"
+    VERSION_SUBMITTED_FOR_REVIEW = "formulations.version.submitted_for_review"
+    VERSION_RETURNED = "formulations.version.returned"
+    VERSION_REJECTED = "formulations.version.rejected"
+    VERSION_APPROVED = "formulations.version.approved"
+    VERSION_SUPERSEDED = "formulations.version.superseded"
 
 
 def emit(

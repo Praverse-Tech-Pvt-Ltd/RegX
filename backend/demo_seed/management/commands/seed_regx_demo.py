@@ -39,11 +39,10 @@ Two of those rules shape the seed and are worth knowing before editing it:
 * `PERM_APPROVE` and `PERM_ACTIVATE` are held by the VP role only -- not by
   Tenant Admin, which holds view permissions alone.
 
-Formulations are different. That app has no transition service, no approval
-endpoint, and `FormulationVersionSerializer` sets `read_only_fields = fields`,
-so there is no sanctioned path to move a formulation version to `approved`.
-Creating it in that state directly is what the app's own tests do. This is
-recorded as a known asymmetry rather than worked around.
+Formulation versions go through `formulations.approval` (Option A, 2026-11-18):
+the version is created as a draft with its components, the Doer submits it and
+the VP approves it. The database refuses an approval by the version's creator
+or submitter, so the VP is a different account from the Doer.
 
 USAGE
 -----
@@ -284,7 +283,7 @@ class Command(BaseCommand):
             users[role_name] = user
 
         checklist = self._seed_checklist(tenant, users)
-        formulation = self._seed_formulation(tenant, users["doer"])
+        formulation = self._seed_formulation(tenant, users["doer"], users["vp"])
         execution_public_id = self._seed_execution(
             tenant, users["doer"], checklist["version"], formulation["version"]
         )
@@ -783,7 +782,7 @@ class Command(BaseCommand):
 
     # -- formulation -----------------------------------------------------
 
-    def _seed_formulation(self, tenant, actor) -> dict:
+    def _seed_formulation(self, tenant, actor, approver) -> dict:
         from formulations.models import (
             FormulationComponent,
             FormulationStatus,
@@ -813,20 +812,18 @@ class Command(BaseCommand):
 
         version = product.formulation_versions.filter(version_number=1).first()
         if version is None:
-            # No transition service and no writable status field exists for
-            # formulation versions, so `approved` is set at creation. This is
-            # what the formulations and IIG test suites do; see the module
-            # docstring for why it is not treated as a governance bypass.
+            # Created as a draft with its components, then submitted by the
+            # Doer and approved by the VP through formulations.approval.
             version = FormulationVersion.objects.create(
                 product=product,
                 version_number=1,
-                status=FormulationStatus.APPROVED,
+                status=FormulationStatus.DRAFT,
                 total_dosage_unit_weight=Decimal("500.000000"),
                 total_dosage_unit_weight_unit="milligram",
                 maximum_dosage_units_per_day=Decimal("2.0000"),
                 created_by=actor,
             )
-            self._note(True, "formulation version 1 (approved)")
+            self._note(True, "formulation version 1 (draft)")
 
             for order, (name, qty, function) in enumerate(
                 [
@@ -846,6 +843,18 @@ class Command(BaseCommand):
                     display_order=order,
                 )
             self._note(True, "3 excipient components")
+
+            from formulations.approval import approve, submit
+
+            version = submit(version, actor, tenant)
+            self._note(True, "formulation version submit for review -> under_review")
+            version = approve(
+                version,
+                approver,
+                tenant,
+                "DEMO approval of synthetic demonstration data (internal workflow only).",
+            )
+            self._note(True, "formulation version approve -> approved")
         else:
             self._note(False, "formulation version 1")
 

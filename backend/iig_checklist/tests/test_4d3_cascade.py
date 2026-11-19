@@ -38,6 +38,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
 from fda_data.tests._meanings import per_day, per_dose_unit
+from formulations.testing import create_on_any_version, formulation_guards_off
 from iid_assessment import calculations as engine
 from iig_checklist import calculation_registry as registry_mod
 from iig_checklist import cascade as cascade_mod
@@ -112,7 +113,8 @@ def _component(
 ):
     from formulations.models import FormulationComponent
 
-    return FormulationComponent.objects.create(
+    return create_on_any_version(
+        FormulationComponent,
         formulation_version=formulation,
         component_type="inactive",
         ingredient_name=name,
@@ -824,7 +826,8 @@ class TestOutcomePersistence:
 
         component = world["component"]
         component.quantity_per_dosage_unit = Decimal("0.500000")
-        component.save(update_fields=["quantity_per_dosage_unit", "updated_at"])
+        with formulation_guards_off():
+            component.save(update_fields=["quantity_per_dosage_unit", "updated_at"])
 
         _cascade(world)
         assert _outcome(world, "percentage_w_w").value == Decimal("50")
@@ -900,7 +903,8 @@ class TestAudit:
 
         component = world["component"]
         component.quantity_per_dosage_unit = Decimal("0.500000")
-        component.save(update_fields=["quantity_per_dosage_unit", "updated_at"])
+        with formulation_guards_off():
+            component.save(update_fields=["quantity_per_dosage_unit", "updated_at"])
 
         with django_capture_on_commit_callbacks(execute=True):
             result = _cascade(world)
@@ -1714,7 +1718,8 @@ class TestRealChainCascade:
 
         component = chain["component"]
         component.quantity_per_dosage_unit = Decimal("0.125000")
-        component.save(update_fields=["quantity_per_dosage_unit", "updated_at"])
+        with formulation_guards_off():
+            component.save(update_fields=["quantity_per_dosage_unit", "updated_at"])
 
         _cascade(chain)
         assert _outcome(chain, "daily_exposure").value == Decimal("0.500000")
@@ -1875,7 +1880,8 @@ class TestRealDiamondCascade:
         first = _outcome(world, "difference_from_iid_mde").value
 
         world["component"].quantity_per_dosage_unit = Decimal("0.125000")
-        world["component"].save(update_fields=["quantity_per_dosage_unit", "updated_at"])
+        with formulation_guards_off():
+            world["component"].save(update_fields=["quantity_per_dosage_unit", "updated_at"])
         _cascade(world)
 
         b_outcome = _outcome(world, "daily_exposure")
