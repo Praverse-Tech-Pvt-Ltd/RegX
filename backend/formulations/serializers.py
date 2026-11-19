@@ -119,6 +119,21 @@ class ReferenceProductSelectionSerializer(serializers.Serializer):
 
 class FormulationVersionSerializer(serializers.ModelSerializer):
     product = serializers.UUIDField(source="product.public_id", read_only=True)
+    created_by_email = serializers.EmailField(
+        source="created_by.email", read_only=True, default=None
+    )
+    submitted_by_email = serializers.EmailField(
+        source="submitted_by.email", read_only=True, default=None
+    )
+    returned_by_email = serializers.EmailField(
+        source="returned_by.email", read_only=True, default=None
+    )
+    rejected_by_email = serializers.EmailField(
+        source="rejected_by.email", read_only=True, default=None
+    )
+    approved_by_email = serializers.EmailField(
+        source="approved_by.email", read_only=True, default=None
+    )
 
     class Meta:
         model = FormulationVersion
@@ -136,6 +151,19 @@ class FormulationVersionSerializer(serializers.ModelSerializer):
             "dosing_basis",
             "rationale",
             "created_at",
+            "created_by_email",
+            "submitted_by_email",
+            "submitted_at",
+            "returned_by_email",
+            "returned_at",
+            "return_reason",
+            "rejected_by_email",
+            "rejected_at",
+            "reject_reason",
+            "approved_by_email",
+            "approved_at",
+            "approval_note",
+            "superseded_at",
         ]
         read_only_fields = fields
 

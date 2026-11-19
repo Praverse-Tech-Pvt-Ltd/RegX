@@ -18,6 +18,7 @@ from decimal import Decimal
 import pytest
 
 from fda_data.tests._meanings import per_day, per_dose_unit
+from formulations.testing import create_on_any_version, formulation_guards_off
 from iid_assessment.models import AssessmentSnapshot
 from iid_assessment.services import (
     ActiveReleaseUnavailable,
@@ -285,7 +286,8 @@ class TestOwnershipAndIsolation:
             total_dosage_unit_weight_unit="milligram",
             created_by=user_a,
         )
-        foreign_component = FormulationComponent.objects.create(
+        foreign_component = create_on_any_version(
+            FormulationComponent,
             formulation_version=other_version,
             component_type="inactive",
             ingredient_name="Other Excipient",
@@ -572,7 +574,8 @@ class TestSnapshotApi:
             total_dosage_unit_weight_unit="milligram",
             created_by=user_a,
         )
-        foreign = FormulationComponent.objects.create(
+        foreign = create_on_any_version(
+            FormulationComponent,
             formulation_version=other_version,
             component_type="inactive",
             ingredient_name="Other",
@@ -643,7 +646,8 @@ class TestSnapshotApi:
 def _regimen(formulation_version, units):
     from formulations.models import DosingRegimen
 
-    return DosingRegimen.objects.create(
+    return create_on_any_version(
+        DosingRegimen,
         formulation_version=formulation_version,
         units_per_administration=Decimal("1.0000"),
         administrations_per_day=Decimal(units),
@@ -665,7 +669,8 @@ class TestClientDosingValueProhibited:
     def _worst_case_fixture(self, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal("1.0000")
-        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(fv, "10")
         return fv
 
@@ -765,7 +770,8 @@ class TestClientDosingValueProhibited:
     def test_null_version_scalar_uses_the_regimen(self, api_client_doer, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = None
-        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(fv, "8")
 
         resp = _post(api_client_doer, world)
@@ -779,7 +785,8 @@ class TestClientDosingValueProhibited:
     def test_version_scalar_higher_than_every_regimen_wins(self, api_client_doer, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal("12.0000")
-        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(fv, "3")
         _regimen(fv, "5")
 
@@ -791,7 +798,8 @@ class TestClientDosingValueProhibited:
     def test_no_regimen_uses_the_version_scalar(self, api_client_doer, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal("4.0000")
-        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         assert not fv.dosing_regimens.exists()
 
         resp = _post(api_client_doer, world)
@@ -802,7 +810,8 @@ class TestClientDosingValueProhibited:
     def test_no_source_at_all_fails_closed(self, api_client_doer, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = None
-        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
 
         resp = _post(api_client_doer, world)
         assert resp.status_code == 201, resp.content
@@ -818,7 +827,8 @@ class TestClientDosingValueProhibited:
     def test_non_positive_scalar_alone_fails_closed(self, api_client_doer, world, scalar):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal(scalar)
-        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
 
         resp = _post(api_client_doer, world)
         assert resp.status_code == 201, resp.content
@@ -829,7 +839,8 @@ class TestClientDosingValueProhibited:
     def test_zero_scalar_with_a_valid_regimen_uses_the_regimen(self, api_client_doer, world):
         fv = world["formulation_version"]
         fv.maximum_dosage_units_per_day = Decimal("0.0000")
-        fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fv.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(fv, "6")
 
         resp = _post(api_client_doer, world)

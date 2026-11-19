@@ -27,6 +27,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
 from fda_data.tests._meanings import per_day, per_dose_unit
+from formulations.testing import create_on_any_version, formulation_guards_off
 from iid_assessment import calculations as engine
 from iig_checklist import calculation_execution as execution_mod
 from iig_checklist import calculation_registry as registry_mod
@@ -171,7 +172,8 @@ def _formulation(product, user, *, weight="1.000000", max_units=None):
 def _component(formulation, *, quantity="0.250000", order=1, ctype="inactive", ingredient=None):
     from formulations.models import FormulationComponent
 
-    return FormulationComponent.objects.create(
+    return create_on_any_version(
+        FormulationComponent,
         formulation_version=formulation,
         component_type=ctype,
         ingredient_name="Synthetic Excipient",
@@ -902,7 +904,8 @@ class TestNonSuccessResults:
     def test_resolver_unit_fault_is_not_scientific_non_comparability(self, world):
         """An unknown source unit is UNIT_MISMATCH, never NOT_COMPARABLE."""
         world["component"].quantity_unit = "furlong"
-        world["component"].save(update_fields=["quantity_unit", "updated_at"])
+        with formulation_guards_off():
+            world["component"].save(update_fields=["quantity_unit", "updated_at"])
         result = _run(world, "percentage_w_w")
         outcome = world["outcomes"]["percentage_w_w"]
         outcome.refresh_from_db()
@@ -1161,7 +1164,8 @@ class TestRecalculation:
         first = _run(world, "percentage_w_w")
         outcome_id = first.outcome_public_id
         world["component"].quantity_per_dosage_unit = Decimal("0.500000")
-        world["component"].save(update_fields=["quantity_per_dosage_unit", "updated_at"])
+        with formulation_guards_off():
+            world["component"].save(update_fields=["quantity_per_dosage_unit", "updated_at"])
         second = _run(world, "percentage_w_w")
 
         assert second.outcome_public_id == outcome_id
@@ -1765,9 +1769,10 @@ def _use_milligram_component(world):
     """Make the subject component 0.000001 mg, i.e. exactly 1E-9 g once converted."""
     world["component"].quantity_per_dosage_unit = Decimal("0.000001")
     world["component"].quantity_unit = "milligram"
-    world["component"].save(
-        update_fields=["quantity_per_dosage_unit", "quantity_unit", "updated_at"]
-    )
+    with formulation_guards_off():
+        world["component"].save(
+            update_fields=["quantity_per_dosage_unit", "quantity_unit", "updated_at"]
+        )
 
 
 class TestPlainNotationPersistence:
@@ -2196,7 +2201,8 @@ class TestGovernedSnapshotIntegration:
 def _regimen(formulation, units, *, population=""):
     from formulations.models import DosingRegimen
 
-    return DosingRegimen.objects.create(
+    return create_on_any_version(
+        DosingRegimen,
         formulation_version=formulation,
         units_per_administration=Decimal("1.0000"),
         administrations_per_day=Decimal(units),
@@ -2232,7 +2238,8 @@ class TestWorstCaseDailyUnits:
         the governed worst case is 300, which exceeds the 200 mg precedent MDE.
         """
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         assert execution_mod._worst_case_daily_units(world["formulation"]) == Decimal("10.0000")
@@ -2259,7 +2266,8 @@ class TestWorstCaseDailyUnits:
         from iid_assessment.services import create_assessment_snapshot
 
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         version_field_only = create_assessment_snapshot(
@@ -2285,7 +2293,8 @@ class TestWorstCaseDailyUnits:
     def test_null_version_field_uses_the_regimen(self, world):
         """No DATA_REQUIRED merely because the version field is null."""
         world["formulation"].maximum_dosage_units_per_day = None
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "8")
 
         assert execution_mod._worst_case_daily_units(world["formulation"]) == Decimal("8.0000")
@@ -2302,7 +2311,8 @@ class TestWorstCaseDailyUnits:
 
     def test_version_field_higher_than_every_regimen_wins(self, world):
         world["formulation"].maximum_dosage_units_per_day = Decimal("12.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "3")
         _regimen(world["formulation"], "5")
 
@@ -2314,7 +2324,8 @@ class TestWorstCaseDailyUnits:
 
     def test_multiple_regimens_select_the_highest_deterministically(self, world):
         world["formulation"].maximum_dosage_units_per_day = Decimal("2.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         for units in ("4", "9", "6", "9"):
             _regimen(world["formulation"], units)
 
@@ -2326,14 +2337,16 @@ class TestWorstCaseDailyUnits:
 
     def test_no_regimen_uses_the_version_field(self, world):
         world["formulation"].maximum_dosage_units_per_day = Decimal("4.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         assert not world["formulation"].dosing_regimens.exists()
         assert execution_mod._worst_case_daily_units(world["formulation"]) == Decimal("4.0000")
 
     def test_no_source_at_all_fails_closed(self, world):
         """M4D3-MDU-013/014 -- unresolved, never an invented default."""
         world["formulation"].maximum_dosage_units_per_day = None
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         assert execution_mod._worst_case_daily_units(world["formulation"]) is None
 
         _run(world, "percentage_of_iid_potency")
@@ -2347,7 +2360,8 @@ class TestWorstCaseDailyUnits:
     def test_a_non_positive_version_field_is_not_used_as_zero_exposure(self, world):
         """The selector rejects a non-positive value; no zero-exposure snapshot."""
         world["formulation"].maximum_dosage_units_per_day = Decimal("0.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         assert execution_mod._worst_case_daily_units(world["formulation"]) is None
         _run(world, "percentage_of_iid_potency")
         daily = self._daily_exposure(self._snapshot(world))
@@ -2395,7 +2409,8 @@ class TestWorstCaseDailyUnits:
     def test_the_4d3_precedent_fields_are_untouched_by_the_change(self, world):
         """The four fields Form D reads come from the precedent record."""
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         _run(world, "percentage_of_iid_potency")
@@ -2414,7 +2429,8 @@ class TestWorstCaseDailyUnits:
         from iid_assessment.models import AssessmentSnapshot
 
         world["formulation"].maximum_dosage_units_per_day = Decimal("1.0000")
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         def _explode(**kwargs):
@@ -2488,7 +2504,8 @@ class TestFormCDailyUnitsConsistency:
 
         fresh = FormulationVersion.objects.get(pk=world["formulation"].pk)
         fresh.maximum_dosage_units_per_day = Decimal("9.0000")
-        fresh.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fresh.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
 
         # The cached relation still reports the old value...
         assert execution.formulation_version.maximum_dosage_units_per_day == (Decimal("4.0000"))
@@ -2518,7 +2535,8 @@ class TestFormCDailyUnitsConsistency:
         execution.formulation_version  # noqa: B018 - populate the descriptor
         fresh = FormulationVersion.objects.get(pk=world["formulation"].pk)
         fresh.maximum_dosage_units_per_day = Decimal("1.0000")
-        fresh.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            fresh.save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         _regimen(world["formulation"], "10")
 
         resolved, failures = self._form_c(world)
@@ -2556,7 +2574,8 @@ class TestFormCDailyUnitsConsistency:
         world["formulation"].maximum_dosage_units_per_day = (
             None if scalar is None else Decimal(scalar)
         )
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         for units in regimens:
             _regimen(world["formulation"], units)
 
@@ -2577,7 +2596,8 @@ class TestFormCDailyUnitsConsistency:
         world["formulation"].maximum_dosage_units_per_day = (
             None if scalar is None else Decimal(scalar)
         )
-        world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
+        with formulation_guards_off():
+            world["formulation"].save(update_fields=["maximum_dosage_units_per_day", "updated_at"])
         for units in regimens:
             _regimen(world["formulation"], units)
 

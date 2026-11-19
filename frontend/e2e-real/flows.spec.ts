@@ -107,12 +107,42 @@ test("Doer: IID preview on public FDA IID data", async ({ page }) => {
   });
 });
 
+test("Doer: submit the new formulation version for review", async ({ page }) => {
+  await signIn(page, "doer");
+  await step(page, "doer submits the new version for review", async () => {
+    await page.goto(state.versionUrl!);
+    const review = page.getByTestId("formulation-review");
+    await expect(review.getByTestId("version-status")).toHaveText("Draft");
+    await review.getByRole("button", { name: "Submit for review" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Submit for review" }).click();
+    await expect(review.getByTestId("version-status")).toHaveText("Under review");
+    // The Doer is offered no approval action, and the version is frozen.
+    await expect(review.getByRole("button", { name: "Approve" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add component" })).toHaveCount(0);
+  });
+});
+
+test("VP: approve the new formulation version", async ({ page }) => {
+  await signIn(page, "vp");
+  await step(page, "vp approves the new version (with a note, after confirming)", async () => {
+    await page.goto(state.versionUrl!);
+    const review = page.getByTestId("formulation-review");
+    await expect(review.getByTestId("version-status")).toHaveText("Under review");
+    await review.getByRole("button", { name: "Approve" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("button", { name: "Approve" })).toBeDisabled(); // a note is required
+    await dialog.getByLabel(/Approval note/).fill("Real-stack test: synthetic formulation reviewed (internal).");
+    await dialog.getByRole("button", { name: "Approve" }).click();
+    await expect(review.getByTestId("version-status")).toHaveText("Approved (internal)");
+    await expect(review.getByRole("table", { name: "Version history" })).toContainText("approved (internal)");
+  });
+});
+
 test("Doer: run the IIG checklist and submit it for review", async ({ page }) => {
   await signIn(page, "doer");
-  // KNOWN PRODUCT GAP (reported, not built): the API runs a checklist only on an
-  // APPROVED formulation version and the app has no step that approves one, so
-  // the version created above can never be checked. The picker must say so.
-  await step(page, "new draft version is offered but blocked (needs approval workflow)", async () => {
+  // QA-01 closed by Option A: the version created above is now approved, so the
+  // IIG checklist runs on it. This step used to be recorded as BLOCKED.
+  await step(page, "the newly created, approved formulation runs the IIG checklist", async () => {
     await page.goto(state.versionUrl!);
     await page.getByRole("link", { name: /Run IIG checklist on this version/ }).click();
     const optionState = () =>
@@ -120,12 +150,12 @@ test("Doer: run the IIG checklist and submit it for review", async ({ page }) =>
         const option = [...document.querySelectorAll("option")].find((o) => o.textContent?.includes(code));
         return option ? { text: option.textContent, disabled: option.disabled } : null;
       }, `RS-${RUN}`);
-    await expect.poll(optionState).toMatchObject({ disabled: true });
-    expect((await optionState())?.text).toMatch(/not approved/);
-    await expect(page.getByText("This formulation version is not approved")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Create execution" })).toBeDisabled();
-    record("flows.jsonl", { step: "BLOCKED: checklist on a newly created formulation version", ok: false, blocked: true,
-      reason: "no approval step for formulation versions in the app (API requires an approved version)" });
+    await expect.poll(optionState).toMatchObject({ disabled: false });
+    const selects = page.locator("main select");
+    await selects.first().selectOption({ index: 1 }); // the active demo checklist version
+    await page.getByRole("button", { name: "Create execution" }).click();
+    await expect(page).toHaveURL(/\/iig-checklists\/executions\/[0-9a-f-]{36}/);
+    await expect(page.getByText("draft").first()).toBeVisible();
   });
   // The demo seed's approved formulation version has a draft execution on the
   // active demo checklist; run that one through review.

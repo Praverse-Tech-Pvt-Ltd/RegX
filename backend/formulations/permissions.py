@@ -8,11 +8,16 @@ PERM_CREATE = "formulations.create"
 PERM_EDIT_DRAFT = "formulations.edit_draft"
 PERM_VIEW = "formulations.view"
 PERM_SUBMIT_REVIEW = "formulations.submit_review"
+#: Return a version under review to draft, or reject it (Reviewer, VP).
+PERM_REVIEW = "formulations.review"
+#: Approve a version under review (VP only). Never the version's creator or
+#: submitter, whatever their roles (formulations.approval).
+PERM_APPROVE = "formulations.approve"
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     Role.BuiltIn.DOER: [PERM_VIEW, PERM_CREATE, PERM_EDIT_DRAFT, PERM_SUBMIT_REVIEW],
-    Role.BuiltIn.REVIEWER: [PERM_VIEW],
-    Role.BuiltIn.VP: [PERM_VIEW],
+    Role.BuiltIn.REVIEWER: [PERM_VIEW, PERM_REVIEW],
+    Role.BuiltIn.VP: [PERM_VIEW, PERM_REVIEW, PERM_APPROVE],
     Role.BuiltIn.TENANT_ADMIN: [PERM_VIEW, PERM_CREATE, PERM_EDIT_DRAFT, PERM_SUBMIT_REVIEW],
     Role.BuiltIn.PLATFORM_SUPPORT: [],
 }

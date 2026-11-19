@@ -1121,6 +1121,23 @@ export interface FormulationVersion {
   dosing_basis: string;
   rationale: string;
   created_at: string;
+  // Review and approval (Option A). Present on detail and action responses.
+  created_by_email?: string | null;
+  submitted_by_email?: string | null;
+  submitted_at?: string | null;
+  returned_by_email?: string | null;
+  returned_at?: string | null;
+  return_reason?: string;
+  rejected_by_email?: string | null;
+  rejected_at?: string | null;
+  reject_reason?: string;
+  approved_by_email?: string | null;
+  approved_at?: string | null;
+  approval_note?: string;
+  superseded_at?: string | null;
+  /** What this user may do now: submit, return, reject, approve (display only). */
+  available_actions?: string[];
+  history?: { event: string; at: string; by: string; reason: string }[];
 }
 
 export interface FormulationComponent {
@@ -1242,6 +1259,34 @@ export const formulations = {
         `/api/regx/v1/formulations/products/${productPublicId}/versions/`,
         { headers: { "X-Tenant-Slug": tenantSlug } }
       ),
+
+    submitReview: (tenantSlug: string, publicId: string) =>
+      apiRequest<FormulationVersion>(`/api/regx/v1/formulations/versions/${publicId}/submit-review/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: {},
+      }),
+
+    returnToDraft: (tenantSlug: string, publicId: string, reason: string) =>
+      apiRequest<FormulationVersion>(`/api/regx/v1/formulations/versions/${publicId}/return/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+
+    reject: (tenantSlug: string, publicId: string, reason: string) =>
+      apiRequest<FormulationVersion>(`/api/regx/v1/formulations/versions/${publicId}/reject/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { reason },
+      }),
+
+    approve: (tenantSlug: string, publicId: string, note: string) =>
+      apiRequest<FormulationVersion>(`/api/regx/v1/formulations/versions/${publicId}/approve/`, {
+        method: "POST",
+        headers: { "X-Tenant-Slug": tenantSlug },
+        body: { note },
+      }),
   },
 
   components: {

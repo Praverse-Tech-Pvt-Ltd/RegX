@@ -29,6 +29,26 @@ urlpatterns = [
         name="version-detail",
     ),
     path(
+        "formulations/versions/<uuid:public_id>/submit-review/",
+        views.FormulationVersionTransitionView.as_view(action="submit"),
+        name="version-submit-review",
+    ),
+    path(
+        "formulations/versions/<uuid:public_id>/return/",
+        views.FormulationVersionTransitionView.as_view(action="return"),
+        name="version-return",
+    ),
+    path(
+        "formulations/versions/<uuid:public_id>/reject/",
+        views.FormulationVersionTransitionView.as_view(action="reject"),
+        name="version-reject",
+    ),
+    path(
+        "formulations/versions/<uuid:public_id>/approve/",
+        views.FormulationVersionTransitionView.as_view(action="approve"),
+        name="version-approve",
+    ),
+    path(
         "formulations/versions/<uuid:public_id>/components/",
         views.FormulationComponentListView.as_view(),
         name="component-list",

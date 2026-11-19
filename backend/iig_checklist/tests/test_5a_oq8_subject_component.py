@@ -13,6 +13,7 @@ from decimal import Decimal
 
 import pytest
 
+from formulations.testing import formulation_guards_off
 from iig_checklist.enums import DataSourceClassification
 from iig_checklist.services import (
     SubjectComponentNotInFormulationVersion,
@@ -172,7 +173,8 @@ class TestSubjectComponentRequirement:
     def test_a_single_component_formulation_works_the_same_way(self, world):
         from formulations.models import FormulationComponent
 
-        FormulationComponent.objects.filter(pk=world["second"].pk).delete()
+        with formulation_guards_off():
+            FormulationComponent.objects.filter(pk=world["second"].pk).delete()
         version, _ = _iid_version(world["definition"], world["user"])
         execution = _create(world, version, component=world["first"])
         assert execution.subject_component_id == world["first"].pk

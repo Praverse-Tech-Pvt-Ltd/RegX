@@ -6,6 +6,7 @@ import Link from "next/link";
 import { formulations, type FormulationVersion, type FormulationComponent, type DosingRegimen, ApiError, isSignedOut, loadError } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
+import { FormulationReviewPanel } from "@/components/FormulationReviewPanel";
 
 /** The units a component may use (iid_assessment/amount_limits.py COMPONENT_UNITS). */
 const COMPONENT_UNITS = [
@@ -148,6 +149,8 @@ function VersionDetailInner() {
     );
   }
 
+  const isDraft = version.status === "draft";
+
   return (
     <main style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1rem" }}>
       <div style={{ marginBottom: "0.5rem" }}>
@@ -161,13 +164,15 @@ function VersionDetailInner() {
       <h1 style={{ margin: "0 0 0.25rem" }}>Formulation Version {version.version_number}</h1>
       <p style={{ color: "#66768b", fontSize: 13, marginTop: 0 }}>
         {version.total_dosage_unit_weight} {version.total_dosage_unit_weight_unit} total dosage-unit
-        weight <ProvenanceLabel kind="USER_INPUT" /> · status: {version.status}
+        weight <ProvenanceLabel kind="USER_INPUT" />
       </p>
       {version.maximum_dosage_units_per_day && (
         <p style={{ color: "#66768b", fontSize: 13, marginTop: 0 }}>
           Maximum {version.maximum_dosage_units_per_day} dosage units/day <ProvenanceLabel kind="USER_INPUT" />
         </p>
       )}
+
+      <FormulationReviewPanel tenantSlug={tenantSlug} version={version} onChanged={setVersion} />
 
       {/* Components */}
       <section style={{ marginTop: "1.5rem", border: "1px solid #dce7f4", borderRadius: 8, padding: "1rem" }}>
@@ -218,10 +223,17 @@ function VersionDetailInner() {
         ) : (
           <p style={{ color: "#66768b", fontSize: 13 }}>No components added yet.</p>
         )}
-        <button onClick={() => setShowComponentForm((s) => !s)} style={smallButtonStyle}>
-          {showComponentForm ? "Cancel" : "Add component"}
-        </button>
-        {showComponentForm && (
+        {/* Components change only while the version is a draft (server and database agree). */}
+        {isDraft ? (
+          <button onClick={() => setShowComponentForm((s) => !s)} style={smallButtonStyle}>
+            {showComponentForm ? "Cancel" : "Add component"}
+          </button>
+        ) : (
+          <p style={{ color: "#66768b", fontSize: 13, margin: 0 }} data-testid="frozen-note">
+            Components can be changed only while the version is a draft.
+          </p>
+        )}
+        {isDraft && showComponentForm && (
           <form onSubmit={handleAddComponent} style={{ marginTop: 12 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
               <label style={{ fontSize: 13 }}>
@@ -301,10 +313,12 @@ function VersionDetailInner() {
         ) : (
           <p style={{ color: "#66768b", fontSize: 13 }}>No dosing regimen recorded yet.</p>
         )}
-        <button onClick={() => setShowRegimenForm((s) => !s)} style={smallButtonStyle}>
-          {showRegimenForm ? "Cancel" : "Add dosing regimen"}
-        </button>
-        {showRegimenForm && (
+        {isDraft && (
+          <button onClick={() => setShowRegimenForm((s) => !s)} style={smallButtonStyle}>
+            {showRegimenForm ? "Cancel" : "Add dosing regimen"}
+          </button>
+        )}
+        {isDraft && showRegimenForm && (
           <form onSubmit={handleAddRegimen} style={{ marginTop: 12 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
               <label style={{ fontSize: 13 }}>

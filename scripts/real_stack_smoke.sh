@@ -10,8 +10,10 @@
 # API calls, error text, screenshot ($OUT/pages.jsonl, $OUT/screenshots/).
 #
 # Flows (--flows): Doer creates a product, a formulation version and two
-# components, runs an IID preview, answers and submits the seeded draft IIG
-# checklist execution, uploads a PDF; the VP approves the execution.
+# components, runs an IID preview, submits the version for review; the VP
+# approves it (Option A); the Doer runs the IIG checklist on that newly approved
+# version, answers and submits the seeded draft execution, uploads a PDF; the VP
+# approves the execution.
 # Then e2e-real/qa-fixes.spec.ts checks the fixes for QA-02/03/05/06/07/13 of
 # docs/QA_BROWSER_TEST_2026-11-18.md (input checks, no stale IID result, honest
 # reasons, release link health, buttons that follow permissions).

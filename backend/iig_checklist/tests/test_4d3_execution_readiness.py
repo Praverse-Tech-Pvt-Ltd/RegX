@@ -23,6 +23,7 @@ from types import MappingProxyType
 
 import pytest
 
+from formulations.testing import create_on_any_version
 from iid_assessment import calculations as engine
 from iig_checklist import calculation_registry as registry_mod
 from iig_checklist.calculation_inputs import (
@@ -76,7 +77,8 @@ def _formulation(product, user):
 def _component(formulation, *, quantity="0.250000", order=1):
     from formulations.models import FormulationComponent
 
-    return FormulationComponent.objects.create(
+    return create_on_any_version(
+        FormulationComponent,
         formulation_version=formulation,
         component_type="inactive",
         ingredient_name="Synthetic Excipient",

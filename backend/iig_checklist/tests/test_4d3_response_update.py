@@ -29,6 +29,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from fda_data.tests._meanings import per_day, per_dose_unit
+from formulations.testing import create_on_any_version
 from iig_checklist import calculation_registry as registry_mod
 from iig_checklist import cascade as cascade_mod
 from iig_checklist.enums import (
@@ -156,7 +157,8 @@ def world(db, tenant_a, tenant_definition, user_a, doer_membership):
         maximum_dosage_units_per_day=Decimal("4.0000"),
         created_by=user_a,
     )
-    component = FormulationComponent.objects.create(
+    component = create_on_any_version(
+        FormulationComponent,
         formulation_version=formulation,
         component_type="inactive",
         ingredient_name="Update Excipient",
