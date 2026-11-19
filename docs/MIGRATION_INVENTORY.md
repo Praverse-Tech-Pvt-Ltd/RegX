@@ -55,6 +55,12 @@ database contains, on a fresh install and on one upgraded from Milestone 8.
 `common/tests/test_governed_database_objects.py` asserts that catalogue by name
 and attachment table.
 
+**Since this release:** `formulations/0004_version_db_governance` (Option A,
+formulation version approval, 2026-11-19) adds **3 functions and 4 triggers**:
+class **A** forward (additive) and **A** in reverse (drops the protection only).
+The catalogue is now **49 functions and 61 triggers**; the test above asserts
+the new totals.
+
 ## The one migration with a required operator action
 
 `submission_packages/0003_package_revision_family` builds

@@ -25,10 +25,12 @@ a better test. This is the inventory; those are the proof.
 
 The expected set below was not copied from a live database and then blessed.
 Each entry traces to the migration that creates it, and the totals were
-reconciled against the migration sources: 46 plpgsql functions and 57 triggers,
-where 57 is the 49 `CREATE TRIGGER` statements in the migrations plus the
+reconciled against the migration sources: 49 plpgsql functions and 61 triggers,
+where 61 is the 53 `CREATE TRIGGER` statements in the migrations plus the
 templated expansion of two statements over three link tables in each of
-`regulatory_cases` and `submission_dossiers`.
+`regulatory_cases` and `submission_dossiers`. (`formulations/0004`, Option A
+formulation approval, 2026-11-19, added 3 functions and 4 triggers to the
+earlier 46 and 57.)
 
 **Absences are recorded too.** `iig_checklist` and `documents` have no
 governed triggers at all. That is a real property of the platform, not an
@@ -61,6 +63,12 @@ EXPECTED_TRIGGERS = {
         "guard_update_blueprint_version",
         "no_delete_blueprint_version",
     ),
+    "formulations_formulationversion": (
+        "formulations_version_guard_update",
+        "formulations_version_prevent_delete",
+    ),
+    "formulations_formulationcomponent": ("formulations_component_guard",),
+    "formulations_dosingregimen": ("formulations_dosingregimen_guard",),
     "dossier_upgrades_dossierupgradeapplication": (
         "freeze_upgrade_history",
         "guard_insert_upgrade_application",
@@ -165,6 +173,9 @@ EXPECTED_FUNCTIONS = (
     "dossier_upgrades_guard_plan_update",
     "dossier_upgrades_prevent_history_change",
     "dossier_upgrades_prevent_plan_delete",
+    "formulations_guard_version_child",
+    "formulations_guard_version_update",
+    "formulations_prevent_version_delete",
     "external_integrations_guard_connector_insert",
     "external_integrations_guard_connector_update",
     "external_integrations_guard_credential_insert",
@@ -289,8 +300,8 @@ class TestGovernedTriggersAreInstalled:
         """A blunt cross-check on the two numbers the migration register cites."""
         installed = _installed_triggers()
         total = sum(len(names) for names in installed.values())
-        assert total == 57, f"expected 57 governed triggers, found {total}"
-        assert len(_installed_functions()) == 46
+        assert total == 61, f"expected 61 governed triggers, found {total}"
+        assert len(_installed_functions()) == 49
 
 
 @pytest.mark.django_db
