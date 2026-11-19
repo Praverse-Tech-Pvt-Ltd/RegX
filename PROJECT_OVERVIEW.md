@@ -780,6 +780,12 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 34. **Display gaps in the IID preview (cosmetic, not fixed):** daily exposure is shown with 10 decimals and no unit; the % w/w line shows the raw code `percent_w_w`; the "Run IID assessment preview" link from a formulation version passes `versionId`, which the preview page ignores (nothing is pre-filled).
 35. **Browser test of 2026-11-18 (`docs/QA_BROWSER_TEST_2026-11-18.md`, PR #133): 28 issues.** Fixed in PR #134 `regx/fix/input-validation-honest-preview` (not merged at the time of writing): QA-02 (component unit from a list; percentages capped at 100 in any spelling and need a basis; per-volume amounts refused on clearly solid products; old rows flagged, never changed), QA-03 (maximum dosage units/day 1 to 1,000), QA-05 (the IID preview never shows a result next to inputs it was not computed from), QA-06 (specific reason codes for every 'no match'), QA-07 (IID release link health on the preview and the Releases page) and the QA-13 button cases (Doer approve, VP create). **Still open:** QA-04 (no edit/delete of draft components), QA-08/10 (no sign-out, session-ended message), QA-09 (phone width), QA-11 (no confirmation on irreversible actions), QA-12 (raw field names in errors) and the minor/cosmetic items.
 
+36. ~~**A typed unit that disagrees with the chosen meaning was ignored.**~~ **Fixed.** Found by the validation run of 2026-11-19 (`docs/VALIDATION_REPORT_2026-11-19.md`, PR #137).
+    - **F-1, IID preview: fixed in PR [#138](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/138) (merged 2026-11-19).** With a meaning chosen, the amount was read in the meaning's unit and the typed unit dropped: "0.03 g" with "mg per dose unit" was compared as 0.03 mg (a false "at or below"). Now refused (400), same rule as a formulation component.
+    - **Formulation components, percentage basis: fixed in PR [#139](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/139) (open).** "%w/v" with the meaning %w/w was stored as percent / %w/w. Now refused. The rule is one shared function, `fda_data.controlled_units.unit_meaning_problem`, called by both the preview and components.
+    - **Basis spellings (#139):** exactly w/w, wt/wt, m/m; w/v, wt/vol, wt/v, m/v; v/v, vol/vol (spaces, brackets, case ignored); anything else after the percent sign is refused in both places.
+    - **Existing data:** dev DB 0 mismatched components (21, all mg; schema predates meanings). On newer schemas a past mismatch cannot be found from stored data: the typed basis was discarded when the unit was saved as "percent".
+
 ---
 
 ## 12. Open questions (need humans)
@@ -1737,3 +1743,21 @@ Orange Book matching (Phase 3) also needs the reviewed workbook and approved Ora
 - **Live re-check** on the `regx-val` stack rebuilt from the branch: the 4 probe mismatches now get 400, the no-meaning control is unchanged; the 40 GPT cases give exactly the same outcomes as before (37/37 scored).
 - **Tester rules** updated (section 5a row; previous kept as `RULES_FOR_TESTER.before-2026-11-19-unit-meaning.md`).
 - **Found, not fixed (same rule, formulation side):** a formulation component accepts unit "%w/v" with the meaning %w/w and stores it as percent / %w/w (live probe); the stored meaning is visible, so lower severity. Proposed as a follow-up.
+
+### 2026-11-19 (twenty-fifth session, continued) — one shared unit-vs-meaning rule; percentage basis on components; basis spellings (#139) (Claude Code)
+
+**Owner's direction (2026-11-19):** after #138 merged, a new branch from `regx-main`: move the preview's unit-vs-meaning check into `fda_data/controlled_units.py` as one shared public function used by the preview and formulation components; refuse a component's percentage basis that differs from its meaning (tests first, failing on the old code); recognise or refuse basis spellings such as "% wt/vol", "% m/v", "%(w/v)", "% v/v" in both places and list them; count mismatched components on the dev DB read-only; re-run the 40 GPT cases and the probes (must stay 37/37); local backend CI only; hand-off; clean stop; this entry and §11.
+
+- **#138 confirmed merged** (`8f4dc6a`, 10:31 UTC). Branch `regx/fix/unit-meaning-shared-rule` from it (worktree `D:/Praverse/session-work/2026-11-19/s25/fix2wt`); PR #139.
+- **Code:**
+  - `fda_data.controlled_units`: `PERCENTAGE_BASIS_SPELLINGS`, `parse_percentage_unit`, `percentage_unit_problem`, `unit_meaning_problem` (the one rule);
+  - `iid_assessment/serializers.py`: the private copy from #138 removed; calls the shared rule; an unreadable basis is refused even without a meaning;
+  - `formulations/serializers.py`: the typed unit is checked before it is normalised to "percent";
+  - `iid_assessment/amount_limits.is_percentage_unit` delegates to the same parser (definition unchanged).
+- **Accepted spellings** (spaces, brackets, case ignored): none (`%`, `percent`, `percentage`, `pct`); w/w: `w/w`, `wt/wt`, `m/m`; w/v: `w/v`, `wt/vol`, `wt/v`, `m/v`; v/v: `v/v`, `vol/vol`. Anything else after the percent sign is refused.
+- **Tests first:** 67 new (shared rule 28, component API 26, preview API 13). On `regx-main` all 18 refusal tests fail and the shared-rule module cannot import; the 21 agreeing cases pass on both. #138's tests still pass; `iid_assessment` + `formulations` + `fda_data` 923 passed, 1 skipped; ruff clean; import contracts 16/16. Local backend CI job (the GitHub workflow run locally): 20/20 steps, 4,742 passed, 2 skipped, coverage 96.12%; frontend, locks, company_site and docker-integration jobs not run (no file they cover changed).
+- **Dev DB (read-only transaction):** 0 mismatched components: 21 components, units "mg" (18) and "milligram" (3), none in percent; its schema predates meanings (formulations at 0001), so none can carry one. On newer schemas a past mismatch cannot be detected from stored data (the typed basis was discarded); a probe row on the test stack shows this.
+- **Live re-check** on `regx-val` rebuilt from the branch: the 40 GPT cases 37/37, no outcome changed from the first run; F-1 probes still refused, no-meaning control unchanged; spelling probe (17 preview requests, 17 component creations on real IID rows) as listed.
+- **Tester rules:** section 5c (exact spellings) added; previous kept as `RULES_FOR_TESTER.before-2026-11-19-percent-spellings.md`.
+- **§11:** item 36 marks F-1 (#138) and this gap (#139) fixed.
+- **Not changed:** error field names (preview: `proposed_quantity_unit`; component: `quantity_expression_public_id` for a mismatch, `quantity_unit` for an unreadable spelling), to keep the API contract.
