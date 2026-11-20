@@ -5,7 +5,8 @@ Granular permission codenames follow the pattern documents.<action>.
 
 Role mapping:
 - doer          : create, view, upload_version
-- reviewer      : view, view_previous_versions, view_processing_status
+- reviewer      : create, view, upload_version, view_previous_versions, view_processing_status
+                  (owner decision 2026-11-18, QA-05: Reviewers attach documents; no archive/restore)
 - vp            : view, view_previous_versions, view_processing_status
 - tenant_admin  : all document permissions within tenant
 - platform_support : no document content access (metadata-only, future break-glass required)
@@ -30,7 +31,15 @@ PERM_VIEW_PREVIOUS_VERSIONS = "documents.view_previous_versions"
 
 ROLE_PERMISSIONS: dict[str, list[str]] = {
     Role.BuiltIn.DOER: [PERM_CREATE, PERM_VIEW, PERM_UPLOAD_VERSION],
-    Role.BuiltIn.REVIEWER: [PERM_VIEW, PERM_VIEW_PREVIOUS_VERSIONS, PERM_VIEW_PROCESSING_STATUS],
+    # QA-05 (owner decision 2026-11-18): a Reviewer may attach documents (upload and add
+    # a version), in its own tenant; archive and restore stay with Tenant Admin.
+    Role.BuiltIn.REVIEWER: [
+        PERM_CREATE,
+        PERM_VIEW,
+        PERM_UPLOAD_VERSION,
+        PERM_VIEW_PREVIOUS_VERSIONS,
+        PERM_VIEW_PROCESSING_STATUS,
+    ],
     Role.BuiltIn.VP: [PERM_VIEW, PERM_VIEW_PREVIOUS_VERSIONS, PERM_VIEW_PROCESSING_STATUS],
     Role.BuiltIn.TENANT_ADMIN: [
         PERM_CREATE,

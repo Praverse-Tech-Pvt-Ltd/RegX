@@ -44,12 +44,12 @@ class TestReviewerPermissions:
     def test_reviewer_can_view_processing_status(self, user_b, tenant_a, reviewer_membership):
         assert has_document_permission(user_b, tenant_a, PERM_VIEW_PROCESSING_STATUS)
 
-    def test_reviewer_cannot_create(self, user_b, tenant_a, reviewer_membership):
-        # PLANTED: reviewer cannot create documents
-        assert not has_document_permission(user_b, tenant_a, PERM_CREATE)
+    def test_reviewer_can_create(self, user_b, tenant_a, reviewer_membership):
+        # QA-05, owner decision 2026-11-18: Reviewers attach documents.
+        assert has_document_permission(user_b, tenant_a, PERM_CREATE)
 
-    def test_reviewer_cannot_upload_version(self, user_b, tenant_a, reviewer_membership):
-        assert not has_document_permission(user_b, tenant_a, PERM_UPLOAD_VERSION)
+    def test_reviewer_can_upload_version(self, user_b, tenant_a, reviewer_membership):
+        assert has_document_permission(user_b, tenant_a, PERM_UPLOAD_VERSION)
 
     def test_reviewer_cannot_archive(self, user_b, tenant_a, reviewer_membership):
         assert not has_document_permission(user_b, tenant_a, PERM_ARCHIVE)
