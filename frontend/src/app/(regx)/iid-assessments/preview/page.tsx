@@ -83,6 +83,10 @@ function CalculationBlock({ label, calc }: { label: string; calc: Record<string,
           {isPercentUnit(calc.unit) ? <PercentValue value={calc.value} /> : String(calc.value)}{" "}
           {calc.unit ? String(calc.unit) : ""}
         </span>
+      ) : calc.reason ? (
+        // The backend's own sentence when it says why nothing was calculated
+        // (e.g. daily exposure for a percentage); no value is shown.
+        <span style={{ marginLeft: 8, color: "#8a5a10" }}>{String(calc.reason)}</span>
       ) : (
         <span style={{ marginLeft: 8, color: "#8a5a10" }}>Blocked: {String(calc.status)}</span>
       )}
