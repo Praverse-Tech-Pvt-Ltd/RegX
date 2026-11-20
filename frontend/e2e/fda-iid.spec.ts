@@ -1259,6 +1259,97 @@ test.describe("Maximum dosage units/day range (QA-07)", () => {
   });
 });
 
+// QA-03 and QA-16 (QA_CODEX_REPORT.md).
+test.describe("IID preview: each response belongs to the request it answers (QA-03, QA-16)", () => {
+  const candidate = (id: string, potency: string) => ({
+    precedent_record_public_id: id,
+    ingredient_name: "Synthetic Starch",
+    route: "Oral",
+    dosage_form: "Tablet",
+    potency_amount: potency,
+    potency_unit: "milligram",
+    maximum_daily_exposure: null,
+    mde_unit: null,
+    calculability_status: "calculable",
+  });
+
+  async function fill(page: import("@playwright/test").Page, amount: string) {
+    await page.getByLabel(/ingredient id/i).fill("ing-1");
+    await page.getByLabel(/active fda release id/i).fill("rel-1");
+    await page.getByLabel(/^route code/i).fill("oral");
+    await page.getByLabel(/dosage form code/i).fill("tablet");
+    await page.getByLabel(/proposed quantity per unit/i).fill(amount);
+    await page.getByLabel(/total dosage-unit weight/i).fill("500");
+  }
+
+  test("QA-03: a response that arrives after the inputs changed is ignored", async ({ page }) => {
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/iid-assessments\/preview\/$/, async (route) => {
+      const sent = route.request().postDataJSON() as { proposed_quantity_per_unit: string };
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          match_status: "EXACT_MATCH",
+          candidates: [candidate("prec-1", "70.000000")],
+          selected_record: candidate("prec-1", "70.000000"),
+          calculations: {},
+          decision_status: "EXCEEDS_IID_PRECEDENT",
+          decision_note: `Result for the request that sent ${sent.proposed_quantity_per_unit} mg.`,
+          escalation_required: true,
+        }),
+      });
+    });
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await fill(page, "77");
+    const answered = page.waitForResponse(/iid-assessments\/preview\/$/);
+    await page.getByRole("button", { name: /run preview/i }).click();
+    // The user changes the amount while the 77 mg request is still in flight.
+    await page.getByLabel(/proposed quantity per unit/i).fill("35");
+    await answered;
+    await page.waitForTimeout(300);
+    await expect(page.getByText("Result for the request that sent 77 mg.")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: /assessment result/i })).toHaveCount(0);
+    await expect(page.getByLabel(/proposed quantity per unit/i)).toHaveValue("35");
+    await expect(page.getByRole("button", { name: /run preview/i })).toBeEnabled();
+  });
+
+  test("QA-16: the first 'Select this precedent' click sends the clicked row", async ({ page }) => {
+    const sentSelections: (string | null)[] = [];
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/iid-assessments\/preview\/$/, async (route) => {
+      const sent = route.request().postDataJSON() as { selected_precedent_record_public_id?: string };
+      const chosen = sent.selected_precedent_record_public_id ?? null;
+      sentSelections.push(chosen);
+      const rows = [candidate("prec-low", "10.000000"), candidate("prec-high", "500.000000")];
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          match_status: chosen ? "EXACT_MATCH" : "MULTIPLE_EXACT_MATCHES",
+          candidates: rows,
+          selected_record: rows.find((r) => r.precedent_record_public_id === chosen) ?? null,
+          calculations: {},
+          decision_status: "REVIEW_REQUIRED",
+          decision_note: chosen ? `Selected ${chosen}.` : "Multiple exact IID records match; select one.",
+          escalation_required: true,
+        }),
+      });
+    });
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await fill(page, "30");
+    await page.getByRole("button", { name: /run preview/i }).click();
+    await expect(page.getByRole("button", { name: /select this precedent/i })).toHaveCount(2);
+
+    const answered = page.waitForResponse(/iid-assessments\/preview\/$/);
+    await page.getByRole("button", { name: /select this precedent/i }).nth(1).click();
+    await answered;
+    expect(sentSelections).toEqual([null, "prec-high"]);
+    await expect(page.getByText("Selected prec-high.")).toBeVisible();
+  });
+});
+
 // Daily exposure for a percentage or an unrecognised unit (PROJECT_OVERVIEW §11
 // item 37): the API now returns no value and a short reason; the page shows the
 // reason instead of a bare status code, and no number.
