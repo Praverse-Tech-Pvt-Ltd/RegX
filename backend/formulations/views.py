@@ -278,20 +278,26 @@ class FormulationVersionTransitionView(APIView):
 
     def post(self, request, public_id):
         from .approval import ApprovalRefused, approve, reject, return_to_draft, submit
+        from .serializers import VersionTransitionSerializer
 
         tenant = _get_tenant(request)
         version = _get_version_or_404(public_id, tenant)
+        text = {}
+        if self.action != "submit":
+            # QA-11: a note or reason that is not text is a 400 with a field
+            # error, never a 500 from .strip() in the service.
+            serializer = VersionTransitionSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            text = serializer.validated_data
         try:
             if self.action == "submit":
                 version = submit(version, request.user, tenant)
             elif self.action == "return":
-                version = return_to_draft(
-                    version, request.user, tenant, request.data.get("reason", "")
-                )
+                version = return_to_draft(version, request.user, tenant, text.get("reason", ""))
             elif self.action == "reject":
-                version = reject(version, request.user, tenant, request.data.get("reason", ""))
+                version = reject(version, request.user, tenant, text.get("reason", ""))
             else:
-                version = approve(version, request.user, tenant, request.data.get("note", ""))
+                version = approve(version, request.user, tenant, text.get("note", ""))
         except ApprovalRefused as exc:
             return Response({"error_code": exc.code, "detail": exc.message}, status=exc.status)
         return Response(_version_payload(version, request.user, tenant))
