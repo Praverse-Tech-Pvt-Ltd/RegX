@@ -71,27 +71,11 @@ REASON_TEXT = {
 
 AT_OR_BELOW, ABOVE = "at_or_below", "above"
 
-#: ControlledUnit code -> the exact-factor key used by unit_conversion. A code
-#: that already is such a key maps to itself.
-_CONVERSION_KEY = {
-    "mg": "milligram",
-    "mcg": "microgram",
-    "ug": "microgram",
-    "µg": "microgram",  # micro sign
-    "μg": "microgram",  # Greek small letter mu
-    "g": "gram",
-    "kg": "kilogram",
-    "ml": "millilitre",
-    "l": "litre",
-}
-
 
 def conversion_key(unit_code: str | None) -> str | None:
-    code = (unit_code or "").strip().lower()
-    if not code:
-        return None
-    key = _CONVERSION_KEY.get(code, code)
-    return key if unit_conversion.dimension_of(key) in ("mass", "volume") else None
+    """ControlledUnit code or typed spelling -> the exact-factor key used by
+    unit_conversion (the shared alias list: unit_conversion.canonical_unit)."""
+    return unit_conversion.canonical_unit(unit_code)
 
 
 @dataclass(frozen=True)

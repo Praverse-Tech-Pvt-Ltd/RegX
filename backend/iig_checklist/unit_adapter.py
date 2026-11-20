@@ -77,7 +77,15 @@ def convert_for_calculation(
     if not to_unit or not str(to_unit).strip():
         return _failure(FAILURE_UNIT_MISSING, value, from_unit, to_unit)
 
-    result = unit_conversion.convert(value, from_unit, to_unit, density_g_per_ml=density_g_per_ml)
+    # QA-02: stored spellings ("mg", "g", "µg", "ml") are read through the same
+    # alias function as the IID comparison path; an unknown unit passes through
+    # unchanged and the service refuses it as before.
+    result = unit_conversion.convert(
+        value,
+        unit_conversion.canonical_unit(from_unit) or from_unit,
+        unit_conversion.canonical_unit(to_unit) or to_unit,
+        density_g_per_ml=density_g_per_ml,
+    )
 
     if not result.ok:
         failure = _REASON_TO_FAILURE.get(result.reason_code or "", FAILURE_UNKNOWN)
@@ -97,7 +105,7 @@ def convert_for_calculation(
         provenance=MappingProxyType(
             {
                 "original_value": format_decimal_plain(value),
-                "original_unit": result.original_unit or from_unit,
+                "original_unit": from_unit,
                 "converted_value": format_decimal_plain(converted),
                 "converted_unit": result.converted_unit or to_unit,
                 "conversion_factor": factor,

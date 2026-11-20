@@ -751,6 +751,21 @@ def _persist_input_failure(outcome, entry, resolved_inputs):
     )
 
 
+def _without_trailing_zeros(value):
+    """The same exact value without trailing zeros (never scientific for whole numbers).
+
+    QA-02: 25 mg converts to 0.025000000 g; times 4.0000 units/day the exact
+    0.1 g/day was carried as 0.1000000000000 (13 places), which the outcome
+    field (10 places) refused with a 500. Only the exponent changes, never the
+    value; recorded inputs keep their exact original form.
+    """
+    if not isinstance(value, Decimal) or not value.is_finite():
+        return value
+    if value == value.to_integral_value():
+        return value.quantize(Decimal(1))
+    return value.normalize()
+
+
 def _persist_engine_result(outcome, entry, resolved_inputs, engine_result, snapshot):
     """Translate and persist a governed engine result (M4D3-TRL-001..006)."""
     translated = translate_engine_status(engine_result)
@@ -758,7 +773,7 @@ def _persist_engine_result(outcome, entry, resolved_inputs, engine_result, snaps
     outcome.calculation_name = entry.calculation_name
     outcome.formula_version = entry.formula_version
     outcome.status = translated.status
-    outcome.value = translated.value
+    outcome.value = _without_trailing_zeros(translated.value)
     outcome.rounding_rule = entry.rounding_rule
     outcome.reason_code = translated.reason_code
     outcome.generated_at = translated.generated_at

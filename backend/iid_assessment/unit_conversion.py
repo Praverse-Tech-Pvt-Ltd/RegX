@@ -71,6 +71,33 @@ def _fail(reason_code: str, original_value=None, original_unit=None) -> Conversi
     )
 
 
+#: Common spellings -> the names this converter uses. THE one alias list for mass
+#: and volume units: the IID comparison (comparison.conversion_key) and the IIG
+#: checklist calculations (iig_checklist.unit_adapter) both read units through
+#: canonical_unit(), so "mg", "µg" or "ml" mean the same thing on both paths.
+UNIT_ALIASES = {
+    "mg": "milligram",
+    "mcg": "microgram",
+    "ug": "microgram",
+    "µg": "microgram",  # micro sign
+    "μg": "microgram",  # Greek small letter mu
+    "g": "gram",
+    "kg": "kilogram",
+    "ml": "millilitre",
+    "l": "litre",
+}
+
+
+def canonical_unit(unit: str | None) -> str | None:
+    """The converter's name for a mass or volume unit, in any listed spelling
+    (case ignored), or None when it is not a mass or volume unit REGX knows."""
+    code = (unit or "").strip().lower()
+    if not code:
+        return None
+    key = UNIT_ALIASES.get(code, code)
+    return key if DIMENSION_OF_UNIT.get(key) in ("mass", "volume") else None
+
+
 def dimension_of(unit: str) -> str | None:
     return DIMENSION_OF_UNIT.get((unit or "").strip().lower())
 
