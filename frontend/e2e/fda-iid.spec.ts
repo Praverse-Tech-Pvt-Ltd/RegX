@@ -277,11 +277,14 @@ test.describe("Formulation record and explicit reference selection", () => {
 
     await expect(page).toHaveURL(/\/formulations\/product-e2e-1/);
     await expect(page.getByText(/No reference product selected/i)).toBeVisible();
+    await page.route(
+      /\/api\/regx\/v1\/fda-data\/orange-book\/products\/(\?[^/]*)?$/,
+      jsonRoute(paginate([obProduct({ public_id: "ob-e2e-1", release: "release-e2e-1", application_number: "099999" })])),
+    );
     await page.getByRole("button", { name: /select reference product/i }).click();
-    await page.getByLabel(/application number/i).fill("099999");
-    await page.getByLabel(/product number/i).fill("001");
-    await page.getByLabel(/orange book product id/i).fill("ob-e2e-1");
-    await page.getByLabel(/fda release id/i).fill("release-e2e-1");
+    await page.getByLabel(/find the reference product/i).fill("A099999");
+    await page.getByRole("button", { name: /^find$/i }).click();
+    await page.getByRole("button", { name: /use this product/i }).click();
 
     // Submitting without the confirmation checkbox must not select anything.
     await page.getByRole("button", { name: /confirm selection/i }).click();
@@ -1444,5 +1447,142 @@ test.describe("IID result and release form (QA-13, QA-17)", () => {
     const options = await select.locator("option").evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value));
     expect(options.join("|")).toContain("fda_iid");
     expect(options.join("|")).not.toMatch(/patent|exclusivity/i);
+  });
+});
+
+// QA-12 / F-4 and F-5: Orange Book search by trade name and application number; a
+// reference product is picked from search results, never by typing UUIDs.
+function obProduct(over: Record<string, unknown> = {}) {
+  return {
+    public_id: "ob-amzeeq",
+    release: "rel-ob-active",
+    application_number: "212379",
+    application_type: "N",
+    product_number: "001",
+    trade_name: "AMZEEQ",
+    active_ingredient_raw: "MINOCYCLINE HYDROCHLORIDE",
+    dosage_form_raw: "AEROSOL, FOAM",
+    route_raw: "TOPICAL",
+    dosage_form_normalized: null,
+    route_normalized: null,
+    strength_raw: "EQ 4% BASE",
+    strength_amount: null,
+    strength_parse_status: "unparsed",
+    rld_flag: true,
+    reference_standard_flag: true,
+    te_code: "",
+    approval_date: null,
+    approval_date_text: "Oct 18, 2019",
+    discontinued: false,
+    ...over,
+  };
+}
+
+test.describe("Orange Book: trade name and application number (QA-12, F-5)", () => {
+  test("the search page sends trade_name and application_number", async ({ page }) => {
+    const queries: URLSearchParams[] = [];
+    await page.route(/\/api\/regx\/v1\/fda-data\/orange-book\/products\/(\?[^/]*)?$/, async (route) => {
+      queries.push(new URL(route.request().url()).searchParams);
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paginate([obProduct()])) });
+    });
+    await page.goto(`/fda-data/orange-book?tenant=${TENANT}`);
+    await page.getByLabel(/^trade name/i).fill("amzeeq");
+    await page.getByRole("button", { name: /^search$/i }).click();
+    await expect(page.getByText("AMZEEQ")).toBeVisible();
+    expect(queries.at(-1)?.get("trade_name")).toBe("amzeeq");
+
+    await page.getByLabel(/^trade name/i).fill("");
+    await page.getByLabel(/^application number/i).fill("N212379");
+    await page.getByRole("button", { name: /^search$/i }).click();
+    await expect.poll(() => queries.length).toBe(2);
+    expect(queries[1]?.get("application_number")).toBe("N212379");
+    expect(queries[1]?.get("trade_name")).toBeNull();
+  });
+
+  test("a reference product is picked by typing N212379, with no UUID typed", async ({ page }) => {
+    await mockCsrf(page);
+    const searched: URLSearchParams[] = [];
+    let sentSelection: Record<string, unknown> | null = null;
+    const product = {
+      public_id: "prod-f5",
+      product_code: "F5",
+      proposed_product_name: "F-5 product",
+      active_ingredient: "MINOCYCLINE",
+      is_combination_product: false,
+      release_type: "immediate",
+      route: "TOPICAL",
+      dosage_form: "AEROSOL, FOAM",
+      selected_ob_application_number: "",
+      selected_ob_product_number: "",
+      selected_ob_product_public_id: null,
+      selected_ob_release_public_id: null,
+      selecting_user_email: null,
+      selection_justification: "",
+    };
+    await page.route(/\/api\/regx\/v1\/formulations\/products\/prod-f5\/$/, jsonRoute(product));
+    await page.route(/\/api\/regx\/v1\/formulations\/products\/prod-f5\/versions\/(\?[^/]*)?$/, jsonRoute(paginate([])));
+    await page.route(/\/api\/regx\/v1\/fda-data\/orange-book\/products\/(\?[^/]*)?$/, async (route) => {
+      searched.push(new URL(route.request().url()).searchParams);
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paginate([obProduct()])) });
+    });
+    await page.route(/\/api\/regx\/v1\/formulations\/products\/prod-f5\/select-reference\/$/, async (route) => {
+      sentSelection = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ...product,
+          selected_ob_application_number: "212379",
+          selected_ob_product_number: "001",
+          selected_ob_product_public_id: "ob-amzeeq",
+          selected_ob_release_public_id: "rel-ob-active",
+          selecting_user_email: "doer@example.com",
+        }),
+      });
+    });
+
+    await page.goto(`/formulations/prod-f5?tenant=${TENANT}`);
+    await page.getByRole("button", { name: /select reference product/i }).click();
+    // Nothing asks for an identifier by hand any more.
+    await expect(page.getByLabel(/orange book product id/i)).toHaveCount(0);
+    await expect(page.getByLabel(/fda release id/i)).toHaveCount(0);
+
+    await page.getByLabel(/find the reference product/i).fill("N212379");
+    await page.getByRole("button", { name: /^find$/i }).click();
+    await expect(page.getByText("AMZEEQ")).toBeVisible();
+    expect(searched.at(-1)?.get("application_number")).toBe("N212379");
+
+    await page.getByRole("button", { name: /use this product/i }).click();
+    await page.getByLabel(/I confirm this is the correct reference product/i).check();
+    await page.getByRole("button", { name: /confirm selection/i }).click();
+    await expect(page.getByText(/Application 212379-001/i)).toBeVisible();
+    expect(sentSelection).toMatchObject({
+      application_number: "212379",
+      product_number: "001",
+      product_public_id: "ob-amzeeq",
+      release_public_id: "rel-ob-active",
+    });
+  });
+
+  test("a trade name typed in the picker searches by trade name", async ({ page }) => {
+    await mockCsrf(page);
+    const searched: URLSearchParams[] = [];
+    await page.route(
+      /\/api\/regx\/v1\/formulations\/products\/prod-f5b\/$/,
+      jsonRoute({ public_id: "prod-f5b", product_code: "F5B", proposed_product_name: "F-5 B", active_ingredient: "X", selected_ob_product_public_id: null }),
+    );
+    await page.route(/\/api\/regx\/v1\/formulations\/products\/prod-f5b\/versions\/(\?[^/]*)?$/, jsonRoute(paginate([])));
+    await page.route(/\/api\/regx\/v1\/fda-data\/orange-book\/products\/(\?[^/]*)?$/, async (route) => {
+      searched.push(new URL(route.request().url()).searchParams);
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paginate([])) });
+    });
+    await page.goto(`/formulations/prod-f5b?tenant=${TENANT}`);
+    await page.getByRole("button", { name: /select reference product/i }).click();
+    await page.getByLabel(/find the reference product/i).fill("amzeeq");
+    await page.getByRole("button", { name: /^find$/i }).click();
+    await expect.poll(() => searched.length).toBe(1);
+    expect(searched[0]?.get("trade_name")).toBe("amzeeq");
+    expect(searched[0]?.get("application_number")).toBeNull();
+    await expect(page.getByText(/no orange book product matches/i)).toBeVisible();
   });
 });

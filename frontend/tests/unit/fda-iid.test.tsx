@@ -280,10 +280,15 @@ describe("FormulationDetailPage — explicit reference selection, no auto-fill",
     render(<FormulationDetailPage />);
     await user.click(await screen.findByRole("button", { name: /select reference product/i }));
 
-    await user.type(screen.getByLabelText(/application number/i), "099999");
-    await user.type(screen.getByLabelText(/product number/i), "001");
-    await user.type(screen.getByLabelText(/orange book product id/i), "ob-1");
-    await user.type(screen.getByLabelText(/fda release id/i), "rel-1");
+    // F-5: find by application number and pick the row; no identifier is typed.
+    api.orangeBookSearch.mockResolvedValue(
+      paginate([makeOrangeBookProduct({ public_id: "ob-1", release: "rel-1", application_number: "099999", product_number: "001" })]),
+    );
+    await user.type(screen.getByLabelText(/find the reference product/i), "A099999");
+    await user.click(screen.getByRole("button", { name: /^find$/i }));
+    await user.click(await screen.findByRole("button", { name: /use this product/i }));
+    expect(api.orangeBookSearch).toHaveBeenCalledWith("alpha", { application_number: "A099999" });
+    expect(screen.queryByLabelText(/orange book product id/i)).toBeNull();
     await user.click(screen.getByRole("button", { name: /confirm selection/i }));
 
     expect(api.productsSelectReference).not.toHaveBeenCalled();
@@ -299,17 +304,27 @@ describe("FormulationDetailPage — explicit reference selection, no auto-fill",
     render(<FormulationDetailPage />);
     await user.click(await screen.findByRole("button", { name: /select reference product/i }));
 
-    await user.type(screen.getByLabelText(/application number/i), "099999");
-    await user.type(screen.getByLabelText(/product number/i), "001");
-    await user.type(screen.getByLabelText(/orange book product id/i), "ob-1");
-    await user.type(screen.getByLabelText(/fda release id/i), "rel-1");
+    // F-5: find by application number and pick the row; no identifier is typed.
+    api.orangeBookSearch.mockResolvedValue(
+      paginate([makeOrangeBookProduct({ public_id: "ob-1", release: "rel-1", application_number: "099999", product_number: "001" })]),
+    );
+    await user.type(screen.getByLabelText(/find the reference product/i), "A099999");
+    await user.click(screen.getByRole("button", { name: /^find$/i }));
+    await user.click(await screen.findByRole("button", { name: /use this product/i }));
+    expect(api.orangeBookSearch).toHaveBeenCalledWith("alpha", { application_number: "A099999" });
+    expect(screen.queryByLabelText(/orange book product id/i)).toBeNull();
     await user.click(screen.getByLabelText(/I confirm this is the correct reference product/i));
     await user.click(screen.getByRole("button", { name: /confirm selection/i }));
 
     expect(api.productsSelectReference).toHaveBeenCalledWith(
       "alpha",
       "product-public-0001",
-      expect.objectContaining({ application_number: "099999" }),
+      expect.objectContaining({
+        application_number: "099999",
+        product_number: "001",
+        product_public_id: "ob-1",
+        release_public_id: "rel-1",
+      }),
     );
   });
 });
