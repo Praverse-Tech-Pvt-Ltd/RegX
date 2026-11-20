@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -191,10 +191,17 @@ function IidPreviewInner() {
   // QA-05: a result belongs to the inputs it was run with. Any change to an
   // input clears it (and any error, and a chosen precedent), so the screen can
   // never show a result next to numbers it was not computed from.
+  // QA-03: every request gets a number. An input change or a newer run moves the
+  // number on, so a response that arrives later for older inputs is dropped
+  // instead of being shown next to inputs it was not computed from.
+  const requestSeq = useRef(0);
+
   function clearResult() {
+    requestSeq.current += 1;
     setPreview(null);
     setError(null);
     setSelectedRecordId(undefined);
+    setLoading(false);
   }
   const edited =
     <T,>(set: (value: T) => void) =>
@@ -240,13 +247,19 @@ function IidPreviewInner() {
     return hit ? hit.code : value;
   }
 
-  async function runPreview(e?: React.FormEvent) {
+  /**
+   * `selectedOverride`: the precedent the user just clicked (QA-16). React state
+   * set in the same click is not readable until the next render, so the clicked
+   * row is passed in rather than read back from `selectedRecordId`.
+   */
+  async function runPreview(e?: React.FormEvent, selectedOverride?: string) {
     e?.preventDefault();
     if (!tenantSlug) return;
     if (!ingredientId.trim() && !ingredientName.trim()) {
       setError("Enter the ingredient name (as listed in the IID) or its ingredient ID.");
       return;
     }
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     setPreview(null); // never show the previous result while (or after) this run fails
@@ -263,18 +276,20 @@ function IidPreviewInner() {
         total_dosage_unit_weight: totalWeight,
         total_dosage_unit_weight_unit: totalWeightUnit,
         maximum_dosage_units_per_day: maxUnitsPerDay || undefined,
-        selected_precedent_record_public_id: selectedRecordId,
+        selected_precedent_record_public_id: selectedOverride ?? selectedRecordId,
         ...(proposedMeaning ? { proposed_quantity_expression_public_id: proposedMeaning } : {}),
       });
+      if (seq !== requestSeq.current) return; // inputs changed or a newer run started (QA-03)
       setPreview(result);
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       if (isSignedOut(err)) {
         router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       } else {
         setError(err instanceof ApiError ? err.message : "Preview failed.");
       }
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }
 
@@ -440,7 +455,7 @@ function IidPreviewInner() {
                       selectable
                       onSelect={() => {
                         setSelectedRecordId(c.precedent_record_public_id);
-                        runPreview();
+                        runPreview(undefined, c.precedent_record_public_id);
                       }}
                     />
                   ))}
