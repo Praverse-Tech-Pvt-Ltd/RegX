@@ -451,13 +451,54 @@ class ChecklistVersionCreateView(APIView):
         tenant = _require_tenant()
         definition = _get_definition_or_404(public_id, tenant)
         _authorize_mutation(request, tenant, definition, PERM_CREATE_DEFINITION)
+        # QA-06(a): the request body was ignored, so an effective_date sent here was
+        # dropped. The same draft fields a PATCH may set are now saved at creation
+        # (validated by the model; a bad value is a 400, never silence).
+        fields = {f: request.data[f] for f in VERSION_DRAFT_FIELDS if f in request.data}
         try:
-            version = create_next_version(definition=definition, actor=request.user)
+            version = create_next_version(definition=definition, actor=request.user, fields=fields)
         except VersionAllocationConflict as exc:
             raise ValidationError(
                 {"error_code": "VERSION_ALLOCATION_CONFLICT", "detail": str(exc)}
             ) from exc
+        except DjangoValidationError as exc:
+            _raise_django_validation_as_drf(exc)
         return Response(ChecklistVersionSerializer(version).data, status=status.HTTP_201_CREATED)
+
+
+#: Draft fields a version may carry from creation and change while editable (PATCH).
+VERSION_DRAFT_FIELDS = (
+    "effective_date",
+    "expiry_date",
+    "regulatory_basis",
+    "jurisdiction",
+    "change_summary",
+)
+
+
+def _raise_if_activation_prerequisites_missing(version, action) -> None:
+    """What activation needs, checked before submit, approve and activate (QA-06(b)).
+
+    Runs before any lifecycle mutation -- including superseding a prior active
+    version -- so a failure leaves everything intact. Milestone 4D-3
+    (M4D3-REG-018/019): every calculation-registry binding must resolve against
+    the version's own persisted content.
+    """
+    from .activation_validation import (
+        format_activation_errors,
+        validate_version_calculation_bindings,
+    )
+
+    if not version.effective_date:
+        step = {
+            VersionAction.SUBMIT_REVIEW: "submitting for review",
+            VersionAction.APPROVE: "approval",
+            VersionAction.ACTIVATE: "activation",
+        }[action]
+        raise ValidationError(f"effective_date is required before {step}.")
+    binding_findings = validate_version_calculation_bindings(version)
+    if binding_findings:
+        raise ValidationError(format_activation_errors(binding_findings))
 
 
 class ChecklistVersionDetailView(APIView):
@@ -500,13 +541,7 @@ class ChecklistVersionDetailView(APIView):
             # regulatory_basis is: both describe what the draft will be approved
             # against, and both freeze together when it leaves draft/returned.
             fields_changed = []
-            for field in (
-                "effective_date",
-                "expiry_date",
-                "regulatory_basis",
-                "jurisdiction",
-                "change_summary",
-            ):
+            for field in VERSION_DRAFT_FIELDS:
                 if field in request.data:
                     setattr(version, field, request.data[field])
                     fields_changed.append(field)
@@ -588,23 +623,15 @@ class _ChecklistVersionActionViewBase(APIView):
             except IllegalVersionTransition as exc:
                 raise ValidationError(str(exc)) from exc
 
-            if self.action == VersionAction.ACTIVATE and not version.effective_date:
-                raise ValidationError("effective_date is required before activation.")
-
-            if self.action == VersionAction.ACTIVATE:
-                # Milestone 4D-3 (M4D3-REG-018/019): every calculation-registry
-                # binding referenced by this version must resolve against its own
-                # persisted content before the version becomes executable.  This
-                # runs before any lifecycle mutation -- including superseding a
-                # prior active version -- so a failure leaves everything intact.
-                from .activation_validation import (
-                    format_activation_errors,
-                    validate_version_calculation_bindings,
-                )
-
-                binding_findings = validate_version_calculation_bindings(version)
-                if binding_findings:
-                    raise ValidationError(format_activation_errors(binding_findings))
+            # QA-06(b): the activation prerequisites are checked at submit and
+            # approve too, so a version can never be approved and then fail to
+            # activate (an approved version can no longer be edited or returned).
+            if self.action in (
+                VersionAction.SUBMIT_REVIEW,
+                VersionAction.APPROVE,
+                VersionAction.ACTIVATE,
+            ):
+                _raise_if_activation_prerequisites_missing(version, self.action)
 
             if self.action == VersionAction.ACTIVATE:
                 other_active = (

@@ -143,9 +143,16 @@ class TestChecklistVersionLifecycleApi:
         assert resp.status_code == 400
 
     def test_activate_requires_effective_date(self, draft_version, api_client_doer, api_client_vp):
+        # QA-06(b): without an effective date the version is refused at submit, so it
+        # can never reach approved and then fail to activate.
+        draft_version.effective_date = None
+        draft_version.save(update_fields=["effective_date", "updated_at"])
         pid = draft_version.public_id
-        api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
-        api_client_vp.post(f"{BASE}/iig-checklists/versions/{pid}/approve/", data={})
+        submit = api_client_doer.post(
+            f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={}
+        )
+        assert submit.status_code == 400
+        assert "effective_date" in str(submit.content)
         resp = api_client_vp.post(f"{BASE}/iig-checklists/versions/{pid}/activate/", data={})
         assert resp.status_code == 400
 
