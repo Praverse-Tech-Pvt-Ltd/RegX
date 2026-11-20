@@ -8,7 +8,7 @@ is not. The amount is therefore refused (not merely warned about) on a product
 whose dosage form is clearly solid.
 
 "Clearly solid" is deliberately narrow: the product's dosage form (free text)
-names a solid unit such as TABLET or CAPSULE, and does not say it is made into a
+names a solid unit such as TABLET, CAPSULE, POWDER or GRANULE, and does not say it is made into a
 liquid before use ("... FOR SUSPENSION", "... FOR SOLUTION", "... FOR
 INJECTION"), where a per-volume amount after reconstitution is legitimate. A
 blank or unknown dosage form is never treated as solid.
@@ -33,8 +33,18 @@ SOLID_WORDS = (
     "SUPPOSITORY",
     "WAFER",
     "GUM",
+    # QA-19: a plain powder or granule has no volume either. "POWDER, FOR
+    # SOLUTION" and the like stay liquid through _MADE_INTO_LIQUID below.
+    "POWDER",
+    "POWDERS",
+    "GRANULE",
+    "GRANULES",
 )
-_MADE_INTO_LIQUID = re.compile(r"\bFOR\s+(ORAL\s+)?(SUSPENSION|SOLUTION|INJECTION)\b")
+#: "FOR SOLUTION", "FOR ORAL SUSPENSION", "FOR LIPOSOMAL SUSPENSION", "FOR INJECTION":
+#: made into a liquid before use. One optional qualifier word is allowed so the
+#: SPL term "INJECTION, POWDER, LYOPHILIZED, FOR LIPOSOMAL SUSPENSION" reads as
+#: reconstituted (tests: the full SPL list, test_qa19_per_volume_on_solid_forms).
+_MADE_INTO_LIQUID = re.compile(r"\bFOR\s+(?:[A-Z]+\s+)?(SUSPENSION|SOLUTION|INJECTION)\b")
 
 #: Bases that need a volume to be relative to.
 PER_VOLUME_BASES = ("per_volume", "w_v", "v_v")
