@@ -198,6 +198,28 @@ class FormulationVersionCreateSerializer(serializers.Serializer):
         return value
 
 
+class _TextField(serializers.CharField):
+    """Text only. DRF's CharField turns 123 into "123"; a note or reason that is not
+    text is refused instead (QA-11)."""
+
+    default_error_messages = {"not_text": "Enter this as text."}
+
+    def to_internal_value(self, data):
+        if not isinstance(data, str):
+            self.fail("not_text")
+        return super().to_internal_value(data)
+
+
+class VersionTransitionSerializer(serializers.Serializer):
+    """The text an approve (`note`), return or reject (`reason`) carries (QA-11).
+
+    Only the type is checked here; whether a note or reason is required, and its
+    wording, stay with formulations.approval."""
+
+    note = _TextField(required=False, allow_blank=True, trim_whitespace=False)
+    reason = _TextField(required=False, allow_blank=True, trim_whitespace=False)
+
+
 class FormulationComponentSerializer(serializers.ModelSerializer):
     #: The meaning of `quantity_per_dosage_unit` (controlled units, increment 4).
     #: Omitted or null: an amount per dosage unit in `quantity_unit`, as before.
