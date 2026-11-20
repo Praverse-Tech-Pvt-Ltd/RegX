@@ -77,7 +77,7 @@ from __future__ import annotations
 import uuid as uuid_module
 from dataclasses import dataclass, replace
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from types import MappingProxyType
 from typing import Any
 
@@ -751,6 +751,29 @@ def _persist_input_failure(outcome, entry, resolved_inputs):
     )
 
 
+#: CalculationOutcome.value is DecimalField(max_digits=20, decimal_places=10).
+OUTCOME_VALUE_PLACES = Decimal("1e-10")
+#: Recorded as the outcome's rounding rule when the exact result had to be rounded
+#: to fit (CalculationOutcome.rounding_rule is at most 100 characters).
+OUTCOME_FIELD_ROUNDING_RULE = (
+    "half-even to 10 decimal places for storage; exact value in provenance unrounded_value"
+)
+
+
+def _fit_outcome_field(value):
+    """The value as stored: unchanged when it has at most 10 decimal places,
+    else rounded half-even to 10 (the outcome field's precision).
+
+    Found checking #140: 1/3 % w/w (28 significant digits) and a µg-scale daily
+    exposure (0.0000000012345 g) still failed full_clean() with a 500.
+    """
+    if not isinstance(value, Decimal) or not value.is_finite():
+        return value
+    if value.as_tuple().exponent >= -10:
+        return value
+    return _without_trailing_zeros(value.quantize(OUTCOME_VALUE_PLACES, rounding=ROUND_HALF_EVEN))
+
+
 def _without_trailing_zeros(value):
     """The same exact value without trailing zeros (never scientific for whole numbers).
 
@@ -773,8 +796,11 @@ def _persist_engine_result(outcome, entry, resolved_inputs, engine_result, snaps
     outcome.calculation_name = entry.calculation_name
     outcome.formula_version = entry.formula_version
     outcome.status = translated.status
-    outcome.value = _without_trailing_zeros(translated.value)
-    outcome.rounding_rule = entry.rounding_rule
+    exact = _without_trailing_zeros(translated.value)
+    stored = _fit_outcome_field(exact)
+    rounded = stored != exact
+    outcome.value = stored
+    outcome.rounding_rule = OUTCOME_FIELD_ROUNDING_RULE if rounded else entry.rounding_rule
     outcome.reason_code = translated.reason_code
     outcome.generated_at = translated.generated_at
     outcome.unit = (
@@ -786,6 +812,12 @@ def _persist_engine_result(outcome, entry, resolved_inputs, engine_result, snaps
         resolved.kwarg_name: _json_safe(resolved.value) for resolved in resolved_inputs.inputs
     }
     outcome.input_provenance = _build_provenance(entry, resolved_inputs, snapshot)
+    if rounded:
+        # Never cut digits silently: the exact engine value stays on the record.
+        outcome.input_provenance = {
+            **outcome.input_provenance,
+            "unrounded_value": format_decimal_plain(exact),
+        }
     outcome.source_assessment_snapshot_public_id = (
         snapshot.public_id if snapshot is not None else None
     )
