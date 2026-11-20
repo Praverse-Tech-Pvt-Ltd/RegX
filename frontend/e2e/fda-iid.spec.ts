@@ -1308,8 +1308,8 @@ test.describe("Orange Book: trade name and application number (QA-12, F-5)", () 
     await page.getByLabel(/^application number/i).fill("N212379");
     await page.getByRole("button", { name: /^search$/i }).click();
     await expect.poll(() => queries.length).toBe(2);
-    expect(queries[1].get("application_number")).toBe("N212379");
-    expect(queries[1].get("trade_name")).toBeNull();
+    expect(queries[1]?.get("application_number")).toBe("N212379");
+    expect(queries[1]?.get("trade_name")).toBeNull();
   });
 
   test("a reference product is picked by typing N212379, with no UUID typed", async ({ page }) => {
@@ -1394,8 +1394,8 @@ test.describe("Orange Book: trade name and application number (QA-12, F-5)", () 
     await page.getByLabel(/find the reference product/i).fill("amzeeq");
     await page.getByRole("button", { name: /^find$/i }).click();
     await expect.poll(() => searched.length).toBe(1);
-    expect(searched[0].get("trade_name")).toBe("amzeeq");
-    expect(searched[0].get("application_number")).toBeNull();
+    expect(searched[0]?.get("trade_name")).toBe("amzeeq");
+    expect(searched[0]?.get("application_number")).toBeNull();
     await expect(page.getByText(/no orange book product matches/i)).toBeVisible();
   });
 });
