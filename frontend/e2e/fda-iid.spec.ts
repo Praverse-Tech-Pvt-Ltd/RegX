@@ -1301,8 +1301,13 @@ test.describe("IID result and release form (QA-13, QA-17)", () => {
   });
 
   test("QA-17: patent and exclusivity dataset types are not offered", async ({ page }) => {
+    await page.route("**/api/regx/v1/**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paginate([])) }),
+    );
     await page.goto(`/fda-data/releases/new?tenant=${TENANT}`);
-    const options = await page.locator("select option").allTextContents();
+    const select = page.locator("select").first();
+    await expect(select).toBeVisible();
+    const options = await select.locator("option").evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value));
     expect(options.join("|")).toContain("fda_iid");
     expect(options.join("|")).not.toMatch(/patent|exclusivity/i);
   });
