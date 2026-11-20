@@ -160,6 +160,13 @@ function ComparisonBlock({ calc }: { calc: Record<string, unknown> | undefined }
           IID source row: {String(sourceRow.source_row_locator)}
         </p>
       ) : null}
+      {calc.iid_release_public_id ? (
+        // QA-13: the result names the release it was computed from, not only the
+        // editable input above it.
+        <p style={{ margin: "4px 0 0", color: "#66768b" }}>
+          IID release: <span style={{ fontFamily: "monospace" }}>{String(calc.iid_release_public_id)}</span>
+        </p>
+      ) : null}
     </div>
   );
 }

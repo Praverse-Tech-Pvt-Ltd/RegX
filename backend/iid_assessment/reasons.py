@@ -35,6 +35,7 @@ HEADINGS = {
     "INGREDIENT_NOT_IN_RELEASE": "Ingredient has no record in the active IID release",
     "RECORDS_NOT_LINKED": "Some IID records for this ingredient are not yet mapped",
     "NO_RECORD_FOR_ROUTE_AND_FORM": "No IID record with this route and dosage form",
+    "RELEASE_NOT_ACTIVE": "The chosen IID release is not the active release",
 }
 
 
@@ -110,6 +111,34 @@ def _ingredient_reason(reason_code: str | None, name: str) -> Reason | None:
     return None
 
 
+def _release_not_usable(release) -> Reason | None:
+    """QA-14: matching uses only an approved or active IID release. A preview run
+    against any other release (e.g. superseded) finds nothing for that reason, not
+    because the record is missing, so say so and name the release to use."""
+    from fda_data.models import FDADataSourceRelease, FDAReleaseStatus
+
+    usable = (FDAReleaseStatus.APPROVED, FDAReleaseStatus.ACTIVE)
+    if release is None or release.status in usable:
+        return None
+    active = (
+        FDADataSourceRelease.objects.filter(
+            dataset_type=release.dataset_type, status=FDAReleaseStatus.ACTIVE
+        )
+        .order_by("-created_at")
+        .first()
+    )
+    tail = (
+        f" Choose the active IID release ({active.public_id}) instead."
+        if active is not None
+        else " No IID release is active at the moment."
+    )
+    return Reason(
+        "RELEASE_NOT_ACTIVE",
+        f"The IID release you chose ({release.public_id}) is {release.status}; a preview "
+        f"can only use the active (or an approved) release.{tail}",
+    )
+
+
 def refine(
     *,
     match: MatchResult,
@@ -140,6 +169,9 @@ def refine(
     if status == MatchStatus.DOSAGE_FORM_MISMATCH and dosage_form is None:
         return _term_reason("DOSAGE_FORM", dosage_form_code, release, "dosage_form")
     if status == MatchStatus.NO_MATCHING_IID_PRECEDENT:
+        not_usable = _release_not_usable(release)
+        if not_usable:
+            return not_usable
         records = _records(release)
         if records is None or ingredient_public_id is None:
             return None
