@@ -1392,3 +1392,57 @@ test.describe("IID preview: daily exposure not calculated", () => {
     await expect(block).not.toContainText("Blocked: NOT_COMPARABLE");
   });
 });
+
+// QA-13 and QA-17 (QA_CODEX_REPORT.md).
+test.describe("IID result and release form (QA-13, QA-17)", () => {
+  test("QA-13: the comparison names the IID release it used", async ({ page }) => {
+    await mockCsrf(page);
+    await page.route(
+      /\/api\/regx\/v1\/iid-assessments\/preview\/$/,
+      jsonRoute({
+        match_status: "EXACT_MATCH",
+        candidates: [],
+        selected_record: null,
+        calculations: {
+          potency_comparison: {
+            comparable: true,
+            result: "at_or_below",
+            proposed_value: "30",
+            iid_value: "50",
+            unit: "mg per dose unit",
+            conversion: "none needed",
+            label: "technically comparable (not regulatorily approved)",
+            iid_release_public_id: "rel-2026-07-active",
+            iid_source_row: { source_row_locator: "IIR_OCOMM.csv:55" },
+          },
+        },
+        decision_status: "REVIEW_REQUIRED",
+        decision_note: "Within selected IID potency precedent.",
+        escalation_required: true,
+      }),
+    );
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await page.getByLabel(/ingredient id/i).fill("ing-1");
+    await page.getByLabel(/active fda release id/i).fill("rel-2026-07-active");
+    await page.getByLabel(/^route code/i).fill("oral");
+    await page.getByLabel(/dosage form code/i).fill("tablet");
+    await page.getByLabel(/proposed quantity per unit/i).fill("30");
+    await page.getByLabel(/total dosage-unit weight/i).fill("500");
+    await page.getByRole("button", { name: /run preview/i }).click();
+    const block = page.getByTestId("potency-comparison");
+    await expect(block).toContainText("IID source row: IIR_OCOMM.csv:55");
+    await expect(block).toContainText("IID release: rel-2026-07-active");
+  });
+
+  test("QA-17: patent and exclusivity dataset types are not offered", async ({ page }) => {
+    await page.route("**/api/regx/v1/**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paginate([])) }),
+    );
+    await page.goto(`/fda-data/releases/new?tenant=${TENANT}`);
+    const select = page.locator("select").first();
+    await expect(select).toBeVisible();
+    const options = await select.locator("option").evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value));
+    expect(options.join("|")).toContain("fda_iid");
+    expect(options.join("|")).not.toMatch(/patent|exclusivity/i);
+  });
+});
