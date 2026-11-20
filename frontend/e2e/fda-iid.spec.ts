@@ -1262,6 +1262,193 @@ test.describe("Maximum dosage units/day range (QA-07)", () => {
   });
 });
 
+// QA-03 and QA-16 (QA_CODEX_REPORT.md).
+test.describe("IID preview: each response belongs to the request it answers (QA-03, QA-16)", () => {
+  const candidate = (id: string, potency: string) => ({
+    precedent_record_public_id: id,
+    ingredient_name: "Synthetic Starch",
+    route: "Oral",
+    dosage_form: "Tablet",
+    potency_amount: potency,
+    potency_unit: "milligram",
+    maximum_daily_exposure: null,
+    mde_unit: null,
+    calculability_status: "calculable",
+  });
+
+  async function fill(page: import("@playwright/test").Page, amount: string) {
+    await page.getByLabel(/ingredient id/i).fill("ing-1");
+    await page.getByLabel(/active fda release id/i).fill("rel-1");
+    await page.getByLabel(/^route code/i).fill("oral");
+    await page.getByLabel(/dosage form code/i).fill("tablet");
+    await page.getByLabel(/proposed quantity per unit/i).fill(amount);
+    await page.getByLabel(/total dosage-unit weight/i).fill("500");
+  }
+
+  test("QA-03: a response that arrives after the inputs changed is ignored", async ({ page }) => {
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/iid-assessments\/preview\/$/, async (route) => {
+      const sent = route.request().postDataJSON() as { proposed_quantity_per_unit: string };
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          match_status: "EXACT_MATCH",
+          candidates: [candidate("prec-1", "70.000000")],
+          selected_record: candidate("prec-1", "70.000000"),
+          calculations: {},
+          decision_status: "EXCEEDS_IID_PRECEDENT",
+          decision_note: `Result for the request that sent ${sent.proposed_quantity_per_unit} mg.`,
+          escalation_required: true,
+        }),
+      });
+    });
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await fill(page, "77");
+    const answered = page.waitForResponse(/iid-assessments\/preview\/$/);
+    await page.getByRole("button", { name: /run preview/i }).click();
+    // The user changes the amount while the 77 mg request is still in flight.
+    await page.getByLabel(/proposed quantity per unit/i).fill("35");
+    await answered;
+    await page.waitForTimeout(300);
+    await expect(page.getByText("Result for the request that sent 77 mg.")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: /assessment result/i })).toHaveCount(0);
+    await expect(page.getByLabel(/proposed quantity per unit/i)).toHaveValue("35");
+    await expect(page.getByRole("button", { name: /run preview/i })).toBeEnabled();
+  });
+
+  test("QA-16: the first 'Select this precedent' click sends the clicked row", async ({ page }) => {
+    const sentSelections: (string | null)[] = [];
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/iid-assessments\/preview\/$/, async (route) => {
+      const sent = route.request().postDataJSON() as { selected_precedent_record_public_id?: string };
+      const chosen = sent.selected_precedent_record_public_id ?? null;
+      sentSelections.push(chosen);
+      const rows = [candidate("prec-low", "10.000000"), candidate("prec-high", "500.000000")];
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          match_status: chosen ? "EXACT_MATCH" : "MULTIPLE_EXACT_MATCHES",
+          candidates: rows,
+          selected_record: rows.find((r) => r.precedent_record_public_id === chosen) ?? null,
+          calculations: {},
+          decision_status: "REVIEW_REQUIRED",
+          decision_note: chosen ? `Selected ${chosen}.` : "Multiple exact IID records match; select one.",
+          escalation_required: true,
+        }),
+      });
+    });
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await fill(page, "30");
+    await page.getByRole("button", { name: /run preview/i }).click();
+    await expect(page.getByRole("button", { name: /select this precedent/i })).toHaveCount(2);
+
+    const answered = page.waitForResponse(/iid-assessments\/preview\/$/);
+    await page.getByRole("button", { name: /select this precedent/i }).nth(1).click();
+    await answered;
+    expect(sentSelections).toEqual([null, "prec-high"]);
+    await expect(page.getByText("Selected prec-high.")).toBeVisible();
+  });
+});
+
+// Daily exposure for a percentage or an unrecognised unit (PROJECT_OVERVIEW §11
+// item 37): the API now returns no value and a short reason; the page shows the
+// reason instead of a bare status code, and no number.
+test.describe("IID preview: daily exposure not calculated", () => {
+  test("shows the reason and no value", async ({ page }) => {
+    const reason =
+      "Not calculated: '%w/v' is a percentage. Daily exposure needs an amount per dosage unit in mg, g, µg, mL or L.";
+    await page.route(
+      /\/api\/regx\/v1\/iid-assessments\/preview\/$/,
+      jsonRoute({
+        match_status: "EXACT_MATCH",
+        candidates: [],
+        selected_record: null,
+        calculations: {
+          daily_exposure: {
+            status: "NOT_COMPARABLE",
+            value: null,
+            unit: null,
+            reason_code: "NOT_A_PER_DOSE_MASS_OR_VOLUME",
+            reason,
+          },
+        },
+        decision_status: "NOT_COMPARABLE",
+        decision_note: "Not comparable.",
+        escalation_required: false,
+      }),
+    );
+    await mockCsrf(page);
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await page.getByLabel(/ingredient id/i).fill("ing-1");
+    await page.getByLabel(/active fda release id/i).fill("rel-1");
+    await page.getByLabel(/^route code/i).fill("oral");
+    await page.getByLabel(/dosage form code/i).fill("tablet");
+    await page.getByLabel(/proposed quantity per unit/i).fill("0.3");
+    await page.getByLabel(/total dosage-unit weight/i).fill("500");
+    await page.getByRole("button", { name: /run preview/i }).click();
+
+    const block = page.getByText(/^Daily exposure/).locator("..");
+    await expect(block).toContainText(reason);
+    await expect(block).not.toContainText("Blocked: NOT_COMPARABLE");
+  });
+});
+
+// QA-13 and QA-17 (QA_CODEX_REPORT.md).
+test.describe("IID result and release form (QA-13, QA-17)", () => {
+  test("QA-13: the comparison names the IID release it used", async ({ page }) => {
+    await mockCsrf(page);
+    await page.route(
+      /\/api\/regx\/v1\/iid-assessments\/preview\/$/,
+      jsonRoute({
+        match_status: "EXACT_MATCH",
+        candidates: [],
+        selected_record: null,
+        calculations: {
+          potency_comparison: {
+            comparable: true,
+            result: "at_or_below",
+            proposed_value: "30",
+            iid_value: "50",
+            unit: "mg per dose unit",
+            conversion: "none needed",
+            label: "technically comparable (not regulatorily approved)",
+            iid_release_public_id: "rel-2026-07-active",
+            iid_source_row: { source_row_locator: "IIR_OCOMM.csv:55" },
+          },
+        },
+        decision_status: "REVIEW_REQUIRED",
+        decision_note: "Within selected IID potency precedent.",
+        escalation_required: true,
+      }),
+    );
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await page.getByLabel(/ingredient id/i).fill("ing-1");
+    await page.getByLabel(/active fda release id/i).fill("rel-2026-07-active");
+    await page.getByLabel(/^route code/i).fill("oral");
+    await page.getByLabel(/dosage form code/i).fill("tablet");
+    await page.getByLabel(/proposed quantity per unit/i).fill("30");
+    await page.getByLabel(/total dosage-unit weight/i).fill("500");
+    await page.getByRole("button", { name: /run preview/i }).click();
+    const block = page.getByTestId("potency-comparison");
+    await expect(block).toContainText("IID source row: IIR_OCOMM.csv:55");
+    await expect(block).toContainText("IID release: rel-2026-07-active");
+  });
+
+  test("QA-17: patent and exclusivity dataset types are not offered", async ({ page }) => {
+    await page.route("**/api/regx/v1/**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paginate([])) }),
+    );
+    await page.goto(`/fda-data/releases/new?tenant=${TENANT}`);
+    const select = page.locator("select").first();
+    await expect(select).toBeVisible();
+    const options = await select.locator("option").evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value));
+    expect(options.join("|")).toContain("fda_iid");
+    expect(options.join("|")).not.toMatch(/patent|exclusivity/i);
+  });
+});
 
 // QA-12 / F-4 and F-5: Orange Book search by trade name and application number; a
 // reference product is picked from search results, never by typing UUIDs.
@@ -1397,48 +1584,5 @@ test.describe("Orange Book: trade name and application number (QA-12, F-5)", () 
     expect(searched[0]?.get("trade_name")).toBe("amzeeq");
     expect(searched[0]?.get("application_number")).toBeNull();
     await expect(page.getByText(/no orange book product matches/i)).toBeVisible();
-  });
-});
-
-// Daily exposure for a percentage or an unrecognised unit (PROJECT_OVERVIEW §11
-// item 37): the API now returns no value and a short reason; the page shows the
-// reason instead of a bare status code, and no number.
-test.describe("IID preview: daily exposure not calculated", () => {
-  test("shows the reason and no value", async ({ page }) => {
-    const reason =
-      "Not calculated: '%w/v' is a percentage. Daily exposure needs an amount per dosage unit in mg, g, µg, mL or L.";
-    await page.route(
-      /\/api\/regx\/v1\/iid-assessments\/preview\/$/,
-      jsonRoute({
-        match_status: "EXACT_MATCH",
-        candidates: [],
-        selected_record: null,
-        calculations: {
-          daily_exposure: {
-            status: "NOT_COMPARABLE",
-            value: null,
-            unit: null,
-            reason_code: "NOT_A_PER_DOSE_MASS_OR_VOLUME",
-            reason,
-          },
-        },
-        decision_status: "NOT_COMPARABLE",
-        decision_note: "Not comparable.",
-        escalation_required: false,
-      }),
-    );
-    await mockCsrf(page);
-    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
-    await page.getByLabel(/ingredient id/i).fill("ing-1");
-    await page.getByLabel(/active fda release id/i).fill("rel-1");
-    await page.getByLabel(/^route code/i).fill("oral");
-    await page.getByLabel(/dosage form code/i).fill("tablet");
-    await page.getByLabel(/proposed quantity per unit/i).fill("0.3");
-    await page.getByLabel(/total dosage-unit weight/i).fill("500");
-    await page.getByRole("button", { name: /run preview/i }).click();
-
-    const block = page.getByText(/^Daily exposure/).locator("..");
-    await expect(block).toContainText(reason);
-    await expect(block).not.toContainText("Blocked: NOT_COMPARABLE");
   });
 });

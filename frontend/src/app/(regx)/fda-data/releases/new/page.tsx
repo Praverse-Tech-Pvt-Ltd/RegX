@@ -5,11 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { fdaData, ApiError, isSignedOut } from "@/lib/api";
 
+// QA-17: orange_book_patents and orange_book_exclusivity are not offered until
+// they are built (no parser, model or screen exists for them yet).
 const DATASET_TYPES = [
   "orange_book_products",
   "orange_book_discontinued",
-  "orange_book_patents",
-  "orange_book_exclusivity",
   "fda_iid",
   "fda_substance_identifiers",
   "fda_route_terminology",

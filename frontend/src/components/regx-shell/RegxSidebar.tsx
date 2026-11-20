@@ -1,8 +1,9 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { auth } from "@/lib/api";
 
 /**
  * Port of the sidebar in company_site/templates/RATools/RAToolsBase.html.
@@ -407,6 +408,8 @@ export default function RegxSidebar({
 
         <ul className="dashboard-sidebar-nav">{REGX_MODULES.map(renderItem)}</ul>
 
+        <SignOutButton collapsed={collapsed} />
+
         <div className="tt-sidebar-title">
           Regulatory Tools
           <span>Company Suite</span>
@@ -415,5 +418,39 @@ export default function RegxSidebar({
         <ul className="dashboard-sidebar-nav">{LEGACY_TOOLS.map(renderItem)}</ul>
       </div>
     </nav>
+  );
+}
+
+/**
+ * QA-15: REGX had no way to end the session. Ends the server session
+ * (POST auth/logout/) and goes to sign-in; sign-in is shown even if the call
+ * fails, so the user is never left on a page that looks signed in.
+ */
+function SignOutButton({ collapsed }: { collapsed?: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <ul className="dashboard-sidebar-nav">
+      <li>
+        <button
+          type="button"
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await auth.logout();
+            } catch {
+              // fall through to sign-in either way
+            }
+            router.push("/signin");
+          }}
+          disabled={busy}
+          aria-label="Sign out"
+          data-tooltip="Sign out"
+          style={{ background: "none", border: "none", width: "100%", textAlign: "left", cursor: "pointer", padding: "8px 16px", color: "inherit", font: "inherit" }}
+        >
+          <i className="mdi mdi-logout" /> {!collapsed && <span>{busy ? "Signing out…" : "Sign out"}</span>}
+        </button>
+      </li>
+    </ul>
   );
 }

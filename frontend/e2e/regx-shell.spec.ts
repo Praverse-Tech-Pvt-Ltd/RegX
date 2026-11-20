@@ -409,3 +409,23 @@ test.describe("mobile", () => {
     expect(overflows, "page scrolls horizontally on mobile").toBe(false);
   });
 });
+
+// QA-15 (QA_CODEX_REPORT.md): REGX navigation had no way to end the session.
+test.describe("sign out (QA-15)", () => {
+  test("the REGX sidebar signs the user out and goes to sign-in", async ({ page }) => {
+    let loggedOut = false;
+    await page.route("**/api/regx/v1/auth/logout/", (route: Route) => {
+      loggedOut = route.request().method() === "POST";
+      return route.fulfill({ status: 204, body: "" });
+    });
+    await page.route("**/api/regx/v1/auth/csrf/", (route: Route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ csrfToken: "t" }) }),
+    );
+    await page.goto(`/documents?tenant=${TENANT}`);
+    const signOut = page.locator("#sidebar").getByRole("button", { name: /sign out/i });
+    await expect(signOut).toBeVisible();
+    await signOut.click();
+    await expect(page).toHaveURL(/\/signin/);
+    expect(loggedOut).toBe(true);
+  });
+});
