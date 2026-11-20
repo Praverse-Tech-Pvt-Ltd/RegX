@@ -13,7 +13,8 @@ IID preview so the two always accept and refuse the same amounts.
 * A percentage at most 100, whatever its spelling ("%", "% w/w", "%w/v",
   "percent", ...). Above 100 is impossible for w/w and v/v; for w/v it is
   possible in principle, but the highest IID w/v value is 92.
-* Maximum dosage units per day greater than zero and at most 1,000. The largest
+* Maximum dosage units per day at least 1 and at most 1,000 (QA-07: 0.5 was
+  accepted; a maximum below one whole dosage unit a day is not a regimen). The largest
   realistic regimens are a few dozen units a day (for example enzyme capsules
   with every meal); 1,000 leaves a wide margin and still catches an extra zero
   or two (10,000).
@@ -33,6 +34,7 @@ from .unit_conversion import convert_mass_or_volume, dimension_of
 
 MAX_IN_BASE_UNIT = Decimal("1000000")
 MAX_PERCENTAGE = Decimal("100")
+MIN_DOSAGE_UNITS_PER_DAY = Decimal("1")
 MAX_DOSAGE_UNITS_PER_DAY = Decimal("1000")
 PERCENT_UNIT = "percent"
 #: The units a formulation component may use, as offered in the screen.
@@ -75,8 +77,8 @@ def dosage_units_per_day_problem(value: Decimal | None) -> str | None:
     """None when the maximum dosage units per day is acceptable (or not given)."""
     if value is None:
         return None
-    if value <= 0:
-        return "The maximum number of dosage units per day must be greater than zero."
+    if value < MIN_DOSAGE_UNITS_PER_DAY:
+        return "The maximum number of dosage units per day must be at least 1."
     if value > MAX_DOSAGE_UNITS_PER_DAY:
         return (
             "The maximum number of dosage units per day cannot be more than 1,000 "

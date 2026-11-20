@@ -1199,3 +1199,62 @@ test.describe("Formulation version creation, component entry, and dosing regimen
     await expect(page.getByText(/unit\(s\) × 4\/day, max 4\/day/i)).toBeVisible();
   });
 });
+
+// QA-07 (QA_CODEX_REPORT.md): maximum dosage units/day is 1 to 1,000. The browser
+// refuses values outside that range before anything is sent (the API refuses
+// them too: backend formulations/tests/test_qa07_units_per_day_minimum.py).
+test.describe("Maximum dosage units/day range (QA-07)", () => {
+  async function expectRange(input: import("@playwright/test").Locator) {
+    await expect(input).toHaveAttribute("type", "number");
+    await expect(input).toHaveAttribute("min", "1");
+    await expect(input).toHaveAttribute("max", "1000");
+    for (const [value, valid] of [
+      ["0.5", false],
+      ["0.999", false],
+      ["1", true],
+      ["1000", true],
+      ["1000.01", false],
+    ] as const) {
+      await input.fill(value);
+      expect(await input.evaluate((el: HTMLInputElement) => el.checkValidity()), value).toBe(valid);
+    }
+  }
+
+  test("formulation version form refuses 0.5 and accepts 1 to 1,000", async ({ page }) => {
+    let created = false;
+    await mockCsrf(page);
+    await page.route(/\/api\/regx\/v1\/formulations\/products\/prod-qa07\/versions\/$/, async (route) => {
+      if (route.request().method() === "POST") created = true;
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(paginate([])) });
+    });
+    await page.route(
+      /\/api\/regx\/v1\/formulations\/products\/prod-qa07\/$/,
+      jsonRoute({
+        public_id: "prod-qa07",
+        product_code: "QA07",
+        proposed_product_name: "QA-07 product",
+        active_ingredient: "Synthetic",
+        is_combination_product: false,
+        release_type: "immediate",
+        route: "ORAL",
+        dosage_form: "TABLET",
+        selected_ob_product_public_id: null,
+      }),
+    );
+    await page.goto(`/formulations/prod-qa07?tenant=${TENANT}`);
+    await page.getByRole("button", { name: /create formulation version/i }).click();
+    const input = page.getByLabel(/maximum dosage units\/day/i);
+    await expectRange(input);
+    // A value below 1 never reaches the API.
+    await page.getByLabel(/total dosage-unit weight/i).fill("250");
+    await input.fill("0.5");
+    await page.getByRole("button", { name: /^create( version)?$/i }).click();
+    expect(created).toBe(false);
+  });
+
+  test("IID preview refuses 0.5 and accepts 1 to 1,000", async ({ page }) => {
+    await mockCsrf(page);
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await expectRange(page.getByLabel(/maximum dosage units\/day/i));
+  });
+});

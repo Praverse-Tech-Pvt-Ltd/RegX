@@ -331,7 +331,7 @@ function VersionDetailInner() {
               </label>
               <label style={{ fontSize: 13 }}>
                 Maximum units per day
-                <input value={maxRegimenUnits} onChange={(e) => setMaxRegimenUnits(e.target.value)} required style={inputStyle} />
+                <input type="number" min={1} max={1000} step="any" value={maxRegimenUnits} onChange={(e) => setMaxRegimenUnits(e.target.value)} required style={inputStyle} />
               </label>
             </div>
             {regimenError && (

@@ -382,7 +382,7 @@ function IidPreviewInner() {
           </label>
           <label style={{ fontSize: 13 }}>
             Maximum dosage units/day
-            <input value={maxUnitsPerDay} onChange={(e) => edited(setMaxUnitsPerDay)(e.target.value)} style={inputStyle} />
+            <input type="number" min={1} max={1000} step="any" value={maxUnitsPerDay} onChange={(e) => edited(setMaxUnitsPerDay)(e.target.value)} style={inputStyle} />
           </label>
         </div>
         <button type="submit" disabled={loading} style={smallButtonStyle}>
