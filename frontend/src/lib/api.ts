@@ -961,10 +961,16 @@ export const fdaData = {
         rld?: boolean;
         reference_standard?: boolean;
         discontinued?: boolean;
+        /** Contains, any letter case (backend: trade_name__icontains). */
+        trade_name?: string;
+        /** "212379", "N212379", "NDA212379" or "ANDA 210928" (backend parses it). */
+        application_number?: string;
         page?: number;
       }
     ) => {
       const qs = new URLSearchParams();
+      if (params?.trade_name) qs.set("trade_name", params.trade_name);
+      if (params?.application_number) qs.set("application_number", params.application_number);
       if (params?.active_ingredient) qs.set("active_ingredient", params.active_ingredient);
       if (params?.route) qs.set("route", params.route);
       if (params?.dosage_form) qs.set("dosage_form", params.dosage_form);

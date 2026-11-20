@@ -12,6 +12,8 @@ function OrangeBookSearchInner() {
   const tenantSlug = searchParams.get("tenant") ?? "";
 
   const [ingredient, setIngredient] = useState("");
+  const [tradeName, setTradeName] = useState("");
+  const [applicationNumber, setApplicationNumber] = useState("");
   const [route, setRoute] = useState("");
   const [dosageForm, setDosageForm] = useState("");
   const [strength, setStrength] = useState("");
@@ -34,6 +36,8 @@ function OrangeBookSearchInner() {
     try {
       const resp = await fdaData.orangeBook.search(tenantSlug, {
         active_ingredient: ingredient || undefined,
+        trade_name: tradeName.trim() || undefined,
+        application_number: applicationNumber.trim() || undefined,
         route: route || undefined,
         dosage_form: dosageForm || undefined,
         strength: strength || undefined,
@@ -85,6 +89,20 @@ function OrangeBookSearchInner() {
       </p>
 
       <form onSubmit={handleSearch} style={{ display: "flex", gap: 8, marginBottom: "0.75rem", flexWrap: "wrap" }}>
+        <input
+          value={tradeName}
+          onChange={(e) => setTradeName(e.target.value)}
+          placeholder="Trade name (e.g. AMZEEQ)"
+          aria-label="Trade name"
+          style={{ padding: "6px 10px", border: "1px solid #dce7f4", borderRadius: 4, width: 170 }}
+        />
+        <input
+          value={applicationNumber}
+          onChange={(e) => setApplicationNumber(e.target.value)}
+          placeholder="Application number (e.g. N212379)"
+          aria-label="Application number"
+          style={{ padding: "6px 10px", border: "1px solid #dce7f4", borderRadius: 4, width: 220 }}
+        />
         <input
           value={ingredient}
           onChange={(e) => setIngredient(e.target.value)}

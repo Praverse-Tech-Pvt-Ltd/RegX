@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
 import Link from "next/link";
-import { formulations, type ProductDevelopmentRecord, type FormulationVersion, ApiError, isSignedOut, loadError } from "@/lib/api";
+import { formulations, type ProductDevelopmentRecord, type FormulationVersion, ApiError, isSignedOut, loadError, fdaData, type OrangeBookProduct } from "@/lib/api";
 import { ProvenanceLabel } from "@/components/ProvenanceLabel";
 
 function FormulationDetailInner() {
@@ -21,10 +21,13 @@ function FormulationDetailInner() {
   // Reference-product selection -- requires explicit confirmation, never
   // pre-filled or auto-picked.
   const [showSelectForm, setShowSelectForm] = useState(false);
-  const [selApplicationNumber, setSelApplicationNumber] = useState("");
-  const [selProductNumber, setSelProductNumber] = useState("");
-  const [selProductPublicId, setSelProductPublicId] = useState("");
-  const [selReleasePublicId, setSelReleasePublicId] = useState("");
+  // F-5: the product is found by trade name or application number (e.g.
+  // "N212379") and picked from the results; its identifiers come from the chosen
+  // row, so no one types a UUID.
+  const [selQuery, setSelQuery] = useState("");
+  const [selResults, setSelResults] = useState<OrangeBookProduct[] | null>(null);
+  const [selSearching, setSelSearching] = useState(false);
+  const [selChosen, setSelChosen] = useState<OrangeBookProduct | null>(null);
   const [selJustification, setSelJustification] = useState("");
   const [selConfirmed, setSelConfirmed] = useState(false);
   const [selSubmitting, setSelSubmitting] = useState(false);
@@ -66,8 +69,32 @@ function FormulationDetailInner() {
     load();
   }, [tenantSlug, publicId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  async function findReference() {
+    const query = selQuery.trim();
+    if (!query) return;
+    setSelSearching(true);
+    setSelError(null);
+    setSelChosen(null);
+    try {
+      const page = await fdaData.orangeBook.search(
+        tenantSlug,
+        looksLikeApplicationNumber(query) ? { application_number: query } : { trade_name: query },
+      );
+      setSelResults(page.results);
+    } catch (err) {
+      setSelResults(null);
+      setSelError(err instanceof ApiError ? err.message : "Search failed.");
+    } finally {
+      setSelSearching(false);
+    }
+  }
+
   async function handleSelectReference(e: React.FormEvent) {
     e.preventDefault();
+    if (!selChosen) {
+      setSelError("Find the product and choose it from the results first.");
+      return;
+    }
     if (!selConfirmed) {
       setSelError("You must explicitly confirm this is the correct reference product.");
       return;
@@ -76,10 +103,10 @@ function FormulationDetailInner() {
     setSelError(null);
     try {
       const updated = await formulations.products.selectReference(tenantSlug, publicId, {
-        application_number: selApplicationNumber,
-        product_number: selProductNumber,
-        product_public_id: selProductPublicId,
-        release_public_id: selReleasePublicId,
+        application_number: selChosen.application_number,
+        product_number: selChosen.product_number,
+        product_public_id: selChosen.public_id,
+        release_public_id: selChosen.release,
         justification: selJustification,
       });
       setProduct(updated);
@@ -167,24 +194,69 @@ function FormulationDetailInner() {
 
         {showSelectForm && (
           <form onSubmit={handleSelectReference} style={{ marginTop: 12 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-              <label style={{ fontSize: 13 }}>
-                Application number
-                <input value={selApplicationNumber} onChange={(e) => setSelApplicationNumber(e.target.value)} required style={inputStyle} />
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 8 }}>
+              <label style={{ fontSize: 13, flex: 1 }}>
+                Find the reference product (trade name or application number, e.g. N212379)
+                <input
+                  value={selQuery}
+                  onChange={(e) => setSelQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void findReference();
+                    }
+                  }}
+                  style={inputStyle}
+                />
               </label>
-              <label style={{ fontSize: 13 }}>
-                Product number
-                <input value={selProductNumber} onChange={(e) => setSelProductNumber(e.target.value)} required style={inputStyle} />
-              </label>
-              <label style={{ fontSize: 13 }}>
-                Orange Book product ID
-                <input value={selProductPublicId} onChange={(e) => setSelProductPublicId(e.target.value)} required style={inputStyle} />
-              </label>
-              <label style={{ fontSize: 13 }}>
-                FDA release ID
-                <input value={selReleasePublicId} onChange={(e) => setSelReleasePublicId(e.target.value)} required style={inputStyle} />
-              </label>
+              <button type="button" onClick={() => void findReference()} disabled={selSearching} style={smallButtonStyle}>
+                {selSearching ? "Finding…" : "Find"}
+              </button>
             </div>
+            {selResults !== null && selResults.length === 0 && (
+              <p style={{ fontSize: 13, color: "#66768b" }}>No Orange Book product matches &quot;{selQuery.trim()}&quot; in the active release.</p>
+            )}
+            {selResults !== null && selResults.length > 0 && (
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #dce7f4", textAlign: "left" }}>
+                    <th style={{ padding: "4px 8px" }} scope="col">Trade name</th>
+                    <th style={{ padding: "4px 8px" }} scope="col">Application</th>
+                    <th style={{ padding: "4px 8px" }} scope="col">Strength</th>
+                    <th style={{ padding: "4px 8px" }} scope="col">RLD / RS</th>
+                    <th style={{ padding: "4px 8px" }} scope="col">Discontinued</th>
+                    <th style={{ padding: "4px 8px" }} scope="col" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {selResults.map((p) => (
+                    <tr key={p.public_id} style={{ borderBottom: "1px solid #f4f8fe", background: selChosen?.public_id === p.public_id ? "#eef6fc" : undefined }}>
+                      <td style={{ padding: "4px 8px" }}>{p.trade_name || "(untitled)"}</td>
+                      <td style={{ padding: "4px 8px" }}>
+                        {p.application_type}
+                        {p.application_number}-{p.product_number}
+                      </td>
+                      <td style={{ padding: "4px 8px" }}>{p.strength_raw}</td>
+                      <td style={{ padding: "4px 8px" }}>
+                        {[p.rld_flag ? "RLD" : "", p.reference_standard_flag ? "RS" : ""].filter(Boolean).join(" ") || "—"}
+                      </td>
+                      <td style={{ padding: "4px 8px" }}>{p.discontinued ? "Yes" : "No"}</td>
+                      <td style={{ padding: "4px 8px" }}>
+                        <button type="button" onClick={() => setSelChosen(p)} style={{ ...smallButtonStyle, padding: "2px 8px" }}>
+                          {selChosen?.public_id === p.public_id ? "Chosen" : "Use this product"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {selChosen && (
+              <p style={{ fontSize: 13, margin: "0 0 8px" }}>
+                Chosen: <strong>{selChosen.trade_name}</strong> {selChosen.application_type}
+                {selChosen.application_number}-{selChosen.product_number} <ProvenanceLabel kind="FDA_SOURCE" />
+              </p>
+            )}
             <label style={{ display: "block", fontSize: 13, marginBottom: 8 }}>
               Justification
               <textarea value={selJustification} onChange={(e) => setSelJustification(e.target.value)} rows={2} style={inputStyle} />
@@ -299,6 +371,11 @@ const smallButtonStyle: React.CSSProperties = {
   fontWeight: 600,
   fontSize: 13,
 };
+
+/** "212379", "N212379", "NDA 212379", "A099999", "ANDA210928": search by application number. */
+function looksLikeApplicationNumber(text: string): boolean {
+  return /^(N|A|NDA|ANDA)?\s*\d{1,6}$/i.test(text.trim());
+}
 
 export default function FormulationDetailPage() {
   return (
