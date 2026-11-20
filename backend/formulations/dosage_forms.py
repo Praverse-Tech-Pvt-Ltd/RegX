@@ -8,9 +8,9 @@ is not. The amount is therefore refused (not merely warned about) on a product
 whose dosage form is clearly solid.
 
 "Clearly solid" is deliberately narrow: the product's dosage form (free text)
-names a solid unit such as TABLET, CAPSULE, POWDER or GRANULE, and does not say it is made into a
-liquid before use ("... FOR SUSPENSION", "... FOR SOLUTION", "... FOR
-INJECTION"), where a per-volume amount after reconstitution is legitimate. A
+names a solid unit such as TABLET, CAPSULE, POWDER, GRANULE, FILM or PATCH, and
+does not say it is made into a liquid before use ("... FOR SUSPENSION", "... FOR
+SOLUTION", "... FOR INJECTION"), where a per-volume amount after reconstitution is legitimate. A
 blank or unknown dosage form is never treated as solid.
 """
 
@@ -39,6 +39,31 @@ SOLID_WORDS = (
     "POWDERS",
     "GRANULE",
     "GRANULES",
+    # QA-19 follow-up: the other clearly solid SPL dosage forms (26 SPL terms;
+    # the full list outcome is pinned in tests/test_qa19_per_volume_on_solid_forms.py).
+    # Not here on purpose: a liquid on a carrier (CLOTH, SWAB, DRESSING),
+    # semi-solids (CREAM, GEL, PASTE, POULTICE, ...) and non-forms (KIT, SYSTEM).
+    "BAR",
+    "BEAD",
+    "CHEWABLE",
+    "CRYSTAL",
+    "DISC",
+    "FIBER",
+    "FILM",
+    "GLOBULE",
+    "INSERT",
+    "LENS",
+    "DEVICE",
+    "LIPSTICK",
+    "PATCH",
+    "PILL",
+    "PLASTER",
+    "RING",
+    "SPONGE",
+    "STICK",
+    "STRIP",
+    "TAMPON",
+    "TAPE",
 )
 #: "FOR SOLUTION", "FOR ORAL SUSPENSION", "FOR LIPOSOMAL SUSPENSION", "FOR INJECTION":
 #: made into a liquid before use. One optional qualifier word is allowed so the
