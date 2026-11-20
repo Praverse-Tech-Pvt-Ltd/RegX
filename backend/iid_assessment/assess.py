@@ -260,11 +260,22 @@ def run_preview(
             )
             calculations["percentage_w_w"] = asdict(pct_ww)
 
-            daily_exposure_result = calculate_daily_exposure(
-                quantity_per_dosage_unit=proposed_quantity_per_unit,
-                maximum_dosage_units_per_day=maximum_dosage_units_per_day,
-            )
-            calculations["daily_exposure"] = asdict(daily_exposure_result)
+            if proposed.family in ("mass", "volume") and proposed.unit:
+                daily_exposure_result = calculate_daily_exposure(
+                    quantity_per_dosage_unit=proposed_quantity_per_unit,
+                    maximum_dosage_units_per_day=maximum_dosage_units_per_day,
+                )
+                calculations["daily_exposure"] = asdict(daily_exposure_result)
+            else:
+                # A percentage or a unit REGX cannot read is not an amount per
+                # dosage unit: 0.3 %w/v x 4 is not "1.2" of anything (§11 item 37).
+                daily_exposure_result = _not_a_per_dose_amount(
+                    proposed_quantity_per_unit, proposed_quantity_unit
+                )
+                calculations["daily_exposure"] = {
+                    **asdict(daily_exposure_result),
+                    "reason": _not_a_per_dose_amount_reason(proposed_quantity_unit),
+                }
 
         if unit_conversion_ok:
             pct_potency = calculate_percentage_of_potency(
@@ -343,6 +354,37 @@ def _decimal_safe(value):
     if isinstance(value, Decimal):
         return str(value)
     return value
+
+
+NOT_A_PER_DOSE_MASS_OR_VOLUME = "NOT_A_PER_DOSE_MASS_OR_VOLUME"
+
+
+def _not_a_per_dose_amount(amount, unit):
+    """Daily exposure refused: the amount is not a mass or volume per dosage unit
+    (a percentage, or a unit REGX cannot read). Never computed."""
+    from datetime import UTC, datetime
+
+    from .calculations import FORMULA_VERSION, CalculationResult, CalculationStatus
+
+    return CalculationResult(
+        formula_identifier="daily_exposure",
+        formula_version=FORMULA_VERSION,
+        status=CalculationStatus.BASIS_UNCLEAR,
+        reason_code=NOT_A_PER_DOSE_MASS_OR_VOLUME,
+        inputs={"proposed_quantity": str(amount), "proposed_unit": str(unit or "")},
+        generated_at=datetime.now(tz=UTC).isoformat(),
+    )
+
+
+def _not_a_per_dose_amount_reason(unit) -> str:
+    from .amount_limits import is_percentage_unit
+
+    shown = (unit or "").strip()
+    what = "is a percentage" if is_percentage_unit(shown) else "is not a unit REGX can read"
+    return (
+        f"Not calculated: '{shown}' {what}. Daily exposure needs an amount per dosage unit "
+        "in mg, g, µg, mL or L."
+    )
 
 
 def _not_per_dose_unit(formula_id: str, amount):

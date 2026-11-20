@@ -1258,3 +1258,46 @@ test.describe("Maximum dosage units/day range (QA-07)", () => {
     await expectRange(page.getByLabel(/maximum dosage units\/day/i));
   });
 });
+
+// Daily exposure for a percentage or an unrecognised unit (PROJECT_OVERVIEW §11
+// item 37): the API now returns no value and a short reason; the page shows the
+// reason instead of a bare status code, and no number.
+test.describe("IID preview: daily exposure not calculated", () => {
+  test("shows the reason and no value", async ({ page }) => {
+    const reason =
+      "Not calculated: '%w/v' is a percentage. Daily exposure needs an amount per dosage unit in mg, g, µg, mL or L.";
+    await page.route(
+      /\/api\/regx\/v1\/iid-assessments\/preview\/$/,
+      jsonRoute({
+        match_status: "EXACT_MATCH",
+        candidates: [],
+        selected_record: null,
+        calculations: {
+          daily_exposure: {
+            status: "NOT_COMPARABLE",
+            value: null,
+            unit: null,
+            reason_code: "NOT_A_PER_DOSE_MASS_OR_VOLUME",
+            reason,
+          },
+        },
+        decision_status: "NOT_COMPARABLE",
+        decision_note: "Not comparable.",
+        escalation_required: false,
+      }),
+    );
+    await mockCsrf(page);
+    await page.goto(`/iid-assessments/preview?tenant=${TENANT}`);
+    await page.getByLabel(/ingredient id/i).fill("ing-1");
+    await page.getByLabel(/active fda release id/i).fill("rel-1");
+    await page.getByLabel(/^route code/i).fill("oral");
+    await page.getByLabel(/dosage form code/i).fill("tablet");
+    await page.getByLabel(/proposed quantity per unit/i).fill("0.3");
+    await page.getByLabel(/total dosage-unit weight/i).fill("500");
+    await page.getByRole("button", { name: /run preview/i }).click();
+
+    const block = page.getByText(/^Daily exposure/).locator("..");
+    await expect(block).toContainText(reason);
+    await expect(block).not.toContainText("Blocked: NOT_COMPARABLE");
+  });
+});
