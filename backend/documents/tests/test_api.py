@@ -79,14 +79,15 @@ class TestDocumentUploadAPI:
         assert "storage_key" not in str(data)  # no storage key leaked
         assert data["title"] == "My PDF"
 
-    def test_reviewer_cannot_upload(
+    def test_reviewer_can_upload(
         self, user_b, tenant_a, reviewer_membership, local_storage, valid_pdf_bytes, settings
     ):
-        # PLANTED: reviewer role cannot upload
+        # QA-05, owner decision 2026-11-18: Reviewers attach documents (VP still cannot;
+        # see test_qa05_reviewer_upload.py).
         settings.CELERY_TASK_ALWAYS_EAGER = True
         client = _client_for(user_b, tenant_a)
-        resp = _post_doc(client, valid_pdf_bytes, "Viewer Upload Attempt")
-        assert resp.status_code == 403
+        resp = _post_doc(client, valid_pdf_bytes, "Reviewer Upload")
+        assert resp.status_code == 201
 
     def test_invalid_extension_returns_422(
         self, user_a, tenant_a, doer_membership, local_storage, settings
