@@ -34,10 +34,11 @@ _UNDO = (
 
 @contextmanager
 def audit_writes_fail(when: str = "true"):
-    """Every audit INSERT inside the block raises (or only those matching `when`, an SQL
-    condition on NEW, e.g. "NEW.actor_id IS NOT NULL"; test code only). Call the code under test through
-    `attempt()`: the test asserts on the database afterwards, not on how the failure
-    surfaced (a 500 in production)."""
+    """Every audit INSERT inside the block raises, or only those matching `when` (an SQL
+    condition on NEW, e.g. "NEW.actor_id IS NOT NULL"; test code only).
+
+    Call the code under test through `attempt()`: the test asserts on the database
+    afterwards, not on how the failure surfaced (a 500 in production)."""
     with connection.cursor() as cur:
         cur.execute(_FAIL.format(when=when))
     try:
