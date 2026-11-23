@@ -2104,8 +2104,9 @@ row, after the lock is acquired and before any write.
 **M4D3-TXN-004** An exception after the response write shall roll back both the response
 update and every outcome update.
 
-**M4D3-TXN-005** All audit events shall be dispatched via `transaction.on_commit()`;
-no success audit shall fire after a rollback.
+**M4D3-TXN-005** All audit events shall be written inside the same transaction as the change;
+no success audit shall survive a rollback, and no change shall commit without its audit
+event. (amended 2026-11-23, QA-09, owner decision; was "dispatched via `transaction.on_commit()`"; see the amendment note in `docs/MILESTONE_4D_2_IMPLEMENTATION_SPEC.md`)
 
 **M4D3-TXN-006** Concurrent governed updates on one execution shall serialize on the
 execution lock.
@@ -2149,7 +2150,8 @@ values.
 
 ## Part 19 — Audit
 
-**M4D3-AUD-001** All 4D-3 audit events shall be dispatched via `transaction.on_commit()`.
+**M4D3-AUD-001** All 4D-3 audit events shall be written inside the same transaction as the
+change. (amended 2026-11-23, QA-09, owner decision; was "dispatched via `transaction.on_commit()`"; see the amendment note in `docs/MILESTONE_4D_2_IMPLEMENTATION_SPEC.md`)
 
 **M4D3-AUD-002** Defined events: `iig_checklist.response.fda_populated`;
 `iig_checklist.calculation.completed`; `iig_checklist.calculation.data_required`;

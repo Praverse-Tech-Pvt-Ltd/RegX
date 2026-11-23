@@ -861,9 +861,14 @@ class TestAudit:
         """
         from audit.models import AuditEvent
 
+        # Only the events the cascade writes (the fixture's own execution.created is
+        # written in the fixture's transaction since the audit stopped using on_commit).
+        before = set(AuditEvent.objects.values_list("pk", flat=True))
         with django_capture_on_commit_callbacks(execute=True):
             _cascade(world)
-        emitted = set(AuditEvent.objects.values_list("event_type", flat=True))
+        emitted = set(
+            AuditEvent.objects.exclude(pk__in=before).values_list("event_type", flat=True)
+        )
         assert {e for e in emitted if e.startswith("iig_checklist.")} == {CALCULATED_EVENT}
         assert not any("cascade" in e or "recalc" in e for e in emitted)
 
