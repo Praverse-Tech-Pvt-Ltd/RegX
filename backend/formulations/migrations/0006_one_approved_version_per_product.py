@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("formulations", "0004_version_db_governance"),
+        ("formulations", "0005_freeze_review_stamps"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
