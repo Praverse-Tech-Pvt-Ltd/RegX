@@ -12,6 +12,7 @@ import time
 
 import pyotp
 from django.contrib.auth import login, logout
+from django.db import transaction
 from django.middleware.csrf import get_token
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -169,17 +170,27 @@ def me_view(request):
 def mfa_setup_view(request):
     """Provision a TOTP device. Returns a provisioning URI and 10 recovery codes."""
     user = request.user
-    device, _ = MFADevice.objects.get_or_create(user=user)
-    if device.is_verified:
-        return Response(
-            {"detail": "MFA already active. Disable first to re-enroll."},
-            status=status.HTTP_409_CONFLICT,
+    with transaction.atomic():
+        device, _ = MFADevice.objects.get_or_create(user=user)
+        if device.is_verified:
+            return Response(
+                {"detail": "MFA already active. Disable first to re-enroll."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        secret = pyotp.random_base32()
+        device.set_secret(secret)
+        device.is_verified = False
+        device.save()
+        recovery_codes = RecoveryCode.generate(device)
+        # Same transaction as the new secret and codes. Counts only: never the
+        # secret, the provisioning URI or a recovery code.
+        log_event(
+            "identity.mfa.enrolment_started",
+            resource_type="user",
+            resource_id=str(user.public_id),
+            payload={"recovery_codes_issued": len(recovery_codes)},
+            user=user,
         )
-    secret = pyotp.random_base32()
-    device.set_secret(secret)
-    device.is_verified = False
-    device.save()
-    recovery_codes = RecoveryCode.generate(device)
     totp = pyotp.TOTP(secret)
     uri = totp.provisioning_uri(name=user.email, issuer_name="RegX")
     return Response({"totp_uri": uri, "recovery_codes": recovery_codes})
@@ -216,13 +227,22 @@ def mfa_verify_view(request):
     if device.last_used_counter == current_counter:
         return Response({"detail": "OTP already used (replay prevented)."}, status=400)
 
-    device.is_verified = True
-    device.last_used_counter = current_counter
-    device.failed_attempts = 0
-    device.locked_until = None
-    device.save()
-    request.user.mfa_required = True
-    request.user.save(update_fields=["mfa_required"])
+    with transaction.atomic():
+        device.is_verified = True
+        device.last_used_counter = current_counter
+        device.failed_attempts = 0
+        device.locked_until = None
+        device.save()
+        request.user.mfa_required = True
+        request.user.save(update_fields=["mfa_required"])
+        # Same transaction as the activation. Never the code.
+        log_event(
+            "identity.mfa.activated",
+            resource_type="user",
+            resource_id=str(request.user.public_id),
+            payload={"mfa_required": True},
+            user=request.user,
+        )
     return Response({"detail": "MFA activated."})
 
 
@@ -240,9 +260,22 @@ def mfa_recovery_view(request):
     except MFADevice.DoesNotExist:
         return Response({"detail": "No MFA device."}, status=400)
 
-    if not RecoveryCode.consume(device, code):
-        return Response({"detail": "Invalid or already-used recovery code."}, status=400)
-
+    with transaction.atomic():
+        if not RecoveryCode.consume(device, code):
+            return Response({"detail": "Invalid or already-used recovery code."}, status=400)
+        # Same transaction as spending the code. Never the code itself.
+        log_event(
+            "identity.mfa.recovery_code_used",
+            resource_type="user",
+            resource_id=str(request.user.public_id),
+            payload={
+                "recovery_codes_remaining": device.recovery_codes.filter(
+                    used_at__isnull=True
+                ).count(),
+                "via": "mfa_recovery_endpoint",
+            },
+            user=request.user,
+        )
     return Response({"detail": "Recovery code accepted."})
 
 
