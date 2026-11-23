@@ -173,6 +173,15 @@ class FDADataSourceRelease(PublicIDModel, TimeStampedModel):
                 condition=models.Q(reimport_of__isnull=True),
                 name="unique_release_checksum_per_dataset_type",
             ),
+            # QA-10: the same CONTENT once per dataset type, except a deliberate
+            # re-import. The duplicate check runs before the write, so two
+            # overlapping imports could both pass it; this closes that window.
+            models.UniqueConstraint(
+                fields=["dataset_type", "content_fingerprint_sha256"],
+                condition=models.Q(reimport_of__isnull=True)
+                & ~models.Q(content_fingerprint_sha256=""),
+                name="unique_release_content_fingerprint_per_dataset_type",
+            ),
             # A deliberate re-import always carries a written reason.
             models.CheckConstraint(
                 check=models.Q(reimport_of__isnull=True) | ~models.Q(reimport_reason=""),

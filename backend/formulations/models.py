@@ -189,6 +189,13 @@ class FormulationVersion(PublicIDModel, TimeStampedModel):
                 check=models.Q(total_dosage_unit_weight__gt=0),
                 name="formulation_total_weight_positive",
             ),
+            # QA-08: at most one approved version per product, enforced by the database
+            # (approval.approve also locks the product; this is the backstop).
+            models.UniqueConstraint(
+                fields=["product"],
+                condition=models.Q(status="approved"),
+                name="formulation_one_approved_version_per_product",
+            ),
         ]
 
     def __str__(self):

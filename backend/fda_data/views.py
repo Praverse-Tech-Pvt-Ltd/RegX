@@ -164,25 +164,43 @@ class FdaReleaseListView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        release = importer.register_release(
-            dataset_type=data["dataset_type"],
-            source_name=data["source_name"],
-            official_source_reference=data["official_source_reference"],
-            file_obj=file_obj,
-            original_filename=data.get("file_name") or "synthetic-upload.json",
-            media_type="application/json",
-            schema_version=data.get("schema_version", ""),
-            publication_date=data.get("publication_date"),
-            imported_by=request.user,
-            content_fingerprint=fingerprint,
-        )
+        from django.db import transaction
 
-        # Explicit, resolved above. The previous
-        # `dataset_type.startswith("orange_book")` routed patents and
-        # exclusivity through the PRODUCTS adapter, which turned a patent row
-        # into an OrangeBookProduct with an empty ingredient and strength and
-        # counted it as imported.
-        import_rows(release, neutral, request.user)
+        # QA-09: the release, its rows and their audit records commit together or not
+        # at all. QA-10 (#158): if another request with the same rows was registered
+        # first, the refused insert rolls all of it back and the answer is 409.
+        try:
+            with transaction.atomic():
+                release = importer.register_release(
+                    dataset_type=data["dataset_type"],
+                    source_name=data["source_name"],
+                    official_source_reference=data["official_source_reference"],
+                    file_obj=file_obj,
+                    original_filename=data.get("file_name") or "synthetic-upload.json",
+                    media_type="application/json",
+                    schema_version=data.get("schema_version", ""),
+                    publication_date=data.get("publication_date"),
+                    imported_by=request.user,
+                    content_fingerprint=fingerprint,
+                )
+
+                # Explicit, resolved above. The previous
+                # `dataset_type.startswith("orange_book")` routed patents and
+                # exclusivity through the PRODUCTS adapter, which turned a patent row
+                # into an OrangeBookProduct with an empty ingredient and strength and
+                # counted it as imported.
+                import_rows(release, neutral, request.user)
+        except importer.DuplicateReleaseContent:
+            return Response(
+                {
+                    "error_code": "duplicate_release",
+                    "detail": (
+                        "The same rows were registered by another request at the same "
+                        "time. Nothing was changed."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
 
         release.refresh_from_db()
         return Response(
@@ -835,25 +853,25 @@ class SubstanceMappingProposalView(APIView):
         try:
             with transaction.atomic():
                 mapping.save()
+                # QA-09: the mapping and its audit record commit together or not at all.
+                emit(
+                    event_type=FdaDataEvent.SUBSTANCE_MAPPING_CANDIDATE_CREATED,
+                    resource_type="fda_data_mapping",
+                    resource_id=str(mapping.public_id),
+                    payload={
+                        "mapping_type": "substance",
+                        "release_public_id": str(release.public_id) if release else None,
+                        "normalized_ingredient_name": mapping.normalized_ingredient_name,
+                        "mapping_method": mapping.mapping_method,
+                        "affected_record_count": affected_record_count(mapping),
+                    },
+                    actor_id=request.user.id,
+                    actor_email=request.user.email,
+                )
         except IntegrityError as exc:
             raise ValidationError(
                 "A current mapping already exists for this raw identity in this release."
             ) from exc
-
-        emit(
-            event_type=FdaDataEvent.SUBSTANCE_MAPPING_CANDIDATE_CREATED,
-            resource_type="fda_data_mapping",
-            resource_id=str(mapping.public_id),
-            payload={
-                "mapping_type": "substance",
-                "release_public_id": str(release.public_id) if release else None,
-                "normalized_ingredient_name": mapping.normalized_ingredient_name,
-                "mapping_method": mapping.mapping_method,
-                "affected_record_count": affected_record_count(mapping),
-            },
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
         return Response(
             TerminologyMappingSerializer.from_instance(
                 "substance", mapping, affected_record_count(mapping)
@@ -949,17 +967,18 @@ class _MappingActionViewBase(APIView):
                 raise ValidationError(str(exc)) from exc
             mapping.save()
 
-        emit(
-            event_type=self.event_type,
-            resource_type="fda_data_mapping",
-            resource_id=str(mapping.public_id),
-            payload={
-                "mapping_type": mapping_type,
-                "new_status": target_status,
-            },
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
+            # QA-09: inside the block, so the transition and its audit record commit together.
+            emit(
+                event_type=self.event_type,
+                resource_type="fda_data_mapping",
+                resource_id=str(mapping.public_id),
+                payload={
+                    "mapping_type": mapping_type,
+                    "new_status": target_status,
+                },
+                actor_id=request.user.id,
+                actor_email=request.user.email,
+            )
         return Response(
             TerminologyMappingSerializer.from_instance(
                 mapping_type, mapping, _affected_record_count(mapping_type, mapping)
