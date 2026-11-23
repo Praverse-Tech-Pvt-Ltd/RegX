@@ -65,6 +65,7 @@ __all__ = [
     "EXPORT_SCHEMA_VERSION",
     "ControlledExportError",
     "ExecutionNotExportable",
+    "ExportAuditFailed",
     "ExportPermissionDenied",
     "build_export_artifact",
     "canonical_bytes",
@@ -88,6 +89,11 @@ class ControlledExportError(Exception):
 
 class ExecutionNotExportable(ControlledExportError):
     """§17 -- only a completed (``approved``) execution may be exported."""
+
+
+class ExportAuditFailed(ControlledExportError):
+    """The export's audit record could not be saved, so the export is refused and no
+    artifact is handed back (owner decision 2026-11-23, QA-09)."""
 
 
 class ExportPermissionDenied(ControlledExportError):
@@ -621,8 +627,12 @@ def export_execution(*, tenant, execution_public_id, actor, fmt="json"):
     404 through ``visible_to()`` and never a 403 that would confirm the record
     exists; then the dedicated export permission; then lifecycle.
 
-    The audit event is emitted only after the artifact exists, and carries the
-    checksum so the trail can later attest to a specific issued export (§17).
+    The audit event is written after the artifact is built (it carries the
+    checksum, so the trail can later attest to a specific issued export, §17) and
+    is SAVED before the artifact is handed back: if the record cannot be saved the
+    export is refused with ``ExportAuditFailed`` and no artifact leaves this
+    function (QA-09, owner decision 2026-11-23; was ``transaction.on_commit()``,
+    which inside a caller's transaction handed the file back before the record).
     """
     from django.db import transaction as db_transaction
     from django.utils import timezone
@@ -669,7 +679,11 @@ def export_execution(*, tenant, execution_public_id, actor, fmt="json"):
             },
         )
 
-    db_transaction.on_commit(_audit)
+    try:
+        with db_transaction.atomic():
+            _audit()
+    except Exception as exc:
+        raise ExportAuditFailed() from exc
     return artifact, rendered
 
 
