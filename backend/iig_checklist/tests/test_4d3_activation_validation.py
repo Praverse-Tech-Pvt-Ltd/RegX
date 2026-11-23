@@ -146,6 +146,10 @@ def _approve_then_activate(version, api_client_doer, api_client_vp):
     """Drive the real governed lifecycle: submit -> approve -> activate."""
     pid = version.public_id
     submit = api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
+    if submit.status_code == 400:
+        # QA-06(b): the same validation now runs at submit, so an invalid version is
+        # refused there and never reaches approved.
+        return submit
     assert submit.status_code == 200, submit.data
     approve = api_client_vp.post(f"{BASE}/iig-checklists/versions/{pid}/approve/", data={})
     assert approve.status_code == 200, approve.data
@@ -377,7 +381,7 @@ class TestMissingBindings:
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         assert draft_version.activated_at is None
 
     def test_failed_activation_emits_no_success_audit(
@@ -444,7 +448,7 @@ class TestMissingBindings:
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         _assert_no_success_audit(draft_version)
 
 
@@ -505,7 +509,7 @@ class TestDuplicateBindings:
         assert response.status_code == 400
         draft_version.refresh_from_db()
         prior.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         assert prior.status == ChecklistVersionStatus.ACTIVE
         _assert_no_success_audit(draft_version)
 
@@ -519,7 +523,7 @@ class TestDuplicateBindings:
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
 
     def test_duplicate_calculated_codes_are_an_ambiguous_graph(self, draft_version):
         """Two bound questions sharing one code cannot form distinct nodes."""
@@ -591,7 +595,7 @@ class TestTypeAndClassification:
         assert response.status_code == 400
         assert WRONG_SOURCE_CLASSIFICATION in str(response.data)
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         assert draft_version.activated_at is None
         _assert_no_success_audit(draft_version)
 
@@ -642,7 +646,7 @@ class TestRegistryIntegrity:
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
 
     def test_full_mde_chain_validates(self, draft_version):
         """daily_exposure -> percentage_of_iid_mde resolves end to end."""
@@ -691,7 +695,7 @@ class TestCalculationGraph:
         assert CALCULATION_GRAPH_CYCLE in str(response.data)
         draft_version.refresh_from_db()
         prior.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         assert draft_version.activated_at is None
         assert prior.status == ChecklistVersionStatus.ACTIVE
         _assert_no_success_audit(draft_version)
@@ -728,7 +732,7 @@ class TestCalculationGraph:
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         _assert_no_success_audit(draft_version)
 
     def test_depth_five_is_accepted(
@@ -753,7 +757,7 @@ class TestCalculationGraph:
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         _assert_no_success_audit(draft_version)
 
     def test_cascade_of_ten_is_accepted(
@@ -779,7 +783,7 @@ class TestCalculationGraph:
         response = _approve_then_activate(draft_version, api_client_doer, api_client_vp)
         assert response.status_code == 400
         draft_version.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         _assert_no_success_audit(draft_version)
 
     def test_unknown_dependency_node(self, draft_version, monkeypatch):
@@ -880,7 +884,7 @@ class TestUpstreamProducer:
         assert UPSTREAM_OUTPUT_UNIT_MISMATCH in str(response.data)
         draft_version.refresh_from_db()
         prior.refresh_from_db()
-        assert draft_version.status == ChecklistVersionStatus.APPROVED
+        assert draft_version.status == ChecklistVersionStatus.DRAFT  # QA-06(b): refused at submit
         assert prior.status == ChecklistVersionStatus.ACTIVE
         _assert_no_success_audit(draft_version)
 

@@ -1,5 +1,7 @@
 """Fixtures for iig_checklist domain tests. Synthetic content only."""
 
+import datetime
+
 import pytest
 
 
@@ -213,10 +215,12 @@ def unclassified_definition(db, tenant_a, user_a):
 def draft_version(db, tenant_definition, user_a):
     from iig_checklist.models import ChecklistVersion
 
+    # QA-06: a complete draft carries an effective date (needed from submit on).
     return ChecklistVersion.objects.create(
         definition=tenant_definition,
         version_number=1,
         created_by=user_a,
+        effective_date=datetime.date(2026, 1, 1),
     )
 
 
@@ -242,6 +246,7 @@ def platform_draft_version(db, platform_definition, platform_actor_user):
         definition=platform_definition,
         version_number=1,
         created_by=platform_actor_user,
+        effective_date=datetime.date(2026, 1, 1),
     )
 
 

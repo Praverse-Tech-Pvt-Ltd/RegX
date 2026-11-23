@@ -45,7 +45,9 @@ class CloneSourceNotEligible(Exception):
     pass
 
 
-def create_next_version(*, definition: ChecklistDefinition, actor) -> ChecklistVersion:
+def create_next_version(
+    *, definition: ChecklistDefinition, actor, fields: dict | None = None
+) -> ChecklistVersion:
     """Authoritative version-creation service -- select_for_update() on
     the PARENT ChecklistDefinition row while computing the next
     version_number, mirroring the exact fix already proven in
@@ -64,6 +66,8 @@ def create_next_version(*, definition: ChecklistDefinition, actor) -> ChecklistV
                 version_number=next_number,
                 status=ChecklistVersionStatus.DRAFT,
                 created_by=actor,
+                # QA-06(a): the draft fields a PATCH may set, given at creation.
+                **(fields or {}),
             )
         except IntegrityError as exc:
             raise VersionAllocationConflict("Version allocation conflict -- please retry.") from exc
