@@ -23,7 +23,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from .audit_events import FormulationEvent, emit
-from .models import FormulationStatus, FormulationVersion
+from .models import FormulationStatus, FormulationVersion, ProductDevelopmentRecord
 from .permissions import (
     PERM_APPROVE,
     PERM_REVIEW,
@@ -183,6 +183,11 @@ def reject(version: FormulationVersion, user, tenant, reason: str) -> Formulatio
 def approve(version: FormulationVersion, user, tenant, note: str) -> FormulationVersion:
     note = (note or "").strip()
     with transaction.atomic():
+        # QA-08: lock the PRODUCT first, so approvals of versions of one product run one
+        # at a time. Locking only the version and the currently approved siblings let two
+        # transactions both see "none approved" and both approve. Always product, then
+        # version: one lock order, no deadlock between approvals.
+        ProductDevelopmentRecord.objects.select_for_update().get(pk=version.product_id)
         version = _lock(version)
         _require(version, "approve", user, tenant)
         if _is_creator_or_submitter(version, user):

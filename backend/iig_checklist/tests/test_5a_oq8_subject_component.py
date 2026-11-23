@@ -205,10 +205,12 @@ class TestSubjectComponentEligibility:
     def test_a_component_from_another_version_of_the_same_product(self, world):
         from formulations.models import FormulationVersion
 
+        # Not "approved": world["fv"] is the product's approved version, and a product
+        # has at most one (QA-08). A superseded version is a former approval.
         second_version = FormulationVersion(
             product=world["fv"].product,
             version_number=2,
-            status="approved",
+            status="superseded",
             total_dosage_unit_weight="100.000000",
             total_dosage_unit_weight_unit="milligram",
             created_by=world["user"],
