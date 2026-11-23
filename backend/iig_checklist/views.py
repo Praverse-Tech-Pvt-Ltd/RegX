@@ -775,20 +775,22 @@ class ChecklistSectionListCreateView(APIView):
         _require_editable(version)
         serializer = ChecklistSectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            section = ChecklistSection(checklist_version=version, **serializer.validated_data)
-            section.full_clean()
-            section.save()
-        except DjangoValidationError as exc:
-            _raise_django_validation_as_drf(exc)
-        emit(
-            event_type=IigChecklistEvent.SECTION_CREATED,
-            resource_id=str(section.public_id),
-            actor_id=request.user.id,
-            actor_email=getattr(request.user, "email", ""),
-            tenant_id=getattr(version.definition.tenant, "id", None),
-            payload={"checklist_version_public_id": str(version.public_id)},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            try:
+                section = ChecklistSection(checklist_version=version, **serializer.validated_data)
+                section.full_clean()
+                section.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+            emit(
+                event_type=IigChecklistEvent.SECTION_CREATED,
+                resource_id=str(section.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(version.definition.tenant, "id", None),
+                payload={"checklist_version_public_id": str(version.public_id)},
+            )
         return Response(ChecklistSectionSerializer(section).data, status=status.HTTP_201_CREATED)
 
 
@@ -806,19 +808,21 @@ class ChecklistSectionDetailView(APIView):
         for field in ("title", "description", "display_order", "criticality"):
             if field in request.data:
                 setattr(section, field, request.data[field])
-        try:
-            section.full_clean()
-            section.save()
-        except DjangoValidationError as exc:
-            _raise_django_validation_as_drf(exc)
-        emit(
-            event_type=IigChecklistEvent.SECTION_UPDATED,
-            resource_id=str(section.public_id),
-            actor_id=request.user.id,
-            actor_email=getattr(request.user, "email", ""),
-            tenant_id=getattr(section.checklist_version.definition.tenant, "id", None),
-            payload={},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            try:
+                section.full_clean()
+                section.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+            emit(
+                event_type=IigChecklistEvent.SECTION_UPDATED,
+                resource_id=str(section.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(section.checklist_version.definition.tenant, "id", None),
+                payload={},
+            )
         return Response(ChecklistSectionSerializer(section).data)
 
     def delete(self, request, public_id):
@@ -827,15 +831,17 @@ class ChecklistSectionDetailView(APIView):
         _authorize_mutation(request, tenant, section.checklist_version.definition, PERM_EDIT_DRAFT)
         _require_editable(section.checklist_version)
         section_public_id = str(section.public_id)
-        section.delete()
-        emit(
-            event_type=IigChecklistEvent.SECTION_DELETED,
-            resource_id=section_public_id,
-            actor_id=request.user.id,
-            actor_email=getattr(request.user, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload={},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            section.delete()
+            emit(
+                event_type=IigChecklistEvent.SECTION_DELETED,
+                resource_id=section_public_id,
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload={},
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -852,20 +858,22 @@ class ChecklistQuestionListCreateView(APIView):
         _require_editable(section.checklist_version)
         serializer = ChecklistQuestionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            question = ChecklistQuestion(section=section, **serializer.validated_data)
-            question.full_clean()
-            question.save()
-        except DjangoValidationError as exc:
-            _raise_django_validation_as_drf(exc)
-        emit(
-            event_type=IigChecklistEvent.QUESTION_CREATED,
-            resource_id=str(question.public_id),
-            actor_id=request.user.id,
-            actor_email=getattr(request.user, "email", ""),
-            tenant_id=getattr(section.checklist_version.definition.tenant, "id", None),
-            payload={"section_public_id": str(section.public_id)},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            try:
+                question = ChecklistQuestion(section=section, **serializer.validated_data)
+                question.full_clean()
+                question.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+            emit(
+                event_type=IigChecklistEvent.QUESTION_CREATED,
+                resource_id=str(question.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(section.checklist_version.definition.tenant, "id", None),
+                payload={"section_public_id": str(section.public_id)},
+            )
         return Response(ChecklistQuestionSerializer(question).data, status=status.HTTP_201_CREATED)
 
 
@@ -903,19 +911,21 @@ class ChecklistQuestionDetailView(APIView):
         for field in editable_fields:
             if field in request.data:
                 setattr(question, field, request.data[field])
-        try:
-            question.full_clean()
-            question.save()
-        except DjangoValidationError as exc:
-            _raise_django_validation_as_drf(exc)
-        emit(
-            event_type=IigChecklistEvent.QUESTION_UPDATED,
-            resource_id=str(question.public_id),
-            actor_id=request.user.id,
-            actor_email=getattr(request.user, "email", ""),
-            tenant_id=getattr(question.section.checklist_version.definition.tenant, "id", None),
-            payload={},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            try:
+                question.full_clean()
+                question.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+            emit(
+                event_type=IigChecklistEvent.QUESTION_UPDATED,
+                resource_id=str(question.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(question.section.checklist_version.definition.tenant, "id", None),
+                payload={},
+            )
         return Response(ChecklistQuestionSerializer(question).data)
 
     def delete(self, request, public_id):
@@ -926,15 +936,17 @@ class ChecklistQuestionDetailView(APIView):
         )
         _require_editable(question.section.checklist_version)
         question_public_id = str(question.public_id)
-        question.delete()
-        emit(
-            event_type=IigChecklistEvent.QUESTION_DELETED,
-            resource_id=question_public_id,
-            actor_id=request.user.id,
-            actor_email=getattr(request.user, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload={},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            question.delete()
+            emit(
+                event_type=IigChecklistEvent.QUESTION_DELETED,
+                resource_id=question_public_id,
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload={},
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -960,22 +972,24 @@ class ApplicabilityRuleListCreateView(APIView):
         _require_editable(version)
         serializer = ApplicabilityRuleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        try:
-            rule = ApplicabilityRule(
-                checklist_version=version, created_by=request.user, **serializer.validated_data
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            try:
+                rule = ApplicabilityRule(
+                    checklist_version=version, created_by=request.user, **serializer.validated_data
+                )
+                rule.full_clean()
+                rule.save()
+            except DjangoValidationError as exc:
+                _raise_django_validation_as_drf(exc)
+            emit(
+                event_type=IigChecklistEvent.APPLICABILITY_RULE_CREATED,
+                resource_id=str(rule.public_id),
+                actor_id=request.user.id,
+                actor_email=getattr(request.user, "email", ""),
+                tenant_id=getattr(version.definition.tenant, "id", None),
+                payload={"checklist_version_public_id": str(version.public_id)},
             )
-            rule.full_clean()
-            rule.save()
-        except DjangoValidationError as exc:
-            _raise_django_validation_as_drf(exc)
-        emit(
-            event_type=IigChecklistEvent.APPLICABILITY_RULE_CREATED,
-            resource_id=str(rule.public_id),
-            actor_id=request.user.id,
-            actor_email=getattr(request.user, "email", ""),
-            tenant_id=getattr(version.definition.tenant, "id", None),
-            payload={"checklist_version_public_id": str(version.public_id)},
-        )
         return Response(ApplicabilityRuleSerializer(rule).data, status=status.HTTP_201_CREATED)
 
 

@@ -653,19 +653,23 @@ class ExecutionCancelView(APIView):
                 status=http_status.HTTP_409_CONFLICT,
             )
 
-        services.finish_execution(
-            execution=execution, status=ExecutionStatus.CANCELLED, error_code="CANCELLED_BY_USER"
-        )
-        execution.refresh_from_db()
-        emit(
-            event_type=IntegrationEvent.EXECUTION_CANCELLED,
-            resource_id=execution.public_id,
-            actor=request.user,
-            tenant_id=tenant.pk,
-            payload={
-                "action": "cancelled",
-                "execution_public_id": str(execution.public_id),
-                "connector_public_id": str(execution.connector.public_id),
-            },
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            services.finish_execution(
+                execution=execution,
+                status=ExecutionStatus.CANCELLED,
+                error_code="CANCELLED_BY_USER",
+            )
+            execution.refresh_from_db()
+            emit(
+                event_type=IntegrationEvent.EXECUTION_CANCELLED,
+                resource_id=execution.public_id,
+                actor=request.user,
+                tenant_id=tenant.pk,
+                payload={
+                    "action": "cancelled",
+                    "execution_public_id": str(execution.public_id),
+                    "connector_public_id": str(execution.connector.public_id),
+                },
+            )
         return Response(ExecutionSerializer(_execution_payload(execution)).data)

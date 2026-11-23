@@ -132,35 +132,37 @@ def ingest_new_document(
     )
     sha256 = compute_sha256(file_obj)
 
-    document, version = _persist(
-        tenant=tenant,
-        title=title,
-        document_type=document_type,
-        filename=filename,
-        declared_mime=declared_mime,
-        validation_meta=validation_meta,
-        file_obj=file_obj,
-        sha256=sha256,
-        actor=actor,
-    )
+    # QA-09: the change and its audit record commit together or not at all.
+    with transaction.atomic():
+        document, version = _persist(
+            tenant=tenant,
+            title=title,
+            document_type=document_type,
+            filename=filename,
+            declared_mime=declared_mime,
+            validation_meta=validation_meta,
+            file_obj=file_obj,
+            sha256=sha256,
+            actor=actor,
+        )
 
-    emit(
-        event_type=DocumentEvent.DOCUMENT_CREATED,
-        resource_id=str(document.public_id),
-        actor_id=actor.pk,
-        actor_email=actor.email,
-        tenant_id=tenant.pk,
-        ip_address=ip_address,
-    )
-    emit(
-        event_type=DocumentEvent.VERSION_CREATED,
-        resource_id=str(version.public_id),
-        actor_id=actor.pk,
-        actor_email=actor.email,
-        tenant_id=tenant.pk,
-        payload={"version_number": 1, "document_public_id": str(document.public_id)},
-        ip_address=ip_address,
-    )
+        emit(
+            event_type=DocumentEvent.DOCUMENT_CREATED,
+            resource_id=str(document.public_id),
+            actor_id=actor.pk,
+            actor_email=actor.email,
+            tenant_id=tenant.pk,
+            ip_address=ip_address,
+        )
+        emit(
+            event_type=DocumentEvent.VERSION_CREATED,
+            resource_id=str(version.public_id),
+            actor_id=actor.pk,
+            actor_email=actor.email,
+            tenant_id=tenant.pk,
+            payload={"version_number": 1, "document_public_id": str(document.public_id)},
+            ip_address=ip_address,
+        )
 
     # Queued ON COMMIT, so the worker cannot look up a row that is not there.
     #

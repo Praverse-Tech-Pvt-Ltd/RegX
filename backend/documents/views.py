@@ -290,18 +290,19 @@ class DocumentVersionListCreateView(APIView):
                     defaults={"checksum": sha256, "relationship_type": "exact"},
                 )
 
-        emit(
-            event_type=DocumentEvent.VERSION_CREATED,
-            resource_id=str(version.public_id),
-            actor_id=request.user.pk,
-            actor_email=request.user.email,
-            tenant_id=tenant.pk,
-            payload={
-                "version_number": next_version_number,
-                "document_public_id": str(doc.public_id),
-            },
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
+            # QA-09: inside the block, so the version and its audit record commit together.
+            emit(
+                event_type=DocumentEvent.VERSION_CREATED,
+                resource_id=str(version.public_id),
+                actor_id=request.user.pk,
+                actor_email=request.user.email,
+                tenant_id=tenant.pk,
+                payload={
+                    "version_number": next_version_number,
+                    "document_public_id": str(doc.public_id),
+                },
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
 
         # On commit, for the same reason as `documents.ingest`: the worker must
         # not be able to reach a row this request has not committed.
@@ -401,19 +402,21 @@ class DocumentArchiveView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        doc.status = DocumentStatus.ARCHIVED
-        doc.archived_at = timezone.now()
-        doc.archived_by = request.user
-        doc.save(update_fields=["status", "archived_at", "archived_by"])
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            doc.status = DocumentStatus.ARCHIVED
+            doc.archived_at = timezone.now()
+            doc.archived_by = request.user
+            doc.save(update_fields=["status", "archived_at", "archived_by"])
 
-        emit(
-            event_type=DocumentEvent.DOCUMENT_ARCHIVED,
-            resource_id=str(doc.public_id),
-            actor_id=request.user.pk,
-            actor_email=request.user.email,
-            tenant_id=tenant.pk,
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
+            emit(
+                event_type=DocumentEvent.DOCUMENT_ARCHIVED,
+                resource_id=str(doc.public_id),
+                actor_id=request.user.pk,
+                actor_email=request.user.email,
+                tenant_id=tenant.pk,
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
         return Response(DocumentSerializer(doc).data)
 
 
@@ -434,17 +437,19 @@ class DocumentRestoreView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
-        doc.status = DocumentStatus.ACTIVE
-        doc.archived_at = None
-        doc.archived_by = None
-        doc.save(update_fields=["status", "archived_at", "archived_by"])
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            doc.status = DocumentStatus.ACTIVE
+            doc.archived_at = None
+            doc.archived_by = None
+            doc.save(update_fields=["status", "archived_at", "archived_by"])
 
-        emit(
-            event_type=DocumentEvent.DOCUMENT_RESTORED,
-            resource_id=str(doc.public_id),
-            actor_id=request.user.pk,
-            actor_email=request.user.email,
-            tenant_id=tenant.pk,
-            ip_address=request.META.get("REMOTE_ADDR"),
-        )
+            emit(
+                event_type=DocumentEvent.DOCUMENT_RESTORED,
+                resource_id=str(doc.public_id),
+                actor_id=request.user.pk,
+                actor_email=request.user.email,
+                tenant_id=tenant.pk,
+                ip_address=request.META.get("REMOTE_ADDR"),
+            )
         return Response(DocumentSerializer(doc).data)
