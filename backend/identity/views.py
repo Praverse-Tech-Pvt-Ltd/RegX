@@ -12,6 +12,7 @@ import time
 
 import pyotp
 from django.contrib.auth import login, logout
+from django.db import transaction
 from django.middleware.csrf import get_token
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
@@ -254,23 +255,30 @@ def _login_with_recovery_code(request, user, device):
     a new device.
     """
     s = MFARecoverySerializer(data=request.data)
-    if not s.is_valid() or not RecoveryCode.consume(device, s.validated_data["recovery_code"]):
+    consumed = False
+    if s.is_valid():
+        # QA-09: spending the code and its audit record commit together or not at
+        # all. A refused code writes nothing, so it stays outside (lockout below).
+        with transaction.atomic():
+            consumed = RecoveryCode.consume(device, s.validated_data["recovery_code"])
+            if consumed:
+                remaining = device.recovery_codes.filter(used_at__isnull=True).count()
+                log_event(
+                    "identity.mfa.recovery_code_used",
+                    resource_type="user",
+                    resource_id=str(user.public_id),
+                    payload={"recovery_codes_remaining": remaining},
+                    user=user,
+                )
+    if not consumed:
         login_lockout.record_failure(user.email)
         return Response(
             {"detail": "Invalid or already-used recovery code.", "error_code": "mfa_invalid_code"},
             status=400,
         )
-    remaining = device.recovery_codes.filter(used_at__isnull=True).count()
     login_lockout.clear(user.email)
     request.session.pop(_MFA_PENDING_KEY, None)
     login(request, user)
-    log_event(
-        "identity.mfa.recovery_code_used",
-        resource_type="user",
-        resource_id=str(user.public_id),
-        payload={"recovery_codes_remaining": remaining},
-        user=user,
-    )
     data = dict(UserPublicSerializer(user).data)
     data["recovery_codes_remaining"] = remaining
     return Response(data)

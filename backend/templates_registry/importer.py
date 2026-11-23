@@ -46,6 +46,7 @@ class SourceExcluded(Exception):
     disallowed content (483/warning-letter/AIDatabase-sourced)."""
 
 
+@transaction.atomic  # QA-09: the stage's writes and audit events commit together.
 def register_source_package(
     *,
     tenant,
@@ -91,6 +92,7 @@ def register_source_package(
     return package
 
 
+@transaction.atomic  # QA-09: the stage's writes and audit events commit together.
 def create_migration_batch(source_package: TemplateSourcePackage, actor) -> MigrationBatch:
     batch = MigrationBatch.objects.create(
         tenant=source_package.tenant,
@@ -110,6 +112,7 @@ def create_migration_batch(source_package: TemplateSourcePackage, actor) -> Migr
     return batch
 
 
+@transaction.atomic  # QA-09: the stage's writes and audit events commit together.
 def extract_records(
     batch: MigrationBatch, neutral_records: list[dict]
 ) -> list[TemplateSourceRecord]:
@@ -159,6 +162,7 @@ def extract_records(
     return extracted
 
 
+@transaction.atomic  # QA-09: the stage's writes and audit events commit together.
 def classify_records(batch: MigrationBatch) -> None:
     batch.status = MigrationBatchStatus.CLASSIFYING
     batch.save(update_fields=["status", "updated_at"])
@@ -351,24 +355,26 @@ def import_eligible_records(
             )
             failed += 1
 
-    counts = dict(batch.counts or {})
-    counts["imported"] = counts.get("imported", 0) + imported
-    counts["requires_review"] = counts.get("requires_review", 0) + requires_review
-    counts["failed"] = counts.get("failed", 0) + failed
-    batch.counts = counts
-    batch.status = MigrationBatchStatus.COMPLETED
-    batch.completed_at = _now()
-    batch.save(update_fields=["counts", "status", "completed_at", "updated_at"])
+    # QA-09: the change and its audit record commit together or not at all.
+    with transaction.atomic():
+        counts = dict(batch.counts or {})
+        counts["imported"] = counts.get("imported", 0) + imported
+        counts["requires_review"] = counts.get("requires_review", 0) + requires_review
+        counts["failed"] = counts.get("failed", 0) + failed
+        batch.counts = counts
+        batch.status = MigrationBatchStatus.COMPLETED
+        batch.completed_at = _now()
+        batch.save(update_fields=["counts", "status", "completed_at", "updated_at"])
 
-    emit(
-        event_type=TemplateEvent.MIGRATION_BATCH_COMPLETED,
-        resource_type="migration_batch",
-        resource_id=str(batch.public_id),
-        tenant_id=getattr(batch.tenant, "id", None),
-        payload=counts,
-        actor_id=getattr(actor, "id", None),
-        actor_email=getattr(actor, "email", ""),
-    )
+        emit(
+            event_type=TemplateEvent.MIGRATION_BATCH_COMPLETED,
+            resource_type="migration_batch",
+            resource_id=str(batch.public_id),
+            tenant_id=getattr(batch.tenant, "id", None),
+            payload=counts,
+            actor_id=getattr(actor, "id", None),
+            actor_email=getattr(actor, "email", ""),
+        )
 
 
 def _import_single_record(batch, record, actor, category_mapping_table):
@@ -486,16 +492,18 @@ def run_migration_batch(
         classify_records(batch)
         import_eligible_records(batch, actor, category_mapping_table)
     except Exception as exc:
-        batch.status = MigrationBatchStatus.FAILED
-        batch.error_summary = str(exc)[:2000]
-        batch.completed_at = _now()
-        batch.save(update_fields=["status", "error_summary", "completed_at", "updated_at"])
-        emit(
-            event_type=TemplateEvent.MIGRATION_BATCH_FAILED,
-            resource_type="migration_batch",
-            resource_id=str(batch.public_id),
-            tenant_id=getattr(batch.tenant, "id", None),
-            payload={"error": str(exc)[:500]},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            batch.status = MigrationBatchStatus.FAILED
+            batch.error_summary = str(exc)[:2000]
+            batch.completed_at = _now()
+            batch.save(update_fields=["status", "error_summary", "completed_at", "updated_at"])
+            emit(
+                event_type=TemplateEvent.MIGRATION_BATCH_FAILED,
+                resource_type="migration_batch",
+                resource_id=str(batch.public_id),
+                tenant_id=getattr(batch.tenant, "id", None),
+                payload={"error": str(exc)[:500]},
+            )
         raise
     return batch

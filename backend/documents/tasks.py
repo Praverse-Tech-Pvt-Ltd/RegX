@@ -14,6 +14,7 @@ import io
 import logging
 
 from celery import shared_task
+from django.db import transaction
 from django.utils import timezone
 
 from .audit_events import DocumentEvent, emit
@@ -64,14 +65,16 @@ def scan_document_version(self, version_pk: int, tenant_id: int) -> None:
         file_obj = storage.retrieve(version.storage_key)
     except Exception as exc:
         logger.error("scan_document_version: storage retrieval failed: %s", exc)
-        version.scan_status = ScanStatus.SCAN_FAILED
-        version.save(update_fields=["scan_status"])
-        emit(
-            event_type=DocumentEvent.SCAN_FAILED,
-            resource_id=str(version.public_id),
-            tenant_id=tenant_id,
-            payload={"error": str(exc)[:200]},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            version.scan_status = ScanStatus.SCAN_FAILED
+            version.save(update_fields=["scan_status"])
+            emit(
+                event_type=DocumentEvent.SCAN_FAILED,
+                resource_id=str(version.public_id),
+                tenant_id=tenant_id,
+                payload={"error": str(exc)[:200]},
+            )
         return
 
     try:
@@ -81,14 +84,16 @@ def scan_document_version(self, version_pk: int, tenant_id: int) -> None:
         file_obj.close()
 
     if outcome.result == ScanResult.CLEAN:
-        version.scan_status = ScanStatus.CLEAN
-        version.save(update_fields=["scan_status"])
-        emit(
-            event_type=DocumentEvent.SCAN_COMPLETE,
-            resource_id=str(version.public_id),
-            tenant_id=tenant_id,
-            payload={"result": "clean"},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            version.scan_status = ScanStatus.CLEAN
+            version.save(update_fields=["scan_status"])
+            emit(
+                event_type=DocumentEvent.SCAN_COMPLETE,
+                resource_id=str(version.public_id),
+                tenant_id=tenant_id,
+                payload={"result": "clean"},
+            )
         # Dispatched inline, deliberately.
         #
         # The status write above is a bare `save()` with no enclosing
@@ -104,34 +109,38 @@ def scan_document_version(self, version_pk: int, tenant_id: int) -> None:
         process_document_version.delay(version_pk, tenant_id)
 
     elif outcome.result == ScanResult.INFECTED:
-        version.scan_status = ScanStatus.QUARANTINED
-        version.processing_status = ProcessingStatus.SKIPPED
-        version.failure_code = "infected"
-        version.failure_detail = "File was quarantined after malware detection."
-        version.save(
-            update_fields=["scan_status", "processing_status", "failure_code", "failure_detail"]
-        )
-        emit(
-            event_type=DocumentEvent.SCAN_INFECTED,
-            resource_id=str(version.public_id),
-            tenant_id=tenant_id,
-            payload={"threat": outcome.threat_name[:200] if outcome.threat_name else ""},
-        )
-        emit(
-            event_type=DocumentEvent.QUARANTINED,
-            resource_id=str(version.public_id),
-            tenant_id=tenant_id,
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            version.scan_status = ScanStatus.QUARANTINED
+            version.processing_status = ProcessingStatus.SKIPPED
+            version.failure_code = "infected"
+            version.failure_detail = "File was quarantined after malware detection."
+            version.save(
+                update_fields=["scan_status", "processing_status", "failure_code", "failure_detail"]
+            )
+            emit(
+                event_type=DocumentEvent.SCAN_INFECTED,
+                resource_id=str(version.public_id),
+                tenant_id=tenant_id,
+                payload={"threat": outcome.threat_name[:200] if outcome.threat_name else ""},
+            )
+            emit(
+                event_type=DocumentEvent.QUARANTINED,
+                resource_id=str(version.public_id),
+                tenant_id=tenant_id,
+            )
 
     elif outcome.result in (ScanResult.SCAN_FAILED, ScanResult.SCANNER_UNAVAILABLE):
-        version.scan_status = ScanStatus.SCAN_FAILED
-        version.save(update_fields=["scan_status"])
-        emit(
-            event_type=DocumentEvent.SCAN_FAILED,
-            resource_id=str(version.public_id),
-            tenant_id=tenant_id,
-            payload={"detail": outcome.detail[:200]},
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            version.scan_status = ScanStatus.SCAN_FAILED
+            version.save(update_fields=["scan_status"])
+            emit(
+                event_type=DocumentEvent.SCAN_FAILED,
+                resource_id=str(version.public_id),
+                tenant_id=tenant_id,
+                payload={"detail": outcome.detail[:200]},
+            )
         # Retry for transient failures
         raise self.retry(exc=RuntimeError(outcome.detail))
 
@@ -176,43 +185,47 @@ def process_document_version(self, version_pk: int, tenant_id: int) -> None:
     )
 
     if job.attempt_count >= job.max_attempts:
-        job.status = JobStatus.FAILED_PERMANENT
-        job.error_message = "Maximum processing attempts exceeded."
-        job.save(update_fields=["status", "error_message"])
-        version.processing_status = ProcessingStatus.FAILED
-        version.failure_code = "max_attempts_exceeded"
-        version.failure_detail = "Document processing failed after maximum retries."
-        version.save(update_fields=["processing_status", "failure_code", "failure_detail"])
-        # PROCESSING_STARTED and PROCESSING_COMPLETE were both audited; the
-        # failure paths were not, so a document could end permanently FAILED
-        # with the trail showing only that processing began.
-        emit(
-            event_type=DocumentEvent.PROCESSING_FAILED,
-            resource_id=str(version.public_id),
-            tenant_id=tenant_id,
-            payload={
-                "failure_code": "max_attempts_exceeded",
-                "retryable": False,
-                "attempt_count": job.attempt_count,
-            },
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            job.status = JobStatus.FAILED_PERMANENT
+            job.error_message = "Maximum processing attempts exceeded."
+            job.save(update_fields=["status", "error_message"])
+            version.processing_status = ProcessingStatus.FAILED
+            version.failure_code = "max_attempts_exceeded"
+            version.failure_detail = "Document processing failed after maximum retries."
+            version.save(update_fields=["processing_status", "failure_code", "failure_detail"])
+            # PROCESSING_STARTED and PROCESSING_COMPLETE were both audited; the
+            # failure paths were not, so a document could end permanently FAILED
+            # with the trail showing only that processing began.
+            emit(
+                event_type=DocumentEvent.PROCESSING_FAILED,
+                resource_id=str(version.public_id),
+                tenant_id=tenant_id,
+                payload={
+                    "failure_code": "max_attempts_exceeded",
+                    "retryable": False,
+                    "attempt_count": job.attempt_count,
+                },
+            )
         return
 
-    job.status = JobStatus.RUNNING
-    job.attempt_count += 1
-    job.started_at = timezone.now()
-    job.celery_task_id = self.request.id or ""
-    job.save(update_fields=["status", "attempt_count", "started_at", "celery_task_id"])
+    # QA-09: the change and its audit record commit together or not at all.
+    with transaction.atomic():
+        job.status = JobStatus.RUNNING
+        job.attempt_count += 1
+        job.started_at = timezone.now()
+        job.celery_task_id = self.request.id or ""
+        job.save(update_fields=["status", "attempt_count", "started_at", "celery_task_id"])
 
-    version.processing_status = ProcessingStatus.PROCESSING
-    version.processing_started_at = timezone.now()
-    version.save(update_fields=["processing_status", "processing_started_at"])
+        version.processing_status = ProcessingStatus.PROCESSING
+        version.processing_started_at = timezone.now()
+        version.save(update_fields=["processing_status", "processing_started_at"])
 
-    emit(
-        event_type=DocumentEvent.PROCESSING_STARTED,
-        resource_id=str(version.public_id),
-        tenant_id=tenant_id,
-    )
+        emit(
+            event_type=DocumentEvent.PROCESSING_STARTED,
+            resource_id=str(version.public_id),
+            tenant_id=tenant_id,
+        )
 
     storage = get_storage_backend()
     try:
@@ -235,32 +248,36 @@ def process_document_version(self, version_pk: int, tenant_id: int) -> None:
         elif ext == "pptx":
             text_summary = _process_pptx(version, raw)
 
-        job.status = JobStatus.SUCCESS
-        job.finished_at = timezone.now()
-        job.save(update_fields=["status", "finished_at"])
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            job.status = JobStatus.SUCCESS
+            job.finished_at = timezone.now()
+            job.save(update_fields=["status", "finished_at"])
 
-        version.processing_status = ProcessingStatus.COMPLETE
-        version.processing_finished_at = timezone.now()
-        version.save(update_fields=["processing_status", "processing_finished_at"])
+            version.processing_status = ProcessingStatus.COMPLETE
+            version.processing_finished_at = timezone.now()
+            version.save(update_fields=["processing_status", "processing_finished_at"])
 
-        emit(
-            event_type=DocumentEvent.PROCESSING_COMPLETE,
-            resource_id=str(version.public_id),
-            tenant_id=tenant_id,
-        )
-        # The file was processed, so the status stays COMPLETE; but a file that
-        # yielded no text at all (a scanned PDF, an empty Office file) gets its
-        # own audited event, so "processed" is never silently read as "has
-        # usable text".
-        if text_summary and text_summary["result"] == TEXT_RESULT_NONE:
             emit(
-                event_type=DocumentEvent.PROCESSING_NO_TEXT,
+                event_type=DocumentEvent.PROCESSING_COMPLETE,
                 resource_id=str(version.public_id),
                 tenant_id=tenant_id,
-                payload={
-                    k: text_summary[k] for k in (*_SUMMARY_COUNT_KEYS, "unit") if k in text_summary
-                },
             )
+            # The file was processed, so the status stays COMPLETE; but a file that
+            # yielded no text at all (a scanned PDF, an empty Office file) gets its
+            # own audited event, so "processed" is never silently read as "has
+            # usable text".
+            if text_summary and text_summary["result"] == TEXT_RESULT_NONE:
+                emit(
+                    event_type=DocumentEvent.PROCESSING_NO_TEXT,
+                    resource_id=str(version.public_id),
+                    tenant_id=tenant_id,
+                    payload={
+                        k: text_summary[k]
+                        for k in (*_SUMMARY_COUNT_KEYS, "unit")
+                        if k in text_summary
+                    },
+                )
 
     except Exception as exc:
         logger.exception("process_document_version failed for version %s", version_pk)
@@ -268,6 +285,7 @@ def process_document_version(self, version_pk: int, tenant_id: int) -> None:
         raise self.retry(exc=exc) from exc
 
 
+@transaction.atomic  # QA-09: the failure state and its audit record commit together.
 def _fail_job(job, version, code: str, detail: str, *, retryable: bool) -> None:
     job.status = JobStatus.FAILED_RETRYABLE if retryable else JobStatus.FAILED_PERMANENT
     job.error_code = code

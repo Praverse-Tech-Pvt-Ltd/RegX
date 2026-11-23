@@ -241,6 +241,7 @@ def set_connector_status(*, connector, tenant, actor, status):
     return locked
 
 
+@transaction.atomic  # QA-09: the test result and its audit record commit together.
 def record_test_result(*, connector, tenant, actor, test_status, latency_ms=None, error_code=""):
     """Store the outcome of a connection test. Reachability, nothing else."""
     _assert_tenant(connector, tenant)

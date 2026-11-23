@@ -111,13 +111,14 @@ class ProductListView(APIView):
             product = ProductDevelopmentRecord.objects.create(
                 tenant=tenant, created_by=request.user, **serializer.validated_data
             )
-        emit(
-            event_type=FormulationEvent.PRODUCT_CREATED,
-            resource_id=str(product.public_id),
-            tenant_id=tenant.id,
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
+            # QA-09: inside the block, so the row and its audit record commit together.
+            emit(
+                event_type=FormulationEvent.PRODUCT_CREATED,
+                resource_id=str(product.public_id),
+                tenant_id=tenant.id,
+                actor_id=request.user.id,
+                actor_email=request.user.email,
+            )
 
         return Response(
             ProductDevelopmentRecordSerializer(product).data, status=http_status.HTTP_201_CREATED
@@ -148,36 +149,38 @@ class SelectReferenceProductView(APIView):
         serializer = ReferenceProductSelectionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        product.selected_ob_application_number = data["application_number"]
-        product.selected_ob_product_number = data["product_number"]
-        product.selected_ob_product_public_id = data["product_public_id"]
-        product.selected_ob_release_public_id = data["release_public_id"]
-        product.selection_timestamp = timezone.now()
-        product.selecting_user = request.user
-        product.selection_justification = data.get("justification", "")
-        product.save(
-            update_fields=[
-                "selected_ob_application_number",
-                "selected_ob_product_number",
-                "selected_ob_product_public_id",
-                "selected_ob_release_public_id",
-                "selection_timestamp",
-                "selecting_user",
-                "selection_justification",
-                "updated_at",
-            ]
-        )
-        emit(
-            event_type=FormulationEvent.REFERENCE_PRODUCT_SELECTED,
-            resource_id=str(product.public_id),
-            tenant_id=tenant.id,
-            payload={
-                "product_public_id": str(data["product_public_id"]),
-                "release_public_id": str(data["release_public_id"]),
-            },
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
+        # QA-09: the change and its audit record commit together or not at all.
+        with transaction.atomic():
+            product.selected_ob_application_number = data["application_number"]
+            product.selected_ob_product_number = data["product_number"]
+            product.selected_ob_product_public_id = data["product_public_id"]
+            product.selected_ob_release_public_id = data["release_public_id"]
+            product.selection_timestamp = timezone.now()
+            product.selecting_user = request.user
+            product.selection_justification = data.get("justification", "")
+            product.save(
+                update_fields=[
+                    "selected_ob_application_number",
+                    "selected_ob_product_number",
+                    "selected_ob_product_public_id",
+                    "selected_ob_release_public_id",
+                    "selection_timestamp",
+                    "selecting_user",
+                    "selection_justification",
+                    "updated_at",
+                ]
+            )
+            emit(
+                event_type=FormulationEvent.REFERENCE_PRODUCT_SELECTED,
+                resource_id=str(product.public_id),
+                tenant_id=tenant.id,
+                payload={
+                    "product_public_id": str(data["product_public_id"]),
+                    "release_public_id": str(data["release_public_id"]),
+                },
+                actor_id=request.user.id,
+                actor_email=request.user.email,
+            )
         return Response(ProductDevelopmentRecordSerializer(product).data)
 
 
@@ -214,13 +217,14 @@ class FormulationVersionListCreateView(APIView):
                 created_by=request.user,
                 **serializer.validated_data,
             )
-        emit(
-            event_type=FormulationEvent.FORMULATION_VERSION_CREATED,
-            resource_id=str(version.public_id),
-            tenant_id=tenant.id,
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
+            # QA-09: inside the block, so the row and its audit record commit together.
+            emit(
+                event_type=FormulationEvent.FORMULATION_VERSION_CREATED,
+                resource_id=str(version.public_id),
+                tenant_id=tenant.id,
+                actor_id=request.user.id,
+                actor_email=request.user.email,
+            )
 
         return Response(
             FormulationVersionSerializer(version).data, status=http_status.HTTP_201_CREATED
@@ -332,13 +336,14 @@ class FormulationComponentListView(APIView):
             component = FormulationComponent.objects.create(
                 formulation_version=version, **serializer.validated_data
             )
-        emit(
-            event_type=FormulationEvent.COMPONENT_ADDED,
-            resource_id=str(component.public_id),
-            tenant_id=tenant.id,
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
+            # QA-09: inside the block, so the row and its audit record commit together.
+            emit(
+                event_type=FormulationEvent.COMPONENT_ADDED,
+                resource_id=str(component.public_id),
+                tenant_id=tenant.id,
+                actor_id=request.user.id,
+                actor_email=request.user.email,
+            )
 
         return Response(
             FormulationComponentSerializer(component).data, status=http_status.HTTP_201_CREATED
@@ -369,12 +374,13 @@ class DosingRegimenListView(APIView):
             regimen = DosingRegimen.objects.create(
                 formulation_version=version, **serializer.validated_data
             )
-        emit(
-            event_type=FormulationEvent.DOSING_REGIMEN_CHANGED,
-            resource_id=str(regimen.public_id),
-            tenant_id=tenant.id,
-            actor_id=request.user.id,
-            actor_email=request.user.email,
-        )
+            # QA-09: inside the block, so the row and its audit record commit together.
+            emit(
+                event_type=FormulationEvent.DOSING_REGIMEN_CHANGED,
+                resource_id=str(regimen.public_id),
+                tenant_id=tenant.id,
+                actor_id=request.user.id,
+                actor_email=request.user.email,
+            )
 
         return Response(DosingRegimenSerializer(regimen).data, status=http_status.HTTP_201_CREATED)
