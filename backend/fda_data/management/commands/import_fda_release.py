@@ -222,25 +222,35 @@ class Command(BaseCommand):
                 returncode=DUPLICATE_EXIT_CODE,
             )
 
-        with transaction.atomic():
-            release = importer.register_release(
-                dataset_type=dataset_type,
-                source_name=options["source_name"] or path.name,
-                # Verbatim, from the operator. Never inferred.
-                official_source_reference=options["source_reference"],
-                file_obj=io.BytesIO(raw),
-                original_filename=path.name,
-                media_type=("application/zip" if raw[:2] == b"PK" else "text/plain"),
-                schema_version=options["schema_version"],
-                normalized_payload_sha256=normalized_sha,
-                parser_identifier=parser_identifier,
-                publication_date=publication_date,
-                imported_by=actor,
-                content_fingerprint=fingerprint,
-                reimport_of=duplicate if deliberate else None,
-                reimport_reason=reason if deliberate else "",
-            )
-            import_rows(release, neutral, actor)
+        try:
+            with transaction.atomic():
+                release = importer.register_release(
+                    dataset_type=dataset_type,
+                    source_name=options["source_name"] or path.name,
+                    # Verbatim, from the operator. Never inferred.
+                    official_source_reference=options["source_reference"],
+                    file_obj=io.BytesIO(raw),
+                    original_filename=path.name,
+                    media_type=("application/zip" if raw[:2] == b"PK" else "text/plain"),
+                    schema_version=options["schema_version"],
+                    normalized_payload_sha256=normalized_sha,
+                    parser_identifier=parser_identifier,
+                    publication_date=publication_date,
+                    imported_by=actor,
+                    content_fingerprint=fingerprint,
+                    reimport_of=duplicate if deliberate else None,
+                    reimport_reason=reason if deliberate else "",
+                )
+                import_rows(release, neutral, actor)
+        except importer.DuplicateReleaseContent:
+            # QA-10: another import of the same data passed the check above at
+            # the same time and committed first. Same answer as a duplicate.
+            raise CommandError(
+                "Refused: the same data was registered by another import that ran at "
+                "the same time (same content even if line endings or trailing spaces "
+                "differ). Nothing was changed by this import.",
+                returncode=DUPLICATE_EXIT_CODE,
+            ) from None
 
         release.refresh_from_db()
         self.stdout.write("")

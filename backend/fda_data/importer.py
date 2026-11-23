@@ -24,7 +24,7 @@ import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from .adapters import row_checksum
@@ -102,6 +102,19 @@ def find_imported_duplicate(
     return None
 
 
+class DuplicateReleaseContent(Exception):
+    """Another import registered the same data first (QA-10): both passed the
+    duplicate check at the same time and the other committed first. The
+    database refused this one; nothing was written."""
+
+
+# A violation of either constraint means "the same data is already registered".
+_SAME_DATA_CONSTRAINTS = (
+    "unique_release_checksum_per_dataset_type",
+    "unique_release_content_fingerprint_per_dataset_type",
+)
+
+
 def register_release(
     *,
     dataset_type: str,
@@ -157,25 +170,32 @@ def register_release(
         content_type=media_type,
         original_filename=original_filename,
     )
-    release = FDADataSourceRelease.objects.create(
-        dataset_type=dataset_type,
-        source_name=source_name,
-        official_source_reference=official_source_reference,
-        original_filename=original_filename,
-        media_type=media_type,
-        storage_key=storage_key,
-        source_checksum_sha256=checksum,
-        normalized_payload_sha256=normalized_payload_sha256,
-        source_file_size_bytes=size_bytes,
-        parser_identifier=parser_identifier,
-        schema_version=schema_version,
-        publication_date=publication_date,
-        retrieved_at=timezone.now(),
-        imported_by=imported_by,
-        content_fingerprint_sha256=content_fingerprint,
-        reimport_of=reimport_of,
-        reimport_reason=reimport_reason.strip(),
-    )
+    try:
+        # A savepoint, so a refused insert leaves the caller's transaction usable.
+        with transaction.atomic():
+            release = FDADataSourceRelease.objects.create(
+                dataset_type=dataset_type,
+                source_name=source_name,
+                official_source_reference=official_source_reference,
+                original_filename=original_filename,
+                media_type=media_type,
+                storage_key=storage_key,
+                source_checksum_sha256=checksum,
+                normalized_payload_sha256=normalized_payload_sha256,
+                source_file_size_bytes=size_bytes,
+                parser_identifier=parser_identifier,
+                schema_version=schema_version,
+                publication_date=publication_date,
+                retrieved_at=timezone.now(),
+                imported_by=imported_by,
+                content_fingerprint_sha256=content_fingerprint,
+                reimport_of=reimport_of,
+                reimport_reason=reimport_reason.strip(),
+            )
+    except IntegrityError as exc:
+        if any(name in str(exc) for name in _SAME_DATA_CONSTRAINTS):
+            raise DuplicateReleaseContent(str(exc).splitlines()[0]) from exc
+        raise
     if reimport_of is not None:
         emit(
             event_type=FdaDataEvent.RELEASE_REIMPORT_REGISTERED,
