@@ -257,6 +257,9 @@ class ChecklistDefinitionListCreateView(APIView):
                     title=serializer.validated_data["title"],
                     description=serializer.validated_data.get("description", ""),
                     scope_type=scope_type,
+                    # QA-01: OQ-8's governed classification, validated by the
+                    # serializer; it was accepted and then dropped here.
+                    execution_scope=serializer.validated_data.get("execution_scope", ""),
                     tenant=definition_tenant,
                     created_by=request.user,
                 )
@@ -275,7 +278,11 @@ class ChecklistDefinitionListCreateView(APIView):
                 actor_id=request.user.id,
                 actor_email=getattr(request.user, "email", ""),
                 tenant_id=getattr(definition_tenant, "id", None),
-                payload={"code": definition.code, "scope_type": scope_type},
+                payload={
+                    "code": definition.code,
+                    "scope_type": scope_type,
+                    "execution_scope": definition.execution_scope,
+                },
             )
         return Response(
             ChecklistDefinitionSerializer(definition).data, status=status.HTTP_201_CREATED
