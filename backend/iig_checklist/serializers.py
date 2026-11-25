@@ -273,6 +273,7 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
             "rejected_at",
             "cancelled_by_email",
             "cancelled_at",
+            "supersede_reason",
             "reviewer_conclusion_note",
             "created_at",
             "updated_at",
@@ -756,6 +757,22 @@ class ReturnSerializer(serializers.Serializer):
         if not attrs.get("return_reason", "").strip():
             raise serializers.ValidationError(
                 {"error_code": "missing_return_reason", "detail": "return_reason is required."}
+            )
+        return attrs
+
+
+class SupersedeSerializer(serializers.Serializer):
+    """Blank is let through here so the service gives the one refusal (missing_supersede_reason)."""
+
+    reason = serializers.CharField(
+        max_length=MAX_RETURN_REASON_CHARS, required=False, allow_blank=True, trim_whitespace=False
+    )
+
+    def validate(self, attrs):
+        unknown = set(self.initial_data) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError(
+                {"error_code": "unknown_field", "detail": f"Unknown fields: {unknown}"}
             )
         return attrs
 

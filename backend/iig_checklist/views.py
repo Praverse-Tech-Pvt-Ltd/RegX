@@ -76,6 +76,7 @@ from .serializers import (
     GapAnalysisSerializer,
     ReturnSerializer,
     ReviewerConclusionSerializer,
+    SupersedeSerializer,
     VersionActionSerializer,
 )
 from .services import (
@@ -90,6 +91,7 @@ from .services import (
     InvalidCalculationBinding,
     InvalidQuantityUnitConfig,
     MissingReturnReason,
+    MissingSupersedeReason,
     NoEligibleSubjectComponent,
     ReviewerConclusionCorrectionReasonRequired,
     ReviewerConclusionEmpty,
@@ -1287,6 +1289,14 @@ class _ChecklistExecutionActionViewBase(APIView):
                 {"error_code": "incomplete_execution", "detail": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except MissingSupersedeReason:
+            return Response(
+                {
+                    "error_code": "missing_supersede_reason",
+                    "detail": "A reason is required to supersede an approved execution.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except MissingReturnReason:
             return Response(
                 {"error_code": "missing_return_reason", "detail": "return_reason is required."},
@@ -1340,6 +1350,7 @@ class ChecklistExecutionCancelView(_ChecklistExecutionActionViewBase):
 
 class ChecklistExecutionSupersedeView(_ChecklistExecutionActionViewBase):
     action = "supersede"
+    serializer_class = SupersedeSerializer
     permission_codename = PERM_SUPERSEDE_EXECUTION
 
 
