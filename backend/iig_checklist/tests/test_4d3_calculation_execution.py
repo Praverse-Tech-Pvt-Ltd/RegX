@@ -1946,17 +1946,13 @@ class TestDifferenceResultUnit:
 
 
 class TestAuditCallbackFailure:
-    def test_a_failing_audit_callback_does_not_undo_the_commit(
-        self, world, monkeypatch, django_capture_on_commit_callbacks
-    ):
-        """Established behaviour, not a new guarantee.
+    def test_a_failing_audit_write_undoes_the_calculation(self, world, monkeypatch):
+        """Owner decision 2026-11-23 (QA-09), replacing the on_commit behaviour.
 
-        The audit is dispatched through ``transaction.on_commit()``, so by the
-        time it runs the outcome is already durable. The project has no durable
-        outbox, so a failing callback propagates to the caller, writes no audit
-        row and is not retried; the calculation result stays committed. That
-        limitation is recorded in the evidence rather than hidden behind a
-        swallowed exception.
+        The audit used to be dispatched through ``transaction.on_commit()``, so a
+        failing audit left the calculation committed with no record. It is now
+        written inside the calculation's transaction: a failing audit write rolls
+        the calculation back, and the caller sees the error.
         """
         from audit.models import AuditEvent
 
@@ -1965,27 +1961,25 @@ class TestAuditCallbackFailure:
 
         monkeypatch.setattr(execution_mod_audit(), "emit", _exploding)
 
+        outcome = world["outcomes"]["percentage_w_w"]
+        before = (outcome.status, outcome.value)
         audit_before = AuditEvent.objects.count()
         with pytest.raises(RuntimeError):
-            with django_capture_on_commit_callbacks(execute=True):
-                result = _run(world, "percentage_w_w")
-                assert result.status == CalculationStatus.COMPLETE
+            _run(world, "percentage_w_w")
 
-        # The regulated result survived; only the audit row is missing.
-        outcome = world["outcomes"]["percentage_w_w"]
+        # Neither the regulated result nor an audit row: they commit together or not at all.
         outcome.refresh_from_db()
-        assert outcome.status == CalculationStatus.COMPLETE
-        assert outcome.value == Decimal("25")
+        assert (outcome.status, outcome.value) == before
         assert AuditEvent.objects.count() == audit_before
 
-    def test_a_successful_callback_writes_exactly_one_row(
+    def test_a_successful_calculation_writes_exactly_one_row_without_a_callback(
         self, world, django_capture_on_commit_callbacks
     ):
         from audit.models import AuditEvent
 
         with django_capture_on_commit_callbacks(execute=True) as callbacks:
             _run(world, "percentage_w_w")
-        assert len(callbacks) == 1
+        assert len(callbacks) == 0  # written in the transaction, not on commit
         assert (
             AuditEvent.objects.filter(
                 event_type=CALCULATED_EVENT,

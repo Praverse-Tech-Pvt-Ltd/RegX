@@ -6,6 +6,16 @@
 **Fifth independent specification review:** FAIL → remediated (F5-F-1, F5-M-1 closed;
 see DR-2-34, DR-2-35). Re-review required before this document may be marked approved.
 
+> **Amendment 2026-11-23 (QA-09, owner decision).** Audit events are written **inside the same
+> transaction as the change**, no longer through `transaction.on_commit()`. Why: with
+> `on_commit()` the event was written only after the change had committed, so if the audit write
+> failed the change stayed committed with no audit record (the Codex QA finding QA-09). Writing
+> inside the transaction keeps this spec's goal, no audit event for a validation failure, an
+> illegal transition, a permission denial or a stale-version conflict, because a rollback removes
+> the change and its audit record together; and it adds the missing guarantee that no change
+> commits without its record. The audit table is in the same database and is written on the same
+> connection as the change. Every amended line below is marked "amended 2026-11-23, QA-09".
+
 **Branch:** `regx/design/milestone-4d-2-discovery`
 **Base milestone:** Milestone 4D-1 (CLOSED) — SHA `453974a4cd40501479730a524fd1b6671a96d6fc`
 **Design inputs:**
@@ -638,7 +648,7 @@ Generic 404 (never 403) when a tenant attempts to reach another tenant's executi
             calculation_name=q.calculation_binding_identifier, ...) (DR-2-09).
    e. Catch IntegrityError → structured 409 (uniqueness race backstop).
 
-6. Via transaction.on_commit():
+6. Inside the same transaction (amended 2026-11-23, QA-09; was via transaction.on_commit()):
    Emit IigChecklistEvent.EXECUTION_CREATED audit event.
 
 7. Return execution.
@@ -654,7 +664,7 @@ Generic 404 (never 403) when a tenant attempts to reach another tenant's executi
 4. Inside transaction.atomic() + select_for_update() on execution:
    a. Set new status and provenance fields (actor, timestamp, reason).
    b. execution.full_clean() → execution.save().
-5. Via transaction.on_commit():
+5. Inside the same transaction (amended 2026-11-23, QA-09; was via transaction.on_commit()):
    Emit lifecycle audit event.
 6. Return execution.
 ```
@@ -676,7 +686,7 @@ Generic 404 (never 403) when a tenant attempts to reach another tenant's executi
 8. response.data_source_type_snapshot = question.data_source_classification (if not already set).
 9. Apply raw_value, is_not_applicable, not_applicable_reason, entered_by=actor, entered_at=now.
 10. response.full_clean() → response.save().
-11. Via transaction.on_commit():
+11. Inside the same transaction (amended 2026-11-23, QA-09; was via transaction.on_commit()):
     Emit RESPONSE_ENTERED or RESPONSE_UPDATED audit event.
 12. Return response.
 ```
@@ -760,12 +770,12 @@ Phase B — all regulated writes, inside one transaction (DR-2-27):
       ).save()   # allowed because pk is None — R4-M-1
 15. Commit transaction.
 
-Phase C — post-commit:
+Phase C — audit, inside the Phase B transaction (amended 2026-11-23, QA-09; was via transaction.on_commit()):
 
-16. Via transaction.on_commit():
+16. Inside the same transaction:
     - is_amendment was False → emit RESPONSE_REVIEWER_CONCLUSION_ENTERED.
     - is_amendment was True  → emit RESPONSE_REVIEWER_CONCLUSION_UPDATED.
-    (Only after successful commit — never on any failure path.)
+    (On any failure path it is rolled back with the change, so it is never recorded for a failure.)
 17. Return response.
 ```
 
@@ -925,7 +935,7 @@ All lifecycle action views inherit `_ChecklistExecutionActionViewBase`, mirrorin
 - Calls `visible_to(tenant)` — generic 404 for cross-tenant access.
 - Calls `validate_execution_transition()` — structured 400 on illegal transition; no audit event on failure.
 - Delegates to `transition_execution()`.
-- Emits audit event only on success (via `transaction.on_commit()`).
+- Emits audit event only on success (inside the same transaction as the change) (amended 2026-11-23, QA-09; was via transaction.on_commit()).
 
 `ChecklistExecutionApproveView`: checks `execution.submitted_by == request.user` before calling the service — structured 403 with `error_code = "self_approval_forbidden"`.
 
@@ -997,7 +1007,7 @@ RESPONSE_REVIEWER_CONCLUSION_UPDATED = "checklist_response.reviewer_conclusion_u
 
 **Reviewer-conclusion events:** execution `public_id`, response `public_id`, question `public_id`, actor email, `prior_response_version`, `new_response_version`, `execution_status`, boolean `correction_reason_present`. Never: conclusion text, `raw_value`, `prior_raw_value`, or any regulated conclusion content.
 
-Emit only on success. No audit event on validation failure, illegal transition, authorization denial, or stale-version conflict. All events emitted via `transaction.on_commit()` — never before the transaction commits.
+Emit only on success. No audit event on validation failure, illegal transition, authorization denial, or stale-version conflict. All events are emitted inside the same transaction as the change: a rollback removes the change and its audit record together, so no event survives a failure, and no change commits without its event. (amended 2026-11-23, QA-09; was via transaction.on_commit())
 
 **`response.entered` vs `response.updated` distinction (DR-2-13):**
 - `entered`: response `entered_by` was previously null; first value recorded.

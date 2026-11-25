@@ -1505,6 +1505,7 @@ class ChecklistExecutionExportView(APIView):
     def get(self, request, public_id):
         from .controlled_export import (
             ExecutionNotExportable,
+            ExportAuditFailed,
             ExportPermissionDenied,
             export_execution,
         )
@@ -1547,6 +1548,15 @@ class ChecklistExecutionExportView(APIView):
                     "detail": "Only an approved checklist execution can be exported.",
                 },
                 status=status.HTTP_409_CONFLICT,
+            )
+        except ExportAuditFailed:
+            # QA-09: no file goes out without its audit record.
+            return Response(
+                {
+                    "error_code": "export_not_recorded",
+                    "detail": "The export could not be recorded, so it was not issued. Try again.",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         checksum = artifact["checksum"]["value"]

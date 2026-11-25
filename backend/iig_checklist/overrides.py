@@ -143,8 +143,9 @@ def override_checklist_response(
       and never a 403 that would confirm the record exists.
     - Phase B -- one ``transaction.atomic()`` holding the response write, the
       history row and every dependent recalculation.
-    - Phase C -- audit through ``transaction.on_commit()``, so a rejected or
-      rolled-back attempt never announces success.
+    - Phase C -- audit inside the Phase B transaction (QA-09, owner decision
+      2026-11-23), so a rejected or rolled-back attempt never announces success,
+      and no override commits without its audit record.
     """
     from django.core.exceptions import ValidationError
     from django.db import transaction as db_transaction
@@ -295,34 +296,34 @@ def override_checklist_response(
             expected_version=locked_response.version,
         )
 
-    # -- Phase C: post-commit audit ---------------------------------------
-    def _audit():
-        emit(
-            event_type=IigChecklistEvent.ANSWER_OVERRIDDEN,
-            resource_id=str(locked_response.public_id),
-            actor_id=getattr(actor, "id", None),
-            actor_email=getattr(actor, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload={
-                # §12 L727 -- old/new value, actor and reason, in public
-                # identifiers only. No database primary keys.
-                "execution_public_id": str(locked_execution.public_id),
-                "response_public_id": str(locked_response.public_id),
-                "question_public_id": str(locked_response.question.public_id),
-                "question_code": locked_response.question.code,
-                "data_source_type_snapshot": locked_response.data_source_type_snapshot,
-                "prior_response_version": prior_version,
-                "new_response_version": locked_response.version,
-                "actor_public_id": str(getattr(actor, "public_id", "")) or None,
-                "override_reason": reason,
-                "prior_override_reason": prior_override_reason or None,
-                "prior_value": prior_raw_value,
-                "new_value": locked_response.raw_value,
-                "system_derived_value": locked_response.system_derived_value,
-                "override_created": created,
-                "recalculated_count": cascade_result.recalculated_count,
-            },
-        )
+        # -- Phase C: audit, inside this transaction (QA-09, owner decision 2026-11-23) --
+        def _audit():
+            emit(
+                event_type=IigChecklistEvent.ANSWER_OVERRIDDEN,
+                resource_id=str(locked_response.public_id),
+                actor_id=getattr(actor, "id", None),
+                actor_email=getattr(actor, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload={
+                    # §12 L727 -- old/new value, actor and reason, in public
+                    # identifiers only. No database primary keys.
+                    "execution_public_id": str(locked_execution.public_id),
+                    "response_public_id": str(locked_response.public_id),
+                    "question_public_id": str(locked_response.question.public_id),
+                    "question_code": locked_response.question.code,
+                    "data_source_type_snapshot": locked_response.data_source_type_snapshot,
+                    "prior_response_version": prior_version,
+                    "new_response_version": locked_response.version,
+                    "actor_public_id": str(getattr(actor, "public_id", "")) or None,
+                    "override_reason": reason,
+                    "prior_override_reason": prior_override_reason or None,
+                    "prior_value": prior_raw_value,
+                    "new_value": locked_response.raw_value,
+                    "system_derived_value": locked_response.system_derived_value,
+                    "override_created": created,
+                    "recalculated_count": cascade_result.recalculated_count,
+                },
+            )
 
-    db_transaction.on_commit(_audit)
+        _audit()
     return OverrideResult(response=locked_response, cascade=cascade_result, created=created)

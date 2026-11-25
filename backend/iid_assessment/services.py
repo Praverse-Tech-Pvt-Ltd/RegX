@@ -243,9 +243,9 @@ def create_assessment_snapshot(
     """Create exactly one immutable ``AssessmentSnapshot`` and return it.
 
     The caller owns the transaction (M4D3-SNO-012): this service opens none of
-    its own, commits nothing independently, and schedules its audit through the
-    caller's ``on_commit``, so any later failure discards the snapshot with the
-    rest of the operation.
+    its own, commits nothing independently, and writes its audit event inside the
+    caller's transaction (QA-09, owner decision 2026-11-23), so any later failure
+    discards the snapshot and its audit event with the rest of the operation.
 
     ``selected_release`` is resolved server-side from M4D3-SRC-001 when omitted.
     A server-side caller that has already resolved an exact release -- a
@@ -261,7 +261,6 @@ def create_assessment_snapshot(
     the caller's governed selection failed closed and the argument is left
     unresolved (M4D3-MDU-014). This service applies no source rule of its own.
     """
-    from django.db import transaction as db_transaction
 
     from .assess import run_preview
     from .audit_events import IidAssessmentEvent, emit
@@ -330,15 +329,14 @@ def create_assessment_snapshot(
         "match_status": preview.match_status,
         "decision_status": preview.decision_status,
     }
-    db_transaction.on_commit(
-        lambda: emit(
-            event_type=IidAssessmentEvent.SNAPSHOT_CREATED,
-            resource_id=str(snapshot.public_id),
-            actor_id=getattr(actor, "id", None),
-            actor_email=getattr(actor, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload=payload,
-        )
+    # Written inside the caller's transaction (QA-09, owner decision 2026-11-23).
+    emit(
+        event_type=IidAssessmentEvent.SNAPSHOT_CREATED,
+        resource_id=str(snapshot.public_id),
+        actor_id=getattr(actor, "id", None),
+        actor_email=getattr(actor, "email", ""),
+        tenant_id=getattr(tenant, "id", None),
+        payload=payload,
     )
 
     return AssessmentSnapshotCreationResult(

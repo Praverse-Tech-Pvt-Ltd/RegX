@@ -723,31 +723,31 @@ def create_execution(
             execution=execution, actor=actor, iid_snapshot=iid_snapshot
         )
 
-    # Step 6: post-commit audit.
-    def _audit():
-        emit(
-            event_type=IigChecklistEvent.EXECUTION_CREATED,
-            resource_id=str(execution.public_id),
-            actor_id=getattr(actor, "id", None),
-            actor_email=getattr(actor, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload={
-                "checklist_version_public_id": str(checklist_version.public_id),
-                "formulation_version_public_id": str(fv.public_id),
-                # OQ-8: which excipient this execution governs, and the snapshot
-                # its iid.* values came from. UUIDs only, never internal ids.
-                # None is recorded truthfully rather than omitted -- "no governed
-                # subject" is itself the fact an auditor needs.
-                "subject_component_public_id": (
-                    str(subject_component.public_id) if subject_component is not None else None
-                ),
-                "assessment_snapshot_public_id": (
-                    str(iid_snapshot.public_id) if iid_snapshot is not None else None
-                ),
-            },
-        )
+        # Step 6: audit, inside this transaction (QA-09, owner decision 2026-11-23).
+        def _audit():
+            emit(
+                event_type=IigChecklistEvent.EXECUTION_CREATED,
+                resource_id=str(execution.public_id),
+                actor_id=getattr(actor, "id", None),
+                actor_email=getattr(actor, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload={
+                    "checklist_version_public_id": str(checklist_version.public_id),
+                    "formulation_version_public_id": str(fv.public_id),
+                    # OQ-8: which excipient this execution governs, and the snapshot
+                    # its iid.* values came from. UUIDs only, never internal ids.
+                    # None is recorded truthfully rather than omitted -- "no governed
+                    # subject" is itself the fact an auditor needs.
+                    "subject_component_public_id": (
+                        str(subject_component.public_id) if subject_component is not None else None
+                    ),
+                    "assessment_snapshot_public_id": (
+                        str(iid_snapshot.public_id) if iid_snapshot is not None else None
+                    ),
+                },
+            )
 
-    db_transaction.on_commit(_audit)
+        _audit()
     return execution
 
 
@@ -854,24 +854,24 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
                 execution=locked, actor=actor, approved_at=now
             )
 
-    def _audit():
-        payload = {
-            "action": action,
-            "before_status": execution.status,
-            "after_status": new_status,
-        }
-        if action == "approve":
-            payload["approval_metadata_written"] = approval_metadata_written
-        emit(
-            event_type=action_event_map[action],
-            resource_id=str(locked.public_id),
-            actor_id=getattr(actor, "id", None),
-            actor_email=getattr(actor, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload=payload,
-        )
+        def _audit():
+            payload = {
+                "action": action,
+                "before_status": execution.status,
+                "after_status": new_status,
+            }
+            if action == "approve":
+                payload["approval_metadata_written"] = approval_metadata_written
+            emit(
+                event_type=action_event_map[action],
+                resource_id=str(locked.public_id),
+                actor_id=getattr(actor, "id", None),
+                actor_email=getattr(actor, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload=payload,
+            )
 
-    db_transaction.on_commit(_audit)
+        _audit()
     return locked
 
 
@@ -923,7 +923,7 @@ def enter_reviewer_conclusion(
 
     Phase A: non-mutating validation.
     Phase B: all regulated writes inside one atomic transaction.
-    Phase C: post-commit audit.
+    Phase C: audit, inside the Phase B transaction (QA-09, owner decision 2026-11-23).
     """
     import json
 
@@ -1049,32 +1049,32 @@ def enter_reviewer_conclusion(
                 source_classification_snapshot=locked_response.data_source_type_snapshot,
             ).save()
 
-    # Phase C -- post-commit audit.
-    event_type = (
-        IigChecklistEvent.RESPONSE_REVIEWER_CONCLUSION_UPDATED
-        if is_amendment_confirmed
-        else IigChecklistEvent.RESPONSE_REVIEWER_CONCLUSION_ENTERED
-    )
-
-    def _audit():
-        emit(
-            event_type=event_type,
-            resource_id=str(locked_response.public_id),
-            actor_id=getattr(actor, "id", None),
-            actor_email=getattr(actor, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload={
-                "execution_public_id": str(locked_execution.public_id),
-                "response_public_id": str(locked_response.public_id),
-                "question_public_id": str(locked_response.question.public_id),
-                "prior_response_version": prior_version,
-                "new_response_version": locked_response.version,
-                "execution_status": locked_execution.status,
-                "correction_reason_present": bool(correction_reason),
-            },
+        # Phase C -- audit, inside this transaction (QA-09, owner decision 2026-11-23).
+        event_type = (
+            IigChecklistEvent.RESPONSE_REVIEWER_CONCLUSION_UPDATED
+            if is_amendment_confirmed
+            else IigChecklistEvent.RESPONSE_REVIEWER_CONCLUSION_ENTERED
         )
 
-    db_transaction.on_commit(_audit)
+        def _audit():
+            emit(
+                event_type=event_type,
+                resource_id=str(locked_response.public_id),
+                actor_id=getattr(actor, "id", None),
+                actor_email=getattr(actor, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload={
+                    "execution_public_id": str(locked_execution.public_id),
+                    "response_public_id": str(locked_response.public_id),
+                    "question_public_id": str(locked_response.question.public_id),
+                    "prior_response_version": prior_version,
+                    "new_response_version": locked_response.version,
+                    "execution_status": locked_execution.status,
+                    "correction_reason_present": bool(correction_reason),
+                },
+            )
+
+        _audit()
     return locked_response
 
 
@@ -1109,8 +1109,8 @@ def _clone_applicability_rule(source_rule, new_version):
 # execution lookup; tenant-scoped response lookup; execution-state validation;
 # permission validation; ``expected_version`` validation; execution lock;
 # response lock; payload validation; dependent recalculation; version
-# increment; every write inside one ``transaction.atomic()``; audit through
-# ``transaction.on_commit()``.
+# increment; every write and the audit event inside one ``transaction.atomic()``
+# (QA-09, owner decision 2026-11-23).
 #
 # **No history row is written here, deliberately.** M4D3-HST-001 scopes
 # ``ChecklistResponseHistory`` reuse to governed persisted-state transitions,
@@ -1260,8 +1260,9 @@ def update_checklist_response(
     - Phase B -- one ``transaction.atomic()`` holding the response write and
       every dependent outcome update (M4D3-TXN-002). An exception anywhere in
       it rolls back both (M4D3-TXN-004).
-    - Phase C -- audit dispatched through ``transaction.on_commit()``
-      (M4D3-TXN-005), so nothing is announced that did not commit.
+    - Phase C -- audit written inside the Phase B transaction (QA-09, owner decision 2026-11-23);
+      a rollback removes it with the change, so nothing is announced that did not
+      commit, and nothing commits without its audit record.
 
     ``payload`` is the raw request body. Deserialization happens here rather
     than in the view because the governed shape rules depend on the question,
@@ -1431,30 +1432,30 @@ def update_checklist_response(
             expected_version=locked_response.version,
         )
 
-    # -- Phase C: post-commit audit ---------------------------------------
-    event_type = (
-        IigChecklistEvent.RESPONSE_UPDATED
-        if prior_entered_by
-        else IigChecklistEvent.RESPONSE_ENTERED
-    )
-
-    def _audit():
-        emit(
-            event_type=event_type,
-            resource_id=str(locked_response.public_id),
-            actor_id=getattr(actor, "id", None),
-            actor_email=getattr(actor, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload={
-                "execution_public_id": str(locked_execution.public_id),
-                "response_public_id": str(locked_response.public_id),
-                "question_public_id": str(locked_response.question.public_id),
-                "data_source_type_snapshot": locked_response.data_source_type_snapshot,
-                "prior_response_version": expected_version,
-                "new_response_version": locked_response.version,
-                "recalculated_count": cascade_result.recalculated_count,
-            },
+        # -- Phase C: audit, inside this transaction (QA-09, owner decision 2026-11-23) --
+        event_type = (
+            IigChecklistEvent.RESPONSE_UPDATED
+            if prior_entered_by
+            else IigChecklistEvent.RESPONSE_ENTERED
         )
 
-    db_transaction.on_commit(_audit)
+        def _audit():
+            emit(
+                event_type=event_type,
+                resource_id=str(locked_response.public_id),
+                actor_id=getattr(actor, "id", None),
+                actor_email=getattr(actor, "email", ""),
+                tenant_id=getattr(tenant, "id", None),
+                payload={
+                    "execution_public_id": str(locked_execution.public_id),
+                    "response_public_id": str(locked_response.public_id),
+                    "question_public_id": str(locked_response.question.public_id),
+                    "data_source_type_snapshot": locked_response.data_source_type_snapshot,
+                    "prior_response_version": expected_version,
+                    "new_response_version": locked_response.version,
+                    "recalculated_count": cascade_result.recalculated_count,
+                },
+            )
+
+        _audit()
     return ResponseUpdateResult(response=locked_response, cascade=cascade_result)

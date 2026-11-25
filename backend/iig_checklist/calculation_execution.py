@@ -509,7 +509,7 @@ def execute_calculation_response(
     ``reason_code`` and ``generated_at`` all unchanged, no audit event is
     emitted. Only this service can make that judgement -- it alone sees the
     outcome row before and after the write, under the lock, and it alone owns
-    the ``on_commit`` dispatch -- so the decision lives here rather than in the
+    the audit write -- so the decision lives here rather than in the
     cascade. It defaults to ``False``, so a direct execution always audits and
     the reviewed single-response behaviour is untouched. The clause's companion
     requirement, "no version change", needs no code: recalculation never writes
@@ -635,7 +635,7 @@ def execute_calculation_response(
                 outcome, entry, resolved_inputs, engine_result, snapshot
             )
 
-        # -- Phase C: audit, only after the transaction commits ----------
+        # -- Phase C: audit, inside this transaction (QA-09, owner decision 2026-11-23) --
         result = audit_unless_unchanged(
             result,
             str(snapshot.public_id) if snapshot is not None else None,
@@ -656,7 +656,6 @@ def _schedule_audit(
     snapshot_public_id,
 ):
     """One governed audit event, dispatched only after the commit succeeds."""
-    from django.db import transaction as db_transaction
 
     from .audit import IigChecklistEvent, emit
 
@@ -673,15 +672,14 @@ def _schedule_audit(
     if snapshot_public_id is not None:
         payload["assessment_snapshot_public_id"] = snapshot_public_id
 
-    db_transaction.on_commit(
-        lambda: emit(
-            event_type=IigChecklistEvent.RESPONSE_CALCULATED,
-            resource_id=str(response.public_id),
-            actor_id=getattr(actor, "id", None),
-            actor_email=getattr(actor, "email", ""),
-            tenant_id=getattr(tenant, "id", None),
-            payload=payload,
-        )
+    # Written inside the caller's transaction (QA-09, owner decision 2026-11-23).
+    emit(
+        event_type=IigChecklistEvent.RESPONSE_CALCULATED,
+        resource_id=str(response.public_id),
+        actor_id=getattr(actor, "id", None),
+        actor_email=getattr(actor, "email", ""),
+        tenant_id=getattr(tenant, "id", None),
+        payload=payload,
     )
 
 
