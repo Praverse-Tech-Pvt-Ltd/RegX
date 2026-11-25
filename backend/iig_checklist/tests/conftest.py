@@ -294,3 +294,28 @@ def api_client_platform_actor_full(platform_actor_user, tenant_a):
     client.force_authenticate(user=platform_actor_user)
     client.credentials(HTTP_X_TENANT_SLUG=tenant_a.slug)
     return client
+
+
+def add_one_question(version):
+    """A version needs at least one question before submit, approve and activate (N-2,
+    2026-11-25). Tests about the lifecycle itself give their version this one."""
+    from iig_checklist.enums import AnswerType, Criticality, DataSourceClassification
+    from iig_checklist.models import ChecklistQuestion, ChecklistSection
+
+    section = ChecklistSection.objects.create(
+        checklist_version=version,
+        code="ZZ-CONTENT",
+        title="Content (test setup)",
+        display_order=99,
+        criticality=Criticality.LOW,
+    )
+    return ChecklistQuestion.objects.create(
+        section=section,
+        code="ZZ-Q1",
+        question_text="Test setup question",
+        display_order=1,
+        answer_type=AnswerType.SHORT_TEXT,
+        data_source_classification=DataSourceClassification.USER_REQUIRED,
+        required=False,
+        criticality=Criticality.LOW,
+    )

@@ -16,6 +16,8 @@ from iig_checklist.transitions import (
     validate_version_transition,
 )
 
+from .conftest import add_one_question
+
 BASE = "/api/regx/v1"
 
 
@@ -108,6 +110,7 @@ class TestChecklistVersionLifecycleApi:
     def test_full_lifecycle_walk(
         self, draft_version, api_client_doer, api_client_reviewer, api_client_vp
     ):
+        add_one_question(draft_version)  # N-2: a version needs a question
         pid = draft_version.public_id
 
         submit = api_client_doer.post(
@@ -167,6 +170,7 @@ class TestChecklistVersionLifecycleApi:
         assert after == before
 
     def test_self_approval_blocked(self, draft_version, api_client_vp, vp_user, tenant_a):
+        add_one_question(draft_version)  # N-2: a version needs a question
         from authorization.models import MembershipRole, Role
         from tenancy.models import TenantMembership
 
@@ -201,6 +205,7 @@ class TestChecklistVersionLifecycleApi:
     def test_return_then_edit_then_resubmit_preserves_provenance(
         self, draft_version, api_client_doer, api_client_reviewer
     ):
+        add_one_question(draft_version)  # N-2: a version needs a question
         pid = draft_version.public_id
         api_client_doer.post(f"{BASE}/iig-checklists/versions/{pid}/submit-review/", data={})
         returned = api_client_reviewer.post(
@@ -258,6 +263,9 @@ class TestChecklistVersionLifecycleApi:
             effective_date="2026-01-01",
             created_by=user_a,
         )
+
+        add_one_question(v1)  # N-2: a version needs a question
+        add_one_question(v2)
 
         results = []
 

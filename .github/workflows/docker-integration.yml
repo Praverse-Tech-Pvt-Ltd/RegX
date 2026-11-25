@@ -573,6 +573,14 @@ jobs:
           assert resp.status_code == 200, 'STEP 4 FAIL: setting effective_date returned %s' % resp.status_code
           print('STEP 4 effective date set while draft: OK')
 
+          # A version needs at least one question before submit, approve and activate (N-2).
+          resp = doer_client.post(BASE + '/versions/%s/sections/' % vpub, data=json.dumps({'code': 'S1', 'title': 'CI smoke section (synthetic)', 'display_order': 1, 'criticality': 'low'}), **H)
+          assert resp.status_code == 201, 'STEP 4b FAIL: section create returned %s' % resp.status_code
+          section_pub = resp.json()['public_id']
+          resp = doer_client.post(BASE + '/sections/%s/questions/' % section_pub, data=json.dumps({'code': 'Q1', 'question_text': 'CI smoke question (synthetic)', 'answer_type': 'short_text', 'data_source_classification': 'user_required', 'required': False, 'display_order': 1, 'criticality': 'low'}), **H)
+          assert resp.status_code == 201, 'STEP 4b FAIL: question create returned %s' % resp.status_code
+          print('STEP 4b one section and one question added while draft: OK')
+
           resp = doer_client.post(BASE + '/versions/%s/submit-review/' % vpub, **H)
           assert resp.status_code == 200 and resp.json()['status'] == 'under_review', 'STEP 5 FAIL: submit-review returned %s' % resp.status_code
           print('STEP 5 submitted for review: OK')

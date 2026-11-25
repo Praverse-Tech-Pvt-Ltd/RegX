@@ -2,6 +2,8 @@
 
 import pytest
 
+from .conftest import add_one_question
+
 BASE = "/api/regx/v1"
 
 
@@ -14,6 +16,7 @@ class TestCloneEndpoint:
         version.refresh_from_db()
 
     def test_clone_via_api(self, draft_version, api_client_doer, api_client_vp):
+        add_one_question(draft_version)  # N-2: a version needs a question
         self._approve_and_activate(draft_version, api_client_doer, api_client_vp)
         resp = api_client_doer.post(
             f"{BASE}/iig-checklists/definitions/{draft_version.definition.public_id}/clone/",

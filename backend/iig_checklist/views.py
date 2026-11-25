@@ -12,7 +12,7 @@ from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -483,6 +483,14 @@ VERSION_DRAFT_FIELDS = (
 )
 
 
+class EmptyChecklistVersion(APIException):
+    """A version with no questions cannot go to review, approval or activation (N-2,
+    2026-11-25). A plain sentence and one code, so the screen shows the real reason."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    default_code = "version_has_no_questions"
+
+
 def _raise_if_activation_prerequisites_missing(version, action) -> None:
     """What activation needs, checked before submit, approve and activate (QA-06(b)).
 
@@ -496,13 +504,18 @@ def _raise_if_activation_prerequisites_missing(version, action) -> None:
         validate_version_calculation_bindings,
     )
 
+    step = {
+        VersionAction.SUBMIT_REVIEW: "submitting for review",
+        VersionAction.APPROVE: "approval",
+        VersionAction.ACTIVATE: "activation",
+    }[action]
     if not version.effective_date:
-        step = {
-            VersionAction.SUBMIT_REVIEW: "submitting for review",
-            VersionAction.APPROVE: "approval",
-            VersionAction.ACTIVATE: "activation",
-        }[action]
         raise ValidationError(f"effective_date is required before {step}.")
+    if not ChecklistQuestion.objects.filter(section__checklist_version=version).exists():
+        raise EmptyChecklistVersion(
+            f"This checklist version has no questions. Add at least one section with at least "
+            f"one question before {step}."
+        )
     binding_findings = validate_version_calculation_bindings(version)
     if binding_findings:
         raise ValidationError(format_activation_errors(binding_findings))

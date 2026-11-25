@@ -29,6 +29,8 @@ from iig_checklist.models import (
     ChecklistVersion,
 )
 
+from .conftest import add_one_question
+
 BASE = "/api/regx/v1/iig-checklists"
 
 
@@ -177,6 +179,7 @@ class TestVersionMutationAuthorization:
     def test_full_lifecycle_denied_for_doer_at_every_step(
         self, platform_draft_version, api_client_doer, api_client_platform_actor_full
     ):
+        add_one_question(platform_draft_version)  # N-2: a version needs a question
         # Bring the version to under_review using the authorized actor so
         # we can test each subsequent denied action against a Doer.
         pid = platform_draft_version.public_id
@@ -192,6 +195,7 @@ class TestVersionMutationAuthorization:
     def test_full_lifecycle_succeeds_for_platform_actor_with_permission(
         self, platform_draft_version, api_client_platform_actor_full
     ):
+        add_one_question(platform_draft_version)  # N-2: a version needs a question
         pid = platform_draft_version.public_id
         submit = api_client_platform_actor_full.post(
             f"{BASE}/versions/{pid}/submit-review/", data={}
