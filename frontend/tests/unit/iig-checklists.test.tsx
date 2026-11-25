@@ -54,12 +54,14 @@ const api = vi.hoisted(() => ({
   versionsActivate: vi.fn(),
   versionsSupersede: vi.fn(),
   versionsRetire: vi.fn(),
+  me: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
   return {
     ...actual,
+    auth: { ...actual.auth, me: api.me },
     iigChecklists: {
       definitions: {
         list: api.definitionsList,
@@ -95,6 +97,7 @@ beforeEach(() => {
   nav.publicId = "checklist-def-public-0001";
   nav.versionPublicId = "checklist-version-public-0001";
   Object.values(api).forEach((fn) => fn.mockReset());
+  api.me.mockResolvedValue({ email: "someone-else@example.com" });
 });
 
 describe("DefinitionsPage — list", () => {
@@ -235,6 +238,45 @@ describe("DefinitionDetailPage — versions", () => {
 });
 
 describe("VersionDetailPage — lifecycle actions", () => {
+  it("hides Approve, Reject and Return from the person who submitted the version (4b)", async () => {
+    api.me.mockResolvedValue({ email: "doer@example.com" });
+    api.versionsGet.mockResolvedValue(
+      makeChecklistVersion({ status: "under_review", submitted_by_email: "doer@example.com" }),
+    );
+    render(<VersionDetailPage />);
+    expect(await screen.findByText(/you submitted this version/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^approve$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^reject$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /return for edits/i })).not.toBeInTheDocument();
+  });
+
+  it("still offers Approve, Reject and Return to someone else (4b)", async () => {
+    api.me.mockResolvedValue({ email: "vp@example.com" });
+    api.versionsGet.mockResolvedValue(
+      makeChecklistVersion({ status: "under_review", submitted_by_email: "doer@example.com" }),
+    );
+    render(<VersionDetailPage />);
+    expect(await screen.findByRole("button", { name: /^approve$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^reject$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /return for edits/i })).toBeInTheDocument();
+  });
+
+  it("shows who submitted, approved and activated the version (4c)", async () => {
+    api.versionsGet.mockResolvedValue(
+      makeChecklistVersion({
+        status: "active",
+        submitted_by_email: "doer@example.com",
+        approved_by_email: "vp@example.com",
+        activated_by_email: "vp2@example.com",
+      }),
+    );
+    render(<VersionDetailPage />);
+    expect(await screen.findByText("doer@example.com")).toBeInTheDocument();
+    expect(screen.getByText("vp@example.com")).toBeInTheDocument();
+    expect(screen.getByText("vp2@example.com")).toBeInTheDocument();
+    expect(screen.queryByText(/not yet submitted|not yet approved|not yet activated/)).not.toBeInTheDocument();
+  });
+
   it("shows a submit-review action for a draft version", async () => {
     api.versionsGet.mockResolvedValue(makeChecklistVersion({ status: "draft" }));
     render(<VersionDetailPage />);

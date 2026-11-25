@@ -134,6 +134,16 @@ describe("errorMessage", () => {
     ).toBe("You do not have permission to perform this action.");
   });
 
+  it("shows a list-shaped detail as its sentences, never 'Request failed' (4d, 2026-11-26)", () => {
+    expect(
+      errorMessage({ error: { status: 400, detail: ["effective_date is required before submitting for review."] } }),
+    ).toBe("effective_date is required before submitting for review.");
+    expect(errorMessage({ error: { status: 400, detail: ["First problem.", "Second problem."] } })).toBe(
+      "First problem. Second problem.",
+    );
+    expect(errorMessage(["Unwrapped list message."])).toBe("Unwrapped list message.");
+  });
+
   it("uses a wrapped plain-string detail", () => {
     expect(errorMessage({ error: { status: 400, detail: "Tenant context is required." } })).toBe(
       "Tenant context is required.",

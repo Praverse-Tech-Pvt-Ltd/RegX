@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { documents, type Document, type DocumentType, ApiError } from "@/lib/api";
+import { documents, type Document, type DocumentType, ApiError, isSignedOut, loadError } from "@/lib/api";
 import Link from "next/link";
 
 const ALLOWED_TYPES: DocumentType[] = ["pdf", "docx", "xlsx", "pptx"];
@@ -61,6 +61,7 @@ function DocumentsPageInner() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   // Upload dialog state
   const [showUpload, setShowUpload] = useState(false);
@@ -81,10 +82,13 @@ function DocumentsPageInner() {
         setCount(resp.count);
       })
       .catch((err: unknown) => {
-        if (err instanceof ApiError && err.status === 403) {
+        // Signed out arrives as a 401 (apiRequest maps 403 not_authenticated), like every
+        // other page: go to sign-in. A refusal (403) shows its own sentence.
+        if (isSignedOut(err)) {
+          setRedirecting(true);
           router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
         } else {
-          setError("Failed to load documents.");
+          setError(loadError(err, "Failed to load documents."));
         }
       })
       .finally(() => setLoading(false));
@@ -144,7 +148,7 @@ function DocumentsPageInner() {
       {loading && <p>Loading…</p>}
       {error && <p role="alert" style={{ color: "#c0392b" }}>{error}</p>}
 
-      {!loading && docs.length === 0 && (
+      {!loading && !error && !redirecting && docs.length === 0 && (
         <p style={{ color: "#66768b" }}>No documents yet. Upload one to get started.</p>
       )}
 

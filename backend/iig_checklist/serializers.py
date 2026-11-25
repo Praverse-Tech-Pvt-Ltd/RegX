@@ -65,6 +65,16 @@ class ChecklistDefinitionSerializer(serializers.ModelSerializer):
 class ChecklistVersionSerializer(serializers.ModelSerializer):
     definition_public_id = serializers.UUIDField(source="definition.public_id", read_only=True)
     scope_type = serializers.CharField(source="definition.scope_type", read_only=True)
+    # Who moved the version through its lifecycle (read-only; the version page shows them).
+    submitted_by_email = serializers.EmailField(
+        source="submitted_by.email", read_only=True, default=None
+    )
+    approved_by_email = serializers.EmailField(
+        source="approved_by.email", read_only=True, default=None
+    )
+    activated_by_email = serializers.EmailField(
+        source="activated_by.email", read_only=True, default=None
+    )
 
     class Meta:
         model = ChecklistVersion
@@ -82,6 +92,9 @@ class ChecklistVersionSerializer(serializers.ModelSerializer):
             "jurisdiction",
             "change_summary",
             "cloned_from_version_public_id",
+            "submitted_by_email",
+            "approved_by_email",
+            "activated_by_email",
         ]
         # status/version_number are never client-writable through this
         # plain serializer -- status only via the action endpoints,

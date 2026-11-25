@@ -171,7 +171,12 @@ function FormulationDetailInner() {
               <ProvenanceLabel kind="FDA_SOURCE" />
             </p>
             <p style={{ margin: "0 0 4px", color: "#66768b", fontSize: 13 }}>
-              Selected by {product.selecting_user_email ?? "—"} <ProvenanceLabel kind="REVIEWER_CONFIRMED" />
+              Selected and confirmed by {product.selecting_user_email ?? "—"}
+              {product.selection_timestamp ? ` on ${new Date(product.selection_timestamp).toLocaleString()}` : ""}{" "}
+              <ProvenanceLabel kind="USER_INPUT" />
+            </p>
+            <p style={{ margin: "0 0 4px", color: "#66768b", fontSize: 13 }}>
+              Not confirmed by a Reviewer: REGX has no reviewer-confirmation step for a reference product yet.
             </p>
             {product.selection_justification && (
               <p style={{ margin: 0, color: "#66768b", fontSize: 13 }}>
