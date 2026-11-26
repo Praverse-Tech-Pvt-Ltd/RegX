@@ -160,3 +160,71 @@ data rows: 9071
   rows with neither:                    1207
   total:                                9071
 ```
+
+## Newer release: October 2026 (downloaded 2026-11-26, not imported)
+
+**What was done.** With Maanav's approval (2026-11-26), FDA's current IID file was downloaded and counted. **It was not imported into any database.**
+
+| | |
+|---|---|
+| **Source** | FDA page "Inactive Ingredients Database Download", link "Inactive Ingredients Database Download File" under **Current Update** (`https://www.fda.gov/media/195788/download?attachment`). The page lists "July 2026" (the file above) as the latest previous update |
+| **How** | Through the built-in browser, as an ordinary page visit. FDA refused a scripted `curl` download (it redirected to its abuse-detection page), and no attempt was made to get around that |
+| **File** | `iig_october_2026.zip`, **675,976 bytes**, SHA-256 **`d387d58ad653eedb79d5a5291ef4d1fe5f2486585c9a3b9f4c49882f00761309`**, kept at `D:/Praverse/data/fda/iid/2026-11-26/` (not in the repo) |
+| **Members** | `IIR_OCOMM.xlsx` (378,829 bytes, SHA-256 `41f310b5eb74235c824f7684682747a096a6dd25b47ab1f3d792070985e7bfce`), `IIR_OCOMM.xls`, `Change_Log_Data.csv`, `Change_Log_Data.xls`, all dated **2026-10-15** inside the zip |
+| **Change log** | 301 records, snapshots **"Q3 2026" → "Q4 2026"** (161 change ids; status R 260, D 21, C 20). The July file's log covered "Q2 2026" → "Q3 2026" (70 records, 37 change ids) |
+| **FDA's online database** | "Data Through: September 21, 2026", "Database Last Updated: October 19, 2026" (read 2026-11-26) |
+
+**The October file has no `IIR_OCOMM.csv`.** It ships the data only as `.xlsx` and `.xls`.
+- So the exact CSV script above **cannot run on it**. The same counting rules were applied to `IIR_OCOMM.xlsx` instead, read with Python's standard library (`tools/f3_xlsx_counts.py`: an `.xlsx` is a zip of XML parts; nothing extracted, no formula evaluated).
+- **REGX cannot import this release as it stands.** The importer reads only `IIR_OCOMM.csv` (`backend/fda_data/parsers.py:68`), and its docstring says XLSX is deliberately not handled (`parsers.py:239-242`). The docstring's own advice is to convert the workbook to CSV first ("the contract is the same"), because reading XLSX directly could mean evaluating formulas from an untrusted file. Whether to convert by hand or change the importer, and who checks the converted file, is for the owner; nothing was changed or imported.
+
+### The two files compared
+
+| | July 2026 (`IIR_OCOMM.csv`) | October 2026 (`IIR_OCOMM.xlsx`) | Change |
+|---|---:|---:|---:|
+| Data rows | 9,071 | 9,076 | +5 |
+| With a potency value | 3,805 | 3,659 | −146 |
+| With a maximum daily exposure | 4,059 | 4,211 | +152 |
+| **With both** | **0** | **0** | 0 |
+| With neither (counted directly) | 1,207 | 1,206 | −1 |
+| Blank rows / rows wider than the header / line breaks in a cell | 0 / 0 / 0 | 0 / 0 / 0 | |
+| Header | 10 columns | the same 10 names, same order | |
+
+- **F-3 still holds on the October release:** no row has both a potency value and a daily maximum.
+- The shift from potency to daily maximum (−146 / +152) matches the change logs, where records move from a "%w/w" potency to a daily-exposure value (for example several TOPICAL rows). This was not checked row by row.
+- The counts are the same whether "has a value" means "not blank" or "parses as a number".
+- For the workbook, the equivalent of the raw line check is the row check above: 9,077 rows in the sheet XML = 1 header + 9,076 data rows, no gaps in the row numbering, no blank rows.
+
+Output of `python -I f3_xlsx_counts.py D:/Praverse/data/fda/iid/2026-11-26/iig_october_2026.zip`, as run:
+
+```text
+zip: D:/Praverse/data/fda/iid/2026-11-26/iig_october_2026.zip | bytes: 675976 | sha256: d387d58ad653eedb79d5a5291ef4d1fe5f2486585c9a3b9f4c49882f00761309
+zip members: [('Change_Log_Data.xls', 68608, (2026, 10, 15, 3, 33, 26)), ('IIR_OCOMM.xls', 1163264, (2026, 10, 15, 4, 4, 26)), ('IIR_OCOMM.xlsx', 378829, (2026, 10, 15, 4, 4, 14)), ('Change_Log_Data.csv', 19835, (2026, 10, 15, 3, 34, 26))]
+member: IIR_OCOMM.xlsx | bytes: 378829 | sha256: 41f310b5eb74235c824f7684682747a096a6dd25b47ab1f3d792070985e7bfce
+sheets: ['IIR']
+reading sheet: IIR -> xl/worksheets/sheet1.xml
+
+[workbook rows]
+  rows present in the sheet XML (incl. header): 9077
+  header row number: 1 | header fields: 10
+  header: ['INGREDIENT_NAME', 'ROUTE', 'DOSAGE_FORM', 'CAS_NUMBER', 'UNII', 'POTENCY_AMOUNT', 'POTENCY_UNIT', 'MAXIMUM_DAILY_EXPOSURE', 'MAXIMUM_DAILY_EXPOSURE_UNIT', 'RECORD_UPDATED']
+  data rows: 9076
+  blank data rows: 0
+  data rows with values beyond the header's columns: 0 []
+  gaps in row numbering (skipped empty rows): 0 []
+  data rows with a line break inside a cell: 0
+
+[non-blank] over 9076 non-blank data rows
+  rows with a potency value:            3659
+  rows with a maximum daily exposure:   4211
+  rows with both:                       0
+  rows with neither (counted directly): 1206
+  total:                                9076
+
+[parses as a number] over 9076 non-blank data rows
+  rows with a potency value:            3659
+  rows with a maximum daily exposure:   4211
+  rows with both:                       0
+  rows with neither (counted directly): 1206
+  total:                                9076
+```
