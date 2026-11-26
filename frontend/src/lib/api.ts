@@ -1890,6 +1890,16 @@ export const iigChecklists = {
       ).then(toChecklistExecution),
 
     /**
+     * VP only. Puts a superseded execution back to approved; the server refuses it without a
+     * non-blank reason, or while another execution for the same scope is live (409).
+     */
+    reinstate: (tenantSlug: string, publicId: string, reason: string) =>
+      apiRequest<ChecklistExecutionDTO>(
+        `/api/regx/v1/iig-checklists/executions/${publicId}/reinstate/`,
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { reason } }
+      ).then(toChecklistExecution),
+
+    /**
      * Immutable gap-analysis snapshots for one execution.
      *
      * `list` returns the history newest-first plus `latestIsCurrent`, which the

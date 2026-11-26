@@ -319,6 +319,19 @@ class ReviewerConclusionInvalidExpectedVersion(Exception):
     """
 
 
+class MissingReinstateReason(Exception):
+    """Reinstating a superseded execution needs a non-blank reason (owner, 2026-11-27)."""
+
+
+class AnotherExecutionActive(Exception):
+    """Reinstate refused: another execution for the same scope is live (not rejected,
+    cancelled or superseded)."""
+
+    def __init__(self, other_public_id):
+        super().__init__(str(other_public_id))
+        self.other_public_id = str(other_public_id)
+
+
 class SelfApprovalForbidden(Exception):
     pass
 
@@ -766,6 +779,7 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
     from .permissions import (
         PERM_APPROVE_EXECUTION,
         PERM_CANCEL_EXECUTION,
+        PERM_REINSTATE_EXECUTION,
         PERM_REVIEW_EXECUTION,
         PERM_SUBMIT_EXECUTION,
         PERM_SUPERSEDE_EXECUTION,
@@ -779,6 +793,7 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         "reject": PERM_APPROVE_EXECUTION,
         "cancel": PERM_CANCEL_EXECUTION,
         "supersede": PERM_SUPERSEDE_EXECUTION,
+        "reinstate": PERM_REINSTATE_EXECUTION,
     }
 
     # Validate transition (no DB write on failure).
@@ -811,6 +826,9 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
     elif action == "supersede":
         if not (kwargs.get("reason") or "").strip():
             raise MissingSupersedeReason()
+    elif action == "reinstate":
+        if not (kwargs.get("reason") or "").strip():
+            raise MissingReinstateReason()
 
     action_event_map = {
         "submit_review": IigChecklistEvent.EXECUTION_SUBMITTED,
@@ -819,10 +837,13 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         "reject": IigChecklistEvent.EXECUTION_REJECTED,
         "cancel": IigChecklistEvent.EXECUTION_CANCELLED,
         "supersede": IigChecklistEvent.EXECUTION_SUPERSEDED,
+        "reinstate": IigChecklistEvent.EXECUTION_REINSTATED,
     }
 
     with db_transaction.atomic():
         locked = ChecklistExecution.objects.select_for_update().get(pk=execution.pk)
+        if action == "reinstate":
+            _raise_if_scope_has_a_live_execution(locked)
         locked.status = new_status
         if action == "submit_review":
             locked.submitted_by = actor
@@ -846,6 +867,12 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         elif action == "supersede":
             locked.superseded_by = kwargs.get("superseded_by")
             locked.supersede_reason = kwargs["reason"].strip()
+        elif action == "reinstate":
+            # History is kept: supersede_reason, superseded_by and the original approval
+            # are left as they are.
+            locked.reinstated_by = actor
+            locked.reinstated_at = now
+            locked.reinstate_reason = kwargs["reason"].strip()
         locked.full_clean()
         locked.save()
 
@@ -872,6 +899,9 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
                 payload["approval_metadata_written"] = approval_metadata_written
             if action == "supersede":
                 payload["reason"] = locked.supersede_reason
+            if action == "reinstate":
+                payload["reason"] = locked.reinstate_reason
+                payload["supersede_reason"] = locked.supersede_reason
             emit(
                 event_type=action_event_map[action],
                 resource_id=str(locked.public_id),
@@ -883,6 +913,33 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
 
         _audit()
     return locked
+
+
+def _raise_if_scope_has_a_live_execution(execution):
+    """Reinstate is refused while another execution for the same scope is live.
+
+    Same scope and same notion of live as create_execution and the two partial unique
+    constraints: tenant, checklist version, formulation version and subject component,
+    any status except rejected, cancelled or superseded. The checklist version row is
+    locked first, as create_execution does, so a reinstate and a create for the same
+    version run one after the other."""
+    from .models import ChecklistExecution, ChecklistVersion
+
+    ChecklistVersion.objects.select_for_update().get(pk=execution.checklist_version_id)
+    other = (
+        ChecklistExecution.objects.select_for_update()
+        .filter(
+            tenant_id=execution.tenant_id,
+            checklist_version_id=execution.checklist_version_id,
+            formulation_version_id=execution.formulation_version_id,
+            subject_component_id=execution.subject_component_id,
+        )
+        .exclude(pk=execution.pk)
+        .exclude(status__in=["rejected", "cancelled", "superseded"])
+        .first()
+    )
+    if other is not None:
+        raise AnotherExecutionActive(other.public_id)
 
 
 def _check_execution_completeness(execution, *, for_approve=False):

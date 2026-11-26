@@ -154,6 +154,11 @@ urlpatterns = [
         name="execution-supersede",
     ),
     path(
+        "iig-checklists/executions/<uuid:public_id>/reinstate/",
+        views.ChecklistExecutionReinstateView.as_view(),
+        name="execution-reinstate",
+    ),
+    path(
         "iig-checklists/executions/<uuid:public_id>/responses/",
         views.ChecklistResponseListView.as_view(),
         name="execution-response-list",

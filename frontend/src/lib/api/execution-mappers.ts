@@ -40,6 +40,10 @@ export interface ChecklistExecutionDTO {
   cancelled_at: string | null;
   /** Why an approved execution was superseded (older responses: absent). */
   supersede_reason?: string;
+  /** Reinstating a superseded execution (VP only; older responses: absent). */
+  reinstated_by_email?: string | null;
+  reinstated_at?: string | null;
+  reinstate_reason?: string;
   reviewer_conclusion_note: string;
   created_at: string;
   updated_at: string;
@@ -123,6 +127,9 @@ export interface ChecklistExecution {
   cancelledByEmail: string | null;
   cancelledAt: string | null;
   supersedeReason: string;
+  reinstatedByEmail: string | null;
+  reinstatedAt: string | null;
+  reinstateReason: string;
   reviewerConclusionNote: string;
   createdAt: string;
   updatedAt: string;
@@ -208,6 +215,9 @@ export function toChecklistExecution(dto: ChecklistExecutionDTO): ChecklistExecu
     cancelledByEmail: dto.cancelled_by_email,
     cancelledAt: dto.cancelled_at,
     supersedeReason: dto.supersede_reason ?? "",
+    reinstatedByEmail: dto.reinstated_by_email ?? null,
+    reinstatedAt: dto.reinstated_at ?? null,
+    reinstateReason: dto.reinstate_reason ?? "",
     reviewerConclusionNote: dto.reviewer_conclusion_note,
     createdAt: dto.created_at,
     updatedAt: dto.updated_at,

@@ -1,5 +1,5 @@
 // Supersede on an approved checklist execution needs a confirmation that names the execution,
-// says it cannot be undone, and a typed reason (owner, 2026-11-26; QA-11 in the 2026-11-25
+// warns that it takes effect at once (only a VP can reinstate it), and a typed reason (owner, 2026-11-26; QA-11 in the 2026-11-25
 // browser regression: one click superseded an approved execution). API mocked with page.route.
 import { test, expect, type Route } from "@playwright/test";
 
@@ -44,7 +44,7 @@ async function open(page: import("@playwright/test").Page, posts: unknown[]) {
   await page.goto(`/iig-checklists/executions/exec-e2e-1?tenant=${TENANT}`);
 }
 
-test("Supersede asks for confirmation (names the execution, cannot be undone) and a reason", async ({ page }) => {
+test("Supersede asks for confirmation (names the execution, warns) and a reason", async ({ page }) => {
   const posts: unknown[] = [];
   await open(page, posts);
   await page.getByRole("button", { name: /^Supersede$/ }).click();
@@ -54,7 +54,8 @@ test("Supersede asks for confirmation (names the execution, cannot be undone) an
   await expect(dialog).toContainText("exec-e2e-1");
   await expect(dialog).toContainText("v2");
   await expect(dialog).toContainText("fv-e2e-1");
-  await expect(dialog).toContainText(/cannot be undone/i);
+  await expect(dialog).toContainText(/stops counting as the approved execution at once/i);
+  await expect(dialog).toContainText(/only a VP can reinstate it/i);
   expect(posts).toHaveLength(0); // opening the dialog sends nothing
 
   const confirm = dialog.getByRole("button", { name: /^Supersede execution$/ });

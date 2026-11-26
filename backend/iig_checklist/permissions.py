@@ -25,6 +25,8 @@ PERM_REVIEW_EXECUTION = "iig_checklist.review_execution"
 PERM_APPROVE_EXECUTION = "iig_checklist.approve_execution"
 PERM_CANCEL_EXECUTION = "iig_checklist.cancel_execution"
 PERM_SUPERSEDE_EXECUTION = "iig_checklist.supersede_execution"
+#: Reinstate a superseded execution (owner, 2026-11-27): VP only.
+PERM_REINSTATE_EXECUTION = "iig_checklist.reinstate_execution"
 PERM_VIEW_EXECUTION = "iig_checklist.view_execution"
 #: MILESTONE_4D_DISCOVERY.md §17 -- controlled export requires its own dedicated
 #: permission, "not implicit from `view`", matching the
@@ -98,6 +100,8 @@ ROLE_PERMISSIONS: dict[str, list[str]] = {
         # 4D-2
         PERM_APPROVE_EXECUTION,
         PERM_SUPERSEDE_EXECUTION,
+        # Owner, 2026-11-27: only a VP may reinstate a superseded execution.
+        PERM_REINSTATE_EXECUTION,
         PERM_VIEW_EXECUTION,
         # P7
         PERM_GENERATE_GAP_ANALYSIS,
