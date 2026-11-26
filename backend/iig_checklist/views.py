@@ -12,7 +12,7 @@ from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -588,6 +588,20 @@ class ChecklistVersionDetailView(APIView):
         return Response(ChecklistVersionSerializer(version).data)
 
 
+class SubmitterCannotAct(APIException):
+    """The person who submitted a version for review cannot reject or return it
+    (owner, 2026-11-27); approving it is refused separately (self-approval)."""
+
+    status_code = 400
+
+    def __init__(self, action):
+        verb = "reject" if action == VersionAction.REJECT else "return"
+        super().__init__(
+            f"You submitted this version for review, so someone else must {verb} it.",
+            code=f"submitter_cannot_{verb}",
+        )
+
+
 class _ChecklistVersionActionViewBase(APIView):
     """Shared action plumbing for submit-review/approve/return/reject/
     activate/supersede/retire -- structurally identical in shape to
@@ -598,6 +612,8 @@ class _ChecklistVersionActionViewBase(APIView):
 
     action: str = ""
     self_approval_forbidden: bool = False
+    # Reject and Return: refused for the person who submitted the version.
+    submitter_forbidden: bool = False
     required_permission = CanReviewChecklist
 
     def get_permissions(self):
@@ -663,6 +679,12 @@ class _ChecklistVersionActionViewBase(APIView):
 
             if self.self_approval_forbidden and version.submitted_by_id == request.user.id:
                 raise ValidationError("A user cannot approve a version they submitted for review.")
+            if (
+                self.submitter_forbidden
+                and version.submitted_by_id is not None
+                and version.submitted_by_id == request.user.id
+            ):
+                raise SubmitterCannotAct(self.action)
 
             now = timezone.now()
             if self.action == VersionAction.SUBMIT_REVIEW:
@@ -718,11 +740,13 @@ class ChecklistVersionApproveView(_ChecklistVersionActionViewBase):
 class ChecklistVersionReturnView(_ChecklistVersionActionViewBase):
     action = VersionAction.RETURN
     required_permission = CanReviewChecklist
+    submitter_forbidden = True
 
 
 class ChecklistVersionRejectView(_ChecklistVersionActionViewBase):
     action = VersionAction.REJECT
     required_permission = CanReviewChecklist
+    submitter_forbidden = True
 
 
 class ChecklistVersionActivateView(_ChecklistVersionActionViewBase):
