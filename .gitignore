@@ -48,8 +48,11 @@ db*.sqlite3.bak*
 # Legacy root-level requirements (REGX requirements live in backend/requirements/)
 requirements.txt
 
-# Claude Code project data
-.claude/
+# Claude Code project data. Only the shared settings (hooks) and the hook scripts are tracked;
+# settings.local.json and everything else stay local.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 
 # Python
 __pycache__/
