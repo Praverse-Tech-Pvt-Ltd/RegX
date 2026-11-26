@@ -1310,12 +1310,13 @@ class _ChecklistExecutionActionViewBase(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except AnotherExecutionActive as exc:
+            other = f" ({exc.other_public_id})" if exc.other_public_id else ""
             return Response(
                 {
                     "error_code": "another_execution_active",
                     "detail": (
                         "Another execution for the same checklist version and formulation "
-                        f"version is in progress or approved ({exc.other_public_id}). "
+                        f"version is in progress or approved{other}. "
                         "Close it before reinstating this one."
                     ),
                 },

@@ -328,8 +328,8 @@ class AnotherExecutionActive(Exception):
     cancelled or superseded)."""
 
     def __init__(self, other_public_id):
-        super().__init__(str(other_public_id))
-        self.other_public_id = str(other_public_id)
+        super().__init__(str(other_public_id or ""))
+        self.other_public_id = str(other_public_id) if other_public_id else ""
 
 
 class SelfApprovalForbidden(Exception):
@@ -873,8 +873,11 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
             locked.reinstated_by = actor
             locked.reinstated_at = now
             locked.reinstate_reason = kwargs["reason"].strip()
-        locked.full_clean()
-        locked.save()
+        if action == "reinstate":
+            _save_reinstated(locked)
+        else:
+            locked.full_clean()
+            locked.save()
 
         # `4D4-DEC-008` -- the governed approval_metadata projection is written
         # inside this same atomic block, so the metadata and the approved status
@@ -940,6 +943,37 @@ def _raise_if_scope_has_a_live_execution(execution):
     )
     if other is not None:
         raise AnotherExecutionActive(other.public_id)
+
+
+def _save_reinstated(execution):
+    """Save a reinstated execution. The partial unique constraints are the floor under
+    _raise_if_scope_has_a_live_execution: if a concurrent write got past that check, the
+    database refuses the save (inside a savepoint) and the reinstate is reported as a
+    conflict, never as a server error."""
+    execution.full_clean(validate_constraints=False)
+    try:
+        with transaction.atomic():
+            execution.save()
+    except IntegrityError as exc:
+        raise AnotherExecutionActive(_other_live_execution_id(execution)) from exc
+
+
+def _other_live_execution_id(execution):
+    """The public id of another live execution for the same scope, or None."""
+    from .models import ChecklistExecution
+
+    return (
+        ChecklistExecution.objects.filter(
+            tenant_id=execution.tenant_id,
+            checklist_version_id=execution.checklist_version_id,
+            formulation_version_id=execution.formulation_version_id,
+            subject_component_id=execution.subject_component_id,
+        )
+        .exclude(pk=execution.pk)
+        .exclude(status__in=["rejected", "cancelled", "superseded"])
+        .values_list("public_id", flat=True)
+        .first()
+    )
 
 
 def _check_execution_completeness(execution, *, for_approve=False):
