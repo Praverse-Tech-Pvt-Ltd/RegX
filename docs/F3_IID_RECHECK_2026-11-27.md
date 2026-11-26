@@ -12,13 +12,71 @@ The rule that produces this is `backend/iid_assessment/decisions.py:201-232`: a 
 
 ## Result
 
-| Rows in the file | With a potency value | With a maximum daily exposure | **With both** | With neither |
+| Rows in the file | With a potency value | With a maximum daily exposure | **With both** | With neither (counted directly) |
 |---:|---:|---:|---:|---:|
 | 9,071 | 3,805 | 4,059 | **0** | 1,207 |
 
 - **F-3 is confirmed.** The counts are the same whether "has a value" means "not blank" or "parses as a number".
 - **What it means:** a potency comparison and a daily-maximum comparison can never both run on one IID record from this file. This is a property of FDA's data, not a REGX defect.
 - **What it depends on:** whether a per-day check can use a different record, which is the per-day rule (White Paper spec Q8). That decision is still with iCretegy and the regulatory reviewer.
+
+## The file
+
+| | |
+|---|---|
+| **File** | `iig_july_2026.zip`, 382,910 bytes, SHA-256 `d08cf074fb381dea17f922cb9c085750878e366516236471d97f18e9980c987e`. The owner's download, kept at `D:/Praverse/data/fda/iid/2026-10-12/` (not in the repo) |
+| **Member checked** | `IIR_OCOMM.csv`, 644,025 bytes, SHA-256 `4f3a8e371551a97e362424bbaa211af19dbb5b7919d7db1ae86379598436d302` |
+| **Other members** | `IIR_OCOMM.xls`, `Change_Log_Data.csv`, `Change_Log_Data.xls` |
+| **FDA release date** | **Not confirmed from FDA.** What the file itself shows: all four members are dated **2026-07-21** inside the zip, and the newest snapshot in `Change_Log_Data.csv` is labelled **"Q3 2026"**. FDA's online IID database page (read 2026-11-26) gives no date for this file; it now says **"Data Through: September 21, 2026"** and **"Database Last Updated: October 19, 2026"**, so FDA has published data newer than this file. The newer release was not downloaded, so whether F-3 still holds on it is **not checked** |
+
+## Raw line and row check
+
+The question: is 9,071 every data row, or could blank lines or quoted fields with line breaks make the physical line count and the CSV row count differ?
+
+| Check | Result |
+|---|---|
+| Physical lines | **9,072**, every one ending in CRLF; the file ends with a line break; no bare LF or CR |
+| CSV records (Python `csv` module) | **9,072** = **1 header** (10 fields) + **9,071 data rows** |
+| Blank records | 0 |
+| Records with a different number of fields from the header | 0 |
+| Records with a line break inside a quoted field | 0 |
+| Physical lines minus CSV records | **0** |
+
+- **9,071 is every data row in the file.** The line count and the row count agree exactly, and nothing was skipped.
+- **"Neither" is counted directly** (rows where both the potency field and the daily-maximum field are blank): **1,207**. It is not worked out by subtraction. As a cross-check, 3,805 + 4,059 + 0 + 1,207 = 9,071.
+
+Script: `D:/Praverse/session-work/2026-11-27/tools/f3_raw_lines.py`, run as `python -I f3_raw_lines.py D:/Praverse/data/fda/iid/2026-10-12/iig_july_2026.zip`. Output, as run:
+
+```text
+zip: D:/Praverse/data/fda/iid/2026-10-12/iig_july_2026.zip | bytes: 382910 | sha256: d08cf074fb381dea17f922cb9c085750878e366516236471d97f18e9980c987e
+zip members: [('IIR_OCOMM.xls', 1174016, (2026, 7, 21, 4, 25, 52)), ('Change_Log_Data.csv', 5414, (2026, 7, 21, 4, 32, 16)), ('Change_Log_Data.xls', 30208, (2026, 7, 21, 4, 31, 48)), ('IIR_OCOMM.csv', 644025, (2026, 7, 21, 4, 25, 30))]
+member: IIR_OCOMM.csv | bytes: 644025 | sha256: 4f3a8e371551a97e362424bbaa211af19dbb5b7919d7db1ae86379598436d302
+starts with UTF-8 BOM: False
+
+[physical lines]
+  LF characters (line breaks): 9072
+  of which CRLF: 9072 | bare LF: 0 | bare CR: 0
+  file ends with a line break: True
+  physical lines (wc -l style, plus a last unterminated line if any): 9072
+  blank physical lines (incl. the empty piece after a final newline): 1
+
+[CSV records]
+  records parsed (incl. header): 9072
+  header records: 1 | header fields: 10
+  data records: 9071
+  blank data records: 0
+  data records whose field count differs from the header: 0 []
+  data records with a line break inside a quoted field: 0 []
+  last physical line consumed by the reader: 9072
+  lines minus records: 0
+
+[direct counts over 9071 non-blank data records]
+  potency value present: 3805
+  maximum daily exposure present: 4059
+  both present: 0
+  neither present (counted directly): 1207
+  RECORD_UPDATED: earliest ['Y'] latest ['Y'] | distinct 1
+```
 
 ## The script, as run
 
