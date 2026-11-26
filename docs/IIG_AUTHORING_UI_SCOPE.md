@@ -80,10 +80,12 @@ The order that unblocks the most:
 
 The screens can be built and tested now with synthetic content. **What may not happen before the client's sign-off:**
 
+- **Sample content must be labelled as sample text, never look real** (owner condition, 2026-11-27). Every synthetic or demo definition, version, section, question and option label created while building or testing these screens carries the words **"SAMPLE – not real checklist content"** in its title or text (codes start `SAMPLE-` or `DEMO-`). Do not copy or paraphrase wording from real checklists, agency guidance or the client's files, and do not use realistic regulatory phrasing, product names or limits. This covers test fixtures, e2e mocks, screenshots and seed data alike.
+
 - **No real checklist content may be activated** until the 20-item content gate is signed off. It is still **0 of 20** (`docs/REGULATORY_CONTENT_GATE_20_ITEM_DECISION_INTAKE.md`). The gate decides which definitions ship, their titles and jurisdiction, and more. The demo seed keeps its own `DEMO-` definition for this reason.
 - **The content itself comes from the client:** question wording, criticality, which questions are required, evidence requirements, and the approved labels for every select option. Under 5A-DEC-002 a label cannot be invented or derived from a code (`question_options.py`).
 - **Which calculation applies to which question** is Approval Register items 13/14 (`docs/APPROVAL_REGISTER_13_14_DECISION_INTAKE.md`). The screen can offer the registry bindings; choosing them for real content is the client's decision.
-- **iCretegy's 2026-11-16 delivery is site-audit checklists, not IIG content** (`docs/CHECKLIST_INTAKE_2026-11-16.md`), so there is still no IIG content to enter.
+- **iCretegy's 2026-11-16 delivery looks like cGMP site-audit checklists, not IIG content** (`docs/CHECKLIST_INTAKE_2026-11-16.md`); they may belong to Part 1 / AuditIQ. The owner is confirming this with the client (19 Nov), so do not assume either way. Until then there is no confirmed IIG content to enter.
 - **A named regulatory reviewer** must sign off content before activation (overview §12). That is a person, not a screen.
 
 **Recommendation:** build S1 + S3 + A1 first. They are small, they don't depend on the client, and they close N-1 for synthetic and demo use. Build the full editor (S5–S7) when the client's content is close, so its forms match the real content.
