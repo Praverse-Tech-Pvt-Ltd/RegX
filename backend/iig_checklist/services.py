@@ -301,6 +301,10 @@ class MissingReturnReason(Exception):
     pass
 
 
+class MissingSupersedeReason(Exception):
+    """Superseding an approved execution cannot be undone, so it needs a typed reason."""
+
+
 class ReviewerConclusionRequired(Exception):
     pass
 
@@ -313,6 +317,19 @@ class ReviewerConclusionInvalidExpectedVersion(Exception):
     race. Separate codes so a client can tell "fix your request" from "re-read
     and retry".
     """
+
+
+class MissingReinstateReason(Exception):
+    """Reinstating a superseded execution needs a non-blank reason (owner, 2026-11-27)."""
+
+
+class AnotherExecutionActive(Exception):
+    """Reinstate refused: another execution for the same scope is live (not rejected,
+    cancelled or superseded)."""
+
+    def __init__(self, other_public_id):
+        super().__init__(str(other_public_id or ""))
+        self.other_public_id = str(other_public_id) if other_public_id else ""
 
 
 class SelfApprovalForbidden(Exception):
@@ -762,6 +779,7 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
     from .permissions import (
         PERM_APPROVE_EXECUTION,
         PERM_CANCEL_EXECUTION,
+        PERM_REINSTATE_EXECUTION,
         PERM_REVIEW_EXECUTION,
         PERM_SUBMIT_EXECUTION,
         PERM_SUPERSEDE_EXECUTION,
@@ -775,6 +793,7 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         "reject": PERM_APPROVE_EXECUTION,
         "cancel": PERM_CANCEL_EXECUTION,
         "supersede": PERM_SUPERSEDE_EXECUTION,
+        "reinstate": PERM_REINSTATE_EXECUTION,
     }
 
     # Validate transition (no DB write on failure).
@@ -804,6 +823,12 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         return_reason = kwargs.get("return_reason", "")
         if not (return_reason or "").strip():
             raise MissingReturnReason()
+    elif action == "supersede":
+        if not (kwargs.get("reason") or "").strip():
+            raise MissingSupersedeReason()
+    elif action == "reinstate":
+        if not (kwargs.get("reason") or "").strip():
+            raise MissingReinstateReason()
 
     action_event_map = {
         "submit_review": IigChecklistEvent.EXECUTION_SUBMITTED,
@@ -812,10 +837,13 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         "reject": IigChecklistEvent.EXECUTION_REJECTED,
         "cancel": IigChecklistEvent.EXECUTION_CANCELLED,
         "supersede": IigChecklistEvent.EXECUTION_SUPERSEDED,
+        "reinstate": IigChecklistEvent.EXECUTION_REINSTATED,
     }
 
     with db_transaction.atomic():
         locked = ChecklistExecution.objects.select_for_update().get(pk=execution.pk)
+        if action == "reinstate":
+            _raise_if_scope_has_a_live_execution(locked)
         locked.status = new_status
         if action == "submit_review":
             locked.submitted_by = actor
@@ -838,8 +866,18 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
             locked.cancelled_at = now
         elif action == "supersede":
             locked.superseded_by = kwargs.get("superseded_by")
-        locked.full_clean()
-        locked.save()
+            locked.supersede_reason = kwargs["reason"].strip()
+        elif action == "reinstate":
+            # History is kept: supersede_reason, superseded_by and the original approval
+            # are left as they are.
+            locked.reinstated_by = actor
+            locked.reinstated_at = now
+            locked.reinstate_reason = kwargs["reason"].strip()
+        if action == "reinstate":
+            _save_reinstated(locked)
+        else:
+            locked.full_clean()
+            locked.save()
 
         # `4D4-DEC-008` -- the governed approval_metadata projection is written
         # inside this same atomic block, so the metadata and the approved status
@@ -862,6 +900,11 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
             }
             if action == "approve":
                 payload["approval_metadata_written"] = approval_metadata_written
+            if action == "supersede":
+                payload["reason"] = locked.supersede_reason
+            if action == "reinstate":
+                payload["reason"] = locked.reinstate_reason
+                payload["supersede_reason"] = locked.supersede_reason
             emit(
                 event_type=action_event_map[action],
                 resource_id=str(locked.public_id),
@@ -873,6 +916,64 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
 
         _audit()
     return locked
+
+
+def _raise_if_scope_has_a_live_execution(execution):
+    """Reinstate is refused while another execution for the same scope is live.
+
+    Same scope and same notion of live as create_execution and the two partial unique
+    constraints: tenant, checklist version, formulation version and subject component,
+    any status except rejected, cancelled or superseded. The checklist version row is
+    locked first, as create_execution does, so a reinstate and a create for the same
+    version run one after the other."""
+    from .models import ChecklistExecution, ChecklistVersion
+
+    ChecklistVersion.objects.select_for_update().get(pk=execution.checklist_version_id)
+    other = (
+        ChecklistExecution.objects.select_for_update()
+        .filter(
+            tenant_id=execution.tenant_id,
+            checklist_version_id=execution.checklist_version_id,
+            formulation_version_id=execution.formulation_version_id,
+            subject_component_id=execution.subject_component_id,
+        )
+        .exclude(pk=execution.pk)
+        .exclude(status__in=["rejected", "cancelled", "superseded"])
+        .first()
+    )
+    if other is not None:
+        raise AnotherExecutionActive(other.public_id)
+
+
+def _save_reinstated(execution):
+    """Save a reinstated execution. The partial unique constraints are the floor under
+    _raise_if_scope_has_a_live_execution: if a concurrent write got past that check, the
+    database refuses the save (inside a savepoint) and the reinstate is reported as a
+    conflict, never as a server error."""
+    execution.full_clean(validate_constraints=False)
+    try:
+        with transaction.atomic():
+            execution.save()
+    except IntegrityError as exc:
+        raise AnotherExecutionActive(_other_live_execution_id(execution)) from exc
+
+
+def _other_live_execution_id(execution):
+    """The public id of another live execution for the same scope, or None."""
+    from .models import ChecklistExecution
+
+    return (
+        ChecklistExecution.objects.filter(
+            tenant_id=execution.tenant_id,
+            checklist_version_id=execution.checklist_version_id,
+            formulation_version_id=execution.formulation_version_id,
+            subject_component_id=execution.subject_component_id,
+        )
+        .exclude(pk=execution.pk)
+        .exclude(status__in=["rejected", "cancelled", "superseded"])
+        .values_list("public_id", flat=True)
+        .first()
+    )
 
 
 def _check_execution_completeness(execution, *, for_approve=False):

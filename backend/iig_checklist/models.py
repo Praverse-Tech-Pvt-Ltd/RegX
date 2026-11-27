@@ -692,6 +692,19 @@ class ChecklistExecution(PublicIDModel, TimeStampedModel):
         blank=True,
         related_name="supersedes",
     )
+    #: Why an approved execution was superseded (required at supersede; owner 2026-11-26).
+    supersede_reason = models.TextField(blank=True, max_length=MAX_RETURN_REASON_CHARS)
+    #: Reinstating a superseded execution (VP only; owner 2026-11-27). The supersede fields and
+    #: the original approval are kept; the audit trail holds every supersede and reinstate.
+    reinstated_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    reinstated_at = models.DateTimeField(null=True, blank=True)
+    reinstate_reason = models.TextField(blank=True, max_length=MAX_RETURN_REASON_CHARS)
     reviewer_conclusion_note = models.TextField(
         blank=True,
         max_length=MAX_REVIEWER_CONCLUSION_CHARS,

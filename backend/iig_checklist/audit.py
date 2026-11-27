@@ -35,6 +35,7 @@ class IigChecklistEvent:
     EXECUTION_REJECTED = "iig_checklist.execution.rejected"
     EXECUTION_CANCELLED = "iig_checklist.execution.cancelled"
     EXECUTION_SUPERSEDED = "iig_checklist.execution.superseded"
+    EXECUTION_REINSTATED = "iig_checklist.execution.reinstated"
     RESPONSE_ENTERED = "iig_checklist.response.entered"
     RESPONSE_UPDATED = "iig_checklist.response.updated"
     # 4D-3 governed calculation execution

@@ -24,6 +24,11 @@ function ExecutionDetailPageInner() {
   // Inputs for actions that require text.
   const [returnReason, setReturnReason] = useState("");
   const [reviewerConclusionNote, setReviewerConclusionNote] = useState("");
+  // Supersede and Reinstate are each confirmed in a dialog with a typed reason.
+  const [confirmingSupersede, setConfirmingSupersede] = useState(false);
+  const [supersedeReason, setSupersedeReason] = useState("");
+  const [confirmingReinstate, setConfirmingReinstate] = useState(false);
+  const [reinstateReason, setReinstateReason] = useState("");
 
   function load() {
     if (!tenantSlug || !executionPublicId) return;
@@ -80,6 +85,8 @@ function ExecutionDetailPageInner() {
   // Without the list (an older response) fall back to the status alone.
   const can = (action: string) => execution.availableActions?.includes(action) ?? true;
   const offersNothing = execution.availableActions !== undefined && execution.availableActions.length === 0;
+  // VP only: offered only when the server lists it (no fallback to the status alone).
+  const canReinstate = execution.availableActions?.includes("reinstate") === true;
 
   return (
     <div>
@@ -119,6 +126,16 @@ function ExecutionDetailPageInner() {
             <>
               <tr><th>Rejected by</th><td>{execution.rejectedByEmail ?? "—"}</td></tr>
               <tr><th>Rejected at</th><td>{execution.rejectedAt}</td></tr>
+            </>
+          )}
+          {execution.supersedeReason && (
+            <tr><th>Supersede reason</th><td>{execution.supersedeReason}</td></tr>
+          )}
+          {execution.reinstatedAt && (
+            <>
+              <tr><th>Reinstated by</th><td>{execution.reinstatedByEmail ?? "—"}</td></tr>
+              <tr><th>Reinstated at</th><td>{execution.reinstatedAt}</td></tr>
+              <tr><th>Reinstate reason</th><td>{execution.reinstateReason}</td></tr>
             </>
           )}
           {execution.cancelledAt && (
@@ -234,16 +251,122 @@ function ExecutionDetailPageInner() {
             </>
           )}
 
-          {execution.status === "approved" && can("supersede") && (
-            <button
-              disabled={acting}
-              onClick={() =>
-                doAction(() => iigChecklists.executions.supersede(tenantSlug, executionPublicId))
-              }
-            >
+          {execution.status === "approved" && can("supersede") && !confirmingSupersede && (
+            <button disabled={acting} onClick={() => setConfirmingSupersede(true)}>
               Supersede
             </button>
           )}
+          {execution.status === "approved" && confirmingSupersede && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="supersede-dialog-title"
+              style={{ border: "1px solid #e8c77a", background: "#fff8e6", borderRadius: 8, padding: "0.75rem 1rem", maxWidth: "70ch" }}
+            >
+              <p id="supersede-dialog-title" style={{ fontWeight: 700, margin: "0 0 4px" }}>
+                Supersede this approved execution?
+              </p>
+              <p style={{ margin: "0 0 4px" }}>
+                Execution {execution.publicId} — checklist version v{execution.checklistVersion.versionNumber}, formulation
+                version {execution.formulationVersionPublicId}, approved by {execution.approvedByEmail ?? "—"}.
+              </p>
+              <p style={{ margin: "0 0 8px" }}>
+                <strong>It stops counting as the approved execution at once.</strong> Only a VP can reinstate it,
+                with a reason. The approved execution stays on record as superseded, and the reason is kept with it
+                and in the audit trail.
+              </p>
+              <label style={{ display: "block", marginBottom: 8 }}>
+                Reason for superseding (required)
+                <textarea
+                  value={supersedeReason}
+                  onChange={(e) => setSupersedeReason(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  style={{ display: "block", width: "100%", marginTop: 4, boxSizing: "border-box" }}
+                />
+              </label>
+              <button
+                disabled={acting || !supersedeReason.trim()}
+                onClick={async () => {
+                  await doAction(() =>
+                    iigChecklists.executions.supersede(tenantSlug, executionPublicId, supersedeReason.trim())
+                  );
+                  setConfirmingSupersede(false);
+                }}
+              >
+                Supersede execution
+              </button>{" "}
+              <button
+                disabled={acting}
+                onClick={() => {
+                  setConfirmingSupersede(false);
+                  setSupersedeReason("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {execution.status === "superseded" && canReinstate && !confirmingReinstate && (
+        <div style={{ marginTop: "1rem" }}>
+          <button disabled={acting} onClick={() => setConfirmingReinstate(true)}>
+            Reinstate
+          </button>
+        </div>
+      )}
+      {execution.status === "superseded" && canReinstate && confirmingReinstate && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reinstate-dialog-title"
+          style={{ marginTop: "1rem", border: "1px solid #e8c77a", background: "#fff8e6", borderRadius: 8, padding: "0.75rem 1rem", maxWidth: "70ch" }}
+        >
+          <p id="reinstate-dialog-title" style={{ fontWeight: 700, margin: "0 0 4px" }}>
+            Reinstate this superseded execution?
+          </p>
+          <p style={{ margin: "0 0 4px" }}>
+            Execution {execution.publicId} — checklist version v{execution.checklistVersion.versionNumber}, formulation
+            version {execution.formulationVersionPublicId}, approved by {execution.approvedByEmail ?? "—"}.
+          </p>
+          <p style={{ margin: "0 0 4px" }}>Superseded because: {execution.supersedeReason || "—"}</p>
+          <p style={{ margin: "0 0 8px" }}>
+            <strong>It becomes the approved execution again.</strong> The supersede and this reinstatement both stay on
+            record, with their reasons, on this execution and in the audit trail. It is refused while another execution
+            for the same checklist version and formulation version is in progress or approved.
+          </p>
+          <label style={{ display: "block", marginBottom: 8 }}>
+            Reason for reinstating (required)
+            <textarea
+              value={reinstateReason}
+              onChange={(e) => setReinstateReason(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              style={{ display: "block", width: "100%", marginTop: 4, boxSizing: "border-box" }}
+            />
+          </label>
+          <button
+            disabled={acting || !reinstateReason.trim()}
+            onClick={async () => {
+              await doAction(() =>
+                iigChecklists.executions.reinstate(tenantSlug, executionPublicId, reinstateReason.trim())
+              );
+              setConfirmingReinstate(false);
+            }}
+          >
+            Reinstate execution
+          </button>{" "}
+          <button
+            disabled={acting}
+            onClick={() => {
+              setConfirmingReinstate(false);
+              setReinstateReason("");
+            }}
+          >
+            Cancel
+          </button>
         </div>
       )}
 

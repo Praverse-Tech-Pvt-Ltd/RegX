@@ -11,6 +11,8 @@ _EXECUTION_TRANSITIONS: dict[str, tuple[frozenset, str]] = {
     "reject": (frozenset({"draft", "submitted_for_review"}), "rejected"),
     "cancel": (frozenset({"draft", "returned"}), "cancelled"),
     "supersede": (frozenset({"approved"}), "superseded"),
+    # Owner, 2026-11-27: a superseded execution can be reinstated to approved (VP, with a reason).
+    "reinstate": (frozenset({"superseded"}), "approved"),
 }
 
 
@@ -38,6 +40,7 @@ ACTION_PERMISSIONS = {
     "reject": "iig_checklist.approve_execution",
     "cancel": "iig_checklist.cancel_execution",
     "supersede": "iig_checklist.supersede_execution",
+    "reinstate": "iig_checklist.reinstate_execution",
 }
 
 

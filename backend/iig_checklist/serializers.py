@@ -251,6 +251,7 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
     approved_by_email = serializers.SerializerMethodField()
     rejected_by_email = serializers.SerializerMethodField()
     cancelled_by_email = serializers.SerializerMethodField()
+    reinstated_by_email = serializers.SerializerMethodField()
 
     class Meta:
         model = ChecklistExecution
@@ -273,6 +274,10 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
             "rejected_at",
             "cancelled_by_email",
             "cancelled_at",
+            "supersede_reason",
+            "reinstated_by_email",
+            "reinstated_at",
+            "reinstate_reason",
             "reviewer_conclusion_note",
             "created_at",
             "updated_at",
@@ -301,6 +306,9 @@ class ChecklistExecutionSerializer(serializers.ModelSerializer):
 
     def get_cancelled_by_email(self, obj):
         return getattr(obj.cancelled_by, "email", None)
+
+    def get_reinstated_by_email(self, obj):
+        return getattr(obj.reinstated_by, "email", None)
 
 
 class ChecklistExecutionCreateSerializer(serializers.Serializer):
@@ -756,6 +764,38 @@ class ReturnSerializer(serializers.Serializer):
         if not attrs.get("return_reason", "").strip():
             raise serializers.ValidationError(
                 {"error_code": "missing_return_reason", "detail": "return_reason is required."}
+            )
+        return attrs
+
+
+class SupersedeSerializer(serializers.Serializer):
+    """Blank is let through here so the service gives the one refusal (missing_supersede_reason)."""
+
+    reason = serializers.CharField(
+        max_length=MAX_RETURN_REASON_CHARS, required=False, allow_blank=True, trim_whitespace=False
+    )
+
+    def validate(self, attrs):
+        unknown = set(self.initial_data) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError(
+                {"error_code": "unknown_field", "detail": f"Unknown fields: {unknown}"}
+            )
+        return attrs
+
+
+class ReinstateSerializer(serializers.Serializer):
+    """Blank is let through here so the service gives the one refusal (missing_reinstate_reason)."""
+
+    reason = serializers.CharField(
+        max_length=MAX_RETURN_REASON_CHARS, required=False, allow_blank=True, trim_whitespace=False
+    )
+
+    def validate(self, attrs):
+        unknown = set(self.initial_data) - set(self.fields)
+        if unknown:
+            raise serializers.ValidationError(
+                {"error_code": "unknown_field", "detail": f"Unknown fields: {unknown}"}
             )
         return attrs
 

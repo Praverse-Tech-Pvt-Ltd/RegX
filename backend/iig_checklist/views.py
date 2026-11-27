@@ -39,6 +39,7 @@ from .permissions import (
     PERM_CREATE_DEFINITION,
     PERM_DELETE_DRAFT,
     PERM_EDIT_DRAFT,
+    PERM_REINSTATE_EXECUTION,
     PERM_REVIEW_EXECUTION,
     PERM_SUBMIT_EXECUTION,
     PERM_SUPERSEDE_EXECUTION,
@@ -74,11 +75,14 @@ from .serializers import (
     EmptyActionSerializer,
     GapAnalysisDetailSerializer,
     GapAnalysisSerializer,
+    ReinstateSerializer,
     ReturnSerializer,
     ReviewerConclusionSerializer,
+    SupersedeSerializer,
     VersionActionSerializer,
 )
 from .services import (
+    AnotherExecutionActive,
     ChecklistVersionNotActive,
     CloneRequest,
     CloneSourceNotEligible,
@@ -89,7 +93,9 @@ from .services import (
     IncompleteExecution,
     InvalidCalculationBinding,
     InvalidQuantityUnitConfig,
+    MissingReinstateReason,
     MissingReturnReason,
+    MissingSupersedeReason,
     NoEligibleSubjectComponent,
     ReviewerConclusionCorrectionReasonRequired,
     ReviewerConclusionEmpty,
@@ -1287,6 +1293,35 @@ class _ChecklistExecutionActionViewBase(APIView):
                 {"error_code": "incomplete_execution", "detail": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        except MissingSupersedeReason:
+            return Response(
+                {
+                    "error_code": "missing_supersede_reason",
+                    "detail": "A reason is required to supersede an approved execution.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except MissingReinstateReason:
+            return Response(
+                {
+                    "error_code": "missing_reinstate_reason",
+                    "detail": "A reason is required to reinstate a superseded execution.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except AnotherExecutionActive as exc:
+            other = f" ({exc.other_public_id})" if exc.other_public_id else ""
+            return Response(
+                {
+                    "error_code": "another_execution_active",
+                    "detail": (
+                        "Another execution for the same checklist version and formulation "
+                        f"version is in progress or approved{other}. "
+                        "Close it before reinstating this one."
+                    ),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         except MissingReturnReason:
             return Response(
                 {"error_code": "missing_return_reason", "detail": "return_reason is required."},
@@ -1340,7 +1375,14 @@ class ChecklistExecutionCancelView(_ChecklistExecutionActionViewBase):
 
 class ChecklistExecutionSupersedeView(_ChecklistExecutionActionViewBase):
     action = "supersede"
+    serializer_class = SupersedeSerializer
     permission_codename = PERM_SUPERSEDE_EXECUTION
+
+
+class ChecklistExecutionReinstateView(_ChecklistExecutionActionViewBase):
+    action = "reinstate"
+    serializer_class = ReinstateSerializer
+    permission_codename = PERM_REINSTATE_EXECUTION
 
 
 class ChecklistResponseListView(APIView):
