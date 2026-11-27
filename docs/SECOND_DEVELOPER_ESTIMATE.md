@@ -2,7 +2,7 @@
 
 **Short answer:** yes, but by about a quarter to a third, not by half, and hardly at all in the first two weeks. These are estimates from how this project works, not measurements.
 
-**The work it is measured against:** the screen work estimated in `docs/OPEN_ISSUES_PLAN.md`, which is in docs PR #176 and not merged yet.
+**The work it is measured against:** the screen work estimated in `docs/OPEN_ISSUES_PLAN.md`.
 - The 15 open browser issues from the 2026-11-25 regression: about 22–33 working days.
 - The IIG checklist authoring screens (`docs/IIG_AUTHORING_UI_SCOPE.md`, in PR #170, not merged yet): about 15–20 working days.
 - Together: about **37–53 working days** for one developer who knows the codebase.

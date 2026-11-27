@@ -1,9 +1,9 @@
 # Open decisions: recommended defaults (2026-11-27)
 
-These are the five decisions listed in `docs/OPEN_ISSUES_PLAN.md` §3 step 5 (that file is in docs PR #176, not merged yet).
+These are the five decisions listed in `docs/OPEN_ISSUES_PLAN.md` §3 step 5.
 - **What each default is:** one recommendation and the reason, so that building can start if the owner agrees. The owner or the client can still change any of them.
 - **What they are not:** decisions.
-- **What changing one later costs:** rework, roughly the estimate in `OPEN_ISSUES_PLAN.md` (#176).
+- **What changing one later costs:** rework, roughly the estimate in `OPEN_ISSUES_PLAN.md`.
 
 | # | Decision | Recommended default | Reason |
 |---|---|---|---|
@@ -13,4 +13,4 @@ These are the five decisions listed in `docs/OPEN_ISSUES_PLAN.md` §3 step 5 (th
 | 4 | **Admin screens (QA-18)** | **Tenant Admin can do three things:** list members, change a member's role, and reset a member's MFA. Adding new members stays an operator command for now | These use the member list, roles and MFA reset the API already has. Self-service member creation touches the "no self-registration" rule and needs new endpoints and a decision on invitations, so leave it for later |
 | 5 | **Home-page links (QA-21)** | **The REGX home page (`/signin` → dashboard) is the entry point.** "Explore RegX" opens the REGX dashboard, and "Request access" opens a plain contact page (no self-registration). The legacy tools leave the main sidebar and go under one "Legacy tools" link | Users currently land in the legacy app by default. Pointing everything at REGX matches the platform's purpose. Keeping the legacy tools behind one link avoids removing anything a client may still use (the company_site rules in `constraints.md`) |
 
-**If the owner accepts all five:** QA-09, QA-15, QA-17, QA-18 and QA-21 move from "[decision first]" to estimable. The upper ends of their ranges in `OPEN_ISSUES_PLAN.md` (#176) should then come down. The effect of a second developer is in `docs/SECOND_DEVELOPER_ESTIMATE.md`.
+**If the owner accepts all five:** QA-09, QA-15, QA-17, QA-18 and QA-21 move from "[decision first]" to estimable. The upper ends of their ranges in `OPEN_ISSUES_PLAN.md` should then come down. The effect of a second developer is in `docs/SECOND_DEVELOPER_ESTIMATE.md`.

@@ -37,7 +37,7 @@ The only non-fixed value anywhere in these steps is the `generated_at` timestamp
 - `git merge-base --is-ancestor 1a525fd origin/regx-main` → exit 1, so it is **not** in `regx-main`.
 - No `ai_gateway` code exists on `regx-main`.
 - **If merged as it stands:** it adds a text-only gateway (stub provider, off by default, health-check and benchmark prompts only). No IID, checklist, formulation or gap-analysis file is in its diff, so it would not let AI touch a number or status.
-- It is parked by the owner until the provider and E2E are confirmed in writing (owner, 2026-11-26; recorded in the overview update in docs PR #176, not merged yet).
+- It is parked by the owner until the provider and E2E are confirmed in writing (owner, 2026-11-26; `PROJECT_OVERVIEW.md` §12 item 12).
 
 ## 4. Can the user see the source and release date behind every fetched value?
 
