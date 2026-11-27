@@ -66,4 +66,29 @@
 - **Case 15: within the per-unit value is never "pass" without a daily maximum (F-3).** In the July 2026 file no record has both, so on real data a pass cannot occur today.
 - **Not covered here:** multiple matching records (a reviewer must pick one), superseded releases, substance-name synonyms, density-based conversions, and volume units. Existing tests cover some of these: `test_matching_and_assess.py`, `test_one_path_comparison.py`, `test_unit_conversion.py`.
 
+## Planned cases: not implemented yet (added 2026-11-27)
+
+The owner set two rules on 2026-11-27 (Pratham, via Pravis). Both are working defaults and **not yet reviewed by the regulatory reviewer** (`PROJECT_OVERVIEW.md` §12 items 22–23). REGX does not do either today. The cases below become runnable tests when the code is built: Q8 is order-of-work step 4, and the side-by-side view comes later. Same synthetic data as above, plus a label maximum daily dose typed by the user.
+
+**Q8 working default.** Daily amount = amount per unit × maximum units per day. Maximum units per day = label maximum daily dose ÷ strength per unit; the user may change it, with a saved reason.
+
+| # | Case | Input | Hand working | Expected (planned) |
+|---|---|---|---|---|
+| Q1 | Daily maximum only, at it | B (daily max 200 mg), 50 mg per unit; label max 400 mg/day, strength 100 mg | units/day = 400 ÷ 100 = 4; daily = 50 × 4 = 200; 200 = 200 | "Within IID daily precedent" |
+| Q2 | Daily maximum only, above | B, 60 mg per unit, same label | daily = 60 × 4 = 240 > 200 | "Above IID daily precedent: justification needed" |
+| Q3 | Per-unit value only | A (50 mg per unit), 50 mg | per unit 50 = 50, as today | per-unit result, as today |
+| Q4 | Both values, the worse wins | C (50 mg per unit, 200 mg/day), 50 mg, units/day 5 | per unit: at or below; daily = 250 > 200 | the daily result, "Above IID daily precedent: justification needed" |
+| Q5 | No match | D, any amount | no record | "No IID match: review", and no guessed value |
+| Q6 | User changes units/day | B, 50 mg, units/day changed from 4 to 3 with a reason | daily = 50 × 3 = 150 ≤ 200 | "Within IID daily precedent"; the change and its reason saved with the result |
+| Q7 | Change without a reason | as Q6, no reason | — | refused |
+
+**Film-coated side by side.**
+
+| # | Case | Input | Expected (planned) |
+|---|---|---|---|
+| F1 | Orange Book "TABLET", IID has "TABLET" and "TABLET, FILM COATED" | an excipient with a row under each form | both results shown side by side; **no default selection**, and in particular not the more favourable one; the user must pick one with a reason, and the choice and reason are saved with the result |
+| F2 | Only one of the two forms in the IID | an excipient with a "TABLET" row only | one result, no picker |
+
+**Wording in every case:** each status is shown as support for a decision by a qualified person, never as an approval.
+
 **Sign-off:** expected answers reviewed by ____________ (regulatory reviewer), date ________. Until signed, these are consistency checks only.
