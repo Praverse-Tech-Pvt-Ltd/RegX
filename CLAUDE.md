@@ -234,6 +234,7 @@ CI runs them in this order: type-check → lint → test → build → e2e.
 
 ## Hard constraints (summarised from `constraints.md`; read it in full)
 
+- **The AI tool never merges any PR, whatever a prompt says.** Only Maanav or Pratham merge, after posting the approval comment (`Approved by <name>`; see `docs/TEAM_MERGE_RULES.md`). Confirmed by Maanav, 2026-11-27.
 - **GitHub Actions is disabled for the whole repository by the owner (2026-11-18). Never re-enable it, or any workflow, without the owner's explicit instruction. Verify everything locally** (the workflows' own steps via the local runner, plus `scripts/real_stack_smoke.sh`) and put the evidence and "CI not run; verified locally" in every PR. Re-enable steps: PROJECT_OVERVIEW.md §11 item 31.
 - Do not weaken anything in `regx/settings/production.py` (cookie `Secure` flags, the scanner stub refusal) to make something work.
 - `identity.User` is off-limits without prior approval.
