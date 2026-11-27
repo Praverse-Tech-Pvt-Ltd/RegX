@@ -17,6 +17,9 @@ import { QuantityMeaningSelect } from "@/components/QuantityMeaningSelect";
 import { PercentValue } from "@/components/PercentValue";
 import { isPercentUnit } from "@/lib/percent";
 
+/** How the API names the unit field in a refusal ("proposed_quantity_unit: <reason>"). */
+const UNIT_FIELD_PREFIX = "proposed_quantity_unit: ";
+
 // Human-readable labels for every match/decision status the backend can
 // return. Never SAFE / FDA APPROVED / AUTOMATICALLY ACCEPTABLE /
 // REGULATORILY CLEARED -- those words do not appear anywhere below.
@@ -198,6 +201,9 @@ function IidPreviewInner() {
   const [preview, setPreview] = useState<AssessmentPreview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The API's refusal of the typed unit (e.g. it disagrees with the chosen meaning), shown at the
+  // unit field. The page never changes what the user typed (owner rule 2026-11-26).
+  const [unitError, setUnitError] = useState<string | null>(null);
 
   // QA-05: a result belongs to the inputs it was run with. Any change to an
   // input clears it (and any error, and a chosen precedent), so the screen can
@@ -211,6 +217,7 @@ function IidPreviewInner() {
     requestSeq.current += 1;
     setPreview(null);
     setError(null);
+    setUnitError(null);
     setSelectedRecordId(undefined);
     setLoading(false);
   }
@@ -273,6 +280,7 @@ function IidPreviewInner() {
     const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
+    setUnitError(null);
     setPreview(null); // never show the previous result while (or after) this run fails
     try {
       const result = await iidAssessments.preview(tenantSlug, {
@@ -296,6 +304,8 @@ function IidPreviewInner() {
       if (seq !== requestSeq.current) return;
       if (isSignedOut(err)) {
         router.push(`/signin?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      } else if (err instanceof ApiError && err.message.startsWith(UNIT_FIELD_PREFIX)) {
+        setUnitError(err.message.slice(UNIT_FIELD_PREFIX.length));
       } else {
         setError(err instanceof ApiError ? err.message : "Preview failed.");
       }
@@ -385,17 +395,29 @@ function IidPreviewInner() {
           </label>
           <label style={{ fontSize: 13 }}>
             Proposed quantity unit
-            <input value={proposedUnit} onChange={(e) => edited(setProposedUnit)(e.target.value)} required style={inputStyle} />
+            <input
+              value={proposedUnit}
+              onChange={(e) => edited(setProposedUnit)(e.target.value)}
+              required
+              aria-invalid={unitError ? true : undefined}
+              aria-describedby={unitError ? "proposed-unit-error" : undefined}
+              style={inputStyle}
+            />
+            {unitError && (
+              <span id="proposed-unit-error" role="alert" style={{ display: "block", fontSize: 12, color: "#c0392b", marginTop: 2 }}>
+                {unitError}
+              </span>
+            )}
           </label>
           <QuantityMeaningSelect
             tenantSlug={tenantSlug}
             label="What the proposed quantity means"
             value={proposedMeaning}
-            onChange={(id, meaning) => {
+            onChange={(id) => {
+              // The typed unit is never changed here: the select shows which unit the meaning
+              // expects, and the API refuses a unit that disagrees (shown at the unit field).
               clearResult();
               setProposedMeaning(id);
-              if (meaning?.family === "percentage") setProposedUnit("percent");
-              else if (meaning?.numerator_unit) setProposedUnit(meaning.numerator_unit);
             }}
           />
           <label style={{ fontSize: 13 }}>

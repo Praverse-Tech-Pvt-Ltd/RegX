@@ -555,16 +555,19 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
   });
 
   // Controlled units, increment 4: the proposed quantity can state its meaning.
-  it("sends the chosen quantity meaning and switches the unit to that meaning's unit", async () => {
+  it("sends the chosen quantity meaning with the unit exactly as typed (hint only, never rewritten)", async () => {
     const user = userEvent.setup();
     api.meanings.mockResolvedValue(MEANINGS);
     api.preview.mockResolvedValue(makeAssessmentPreview());
     render(<IidPreviewPage />);
 
+    const unit = screen.getByLabelText(/proposed quantity unit/i);
+    await user.clear(unit);
+    await user.type(unit, "mg");
     const select = await screen.findByLabelText(/what the proposed quantity means/i);
     await screen.findByRole("option", { name: "mg/5mL" });
     await user.selectOptions(select, "m-mg-5ml");
-    expect(screen.getByLabelText(/proposed quantity unit/i)).toHaveValue("mg");
+    expect(unit).toHaveValue("mg");
     expect(screen.getByText("Enter the amount in “mg”.")).toBeInTheDocument();
     await submitPreviewForm(user);
 
@@ -574,13 +577,42 @@ describe("IidPreviewPage — matching, calculation, and safety language", () => 
     );
   });
 
-  it("a percentage meaning sets the unit to percent", async () => {
+  it("never changes the typed unit when a meaning is chosen (gram stays gram)", async () => {
     const user = userEvent.setup();
     api.meanings.mockResolvedValue(MEANINGS);
     render(<IidPreviewPage />);
-    await screen.findByRole("option", { name: "%w/w" });
+    const unit = screen.getByLabelText(/proposed quantity unit/i);
+    await user.clear(unit);
+    await user.type(unit, "gram");
+    await screen.findByRole("option", { name: "mg per dose unit" });
+    await user.selectOptions(screen.getByLabelText(/what the proposed quantity means/i), "m-mg-dose");
+    expect(unit).toHaveValue("gram");
     await user.selectOptions(screen.getByLabelText(/what the proposed quantity means/i), "m-pct-ww");
-    expect(screen.getByLabelText(/proposed quantity unit/i)).toHaveValue("percent");
+    expect(unit).toHaveValue("gram");
+  });
+
+  it("a unit that disagrees with the meaning: the API's refusal is shown at the unit field and no result", async () => {
+    const user = userEvent.setup();
+    api.meanings.mockResolvedValue(MEANINGS);
+    api.preview.mockRejectedValue(
+      new ApiError(400, "proposed_quantity_unit: the amount must be entered in 'mg', the unit this meaning states (got 'gram')"),
+    );
+    render(<IidPreviewPage />);
+    const unit = screen.getByLabelText(/proposed quantity unit/i);
+    await user.clear(unit);
+    await user.type(unit, "gram");
+    await screen.findByRole("option", { name: "mg per dose unit" });
+    await user.selectOptions(screen.getByLabelText(/what the proposed quantity means/i), "m-mg-dose");
+    await submitPreviewForm(user);
+
+    const msg = await screen.findByText(/the amount must be entered in 'mg', the unit this meaning states \(got 'gram'\)/);
+    expect(msg).toHaveAttribute("id", "proposed-unit-error");
+    expect(unit).toHaveAttribute("aria-invalid", "true");
+    expect(unit).toHaveAttribute("aria-describedby", expect.stringContaining("proposed-unit-error"));
+    expect(msg.textContent).not.toMatch(/proposed_quantity_unit/);
+    expect(screen.queryByTestId("potency-comparison")).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/at or below/i);
+    expect(unit).toHaveValue("gram");
   });
 
   it("sends no meaning when none is chosen (per dosage unit, as before)", async () => {
