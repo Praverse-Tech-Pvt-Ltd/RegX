@@ -847,6 +847,30 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
        - **Compose ports on 127.0.0.1 only:** [#175](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/175). Every published port was reachable from the local network (0.0.0.0); now `127.0.0.1:<port>`. Checked: full local CI, LAN address refused (curl exit 7) while localhost answers 200, integrated Playwright 20/20.
        - **Still open (owner):** executions still offer Return/Reject to their submitter; N-6, N-8, N-10.
 
+40. **Calculations first (owner, 2026-11-27).**
+    - **Product used:** SAMPLE losartan potassium 100 mg film-coated tablet, with COZAAR (NDA 020386-003, RLD and RS) as reference. Plain paracetamol is not in the Orange Book: only 650 mg extended-release and combinations.
+    - **Where:** docs in [#178](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/178) (`CALC_MAP_LOSARTAN.md`, `evidence/CALC_RUN_LOSARTAN_2026-11-27.md`, `AI_AND_CALCULATIONS.md`, `CALC_RELEASE_GATE.md`); tests in [#177](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/177).
+    - **Every calculated number matches the hand working, but no excipient can be cleared automatically.**
+      - Five of six excipients have only a daily maximum in the IID, so they are "not comparable" until the per-day rule (Q8) is built.
+      - PEG 3350 (film coated) is within its per-unit value but "review required", because no IID row has both values (F-3).
+      - On real data, 401 of 852 ORAL / TABLET rows have only a daily maximum.
+    - **No AI or model touches a number or status;** #129 is not merged.
+    - **No fetched value shows its FDA source file or release date on screen.**
+    - **Found, not changed:**
+      - the version page's "% w/w" column is never filled;
+      - "Run IID assessment preview →" drops the version, so everything is retyped;
+      - the formulation-to-IID path passes free-text route and form as controlled codes (`backend/iid_assessment/services.py:182-205`), so it likely never matches;
+      - FDA-derived checklist defaults are not shown;
+      - daily exposure has no unit;
+      - all 48,761 Orange Book strengths say `review_required`, because units are deliberately inactive (`backend/fda_data/controlled_units.py:20-24`).
+    - **Release gate:** 15 hand-worked cases, all pass. A deliberate `>=` bug fails the 4 at-the-limit cases. They are consistency checks only until the reviewer signs off the expected answers.
+41. **The leaked Google key and iCretegy-AI483 (2026-11-27).**
+    - **Where the key is:** the Gemini key `AIzaSy…loBQ` is only in iCretegy-AI483's **history** (`backend/.env`), added `88a8cc4` (2026-02-20) and removed `89dbf8b` (2026-04-08). It is not in any current file and not elsewhere on this machine.
+    - **No code fix needed:** the app takes the key from its Settings page, not from the environment. Only `backend/tests/smoke_hybrid.py` reads `GEMINI_API_KEY`.
+    - **Repo made private (owner approved):** Pages off, 0 forks, no outside collaborators, no deploy keys, webhooks or releases. Packages could not be checked (token scope). History was not rewritten.
+    - **Still required:** Pratham revokes the key. It was public from February to 27 November.
+    - **Register fix:** [#180](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/180) corrects row P1 of `docs/CREDENTIAL_INVENTORY.md`.
+
 ---
 
 ## 12. Open questions (need humans)
@@ -873,6 +897,39 @@ docker compose exec backend python manage.py seed_regx_demo --password-env DEMO_
 18. **Merges are paused (owner, 2026-11-27).** Nothing merges into `regx-main` until branch protection is confirmed (item 13). Only #166 and #168 are candidates; everything else is "ready for owner OK".
 19. **Demo seed labels.** The demo seed marks its checklist content "DEMO-" and "synthetic", not the exact phrase "SAMPLE – not real checklist content" that condition E requires for authoring samples (`docs/IIG_AUTHORING_UI_SCOPE.md`). Change the seed, or accept its labels?
 20. **Who sends the client document request** (`docs/CLIENT_DOCUMENT_REQUEST.md`, 9 items ordered by what blocks development first) to iCretegy, and when?
+21. **Order of work (Pravis for Pratham, 2026-11-27):**
+    1. the formulation route and dosage-form problem (item 26), with the answer due **Monday 30 Nov morning**, even if not fully fixed;
+    2. the source file and release date beside every fetched value (item 24);
+    3. the empty "% w/w" column and the retyping between the formulation page and the IID check;
+    4. then Q8 in code and tests (item 22).
+
+    **Until 1 and 2 are done, REGX must not be shown to the client as working from a formulation.**
+22. **Q8, the per-day rule: working default approved by Pratham (via Pravis, 2026-11-27). Not yet reviewed by the regulatory reviewer.** It must not be shown to any client as correct before that review.
+    - **Daily amount** of an excipient = amount per unit × maximum units per day.
+    - **Maximum units per day** = the maximum daily dose of the drug from the reference label (typed by the user, with the label as the source) ÷ the strength per unit. The user can change it but must give a reason, and the reason is saved.
+    - **IID gives a daily maximum** for the same excipient, route and dosage form: at or below it shows "Within IID daily precedent"; above it shows "Above IID daily precedent: justification needed".
+    - **IID gives only a per-unit value:** compare per unit, as now.
+    - **IID gives both:** run both checks and show the worse result.
+    - **No match** on excipient, route or dosage form: "No IID match: review". REGX never fills the gap with a guess.
+    - **Every status is support for a decision by a qualified person, never an approval.**
+    - **Least sure:** the maximum-units-per-day step. A label dose can be stated as the base while the strength is the salt (for example "EQ 10MG BASE"), or the label can give several regimens. A wrong divisor makes every daily figure wrong, so the reviewer should check it first.
+    - Test cases are planned in `docs/CALC_RELEASE_GATE.md` ([#178](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/178)); the runnable tests come with the code (order step 4).
+23. **Film-coated against plain tablet: rule set by Pratham (via Pravis, 2026-11-27). Not yet reviewed.**
+    - When the Orange Book says "TABLET" and the IID has both "TABLET" and "TABLET, FILM COATED", REGX shows **both results side by side**.
+    - The user picks one, with a reason, and the choice is saved with the result. **The default must not be the more favourable one.**
+    - A test case is planned (`docs/CALC_RELEASE_GATE.md`). Not built yet.
+24. **Source and release date beside every fetched value (order step 2).** None is shown today (`docs/AI_AND_CALCULATIONS.md` §4), and `publication_date` is empty for both FDA releases. No client demo until this is done.
+25. **Sign-off of the release-gate expected answers** (`docs/CALC_RELEASE_GATE.md`). Is "equal to the IID value" within precedent? Keep refusing % w/w and mg/mL against a per-unit mg limit? Until signed, the 15 tests in [#177](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/177) are consistency checks only.
+26. **Formulation-to-IID route and dosage form (order step 1).** Products store free-text route and form, but the assessment needs controlled (NCI) codes (`backend/iid_assessment/services.py:182-205`). If confirmed, IID checks from a formulation do not work. Needs a check through a checklist on the stack; the answer is due Monday 30 Nov morning.
+27. **Orange Book strength label.** All 48,761 products say `review_required` although 26,331 have a number, because the unit lookup reads only active units (`docs/CALC_MAP_LOSARTAN.md` §3). Relabel, or link strengths to the reviewed unit list? Nothing uses the field today.
+28. **Five screen decisions:** the recommended defaults are in `docs/OPEN_DECISIONS_DEFAULTS.md` ([#178](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/178)). Accept or change?
+29. **Merging rules (confirmed by Maanav, 2026-11-27).**
+    - **The AI tool never merges any PR, whatever a prompt says.** Only Maanav or Pratham merge, after posting the approval comment (`docs/TEAM_MERGE_RULES.md`; `CLAUDE.md` hard constraints).
+    - **Revisit the GitHub Team plan** when real client data goes in, a client pilot starts, or an auditor asks for enforced review rules.
+    - **Not yet in place:** the AI tool's own GitHub account and fork (rule 2). Until then every PR comes from Maanav's account.
+30. **Approval comments after the merge.** #171, #176 and #179 were merged by `Rabbitshah` at 15:14–15:15 IST on 2026-11-27. The comment "Approved by Pratham Shrivastav via Pravis, 27 Nov 2026." was posted on each afterwards, so on these three the record follows the merge rather than preceding it.
+31. **Leaked Google key (item 41 in §11):** Pratham revokes it. Also open: whether any deployment or browser still uses it, and whether the org has packages tied to iCretegy-AI483 (the token could not list them).
+32. **`D:\Extra data\zepto.env`** (228 bytes, on Maanav's machine) was not opened. It is the likelier place for real Zepto credentials; the two zepto scripts next to it hold none. Owner to check.
 
 **Consolidated execution plan (direction §16, due 2026-11-13): drafted 2026-11-06** as `docs/EXECUTION_PLAN_2026-11.md` and `docs/PROJECT_TRACKER.csv` (docs-only PR, for Pratham's internal review before anything goes to iCretegy). Its open asks: lift the hold on controlled units; confirm developer capacity; name the regulatory reviewer; Azure owner details; the iCretegy question pack (section E, 14 questions including which two milestones trigger the first 20 %).
 
@@ -1974,3 +2031,43 @@ Orange Book matching (Phase 3) also needs the reviewed workbook and approved Ora
   - 2026-11-26: an empty heredoc created an empty `ci_extra.sh`, which was run once (did nothing) and deleted; a bare `python -I -` hung once and was stopped (before the hook was installed); two script names that did not exist were run; `python -I -c` was used twice for library checks instead of a script file.
   - 2026-11-27: a heredoc and a bare `python -I -` were both **blocked by the new hook**; nothing ran.
   - This corrects #171's entry, which said three `python -` hangs and left out the heredoc.
+
+### 2026-11-27 (thirtieth session, continued) — calculations first (Claude Code)
+
+**Owner's brief:** the calculations come before the screen work. Items 1–2 due Mon 30 Nov, items 3–5 due Wed 2 Dec. No code changes. Synthetic and public data only.
+
+- **Item 0:** plain paracetamol tablets are not in the Orange Book data. Maanav chose **losartan potassium, COZAAR 100 mg (NDA 020386-003, RLD and RS)**.
+- **Items 1 and 5:** `docs/CALC_MAP_LOSARTAN.md`. Every screen field classified with `file:line`, why Orange Book strengths say `review_required`, the dosage-form question per excipient, and what the IID and the Orange Book cannot do.
+- **Item 2:** a browser run on `regx-v25`, rebuilt from a local, never-pushed merge of `regx-main` + #166 + #169.
+  - The run: product, reference, version, 7 components, Doer submit, VP approve, checklist execution; then 12 IID previews (6 SAMPLE excipients × 2 dosage forms).
+  - **All 15 checked values match the hand working.** Final status: 5 not comparable, PEG 3350 review required.
+  - Record: `docs/evidence/CALC_RUN_LOSARTAN_2026-11-27.md`; screenshots in the hand-off only.
+- **Item 3:** `docs/AI_AND_CALCULATIONS.md`. No AI touches numbers; #129 not merged; no source or release date shown.
+- **Item 4:** `docs/CALC_RELEASE_GATE.md` plus [#177](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/177) (15 tests, tests only). Full backend CI 4,985 passed.
+- **Also:** `docs/OPEN_DECISIONS_DEFAULTS.md` and `docs/SECOND_DEVELOPER_ESTIMATE.md`, all in [#178](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/178).
+  - Owner's call: the calc docs PR is cut from `regx-main` with no other PR's commits.
+  - The overview update was held until #176 merged.
+- **Helpers:** two read-only sub-agents (screen-field map; AI touch points). Their reports were extracted by script; the cited lines were spot-checked.
+- **Slips:**
+  - a pointless inline `python -I -c`;
+  - the backend CI first run through the wrong runner (exit 127, not a test failure);
+  - several line numbers first read on the run branch, corrected to `regx-main` before commit.
+
+### 2026-11-27 (thirtieth session, final) — the leaked key, iCretegy-AI483 private, folder restore, merges, PR summaries, Pravis's rules (Claude Code)
+
+- **The leaked Google key:**
+  - Found only in iCretegy-AI483's history, using a read-only mirror. Output was masked to the first 6 and last 4 characters.
+  - No current file holds it, and the same value is nowhere else on this machine.
+  - No code PR was needed. The mirror was deleted afterwards.
+  - Register row P1 corrected in [#180](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/180).
+- **iCretegy-AI483 made private (owner approved), after checking:** Pages, forks, collaborators, keys, hooks, releases and links. Packages could not be listed. History was not rewritten.
+- **Team rules:** [#179](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/179) (merged). Standing rule confirmed by Maanav, now in `CLAUDE.md`: **the AI tool never merges any PR; only Maanav or Pratham merge, after the approval comment.**
+- **Merges:** #171, #176 and #179 were already merged by `Rabbitshah` when the AI tool was asked to merge them. It checked their content (docs only, no secrets) and posted the approval comments after the merge (§12 item 30). No open PR conflicts afterwards.
+- **[#181](https://github.com/Praverse-Tech-Pvt-Ltd/RegX/pull/181):** `docs/PR_SUMMARIES_2026-11-27.md`, summaries of the twelve open PRs. A plain-text copy went to Maanav for a mail.
+- **Folder incident:**
+  - At 10:48 `D:\Praverse\{tools,data,backups}` were moved to `D:\Extra data` by accident (Maanav: not deliberate; no script, task or logged PowerShell did it).
+  - Restored: the clean-stop script was copied back after a byte-for-byte match with its logged text. `data` and `backups` were copied back, all 42 files plus the 4 recorded hashes were verified, and the old copies were sent to the Recycle Bin.
+  - The two zepto scripts left in `D:\Extra data\tools` hold no secrets (keys and logins are prompted at run time). `zepto.env` was not opened.
+- **Pravis's answers (for Pratham):** the Q8 working default, the side-by-side film-coated rule and the order of work are recorded as §12 items 21–23, **not yet reviewed**.
+  - The stale "#176 not merged" notes in #178's docs were fixed by a commit on #178. The same commit adds the planned Q8 and film-coated test cases to `docs/CALC_RELEASE_GATE.md`.
+- **Slip:** one hand-off rebuild silently dropped the files of the now-merged #176 and #179. Fixed by diffing merged branches from `4ff74d7`.
