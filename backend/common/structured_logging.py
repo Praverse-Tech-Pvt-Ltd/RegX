@@ -213,6 +213,19 @@ _ALLOWED_EXTRA_FIELDS = (
     "task_name",
     "task_id",
     "outcome",
+    # AI gateway call metadata (ai_gateway.service). Identifiers, counts and
+    # enumerated codes only: the prompt and the response are never passed in.
+    "reason_code",
+    "tenant",
+    "user",
+    "ai_provider",
+    "ai_model",
+    "prompt_id",
+    "prompt_version",
+    "attempts",
+    "input_tokens",
+    "output_tokens",
+    "ai_call_id",
 )
 
 _SERVICE = os.environ.get("REGX_SERVICE_NAME", "backend")

@@ -55,6 +55,9 @@ GOVERNED_MODULES = (
     "inspections",
     "controlled_correspondence",
     "product_comparison",
+    # Model output and prompt text will be shown to users; a regulatory claim
+    # in a prompt template or a gateway message is the cheapest place to stop it.
+    "ai_gateway",
 )
 
 #: Phrases that assert an outside body has accepted, approved or validated

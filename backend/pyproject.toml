@@ -29,11 +29,11 @@ ignore = [
 "*/migrations/*" = ["N806", "E501", "RUF012", "I001"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "regx"]
+known-first-party = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "ai_gateway", "regx"]
 known-third-party = ["django", "rest_framework", "drf_spectacular", "celery", "cryptography", "pyotp", "decouple", "filetype", "pypdf", "docx", "openpyxl", "pptx"]
 
 [tool.importlinter]
-root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades", "submission_operations", "submission_packages", "external_integrations", "demo_seed"]
+root_packages = ["common", "identity", "tenancy", "authorization", "audit", "workflows", "documents", "templates_registry", "fda_data", "formulations", "iid_assessment", "iig_checklist", "regulatory_cases", "submission_dossiers", "dossier_blueprints", "dossier_upgrades", "submission_operations", "submission_packages", "external_integrations", "ai_gateway", "demo_seed"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -205,6 +205,7 @@ source_modules = [
     "submission_operations",
     "submission_packages",
     "external_integrations",
+    "ai_gateway",
 ]
 forbidden_modules = ["demo_seed"]
 
@@ -227,6 +228,9 @@ source_modules = [
     "dossier_upgrades",
     "submission_operations",
     "submission_packages",
+    # The AI gateway receives its HTTP providers from external_integrations at
+    # start-up; it must never import them, or it would own a network edge.
+    "ai_gateway",
 ]
 forbidden_modules = ["external_integrations"]
 
@@ -234,6 +238,12 @@ forbidden_modules = ["external_integrations"]
 name = "external-integrations-no-legacy-django-apps"
 type = "forbidden"
 source_modules = ["external_integrations"]
+forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
+
+[[tool.importlinter.contracts]]
+name = "ai-gateway-no-legacy-django-apps"
+type = "forbidden"
+source_modules = ["ai_gateway"]
 forbidden_modules = ["RATools", "AdminMaster", "RAAI", "AIDatabase"]
 
 [tool.pytest.ini_options]

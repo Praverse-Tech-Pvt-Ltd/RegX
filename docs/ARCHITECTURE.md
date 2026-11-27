@@ -26,6 +26,7 @@ frontend (Next.js)  →  backend (Django + DRF)  →  PostgreSQL
 | `submission_operations` | Read-only operational view across every governed domain. Owns no data, stores nothing and decides nothing ([`SUBMISSION_OPERATIONS_DASHBOARD.md`](SUBMISSION_OPERATIONS_DASHBOARD.md)) |
 | `submission_packages` | Controlled assembly of exact document versions into an internal package, with a frozen manifest and a ZIP export. Binds versions, never documents ([`SUBMISSION_PACKAGES.md`](SUBMISSION_PACKAGES.md)) |
 | `external_integrations` | The only outbound edge. Tenant-configured HTTPS destinations, a credential *reference* model, an SSRF-proof transport, and two bounded operations: import a document through the normal pipeline, transfer an exact frozen package. Not an agency gateway ([`EXTERNAL_INTEGRATIONS.md`](EXTERNAL_INTEGRATIONS.md)) |
+| `ai_gateway` | The one way REGX asks a language model for text: provider interface (offline stub by default), off switch (setting + platform switch, both off by default), versioned prompts, tenant check, safe logging (no prompt or response text), timeout/retry/circuit breaker, call metrics, `ai_benchmark` command. Its HTTP adapter lives in `external_integrations.ai_http` and is registered into it at start-up ([`AI_INTEGRATION_RUNBOOK.md`](AI_INTEGRATION_RUNBOOK.md)) |
 
 ## Key invariants
 
@@ -120,6 +121,12 @@ external_integrations → documents, submission_packages, tenancy, identity,
                    It owns no content: imported bytes belong to the
                    document platform, and an outbound archive is built by
                    `submission_packages.export` into a temporary file.
+                   It also hosts the AI gateway's HTTP adapter (`ai_http`),
+                   which it registers into `ai_gateway` at start-up.
+ai_gateway → tenancy, authorization, identity, common
+                   Never imports external_integrations (it is in the
+                   `nothing-depends-on-external-integrations` contract): it
+                   receives its HTTP providers, so it owns no network edge.
 documents ← never imports workflows (evidence deletion protection goes
             through DeletionProtectionRegistry, keeping it one-way)
 ```

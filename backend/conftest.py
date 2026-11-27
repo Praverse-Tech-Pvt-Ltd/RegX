@@ -7,7 +7,15 @@ Uses factory-boy for object creation; hits a real PostgreSQL database
 import pytest
 from django.contrib.auth import get_user_model
 
+from common import network_guard
+
 User = get_user_model()
+
+
+def pytest_configure(config):
+    # No test may open a connection to a non-local address (see
+    # common/network_guard.py). Guarded by ai_gateway/tests/test_network_guard.py.
+    network_guard.install()
 
 
 @pytest.fixture
