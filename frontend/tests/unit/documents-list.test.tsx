@@ -52,6 +52,24 @@ describe("DocumentsPage — loading and empty states", () => {
     expect(screen.getByText("Loading…")).toBeInTheDocument();
   });
 
+  it("signed out: goes to sign-in and never says 'No documents yet' (4e, 2026-11-26)", async () => {
+    const { ApiError } = await import("@/lib/api");
+    api.list.mockRejectedValue(new ApiError(401, "Authentication credentials were not provided.", "not_authenticated"));
+    render(<DocumentsPage />);
+    await waitFor(() => expect(nav.push).toHaveBeenCalledWith(expect.stringMatching(/^\/signin\?next=/)));
+    expect(screen.queryByText(/No documents yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Failed to load documents/i)).not.toBeInTheDocument();
+  });
+
+  it("refused (403): shows the refusal and no empty-state text", async () => {
+    const { ApiError } = await import("@/lib/api");
+    api.list.mockRejectedValue(new ApiError(403, "You do not have permission to perform this action.", "permission_denied"));
+    render(<DocumentsPage />);
+    expect(await screen.findByText("You do not have permission to perform this action.")).toBeInTheDocument();
+    expect(screen.queryByText(/No documents yet/i)).not.toBeInTheDocument();
+    expect(nav.push).not.toHaveBeenCalled();
+  });
+
   it("shows an empty state when no documents exist", async () => {
     api.list.mockResolvedValue(paginate([]));
     render(<DocumentsPage />);

@@ -57,10 +57,13 @@ export function errorMessage(body: unknown, status = 400): string {
   if (status >= 500) return SERVER_ERROR_MESSAGE;
   const denied = status === 401 || status === 403;
   const fallback = denied ? PERMISSION_MESSAGE : "Request failed";
+  if (Array.isArray(body)) return listMessage(body) || fallback;
   if (!isRecord(body)) return fallback;
   let payload: unknown = body;
   if (isRecord(body.error) && "detail" in body.error) payload = body.error.detail;
   if (typeof payload === "string") return cap(payload) || fallback;
+  // A DRF ValidationError raised with a plain message arrives as a list of sentences.
+  if (Array.isArray(payload)) return listMessage(payload) || fallback;
   if (!isRecord(payload)) return fallback;
   if (typeof payload.detail === "string" && payload.detail) return cap(payload.detail);
   if (denied) return fallback;
@@ -71,6 +74,11 @@ export function errorMessage(body: unknown, status = 400): string {
     return `${field}: ${texts.length ? texts.join(" ") : "is invalid"}`;
   });
   return parts.length ? cap(parts.join("; ")) : fallback;
+}
+
+/** The plain sentences of a list-shaped error, joined; "" when it holds none. */
+function listMessage(items: unknown[]): string {
+  return cap(items.filter((v): v is string => typeof v === "string" && v.length > 0).join(" "));
 }
 
 function cap(text: string): string {

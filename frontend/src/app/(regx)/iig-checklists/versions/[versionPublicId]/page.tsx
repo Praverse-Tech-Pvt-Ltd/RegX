@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams, useParams } from "next/navigation";
-import { iigChecklists, type ChecklistVersion, ApiError, isSignedOut, loadError } from "@/lib/api";
+import { auth, iigChecklists, type ChecklistVersion, ApiError, isSignedOut, loadError } from "@/lib/api";
 
 function VersionDetailInner() {
   const router = useRouter();
@@ -17,6 +17,16 @@ function VersionDetailInner() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [returnReason, setReturnReason] = useState("");
+  // The signed-in user's email, to hide review actions from the person who submitted the
+  // version (the server refuses self-approval; the screen matches). Unknown: show them.
+  const [myEmail, setMyEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    auth
+      .me()
+      .then((u) => setMyEmail(u.email))
+      .catch(() => setMyEmail(null));
+  }, []);
 
   function load() {
     if (!tenantSlug) return;
@@ -89,6 +99,9 @@ function VersionDetailInner() {
     );
   }
 
+  const isSubmitter =
+    !!myEmail && !!version.submitted_by_email && myEmail.toLowerCase() === version.submitted_by_email.toLowerCase();
+
   return (
     <main style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1rem" }}>
       <h1 style={{ margin: "0 0 0.25rem" }}>Checklist version {version.version_number}</h1>
@@ -150,7 +163,12 @@ function VersionDetailInner() {
             Submit for review
           </button>
         )}
-        {version.status === "under_review" && (
+        {version.status === "under_review" && isSubmitter && (
+          <p style={{ fontSize: 13, color: "#66768b", margin: 0 }}>
+            You submitted this version for review, so someone else must approve, reject or return it.
+          </p>
+        )}
+        {version.status === "under_review" && !isSubmitter && (
           <>
             <button onClick={() => runAction("approve")} disabled={actionBusy} style={buttonStyle}>
               Approve
@@ -177,7 +195,7 @@ function VersionDetailInner() {
         )}
       </div>
 
-      {version.status === "under_review" && (
+      {version.status === "under_review" && !isSubmitter && (
         <div style={{ marginTop: 12 }}>
           <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
             Return reason (required to return)

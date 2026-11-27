@@ -295,6 +295,23 @@ describe("FormulationDetailPage — explicit reference selection, no auto-fill",
     expect(screen.getByRole("alert")).toHaveTextContent(/explicitly confirm/i);
   });
 
+  it("a Doer's selection shows who selected and confirmed it, never 'REVIEWER CONFIRMED' (4a)", async () => {
+    api.productsGet.mockResolvedValue(
+      makeProduct({
+        selected_ob_product_public_id: "ob-1",
+        selected_ob_application_number: "212379",
+        selected_ob_product_number: "001",
+        selecting_user_email: "doer@example.com",
+        selection_timestamp: "2026-11-25T06:35:30Z",
+        selection_justification: "QA synthetic",
+      }),
+    );
+    render(<FormulationDetailPage />);
+    expect(await screen.findByText(/Selected and confirmed by doer@example\.com/)).toBeInTheDocument();
+    expect(screen.getByText(/Not confirmed by a Reviewer/i)).toBeInTheDocument();
+    expect(screen.queryByText("REVIEWER CONFIRMED")).not.toBeInTheDocument();
+  });
+
   it("submits the selection once explicitly confirmed", async () => {
     const user = userEvent.setup();
     api.productsGet.mockResolvedValue(makeProduct());
