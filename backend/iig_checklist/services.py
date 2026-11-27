@@ -301,6 +301,10 @@ class MissingReturnReason(Exception):
     pass
 
 
+class MissingSupersedeReason(Exception):
+    """Superseding an approved execution cannot be undone, so it needs a typed reason."""
+
+
 class ReviewerConclusionRequired(Exception):
     pass
 
@@ -804,6 +808,9 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
         return_reason = kwargs.get("return_reason", "")
         if not (return_reason or "").strip():
             raise MissingReturnReason()
+    elif action == "supersede":
+        if not (kwargs.get("reason") or "").strip():
+            raise MissingSupersedeReason()
 
     action_event_map = {
         "submit_review": IigChecklistEvent.EXECUTION_SUBMITTED,
@@ -838,6 +845,7 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
             locked.cancelled_at = now
         elif action == "supersede":
             locked.superseded_by = kwargs.get("superseded_by")
+            locked.supersede_reason = kwargs["reason"].strip()
         locked.full_clean()
         locked.save()
 
@@ -862,6 +870,8 @@ def transition_execution(*, execution, action, actor, tenant, **kwargs):
             }
             if action == "approve":
                 payload["approval_metadata_written"] = approval_metadata_written
+            if action == "supersede":
+                payload["reason"] = locked.supersede_reason
             emit(
                 event_type=action_event_map[action],
                 resource_id=str(locked.public_id),

@@ -1882,10 +1882,11 @@ export const iigChecklists = {
         { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
       ).then(toChecklistExecution),
 
-    supersede: (tenantSlug: string, publicId: string) =>
+    /** Cannot be undone; the server refuses it without a non-blank reason. */
+    supersede: (tenantSlug: string, publicId: string, reason: string) =>
       apiRequest<ChecklistExecutionDTO>(
         `/api/regx/v1/iig-checklists/executions/${publicId}/supersede/`,
-        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: {} }
+        { method: "POST", headers: { "X-Tenant-Slug": tenantSlug }, body: { reason } }
       ).then(toChecklistExecution),
 
     /**

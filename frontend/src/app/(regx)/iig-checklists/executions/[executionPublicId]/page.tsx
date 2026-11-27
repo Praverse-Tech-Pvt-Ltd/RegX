@@ -24,6 +24,9 @@ function ExecutionDetailPageInner() {
   // Inputs for actions that require text.
   const [returnReason, setReturnReason] = useState("");
   const [reviewerConclusionNote, setReviewerConclusionNote] = useState("");
+  // Supersede cannot be undone: it is confirmed in a dialog with a typed reason.
+  const [confirmingSupersede, setConfirmingSupersede] = useState(false);
+  const [supersedeReason, setSupersedeReason] = useState("");
 
   function load() {
     if (!tenantSlug || !executionPublicId) return;
@@ -120,6 +123,9 @@ function ExecutionDetailPageInner() {
               <tr><th>Rejected by</th><td>{execution.rejectedByEmail ?? "—"}</td></tr>
               <tr><th>Rejected at</th><td>{execution.rejectedAt}</td></tr>
             </>
+          )}
+          {execution.status === "superseded" && execution.supersedeReason && (
+            <tr><th>Supersede reason</th><td>{execution.supersedeReason}</td></tr>
           )}
           {execution.cancelledAt && (
             <>
@@ -234,15 +240,60 @@ function ExecutionDetailPageInner() {
             </>
           )}
 
-          {execution.status === "approved" && can("supersede") && (
-            <button
-              disabled={acting}
-              onClick={() =>
-                doAction(() => iigChecklists.executions.supersede(tenantSlug, executionPublicId))
-              }
-            >
+          {execution.status === "approved" && can("supersede") && !confirmingSupersede && (
+            <button disabled={acting} onClick={() => setConfirmingSupersede(true)}>
               Supersede
             </button>
+          )}
+          {execution.status === "approved" && confirmingSupersede && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="supersede-dialog-title"
+              style={{ border: "1px solid #e8c77a", background: "#fff8e6", borderRadius: 8, padding: "0.75rem 1rem", maxWidth: "70ch" }}
+            >
+              <p id="supersede-dialog-title" style={{ fontWeight: 700, margin: "0 0 4px" }}>
+                Supersede this approved execution?
+              </p>
+              <p style={{ margin: "0 0 4px" }}>
+                Execution {execution.publicId} — checklist version v{execution.checklistVersion.versionNumber}, formulation
+                version {execution.formulationVersionPublicId}, approved by {execution.approvedByEmail ?? "—"}.
+              </p>
+              <p style={{ margin: "0 0 8px" }}>
+                <strong>This cannot be undone.</strong> The approved execution stays on record as superseded, and the
+                reason is kept with it and in the audit trail.
+              </p>
+              <label style={{ display: "block", marginBottom: 8 }}>
+                Reason for superseding (required)
+                <textarea
+                  value={supersedeReason}
+                  onChange={(e) => setSupersedeReason(e.target.value)}
+                  rows={3}
+                  maxLength={2000}
+                  style={{ display: "block", width: "100%", marginTop: 4, boxSizing: "border-box" }}
+                />
+              </label>
+              <button
+                disabled={acting || !supersedeReason.trim()}
+                onClick={async () => {
+                  await doAction(() =>
+                    iigChecklists.executions.supersede(tenantSlug, executionPublicId, supersedeReason.trim())
+                  );
+                  setConfirmingSupersede(false);
+                }}
+              >
+                Supersede execution
+              </button>{" "}
+              <button
+                disabled={acting}
+                onClick={() => {
+                  setConfirmingSupersede(false);
+                  setSupersedeReason("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           )}
         </div>
       )}
