@@ -5,6 +5,8 @@ import uuid
 
 import pytest
 
+from .conftest import add_one_question
+
 BASE = "/api/regx/v1"
 
 
@@ -65,6 +67,7 @@ class TestVersionApiMassAssignment:
         assert draft_version.status == "draft"
 
     def test_patch_blocked_once_under_review(self, draft_version, api_client_doer):
+        add_one_question(draft_version)  # N-2: a version needs a question
         api_client_doer.post(
             f"{BASE}/iig-checklists/versions/{draft_version.public_id}/submit-review/", data={}
         )
@@ -108,6 +111,7 @@ class TestSectionQuestionApi:
         assert question_resp.status_code == 201, question_resp.content
 
     def test_section_delete_blocked_once_not_editable(self, draft_version, api_client_doer):
+        add_one_question(draft_version)  # N-2: a version needs a question
         section_resp = api_client_doer.post(
             f"{BASE}/iig-checklists/versions/{draft_version.public_id}/sections/",
             data={"code": "SEC-LOCK", "title": "s", "display_order": 1, "criticality": "low"},
@@ -129,6 +133,7 @@ class TestDeletionPolicyApi:
         assert resp.status_code == 204
 
     def test_submitted_definition_cannot_be_deleted(self, draft_version, api_client_doer):
+        add_one_question(draft_version)  # N-2: a version needs a question
         api_client_doer.post(
             f"{BASE}/iig-checklists/versions/{draft_version.public_id}/submit-review/", data={}
         )
