@@ -17,6 +17,7 @@ The rule that produces this is `backend/iid_assessment/decisions.py:201-232`: a 
 | 9,071 | 3,805 | 4,059 | **0** | 1,207 |
 
 - **F-3 is confirmed.** The counts are the same whether "has a value" means "not blank" or "parses as a number".
+- **On screen:** a preview within the per-unit value (ACACIA, 50 mg against 70 mg, no daily maximum) shows "Review required" with the note quoted in "What the screen shows" below; "MDE UNAVAILABLE" appears once, and the two daily-maximum rows are absent. Screenshot: `review-handoff/evidence__shot__evF3_regx-main_within_per_unit_no_mde.png` (hand-off only, not in git).
 - **What it means:** a potency comparison and a daily-maximum comparison can never both run on one IID record from this file. This is a property of FDA's data, not a REGX defect.
 - **What it depends on:** whether a per-day check can use a different record, which is the per-day rule (White Paper spec Q8). That decision is still with iCretegy and the regulatory reviewer.
 
@@ -159,6 +160,118 @@ data rows: 9071
   rows with both:                       0
   rows with neither:                    1207
   total:                                9071
+```
+
+## What the screen shows (IID preview, within the per-unit value, no daily maximum)
+
+Run on `regx-v25` rebuilt from `regx-main` (4ff74d7), 2026-11-27T04:47:34.380Z (UTC). Screenshot in the review hand-off only: `review-handoff/evidence__shot__evF3_regx-main_within_per_unit_no_mde.png`.
+
+**Steps:**
+
+1. Signed in as doer@demo.regx.invalid; opened "/iid-assessments/preview?tenant=demo".
+2. Ingredient name: typed "ACACIA".
+3. Route code: typed "ORAL".
+4. Dosage form code: typed "TABLET".
+5. Proposed quantity per unit: typed "50".
+6. Proposed quantity unit: typed "mg".
+7. What the proposed quantity means: picked "mg per dose unit".
+8. Total dosage-unit weight: typed "250".
+9. Clicked "Run preview".
+
+| What | On screen |
+|---|---|
+| HTTP status of the preview | 200 |
+| Status (decision box) | Review required |
+| Note (decision box) | Within selected IID potency precedent, but maximum daily exposure precedent is unavailable for comparison. |
+| "MDE UNAVAILABLE" appears | 1 time(s): in p: "ACACIA — 70 milligram potency, MDE UNAVAILABLE MDE" |
+| Row "Percentage of IID MDE" | absent |
+| Row "Difference from IID MDE" | absent |
+| Calculations the server returned | potency_comparison, unit_conversion, percentage_w_w, daily_exposure, percentage_of_iid_potency, difference_from_iid_potency |
+| Potency comparison | {"comparable": true, "reason_code": null, "reason": "compared like for like (same family and basis)", "result": "at_or_below", "proposed_value": "50", "iid_value": "70", "unit": "mg per dose unit", "rounded_for_display": false, "conversion": "none needed", "label": "technically comparable (not regulatorily approved)", "iid_record_public_id": "01148c4e-b039-43a3-aeff-ae25879a0245", "iid_release_public_id": "2247adc0-e3fb-4baa-8dd1-8c3c7b613018", "iid_source_row": {"source_row_locator": "row:55", "ingredient_name": "ACACIA", "route": "ORAL", "dosage_form": "TABLET", "potency_amount": "70", "potency_unit": "mg", "maximum_daily_exposure": "", "maximum_daily_exposure_unit": ""}, "unit_list_release_public_id": "8be16f5f-c518-469a-8271-f0fac43d9a88", "proposed_meaning": "mg per dose unit"} |
+
+**Decision box text, exactly as rendered:**
+
+```text
+Review required
+
+Within selected IID potency precedent, but maximum daily exposure precedent is unavailable for comparison.
+
+Reviewer escalation required before proceeding.
+```
+
+**Whole result area, as rendered:**
+
+```text
+IID Assessment Preview
+
+Comparing your proposed formulation quantity against a selected FDA IID precedent record. This preview is not a regulatory decision and does not determine safety or approval — see the disclaimer on any "within precedent" result below.
+
+Ingredient name (as listed in the IID) USER INPUT
+Ingredient ID (optional, instead of the name)
+Active FDA release ID
+Route code (name or code, e.g. ORAL)
+Dosage form code (name or code, e.g. TABLET)
+Proposed quantity per unit
+Proposed quantity unit
+What the proposed quantity means
+Per dosage unit (in the unit entered)
+mg per dose unit
+mg/0.1mL
+mg/0.2mL
+mg/1mL
+mg/2.5mL
+mg/5mL
+mg/10mL
+mg/15mL
+mg/20mL
+mg/100mL
+mg/120mL
+mg/140mL
+mg/1000mL
+%v/v
+%w/v
+%w/w
+mL per dose unit
+mL/1mL
+mL/5mL
+mL/15mL
+Enter the amount in “mg”.
+Total dosage-unit weight
+Total weight unit
+Maximum dosage units/day
+Run preview
+Match status: Exact match
+About the active IID release: 67 of 9,071 records have no route or dosage-form link, so a preview can never match them; for those records a preview says there is no precedent even when the FDA lists one. What to do: 67 have a route or dosage form no reviewer has mapped yet (listed here): propose and approve those mappings on the Terminology Mappings page.
+Selected IID precedent FDA SOURCE
+
+ACACIA — 70 milligram potency, MDE UNAVAILABLE MDE
+
+Like-for-like comparison CALCULATED
+
+Proposed 50 mg per dose unit is at or below the IID value of 70 mg per dose unit.
+
+Conversion: none needed
+
+technically comparable (not regulatorily approved)
+
+IID source row: row:55
+
+IID release: 2247adc0-e3fb-4baa-8dd1-8c3c7b613018
+
+Calculations
+Unit conversion CALCULATED50.000000 mg = 50 milligram
+Percentage w/w CALCULATED20.000 percent_w_w
+Daily exposure CALCULATEDBlocked: DATA_REQUIRED
+Percentage of IID potency CALCULATED71.429
+(exact value 71.42857142857142857142857143)
+ percent_of_potency
+Difference from IID potency CALCULATED20.000000
+
+Review required
+
+Within selected IID potency precedent, but maximum daily exposure precedent is unavailable for comparison.
+
+Reviewer escalation required before proceeding.
 ```
 
 ## Newer release: October 2026 (downloaded 2026-11-26, not imported)
